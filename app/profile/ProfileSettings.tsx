@@ -8,8 +8,10 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { useState } from 'react'
 import { toast } from 'sonner'
 import { updateUserProfile } from './actions'
-import { User, Image, Mail, Calendar, Award } from 'lucide-react'
+import { User, Image, Mail, Calendar, Award, History } from 'lucide-react'
 import { useRouter } from 'next/navigation'
+import { Navbar } from '@/components/layout/Navbar'
+import Link from 'next/link'
 
 interface ProfileSettingsProps {
   profile: {
@@ -22,10 +24,11 @@ interface ProfileSettingsProps {
     current_gold: number
     is_invested: boolean
   }
+  user: any
   userEmail: string
 }
 
-export default function ProfileSettings({ profile, userEmail }: ProfileSettingsProps) {
+export default function ProfileSettings({ profile, user, userEmail }: ProfileSettingsProps) {
   const [fullName, setFullName] = useState(profile.full_name)
   const [avatarUrl, setAvatarUrl] = useState(profile.avatar_url || '')
   const [loading, setLoading] = useState(false)
@@ -56,25 +59,26 @@ export default function ProfileSettings({ profile, userEmail }: ProfileSettingsP
   }
 
   const SECTION_COLORS: Record<string, string> = {
-    rebentos: 'bg-green-500',
+    rebentos: 'bg-emerald-600',
     ticoes: 'bg-red-800',
     exploradores: 'bg-yellow-500',
     companheiros: 'bg-blue-600',
     embaixadores: 'bg-slate-500',
   }
 
-  const sectionColor = SECTION_COLORS[profile.section as keyof typeof SECTION_COLORS] || 'bg-green-600'
+  const sectionColor = SECTION_COLORS[profile.section as keyof typeof SECTION_COLORS] || 'bg-blue-700'
 
   return (
-    <div className="min-h-screen bg-stone-50 py-8 px-4">
-      <div className="max-w-4xl mx-auto space-y-6">
+    <div className="min-h-screen bg-stone-50">
+      <Navbar user={user} profile={profile} />
+      <div className="max-w-4xl mx-auto space-y-6 py-8 px-4">
         {/* Profile Header */}
-        <Card className="border-t-4 border-green-600">
+        <Card className="border-t-4 border-blue-700">
           <CardHeader className="text-center">
             <div className="flex justify-center mb-4">
-              <Avatar className="w-24 h-24 border-4 border-green-600">
+              <Avatar className="w-24 h-24 border-4 border-blue-700">
                 <AvatarImage src={avatarUrl || profile.avatar_url || undefined} />
-                <AvatarFallback className="bg-green-600 text-white text-2xl">
+                <AvatarFallback className="bg-blue-700 text-white text-2xl">
                   {fullName.charAt(0).toUpperCase()}
                 </AvatarFallback>
               </Avatar>
@@ -111,7 +115,7 @@ export default function ProfileSettings({ profile, userEmail }: ProfileSettingsP
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-sm text-gray-600">Investido:</span>
-                <span className={`font-medium ${profile.is_invested ? 'text-green-600' : 'text-orange-600'}`}>
+                <span className={`font-medium ${profile.is_invested ? 'text-blue-600' : 'text-orange-600'}`}>
                   {profile.is_invested ? 'Sim' : 'Aguardando'}
                 </span>
               </div>
@@ -144,9 +148,17 @@ export default function ProfileSettings({ profile, userEmail }: ProfileSettingsP
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-sm text-gray-600">Nível:</span>
-                <span className="font-bold text-green-600 text-lg">
+                <span className="font-bold text-blue-700 text-lg">
                   {Math.floor(profile.total_xp / 1000) + 1}
                 </span>
+              </div>
+              <div className="pt-2">
+                <Link href="/points-history">
+                  <Button variant="outline" size="sm" className="w-full flex items-center gap-2 border-indigo-200 text-indigo-700 hover:bg-indigo-50">
+                    <History className="w-4 h-4" />
+                    Ver Histórico de Pontos
+                  </Button>
+                </Link>
               </div>
             </CardContent>
           </Card>
@@ -195,7 +207,7 @@ export default function ProfileSettings({ profile, userEmail }: ProfileSettingsP
 
               <Button 
                 type="submit" 
-                className="w-full bg-green-700 hover:bg-green-800"
+                className="w-full bg-blue-800 hover:bg-blue-900"
                 disabled={loading}
               >
                 {loading ? 'A guardar...' : 'Guardar Alterações'}

@@ -44,13 +44,13 @@ export default function OnboardingPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-800 via-green-700 to-emerald-900 p-4">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-900 via-blue-800 to-blue-950 p-4">
       <Card className="w-full max-w-md shadow-xl bg-white/95 backdrop-blur-sm">
         <CardHeader className="text-center">
-          <div className="mx-auto w-16 h-16 bg-yellow-500 rounded-full flex items-center justify-center mb-3 shadow-lg">
+          <div className="mx-auto w-16 h-16 bg-red-600 rounded-full flex items-center justify-center mb-3 shadow-lg border-4 border-yellow-400">
             <User className="w-8 h-8 text-white" />
           </div>
-          <CardTitle className="text-2xl text-green-900">Bem-vindo, Desbravador!</CardTitle>
+          <CardTitle className="text-2xl text-blue-900">Bem-vindo, Desbravador!</CardTitle>
           <CardDescription>
             Completa o teu perfil para começares a aventura
           </CardDescription>
@@ -108,7 +108,7 @@ export default function OnboardingPage() {
 
             <Button 
               type="submit" 
-              className="w-full bg-green-700 hover:bg-green-800 text-white font-medium py-6 text-lg shadow-md transition-all hover:scale-[1.02]"
+              className="w-full bg-blue-800 hover:bg-blue-900 text-white font-medium py-6 text-lg shadow-md transition-all hover:scale-[1.02]"
               disabled={loading}
             >
               {loading ? 'A guardar...' : 'Confirmar e Entrar'}

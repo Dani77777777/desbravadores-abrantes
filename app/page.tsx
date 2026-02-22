@@ -3,11 +3,12 @@ import { Navbar } from '@/components/layout/Navbar'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
 import { Badge } from '@/components/ui/badge'
-import { User, Trophy, Coins, Megaphone, ScanLine } from 'lucide-react'
+import { User, Trophy, Coins, Megaphone, ScanLine, History } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import Link from 'next/link'
 
 const SECTION_COLORS = {
-  rebentos: 'bg-green-500',
+  rebentos: 'bg-emerald-600',
   ticoes: 'bg-red-800',
   exploradores: 'bg-yellow-500', // Yellow/Green - simplified to Gold for now or custom gradient
   companheiros: 'bg-blue-600',
@@ -40,17 +41,39 @@ export default async function Dashboard() {
     .eq('id', user.id)
     .single()
 
-  // Simplified fetching of recent announcements (mock logic for targeting needs more complex query or RLS)
-  // For now, fetch all or targeted ones
-  const { data: announcements } = await supabase
+  // Filter announcements based on role hierarchy:
+  // - Coordenador: sees everything
+  // - Dirigente: sees public + personal + announcements for dirigentes (of their section or globally)
+  // - Desbravador: sees public + personal + announcements for desbravadores (of their section or globally)
+  let announcementsQuery = supabase
     .from('announcements')
     .select('*')
+
+  if (profile.role !== 'coordenador') {
+    // Conditions common to all non-coordenador roles:
+    const orFilter = [
+      // 1. Fully public (no targeting at all)
+      `and(target_user_id.is.null,target_section.is.null,target_role.is.null)`,
+      // 2. Personally addressed to this user
+      `target_user_id.eq.${user.id}`,
+      // 3. Targeted to their section with no role restriction
+      `and(target_section.eq.${profile.section},target_role.is.null)`,
+      // 4. Targeted to their specific section + their role
+      `and(target_section.eq.${profile.section},target_role.eq.${profile.role})`,
+      // 5. Targeted globally to their role (no section restriction)
+      `and(target_section.is.null,target_role.eq.${profile.role})`,
+    ].join(',')
+
+    announcementsQuery = announcementsQuery.or(orFilter)
+  }
+
+  const { data: announcements } = await announcementsQuery
     .order('created_at', { ascending: false })
-    .limit(5)
+    .limit(10)
 
   if (!profile) return <div>Perfil não encontrado.</div>
 
-  const sectionColor = SECTION_COLORS[profile.section as keyof typeof SECTION_COLORS] || 'bg-green-600'
+  const sectionColor = SECTION_COLORS[profile.section as keyof typeof SECTION_COLORS] || 'bg-blue-700'
   const sectionLabel = SECTION_LABELS[profile.section as keyof typeof SECTION_LABELS] || profile.section
 
   return (
@@ -125,9 +148,12 @@ export default async function Dashboard() {
                                 <p className="text-2xl font-bold text-yellow-900">{profile.current_gold}</p>
                             </div>
                         </div>
-                        <Button size="sm" variant="outline" className="border-yellow-300 text-yellow-800 hover:bg-yellow-100">
-                            Histórico
-                        </Button>
+                        <Link href="/points-history">
+                          <Button size="sm" variant="outline" className="border-yellow-300 text-yellow-800 hover:bg-yellow-100 flex items-center gap-1">
+                              <History className="w-4 h-4" />
+                              Histórico
+                          </Button>
+                        </Link>
                     </div>
                 </div>
             </CardContent>
@@ -144,7 +170,7 @@ export default async function Dashboard() {
                 
                 {announcements && announcements.length > 0 ? (
                     announcements.map((announcement) => (
-                        <Card key={announcement.id} className="border-l-4 border-l-green-600 shadow-sm hover:shadow-md transition-shadow">
+                        <Card key={announcement.id} className="border-l-4 border-l-blue-700 shadow-sm hover:shadow-md transition-shadow">
                             <CardHeader className="py-4">
                                 <CardTitle className="text-base font-semibold">{announcement.title}</CardTitle>
                                 <p className="text-xs text-gray-500">

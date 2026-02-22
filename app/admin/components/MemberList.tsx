@@ -134,7 +134,7 @@ export function MemberList({ members, currentUserRole }: MemberListProps) {
                    if (open) setSelectedMember(member)
                }}>
                    <DialogTrigger asChild>
-                       <Button size="sm" variant="outline" className="border-green-600 text-green-700 hover:bg-green-50">
+                       <Button size="sm" variant="outline" className="border-blue-600 text-blue-700 hover:bg-blue-50">
                            Dar Pontos
                        </Button>
                    </DialogTrigger>
@@ -185,7 +185,7 @@ export function MemberList({ members, currentUserRole }: MemberListProps) {
                                />
                            </div>
                            <DialogFooter>
-                               <Button type="submit" className="bg-green-700 hover:bg-green-800" disabled={loading}>
+                               <Button type="submit" className="bg-blue-800 hover:bg-blue-900" disabled={loading}>
                                    {loading ? 'Confirmando...' : 'Confirmar'}
                                </Button>
                            </DialogFooter>

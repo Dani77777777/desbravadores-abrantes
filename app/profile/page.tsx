@@ -21,5 +21,5 @@ export default async function ProfilePage() {
     redirect('/onboarding')
   }
 
-  return <ProfileSettings profile={profile} userEmail={user.email || ''} />
+  return <ProfileSettings profile={profile} user={user} userEmail={user.email || ''} />
 }

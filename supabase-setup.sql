@@ -97,11 +97,20 @@ ALTER TABLE public.announcements ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Users can view relevant announcements" ON public.announcements;
 DROP POLICY IF EXISTS "Coordinators can create announcements" ON public.announcements;
 
--- Todos podem ver avisos públicos
-CREATE POLICY "Users can view announcements"
+-- Utilizadores vêem apenas os avisos que lhes dizem respeito:
+-- 1. Avisos públicos (todos os campos de targeting a null)
+-- 2. Avisos dirigidos especificamente a si (target_user_id = auth.uid())
+-- 3. Avisos dirigidos à sua secção
+-- 4. Avisos dirigidos à sua função (role)
+CREATE POLICY "Users can view relevant announcements"
   ON public.announcements
   FOR SELECT
-  USING (true);
+  USING (
+    (target_user_id IS NULL AND target_section IS NULL AND target_role IS NULL)
+    OR target_user_id = auth.uid()
+    OR target_section = (SELECT section FROM public.profiles WHERE id = auth.uid())
+    OR target_role = (SELECT role FROM public.profiles WHERE id = auth.uid())
+  );
 
 -- Utilizadores autenticados podem criar avisos
 CREATE POLICY "Authenticated users can create announcements"
