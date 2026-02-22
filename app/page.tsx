@@ -3,16 +3,17 @@ import { Navbar } from '@/components/layout/Navbar'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
 import { Badge } from '@/components/ui/badge'
-import { User, Trophy, Coins, Megaphone, ScanLine, History } from 'lucide-react'
+import { User, Trophy, Coins, Megaphone, ScanLine, History, ListChecks, CheckCircle2, Clock } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
+import { TaskCompleteButton } from '@/components/tasks/TaskCompleteButton'
 
 const SECTION_COLORS = {
   rebentos: 'bg-emerald-600',
   ticoes: 'bg-red-800',
-  exploradores: 'bg-yellow-500', // Yellow/Green - simplified to Gold for now or custom gradient
+  exploradores: 'bg-yellow-500',
   companheiros: 'bg-blue-600',
-  embaixadores: 'bg-slate-500', // Grey/Gold
+  embaixadores: 'bg-slate-500',
 }
 
 const SECTION_LABELS = {
@@ -31,7 +32,6 @@ export default async function Dashboard() {
   } = await supabase.auth.getUser()
 
   if (!user) {
-      // This should be handled by middleware, but for safety in dev
       return <div>Carregando...</div>
   }
 
@@ -41,29 +41,19 @@ export default async function Dashboard() {
     .eq('id', user.id)
     .single()
 
-  // Filter announcements based on role hierarchy:
-  // - Coordenador: sees everything
-  // - Dirigente: sees public + personal + announcements for dirigentes (of their section or globally)
-  // - Desbravador: sees public + personal + announcements for desbravadores (of their section or globally)
+  // Filter announcements based on role hierarchy
   let announcementsQuery = supabase
     .from('announcements')
     .select('*')
 
   if (profile.role !== 'coordenador') {
-    // Conditions common to all non-coordenador roles:
     const orFilter = [
-      // 1. Fully public (no targeting at all)
       `and(target_user_id.is.null,target_section.is.null,target_role.is.null)`,
-      // 2. Personally addressed to this user
       `target_user_id.eq.${user.id}`,
-      // 3. Targeted to their section with no role restriction
       `and(target_section.eq.${profile.section},target_role.is.null)`,
-      // 4. Targeted to their specific section + their role
       `and(target_section.eq.${profile.section},target_role.eq.${profile.role})`,
-      // 5. Targeted globally to their role (no section restriction)
       `and(target_section.is.null,target_role.eq.${profile.role})`,
     ].join(',')
-
     announcementsQuery = announcementsQuery.or(orFilter)
   }
 
@@ -73,8 +63,26 @@ export default async function Dashboard() {
 
   if (!profile) return <div>Perfil não encontrado.</div>
 
+  // Fetch tasks for this user (global ones + their section's tasks)
+  const { data: tasks } = await supabase
+    .from('tasks')
+    .select('*')
+    .order('created_at', { ascending: false })
+
+  // Fetch this user's completions
+  const { data: myCompletions } = await supabase
+    .from('task_completions')
+    .select('task_id, points_awarded')
+    .eq('user_id', user.id)
+
+  const completedTaskIds = new Set((myCompletions || []).map(c => c.task_id))
+  const pendingAwardIds = new Set((myCompletions || []).filter(c => !c.points_awarded).map(c => c.task_id))
+
   const sectionColor = SECTION_COLORS[profile.section as keyof typeof SECTION_COLORS] || 'bg-blue-700'
   const sectionLabel = SECTION_LABELS[profile.section as keyof typeof SECTION_LABELS] || profile.section
+
+  const openTasks = (tasks || []).filter(t => !completedTaskIds.has(t.id))
+  const doneTasks = (tasks || []).filter(t => completedTaskIds.has(t.id))
 
   return (
     <div className="min-h-screen bg-stone-50">
@@ -107,7 +115,7 @@ export default async function Dashboard() {
                         </div>
                         {profile.is_invested && (
                            <div className="absolute -bottom-2 -right-2 bg-yellow-400 p-1.5 rounded-full border-2 border-white shadow-sm" title="Investido">
-                               <div className="w-4 h-4 bg-yellow-600 rounded-full" /> {/* Placeholder for scarf icon */}
+                               <div className="w-4 h-4 bg-yellow-600 rounded-full" />
                            </div>
                         )}
                      </div>
@@ -159,7 +167,69 @@ export default async function Dashboard() {
             </CardContent>
         </Card>
 
-        {/* Announcements Feed */}
+        {/* Tasks Section */}
+        {tasks && tasks.length > 0 && (
+          <div className="space-y-3">
+            <h2 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
+              <ListChecks className="w-5 h-5" /> As Minhas Tarefas
+              {openTasks.length > 0 && (
+                <Badge className="bg-blue-700 text-white ml-1">{openTasks.length} pendentes</Badge>
+              )}
+            </h2>
+
+            {openTasks.length > 0 && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {openTasks.map(task => (
+                  <Card key={task.id} className="border border-blue-100 bg-white hover:shadow-md transition-shadow">
+                    <CardContent className="p-4">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-medium text-gray-900 text-sm">{task.title}</h3>
+                          {task.description && <p className="text-xs text-gray-500 mt-1 line-clamp-2">{task.description}</p>}
+                          <div className="flex items-center gap-3 mt-2">
+                            {task.xp_reward > 0 && <span className="text-xs text-indigo-600 font-medium flex items-center gap-1"><Trophy className="w-3 h-3" /> +{task.xp_reward} XP</span>}
+                            {task.gold_reward > 0 && <span className="text-xs text-yellow-600 font-medium flex items-center gap-1"><Coins className="w-3 h-3" /> +{task.gold_reward} Ouro</span>}
+                            {task.deadline && (
+                              <span className="text-xs text-gray-400">
+                                até {new Date(task.deadline).toLocaleDateString('pt-PT')}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <TaskCompleteButton taskId={task.id} userId={user.id} />
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+
+            {doneTasks.length > 0 && (
+              <details className="group">
+                <summary className="cursor-pointer text-sm text-gray-500 hover:text-gray-700 flex items-center gap-1 list-none">
+                  <CheckCircle2 className="w-4 h-4 text-green-600" />
+                  {doneTasks.length} tarefa{doneTasks.length !== 1 ? 's' : ''} concluída{doneTasks.length !== 1 ? 's' : ''}
+                  {pendingAwardIds.size > 0 && <Badge variant="outline" className="ml-1 text-xs text-amber-600 border-amber-300">A aguardar pontos</Badge>}
+                </summary>
+                <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {doneTasks.map(task => (
+                    <div key={task.id} className="p-3 border rounded-lg bg-gray-50 flex items-center gap-2 text-sm text-gray-500">
+                      {pendingAwardIds.has(task.id) ? (
+                        <Clock className="w-4 h-4 text-amber-500 shrink-0" />
+                      ) : (
+                        <CheckCircle2 className="w-4 h-4 text-green-600 shrink-0" />
+                      )}
+                      <span className="truncate">{task.title}</span>
+                      {pendingAwardIds.has(task.id) && <span className="ml-auto text-xs text-amber-500 shrink-0">A aguardar</span>}
+                    </div>
+                  ))}
+                </div>
+              </details>
+            )}
+          </div>
+        )}
+
+        {/* Announcements + Quick Actions */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="md:col-span-2 space-y-4">
                 <div className="flex items-center justify-between">
@@ -190,7 +260,6 @@ export default async function Dashboard() {
             </div>
 
             <div className="md:col-span-1">
-                 {/* Quick Actions / Future standard sidebar */}
                  <Card>
                     <CardHeader>
                         <CardTitle className="text-base">Ações Rápidas</CardTitle>
@@ -200,7 +269,6 @@ export default async function Dashboard() {
                             <ScanLine className="mr-2 h-5 w-5" />
                             Ler QR Code
                         </Button>
-                        {/* More buttons... */}
                     </CardContent>
                  </Card>
             </div>
