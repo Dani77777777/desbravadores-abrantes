@@ -46,16 +46,14 @@ export default async function Dashboard() {
     .from('announcements')
     .select('*')
 
-  if (profile.role !== 'coordenador') {
-    const orFilter = [
-      `and(target_user_id.is.null,target_section.is.null,target_role.is.null)`,
-      `target_user_id.eq.${user.id}`,
-      `and(target_section.eq.${profile.section},target_role.is.null)`,
-      `and(target_section.eq.${profile.section},target_role.eq.${profile.role})`,
-      `and(target_section.is.null,target_role.eq.${profile.role})`,
-    ].join(',')
-    announcementsQuery = announcementsQuery.or(orFilter)
-  }
+  const orFilter = [
+    `and(target_user_id.is.null,target_section.is.null,target_role.is.null)`,
+    `target_user_id.eq.${user.id}`,
+    `and(target_section.eq.${profile.section},target_role.is.null)`,
+    `and(target_section.eq.${profile.section},target_role.eq.${profile.role})`,
+    `and(target_section.is.null,target_role.eq.${profile.role})`,
+  ].join(',')
+  announcementsQuery = announcementsQuery.or(orFilter)
 
   const { data: announcements } = await announcementsQuery
     .order('created_at', { ascending: false })
@@ -67,6 +65,7 @@ export default async function Dashboard() {
   const { data: tasks } = await supabase
     .from('tasks')
     .select('*')
+    .or(`target_section.is.null,target_section.eq.${profile.section}`)
     .order('created_at', { ascending: false })
 
   // Fetch this user's completions

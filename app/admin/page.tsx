@@ -4,7 +4,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { redirect } from 'next/navigation'
 import { MemberList } from './components/MemberList'
 import { TaskPanel } from './components/TaskPanel'
-import { Users, ListChecks } from 'lucide-react'
+import { OverviewPanel } from './components/OverviewPanel'
+import { AnnouncementPanel } from './components/AnnouncementPanel'
+import { SuggestionPanel } from './components/SuggestionPanel'
+import { Users, ListChecks, Megaphone, MessageSquare, LayoutDashboard } from 'lucide-react'
 
 export default async function AdminPage({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
   const supabase = await createClient()
@@ -34,8 +37,6 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
   const { data: members } = await membersQuery
 
   // Fetch tasks visible to this user
-  // Dirigentes see tasks for their leadership section + tasks with no target (global)
-  // Coordenadores see all tasks
   let tasksQuery = supabase.from('tasks').select('*').order('created_at', { ascending: false })
   if (profile.role === 'dirigente') {
     const targetSection = profile.leadership_section || profile.section
@@ -43,7 +44,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
   }
   const { data: tasks } = await tasksQuery
 
-  // Fetch completions - Explicitly join the user who completed the task
+  // Fetch completions – Explicitly join the user who completed the task
   let completionsQuery = supabase
     .from('task_completions')
     .select(`
@@ -60,8 +61,35 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
 
   const { data: completions } = await completionsQuery
 
+  // Fetch announcements sent by ME
+  const { data: sentAnnouncements } = await supabase
+    .from('announcements')
+    .select('*')
+    .eq('author_id', profile.id)
+    .order('created_at', { ascending: false })
+    .limit(20)
+
+  // Fetch suggestions
+  let suggestionsQuery = supabase
+    .from('suggestions')
+    .select(`
+      *,
+      profiles:user_id(full_name, section)
+    `)
+    .order('created_at', { ascending: false })
+
+  if (profile.role === 'dirigente') {
+    const targetSection = profile.leadership_section || profile.section
+    suggestionsQuery = suggestionsQuery
+      .eq('target', 'dirigente')
+      .eq('profiles.section', targetSection)
+  }
+
+  const { data: suggestions } = await suggestionsQuery
+
   const resolvedParams = await searchParams
-  const activeTab = resolvedParams?.tab || 'members'
+  const defaultTab = profile.role === 'coordenador' ? 'overview' : 'members'
+  const activeTab = resolvedParams?.tab || defaultTab
 
   const SECTION_LABELS: Record<string, string> = {
     rebentos: 'Rebentos', ticoes: 'Tições', exploradores: 'Exploradores',
@@ -85,10 +113,22 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
         </div>
 
         {/* Tab navigation */}
-        <div className="flex gap-1 border-b border-gray-200">
+        <div className="flex gap-1 border-b border-gray-200 overflow-x-auto">
+          {profile.role === 'coordenador' && (
+            <a
+              href="/admin?tab=overview"
+              className={`flex items-center gap-2 px-4 py-2 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
+                activeTab === 'overview'
+                  ? 'border-blue-700 text-blue-700'
+                  : 'border-transparent text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              <LayoutDashboard className="w-4 h-4" /> Visão Geral
+            </a>
+          )}
           <a
             href="/admin?tab=members"
-            className={`flex items-center gap-2 px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+            className={`flex items-center gap-2 px-4 py-2 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
               activeTab === 'members'
                 ? 'border-blue-700 text-blue-700'
                 : 'border-transparent text-gray-500 hover:text-gray-700'
@@ -106,7 +146,45 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
           >
             <ListChecks className="w-4 h-4" /> Tarefas
           </a>
+          <a
+            href="/admin?tab=announcements"
+            className={`flex items-center gap-2 px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+              activeTab === 'announcements'
+                ? 'border-blue-700 text-blue-700'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            <Megaphone className="w-4 h-4" /> Comunicados
+            {(sentAnnouncements?.length ?? 0) > 0 && (
+              <span className="ml-1 text-[10px] bg-blue-100 text-blue-700 font-bold rounded-full px-1.5 py-0.5">
+                {sentAnnouncements?.length}
+              </span>
+            )}
+          </a>
+          <a
+            href="/admin?tab=suggestions"
+            className={`flex items-center gap-2 px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+              activeTab === 'suggestions'
+                ? 'border-blue-700 text-blue-700'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            <MessageSquare className="w-4 h-4" /> Sugestões
+            {(suggestions?.filter(s => !s.is_read).length ?? 0) > 0 && (
+              <span className="ml-1 text-[10px] bg-red-100 text-red-700 font-bold rounded-full px-1.5 py-0.5">
+                {suggestions?.filter(s => !s.is_read).length}
+              </span>
+            )}
+          </a>
         </div>
+
+        {/* Overview tab */}
+        {activeTab === 'overview' && profile.role === 'coordenador' && (
+          <OverviewPanel
+            profile={profile}
+            members={members || []}
+          />
+        )}
 
         {/* Members tab */}
         {activeTab === 'members' && (
@@ -131,6 +209,23 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
             profile={profile}
             tasks={tasks || []}
             completions={completions || []}
+          />
+        )}
+
+        {/* Announcements tab */}
+        {activeTab === 'announcements' && (
+          <AnnouncementPanel
+            profile={profile}
+            members={members || []}
+            sentAnnouncements={sentAnnouncements || []}
+          />
+        )}
+
+        {/* Suggestions tab */}
+        {activeTab === 'suggestions' && (
+          <SuggestionPanel
+            profile={profile}
+            initialSuggestions={suggestions || []}
           />
         )}
       </main>

@@ -130,15 +130,47 @@ CREATE POLICY "Authenticated users can insert points" ON public.points_log FOR I
 ALTER TABLE public.announcements ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Users can view relevant announcements" ON public.announcements;
 DROP POLICY IF EXISTS "Authenticated users can create announcements" ON public.announcements;
+DROP POLICY IF EXISTS "Leaders can create announcements" ON public.announcements;
 
 CREATE POLICY "Users can view relevant announcements" ON public.announcements FOR SELECT USING (
-    (target_user_id IS NULL AND target_section IS NULL AND target_role IS NULL)
+    -- Author always sees their own sent messages
+    author_id = auth.uid()
+    -- Personal messages
     OR target_user_id = auth.uid()
-    OR target_section = public.get_my_section()
-    OR target_section = public.get_my_leadership_section()
-    OR target_role = public.get_my_role()
+    -- When target_role IS set → only users with that role see it
+    -- (also checks section if one is specified)
+    OR (
+        target_role IS NOT NULL
+        AND target_role = public.get_my_role()
+        AND (
+            target_section IS NULL
+            OR target_section = public.get_my_section()
+            OR target_section = public.get_my_leadership_section()
+        )
+    )
+    -- When target_section is set but NO target_role → any member of that section
+    OR (
+        target_role IS NULL
+        AND target_user_id IS NULL
+        AND target_section IS NOT NULL
+        AND (
+            target_section = public.get_my_section()
+            OR target_section = public.get_my_leadership_section()
+        )
+    -- Global messages (sent to everyone)
+    OR (
+        target_role IS NULL
+        AND target_section IS NULL
+        AND target_user_id IS NULL
+    )
 );
-CREATE POLICY "Authenticated users can create announcements" ON public.announcements FOR INSERT WITH CHECK (auth.uid() = author_id);
+CREATE POLICY "Leaders can create announcements" ON public.announcements FOR INSERT WITH CHECK (
+    auth.uid() = author_id
+    AND public.get_my_role() IN ('dirigente', 'coordenador')
+);
+CREATE POLICY "Authors can delete their announcements" ON public.announcements FOR DELETE USING (
+    auth.uid() = author_id OR public.get_my_role() = 'coordenador'
+);
 
 -- TASKS
 ALTER TABLE public.tasks ENABLE ROW LEVEL SECURITY;
@@ -252,22 +284,46 @@ CREATE TRIGGER on_profile_lifecycle BEFORE UPDATE ON public.profiles FOR EACH RO
 -- 5. AUTOMAÇÃO DE PONTOS (Sincronização)
 -- ============================================
 
--- Função para atualizar totais de XP e Gold automaticamente ao inserir no log
+-- Função para atualizar totais de XP e Gold automaticamente ao alterar o log (Recálculo total para evitar erros)
 CREATE OR REPLACE FUNCTION public.update_profile_totals() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER AS $$
+DECLARE
+  uid uuid;
 BEGIN
+  -- Identificar o utilizador afetado
+  IF (TG_OP = 'DELETE') THEN
+    uid := OLD.target_user_id;
+  ELSE
+    uid := NEW.target_user_id;
+  END IF;
+
+  -- Recalcular totais baseados no histórico real
   UPDATE public.profiles
   SET 
-    total_xp = GREATEST(0, total_xp + NEW.amount_xp),
-    current_gold = GREATEST(0, current_gold + NEW.amount_gold),
+    total_xp = COALESCE((SELECT SUM(amount_xp) FROM public.points_log WHERE target_user_id = uid), 0),
+    current_gold = COALESCE((SELECT SUM(amount_gold) FROM public.points_log WHERE target_user_id = uid), 0),
     updated_at = now()
-  WHERE id = NEW.target_user_id;
-  RETURN NEW;
+  WHERE id = uid;
+
+  -- Se o target_user_id mudou num UPDATE (raro), atualizar também o utilizador antigo
+  IF (TG_OP = 'UPDATE' AND OLD.target_user_id IS DISTINCT FROM NEW.target_user_id) THEN
+    UPDATE public.profiles
+    SET 
+      total_xp = COALESCE((SELECT SUM(amount_xp) FROM public.points_log WHERE target_user_id = OLD.target_user_id), 0),
+      current_gold = COALESCE((SELECT SUM(amount_gold) FROM public.points_log WHERE target_user_id = OLD.target_user_id), 0),
+      updated_at = now()
+    WHERE id = OLD.target_user_id;
+  END IF;
+
+  IF (TG_OP = 'DELETE') THEN RETURN OLD; ELSE RETURN NEW; END IF;
 END;
 $$;
 
-DROP TRIGGER IF EXISTS on_points_log_insert ON public.points_log;
-CREATE TRIGGER on_points_log_insert AFTER INSERT ON public.points_log
+DROP TRIGGER IF EXISTS on_points_log_change ON public.points_log;
+CREATE TRIGGER on_points_log_change AFTER INSERT OR UPDATE OR DELETE ON public.points_log
 FOR EACH ROW EXECUTE PROCEDURE public.update_profile_totals();
+
+-- Remover gatilho antigo se existir (limpeza)
+DROP TRIGGER IF EXISTS on_points_log_insert ON public.points_log;
 
 -- 1 ⚠️ SINCRONIZAÇÃO INICIAL (Correção de erros passados)
 -- Este comando recalcula os totais baseados no histórico real de cada utilizador.
@@ -276,4 +332,85 @@ SET
   total_xp = COALESCE((SELECT SUM(amount_xp) FROM public.points_log WHERE target_user_id = p.id), 0),
   current_gold = COALESCE((SELECT SUM(amount_gold) FROM public.points_log WHERE target_user_id = p.id), 0)
 WHERE p.role = 'desbravador';
+
+-- ============================================
+-- 6. SUGESTÕES E CRÍTICAS
+-- ============================================
+
+CREATE TABLE IF NOT EXISTS public.suggestions (
+  id uuid DEFAULT uuid_generate_v4() PRIMARY KEY,
+  user_id uuid REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
+  target text NOT NULL CHECK (target IN ('dirigente', 'coordenador')),
+  content text NOT NULL,
+  is_read boolean NOT NULL DEFAULT false,
+  points_awarded boolean NOT NULL DEFAULT false,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
+ALTER TABLE public.suggestions ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Users can view own suggestions" ON public.suggestions;
+DROP POLICY IF EXISTS "Users can insert suggestions" ON public.suggestions;
+DROP POLICY IF EXISTS "Users can delete own suggestions" ON public.suggestions;
+DROP POLICY IF EXISTS "Leaders can view suggestions" ON public.suggestions;
+DROP POLICY IF EXISTS "Leaders can mark suggestions as read" ON public.suggestions;
+
+CREATE POLICY "Users can view own suggestions" ON public.suggestions 
+  FOR SELECT USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can insert suggestions" ON public.suggestions 
+  FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can delete own suggestions" ON public.suggestions 
+  FOR DELETE USING (auth.uid() = user_id);
+
+CREATE POLICY "Leaders can view suggestions" ON public.suggestions 
+  FOR SELECT USING (
+    public.get_my_role() = 'coordenador'
+    OR (
+      public.get_my_role() = 'dirigente'
+      AND target = 'dirigente'
+      AND (SELECT section::text FROM public.profiles WHERE id = user_id) = public.get_my_leadership_section()
+    )
+  );
+
+CREATE POLICY "Leaders can mark suggestions as read" ON public.suggestions 
+  FOR UPDATE USING (
+    public.get_my_role() = 'coordenador'
+    OR (
+      public.get_my_role() = 'dirigente'
+      AND target = 'dirigente'
+      AND (SELECT section::text FROM public.profiles WHERE id = user_id) = public.get_my_leadership_section()
+    )
+  );
+
+-- ============================================
+-- 7. LEADERBOARD (Ranking Público)
+-- ============================================
+
+-- Vista pública para o ranking
+CREATE OR REPLACE VIEW public.leaderboard AS
+SELECT 
+    id,
+    full_name,
+    avatar_url,
+    section,
+    role,
+    total_xp,
+    current_gold,
+    (total_xp + current_gold) as combined_score,
+    is_invested
+FROM public.profiles
+WHERE role = 'desbravador'
+ORDER BY total_xp DESC;
+
+-- Permissões para acesso anónimo à vista
+GRANT SELECT ON public.leaderboard TO anon;
+GRANT SELECT ON public.leaderboard TO authenticated;
+
+-- Política para permitir que qualquer pessoa veja os dados básicos de desbravadores (necessário para a vista)
+CREATE POLICY "Public can view desbravador leaderboard info" ON public.profiles
+FOR SELECT
+USING (role = 'desbravador');
+
+COMMENT ON VIEW public.leaderboard IS 'Public view for the club leaderboard, showing only desbravadores.';
 
