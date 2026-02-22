@@ -258,20 +258,6 @@ export default async function Dashboard() {
                     </div>
                 )}
             </div>
-
-            <div className="md:col-span-1">
-                 <Card>
-                    <CardHeader>
-                        <CardTitle className="text-base">Ações Rápidas</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-3">
-                        <Button className="w-full bg-blue-600 hover:bg-blue-700" size="lg">
-                            <ScanLine className="mr-2 h-5 w-5" />
-                            Ler QR Code
-                        </Button>
-                    </CardContent>
-                 </Card>
-            </div>
         </div>
 
       </main>
