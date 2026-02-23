@@ -3,6 +3,7 @@
 import { createClient as createServerClient } from '@/utils/supabase/server'
 import { createClient } from '@supabase/supabase-js'
 import { revalidatePath } from 'next/cache'
+import { headers } from 'next/headers'
 
 export async function triggerResetPassword(userId: string) {
   const supabase = await createServerClient()
@@ -43,9 +44,13 @@ export async function triggerResetPassword(userId: string) {
     throw new Error('Não foi possível encontrar o email do utilizador')
   }
 
-  // Build redirect URL carefully to avoid double slashes
-  const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000').replace(/\/$/, '')
-  const redirectTo = `${siteUrl}/auth/callback?next=/login/reset-password`
+  // 1. Get origin from headers to be dynamic and avoid environment variable issues
+  const headerList = await headers()
+  const host = headerList.get('host')
+  const protocol = headerList.get('x-forwarded-proto') || 'https'
+  const origin = `${protocol}://${host}`
+  
+  const redirectTo = `${origin}/auth/callback?next=/login/reset-password`
 
   // Trigger the password reset email
   const { error: resetError } = await supabaseAdmin.auth.resetPasswordForEmail(targetUser.email, {
