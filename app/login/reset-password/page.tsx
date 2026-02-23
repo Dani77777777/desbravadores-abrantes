@@ -19,16 +19,27 @@ export default function ResetPasswordPage() {
   const supabase = createClient()
 
   useEffect(() => {
-    // Process the hash fragment to establish session
-    // The hash contains the access_token needed for updateUser to work
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) {
-        setSessionReady(true)
-      } else {
-        // No session means the link is invalid/expired
-        setSessionReady(false)
+    // @supabase/ssr does NOT automatically process URL hash fragments.
+    // We must parse the hash and call setSession() manually.
+    const hash = window.location.hash
+    if (hash) {
+      const params = new URLSearchParams(hash.substring(1))
+      const accessToken = params.get('access_token')
+      const refreshToken = params.get('refresh_token')
+
+      if (accessToken && refreshToken) {
+        supabase.auth.setSession({
+          access_token: accessToken,
+          refresh_token: refreshToken,
+        }).then(({ data, error }) => {
+          if (data.session) {
+            setSessionReady(true)
+          } else {
+            console.error('Failed to set session:', error)
+          }
+        })
       }
-    })
+    }
   }, [supabase])
 
   const handleResetPassword = async (e: React.FormEvent) => {
