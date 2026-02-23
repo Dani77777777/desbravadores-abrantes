@@ -414,3 +414,82 @@ USING (role = 'desbravador');
 
 COMMENT ON VIEW public.leaderboard IS 'Public view for the club leaderboard, showing only desbravadores.';
 
+-- ============================================
+-- 8. EVENTOS E AGENDA
+-- ============================================
+
+DO $$ BEGIN
+  CREATE TYPE public.attendance_status AS ENUM ('presente', 'atrasado', 'faltou');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+CREATE TABLE IF NOT EXISTS public.events (
+  id uuid DEFAULT uuid_generate_v4() PRIMARY KEY,
+  title text NOT NULL,
+  description text,
+  location text,
+  start_at timestamptz NOT NULL,
+  end_at timestamptz NOT NULL,
+  target_section text,
+  xp_reward integer NOT NULL DEFAULT 0,
+  gold_reward integer NOT NULL DEFAULT 0,
+  late_discount_percent float NOT NULL DEFAULT 0.25,
+  absent_penalty_percent float NOT NULL DEFAULT 0,
+  created_by uuid REFERENCES public.profiles(id) ON DELETE SET NULL,
+  is_finished boolean NOT NULL DEFAULT false,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS public.event_attendance (
+  id uuid DEFAULT uuid_generate_v4() PRIMARY KEY,
+  event_id uuid REFERENCES public.events(id) ON DELETE CASCADE NOT NULL,
+  user_id uuid REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
+  status public.attendance_status NOT NULL DEFAULT 'presente',
+  points_awarded boolean NOT NULL DEFAULT false,
+  awarded_at timestamptz,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE(event_id, user_id)
+);
+
+-- RLS para EVENTOS
+ALTER TABLE public.events ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "View relevant events" ON public.events;
+CREATE POLICY "View relevant events" ON public.events FOR SELECT USING (
+  target_section IS NULL 
+  OR target_section = public.get_my_section()
+  OR target_section = public.get_my_leadership_section()
+  OR public.get_my_role() = 'coordenador'
+);
+
+DROP POLICY IF EXISTS "Leaders can manage events" ON public.events;
+CREATE POLICY "Leaders can manage events" ON public.events FOR ALL USING (
+  public.get_my_role() = 'coordenador'
+  OR (
+    public.get_my_role() = 'dirigente' 
+    AND (target_section = public.get_my_leadership_section())
+  )
+);
+
+-- RLS para PRESENÇAS
+ALTER TABLE public.event_attendance ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Users can view own attendance" ON public.event_attendance;
+CREATE POLICY "Users can view own attendance" ON public.event_attendance FOR SELECT USING (
+  user_id = auth.uid()
+  OR public.get_my_role() = 'coordenador'
+  OR (
+    public.get_my_role() = 'dirigente'
+    AND (SELECT section::text FROM public.profiles WHERE id = user_id) = public.get_my_leadership_section()
+  )
+);
+
+DROP POLICY IF EXISTS "Leaders can manage attendance" ON public.event_attendance;
+CREATE POLICY "Leaders can manage attendance" ON public.event_attendance FOR ALL USING (
+  public.get_my_role() = 'coordenador'
+  OR (
+    public.get_my_role() = 'dirigente'
+    AND (SELECT section::text FROM public.profiles WHERE id = user_id) = public.get_my_leadership_section()
+  )
+);

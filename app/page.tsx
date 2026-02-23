@@ -3,10 +3,11 @@ import { Navbar } from '@/components/layout/Navbar'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
 import { Badge } from '@/components/ui/badge'
-import { User, Trophy, Coins, Megaphone, ScanLine, History, ListChecks, CheckCircle2, Clock } from 'lucide-react'
-import { Button } from '@/components/ui/button'
 import Link from 'next/link'
 import { TaskCompleteButton } from '@/components/tasks/TaskCompleteButton'
+import { EventDashboard } from '@/components/events/EventDashboard'
+import { Button } from '@/components/ui/button'
+import { User, Trophy, Coins, Megaphone, ScanLine, History, ListChecks, CheckCircle2, Clock, CalendarDays } from 'lucide-react'
 
 const SECTION_COLORS = {
   rebentos: 'bg-emerald-600',
@@ -58,6 +59,13 @@ export default async function Dashboard() {
   const { data: announcements } = await announcementsQuery
     .order('created_at', { ascending: false })
     .limit(10)
+
+  // Fetch Events
+  const { data: events } = await supabase
+    .from('events')
+    .select('*')
+    .or(`target_section.is.null,target_section.eq.${profile.section}`)
+    .order('start_at', { ascending: true })
 
   if (!profile) return <div>Perfil não encontrado.</div>
 
@@ -165,31 +173,73 @@ export default async function Dashboard() {
                 </div>
             </CardContent>
         </Card>
+        
+        {/* Main Content Grid: Announcements and Events */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            {/* Announcements Section */}
+            <div className="space-y-4">
+                <h2 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
+                    <Megaphone className="w-5 h-5 text-blue-700" /> Avisos e Novidades
+                </h2>
+                <div className="space-y-4">
+                    {announcements && announcements.length > 0 ? (
+                        announcements.map((announcement) => (
+                            <Card key={announcement.id} className="border-none shadow-sm overflow-hidden">
+                                <div className="h-1 bg-blue-600 w-full opacity-20" />
+                                <CardContent className="p-5">
+                                    <div className="flex justify-between items-start mb-2">
+                                        <h3 className="font-bold text-gray-900 transition-colors">
+                                            {announcement.title}
+                                        </h3>
+                                        <span className="text-[10px] text-gray-400 font-medium whitespace-nowrap">
+                                            {new Date(announcement.created_at).toLocaleDateString('pt-PT')}
+                                        </span>
+                                    </div>
+                                    <p className="text-sm text-gray-600 leading-relaxed line-clamp-3">
+                                        {announcement.message}
+                                    </p>
+                                </CardContent>
+                            </Card>
+                        ))
+                    ) : (
+                        <Card className="border-dashed border-2 bg-transparent shadow-none">
+                            <CardContent className="py-10 text-center">
+                                <p className="text-gray-500 italic">Nenhum aviso de momento.</p>
+                            </CardContent>
+                        </Card>
+                    )}
+                </div>
+            </div>
+
+            {/* Events Agenda & Calendar Section */}
+            <div>
+                <EventDashboard events={events || []} profile={profile} />
+            </div>
+        </div>
 
         {/* Tasks Section */}
         {tasks && tasks.length > 0 && (
-          <div className="space-y-3">
+          <div className="space-y-3 pt-4 border-t border-stone-200">
             <h2 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
-              <ListChecks className="w-5 h-5" /> As Minhas Tarefas
+              <ListChecks className="w-5 h-5 text-blue-700" /> As Minhas Tarefas
               {openTasks.length > 0 && (
                 <Badge className="bg-blue-700 text-white ml-1">{openTasks.length} pendentes</Badge>
               )}
             </h2>
 
             {openTasks.length > 0 && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
                 {openTasks.map(task => (
                   <Card key={task.id} className="border border-blue-100 bg-white hover:shadow-md transition-shadow">
                     <CardContent className="p-4">
                       <div className="flex items-start justify-between gap-2">
                         <div className="flex-1 min-w-0">
-                          <h3 className="font-medium text-gray-900 text-sm">{task.title}</h3>
-                          {task.description && <p className="text-xs text-gray-500 mt-1 line-clamp-2">{task.description}</p>}
+                          <h3 className="font-medium text-gray-900 text-sm truncate">{task.title}</h3>
                           <div className="flex items-center gap-3 mt-2">
-                            {task.xp_reward > 0 && <span className="text-xs text-indigo-600 font-medium flex items-center gap-1"><Trophy className="w-3 h-3" /> +{task.xp_reward} XP</span>}
-                            {task.gold_reward > 0 && <span className="text-xs text-yellow-600 font-medium flex items-center gap-1"><Coins className="w-3 h-3" /> +{task.gold_reward} Ouro</span>}
+                            {task.xp_reward > 0 && <span className="text-xs text-indigo-600 font-medium flex items-center gap-1"><Trophy className="w-3 h-3" /> +{task.xp_reward}</span>}
+                            {task.gold_reward > 0 && <span className="text-xs text-yellow-600 font-medium flex items-center gap-1"><Coins className="w-3 h-3" /> +{task.gold_reward}</span>}
                             {task.deadline && (
-                              <span className="text-xs text-gray-400">
+                              <span className="text-[10px] text-gray-400">
                                 até {new Date(task.deadline).toLocaleDateString('pt-PT')}
                               </span>
                             )}
@@ -208,18 +258,12 @@ export default async function Dashboard() {
                 <summary className="cursor-pointer text-sm text-gray-500 hover:text-gray-700 flex items-center gap-1 list-none">
                   <CheckCircle2 className="w-4 h-4 text-green-600" />
                   {doneTasks.length} tarefa{doneTasks.length !== 1 ? 's' : ''} concluída{doneTasks.length !== 1 ? 's' : ''}
-                  {pendingAwardIds.size > 0 && <Badge variant="outline" className="ml-1 text-xs text-amber-600 border-amber-300">A aguardar pontos</Badge>}
                 </summary>
-                <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <div className="mt-2 grid grid-cols-1 md:grid-cols-3 gap-2">
                   {doneTasks.map(task => (
-                    <div key={task.id} className="p-3 border rounded-lg bg-gray-50 flex items-center gap-2 text-sm text-gray-500">
-                      {pendingAwardIds.has(task.id) ? (
-                        <Clock className="w-4 h-4 text-amber-500 shrink-0" />
-                      ) : (
-                        <CheckCircle2 className="w-4 h-4 text-green-600 shrink-0" />
-                      )}
+                    <div key={task.id} className="p-2 px-3 border rounded-lg bg-gray-50 flex items-center gap-2 text-xs text-gray-500">
+                      <CheckCircle2 className="w-3 h-3 text-green-600 shrink-0" />
                       <span className="truncate">{task.title}</span>
-                      {pendingAwardIds.has(task.id) && <span className="ml-auto text-xs text-amber-500 shrink-0">A aguardar</span>}
                     </div>
                   ))}
                 </div>
@@ -227,37 +271,6 @@ export default async function Dashboard() {
             )}
           </div>
         )}
-
-        {/* Announcements + Quick Actions */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="md:col-span-2 space-y-4">
-                <div className="flex items-center justify-between">
-                    <h2 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
-                        <Megaphone className="w-5 h-5" /> Avisos e Novidades
-                    </h2>
-                </div>
-                
-                {announcements && announcements.length > 0 ? (
-                    announcements.map((announcement) => (
-                        <Card key={announcement.id} className="border-l-4 border-l-blue-700 shadow-sm hover:shadow-md transition-shadow">
-                            <CardHeader className="py-4">
-                                <CardTitle className="text-base font-semibold">{announcement.title}</CardTitle>
-                                <p className="text-xs text-gray-500">
-                                   {new Date(announcement.created_at).toLocaleDateString('pt-PT')}
-                                </p>
-                            </CardHeader>
-                            <CardContent className="py-2 pb-4 text-sm text-gray-600">
-                                {announcement.message}
-                            </CardContent>
-                        </Card>
-                    ))
-                ) : (
-                    <div className="text-center py-10 bg-white rounded-lg border border-dashed border-gray-300">
-                        <p className="text-gray-500">Sem avisos recentes.</p>
-                    </div>
-                )}
-            </div>
-        </div>
 
       </main>
     </div>

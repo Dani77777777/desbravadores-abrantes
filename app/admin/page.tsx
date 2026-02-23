@@ -7,7 +7,8 @@ import { TaskPanel } from './components/TaskPanel'
 import { OverviewPanel } from './components/OverviewPanel'
 import { AnnouncementPanel } from './components/AnnouncementPanel'
 import { SuggestionPanel } from './components/SuggestionPanel'
-import { Users, ListChecks, Megaphone, MessageSquare, LayoutDashboard } from 'lucide-react'
+import { EventPanel } from './components/EventPanel'
+import { Users, ListChecks, Megaphone, MessageSquare, LayoutDashboard, CalendarDays } from 'lucide-react'
 
 export default async function AdminPage({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
   const supabase = await createClient()
@@ -87,6 +88,14 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
 
   const { data: suggestions } = await suggestionsQuery
 
+  // Fetch Events
+  let eventsQuery = supabase.from('events').select('*').order('start_at', { ascending: false })
+  if (profile.role === 'dirigente') {
+    const targetSection = profile.leadership_section || profile.section
+    eventsQuery = eventsQuery.or(`target_section.is.null,target_section.eq.${targetSection}`)
+  }
+  const { data: events } = await eventsQuery
+
   const resolvedParams = await searchParams
   const defaultTab = profile.role === 'coordenador' ? 'overview' : 'members'
   const activeTab = resolvedParams?.tab || defaultTab
@@ -145,6 +154,16 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
             }`}
           >
             <ListChecks className="w-4 h-4" /> Tarefas
+          </a>
+          <a
+            href="/admin?tab=events"
+            className={`flex items-center gap-2 px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+              activeTab === 'events'
+                ? 'border-blue-700 text-blue-700'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            <CalendarDays className="w-4 h-4" /> Eventos
           </a>
           <a
             href="/admin?tab=announcements"
@@ -209,6 +228,15 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
             profile={profile}
             tasks={tasks || []}
             completions={completions || []}
+          />
+        )}
+
+        {/* Announcements tab */}
+        {activeTab === 'events' && (
+          <EventPanel 
+            profile={profile}
+            members={members || []}
+            events={events || []}
           />
         )}
 
