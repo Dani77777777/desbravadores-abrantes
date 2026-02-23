@@ -49,6 +49,13 @@ export function EventPanel({ profile, members, events }: EventPanelProps) {
   const [absentPenalty, setAbsentPenalty] = useState(0)
   const [creating, setCreating] = useState(false)
 
+  // Reschedule state
+  const [rescheduleOpen, setRescheduleOpen] = useState(false)
+  const [reschedulingEvent, setReschedulingEvent] = useState<any>(null)
+  const [newStartAt, setNewStartAt] = useState('')
+  const [newEndAt, setNewEndAt] = useState('')
+  const [rescheduling, setRescheduling] = useState(false)
+
   // Attendance Manager
   const [attendanceOpen, setAttendanceOpen] = useState(false)
   const [selectedEvent, setSelectedEvent] = useState<any>(null)
@@ -92,6 +99,61 @@ export function EventPanel({ profile, members, events }: EventPanelProps) {
     }
   }
 
+  const handleReschedule = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!reschedulingEvent) return
+    setRescheduling(true)
+    try {
+      const { error } = await supabase.from('events').update({
+        start_at: new_date_with_time(newStartAt),
+        end_at: new_date_with_time(newEndAt),
+        updated_at: new Date().toISOString()
+      }).eq('id', reschedulingEvent.id)
+
+      if (error) throw error
+
+      // Create announcement
+      await supabase.from('announcements').insert({
+        title: `Evento Reagendado: ${reschedulingEvent.title} 📅`,
+        message: `O evento "${reschedulingEvent.title}" foi reagendado para ${new Date(newStartAt).toLocaleString('pt-PT')}. Por favor, verifica a nova data.`,
+        author_id: profile.id,
+        target_section: reschedulingEvent.target_section,
+      })
+
+      toast.success('Evento reagendado com sucesso!')
+      setRescheduleOpen(false)
+      setReschedulingEvent(null)
+      router.refresh()
+    } catch (e: any) {
+      toast.error(e.message || 'Erro ao reagendar evento.')
+    } finally {
+      setRescheduling(false)
+    }
+  }
+
+  const handleCancelEvent = async (event: any) => {
+    if (!confirm(`Tens a certeza que queres CANCELAR o evento "${event.title}"? Será enviado um comunicado de cancelamento.`)) return
+    
+    try {
+      // 1. Send announcement first
+      await supabase.from('announcements').insert({
+        title: `Evento Cancelado: ${event.title} ❌`,
+        message: `O evento "${event.title}" que estava marcado para ${new Date(event.start_at).toLocaleString('pt-PT')} foi cancelado.`,
+        author_id: profile.id,
+        target_section: event.target_section,
+      })
+
+      // 2. Delete event
+      const { error } = await supabase.from('events').delete().eq('id', event.id)
+      if (error) throw error
+
+      toast.success('Evento cancelado e comunicado enviado.')
+      router.refresh()
+    } catch (e: any) {
+      toast.error('Erro ao cancelar evento.')
+    }
+  }
+
   const new_date_with_time = (val: string) => {
     return new Date(val).toISOString()
   }
@@ -109,7 +171,7 @@ export function EventPanel({ profile, members, events }: EventPanelProps) {
   }
 
   const handleDeleteEvent = async (eventId: string) => {
-    if (!confirm('Tens a certeza que queres apagar este evento?')) return
+    if (!confirm('Tens a certeza que queres apagar este evento? (Sem aviso de cancelamento)')) return
     const { error } = await supabase.from('events').delete().eq('id', eventId)
     if (error) toast.error('Erro ao apagar evento.')
     else { toast.success('Evento apagado.'); router.refresh() }
@@ -253,7 +315,26 @@ export function EventPanel({ profile, members, events }: EventPanelProps) {
                     >
                       <ListChecks className="w-3 h-3" /> Presenças
                     </Button>
-                    <Button variant="ghost" size="icon" className="text-gray-400 hover:text-red-600 shrink-0" onClick={() => handleDeleteEvent(event.id)}>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="text-blue-600 border-blue-200 hover:bg-blue-50 gap-1 text-xs"
+                      onClick={() => {
+                        setReschedulingEvent(event)
+                        setNewStartAt(new Date(event.start_at).toISOString().slice(0, 16))
+                        setNewEndAt(new Date(event.end_at).toISOString().slice(0, 16))
+                        setRescheduleOpen(true)
+                      }}
+                    >
+                      <Calendar className="w-3 h-3" /> Reagendar
+                    </Button>
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="text-gray-400 hover:text-orange-600 shrink-0" 
+                      title="Cancelar Evento"
+                      onClick={() => handleCancelEvent(event)}
+                    >
                       <Trash2 className="w-4 h-4" />
                     </Button>
                   </div>
@@ -306,6 +387,30 @@ export function EventPanel({ profile, members, events }: EventPanelProps) {
           </Card>
         </div>
       </div>
+
+      <Dialog open={rescheduleOpen} onOpenChange={setRescheduleOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Reagendar Evento</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleReschedule} className="space-y-4 pt-2">
+            <div className="space-y-2">
+              <Label>Novo Horário de Início</Label>
+              <Input type="datetime-local" value={newStartAt} onChange={e => setNewStartAt(e.target.value)} required />
+            </div>
+            <div className="space-y-2">
+              <Label>Novo Horário de Fim</Label>
+              <Input type="datetime-local" value={newEndAt} onChange={e => setNewEndAt(e.target.value)} required />
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setRescheduleOpen(false)}>Cancelar</Button>
+              <Button type="submit" className="bg-blue-800 hover:bg-blue-900" disabled={rescheduling}>
+                {rescheduling ? 'A guardar...' : 'Confirmar Reagendamento'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       {selectedEvent && (
         <Dialog open={attendanceOpen} onOpenChange={setAttendanceOpen}>
