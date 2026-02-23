@@ -43,9 +43,13 @@ export async function triggerResetPassword(userId: string) {
     throw new Error('Não foi possível encontrar o email do utilizador')
   }
 
+  // Build redirect URL carefully to avoid double slashes
+  const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000').replace(/\/$/, '')
+  const redirectTo = `${siteUrl}/auth/callback?next=/login/reset-password`
+
   // Trigger the password reset email
   const { error: resetError } = await supabaseAdmin.auth.resetPasswordForEmail(targetUser.email, {
-    redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/auth/callback?next=/login/reset-password`,
+    redirectTo,
   })
 
   if (resetError) {
