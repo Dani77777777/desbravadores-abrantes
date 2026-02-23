@@ -209,7 +209,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
         {activeTab === 'members' && (
           <Card>
             <CardHeader>
-              <CardTitle>Membros da Unidade</CardTitle>
+              <CardTitle>Membros da Classe</CardTitle>
               <CardDescription>Gerencie os pontos, XP e investiduras dos desbravadores.</CardDescription>
             </CardHeader>
             <CardContent>

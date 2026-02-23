@@ -135,7 +135,7 @@ export default function SuggestionsPage() {
                         <SelectValue placeholder="Selecione o destinatário" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="dirigente">Dirigente da Unidade (também visível pela Coordenação)</SelectItem>
+                        <SelectItem value="dirigente">Dirigente da Classe (também visível pela Coordenação)</SelectItem>
                         <SelectItem value="coordenador">Apenas para a Coordenação</SelectItem>
                       </SelectContent>
                     </Select>
@@ -234,7 +234,7 @@ export default function SuggestionsPage() {
               <div className="space-y-2">
                 <p className="font-semibold">Privacidade:</p>
                 <ul className="list-disc pl-5 space-y-1">
-                    <li><strong>Dirigente:</strong> A mensagem será lida pelo teu dirigente de unidade e pela coordenação geral.</li>
+                    <li><strong>Dirigente:</strong> A mensagem será lida pelo teu dirigente de classe e pela coordenação geral.</li>
                     <li><strong>Coordenação:</strong> A mensagem será lida <strong>apenas</strong> pela coordenação geral do clube.</li>
                 </ul>
               </div>

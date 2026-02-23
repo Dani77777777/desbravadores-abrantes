@@ -92,7 +92,7 @@ export function SuggestionPanel({ profile, initialSuggestions }: SuggestionPanel
           <p className="text-sm text-gray-500">
             {profile.role === 'coordenador' 
               ? 'Todas as sugestões enviadas ao clube.' 
-              : 'Sugestões enviadas para a tua unidade.'}
+              : 'Sugestões enviadas para a tua classe.'}
           </p>
         </div>
         <Button 

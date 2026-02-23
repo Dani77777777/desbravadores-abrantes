@@ -262,7 +262,7 @@ export function OverviewPanel({ profile, members }: OverviewPanelProps) {
               </div>
 
               <div className="mt-8 p-4 bg-slate-50 rounded-xl border border-slate-100">
-                <h4 className="text-xs font-bold text-slate-500 uppercase mb-3">Resumo da Unidade</h4>
+                <h4 className="text-xs font-bold text-slate-500 uppercase mb-3">Resumo da Classe</h4>
                 <div className="space-y-2">
                   <div className="flex justify-between text-xs">
                     <span className="text-gray-600">Membros Ativos</span>

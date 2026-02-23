@@ -40,7 +40,7 @@ type AudienceType =
   | 'all_dirigentes'       // coord only — todos os dirigentes
   | 'dirigente_of_section' // coord only — dirigentes de uma classe
   | 'specific_section'     // coord only — desbravadores de uma classe
-  | 'my_section_all'       // dirigente — toda a unidade
+  | 'my_section_all'       // dirigente — toda a classe
   | 'specific_member'      // ambos — membro em específico
 
 export function AnnouncementPanel({ profile, members, sentAnnouncements }: AnnouncementPanelProps) {
@@ -242,7 +242,7 @@ export function AnnouncementPanel({ profile, members, sentAnnouncements }: Annou
           <CardDescription>
             {isCoordenador
               ? 'Envia mensagens para toda a tropa, dirigentes, classes específicas ou membros individuais.'
-              : 'Envia mensagens para a tua unidade ou para um desbravador específico.'}
+              : 'Envia mensagens para a tua classe ou para um desbravador específico.'}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -270,7 +270,7 @@ export function AnnouncementPanel({ profile, members, sentAnnouncements }: Annou
               {!isCoordenador && (
                 <div className="grid grid-cols-2 gap-2">
                   <AudienceBtn active={audience==='my_section_all'} onClick={()=>setAudience('my_section_all')}
-                    icon={<Users className="w-4 h-4"/>} label="Toda a minha unidade" color="green"/>
+                    icon={<Users className="w-4 h-4"/>} label="Toda a minha classe" color="green"/>
                   <AudienceBtn active={audience==='specific_member'} onClick={()=>setAudience('specific_member')}
                     icon={<UserRound className="w-4 h-4"/>} label="Membro específico" color="amber"/>
                 </div>
@@ -446,7 +446,7 @@ function AudienceSummaryChip({ audience, specificSection, specificMemberId, memb
     all_dirigentes:      { icon: '🛡️', label: 'Todos os Dirigentes', color: 'text-purple-700 bg-purple-50 border-purple-200' },
     dirigente_of_section:{ icon: '🛡️📚', label: `Dirigentes do${specificSection ? `s ${SECTION_LABELS[specificSection]}` : '...'}`, color: 'text-violet-700 bg-violet-50 border-violet-200' },
     specific_section:    { icon: '📚', label: `Classe: ${SECTION_LABELS[specificSection] ?? '...'}`, color: 'text-blue-700 bg-blue-50 border-blue-200' },
-    my_section_all:      { icon: '⚜️', label: `Unidade: ${SECTION_LABELS[leadershipSection] ?? leadershipSection}`, color: 'text-green-700 bg-green-50 border-green-200' },
+    my_section_all:      { icon: '⚜️', label: `Classe: ${SECTION_LABELS[leadershipSection] ?? leadershipSection}`, color: 'text-green-700 bg-green-50 border-green-200' },
     specific_member:     { icon: '👤', label: memberOptions.find((m: any) => m.id === specificMemberId)?.full_name ?? 'Selecionar membro...', color: 'text-amber-700 bg-amber-50 border-amber-200' },
   }
   const c = configs[audience as AudienceType]
