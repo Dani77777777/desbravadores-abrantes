@@ -17,7 +17,7 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Coins, Trophy, UserCheck, UserX, Shield, AlertTriangle, PlusCircle, MinusCircle } from 'lucide-react'
+import { Coins, Trophy, UserCheck, UserX, Shield, AlertTriangle, PlusCircle, MinusCircle, KeyRound } from 'lucide-react'
 import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
 import {
@@ -28,6 +28,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { triggerResetPassword } from '../actions'
 
 interface MemberListProps {
   members: any[]
@@ -80,7 +81,6 @@ export function MemberList({ members, currentUserRole, adminProfile }: MemberLis
         if (logError) throw logError
       }
 
-      // 2. Prepare profile update (ONLY for roles/sections, XP/Gold is handled by DB trigger)
       if (currentUserRole === 'coordenador') {
           const updateData: any = {
               role: tempRole,
@@ -111,17 +111,33 @@ export function MemberList({ members, currentUserRole, adminProfile }: MemberLis
   }
 
   const handleToggleInvested = async (memberId: string, currentStatus: boolean) => {
-      try {
-          const { error } = await supabase
-            .from('profiles')
-            .update({ is_invested: !currentStatus })
-            .eq('id', memberId)
-          if (error) throw error
-          toast.success('Estado de investidura atualizado!')
-          router.refresh()
-      } catch (error) {
-          toast.error('Erro ao atualizar estado.')
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ is_invested: !currentStatus })
+        .eq('id', memberId)
+      if (error) throw error
+      toast.success('Estado de investidura atualizado!')
+      router.refresh()
+    } catch (error) {
+      toast.error('Erro ao atualizar estado.')
+    }
+  }
+
+  const handleResetPassword = async (memberId: string) => {
+    if (!confirm('Tem a certeza que deseja enviar um email de recuperação de password para este membro?')) return
+
+    setLoading(true)
+    try {
+      const result = await triggerResetPassword(memberId)
+      if (result.success) {
+        toast.success('Email de recuperação enviado com sucesso!')
       }
+    } catch (error: any) {
+      toast.error(error.message || 'Erro ao enviar email de recuperação.')
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -177,7 +193,7 @@ export function MemberList({ members, currentUserRole, adminProfile }: MemberLis
                        setTempLeadership(member.leadership_section || 'none')
                        setIsPenalty(false)
                    }
-               }}>
+                }}>
                    <DialogTrigger asChild>
                        <Button size="sm" variant="outline" className="border-blue-600 text-blue-700 hover:bg-blue-50">
                            Gerir
@@ -275,6 +291,21 @@ export function MemberList({ members, currentUserRole, adminProfile }: MemberLis
                                  onChange={(e) => setDescription(e.target.value)} 
                                  className="h-9"
                                />
+                           </div>
+
+                           <div className="pt-2 border-t">
+                               <Button 
+                                 type="button"
+                                 variant="outline"
+                                 className="w-full flex items-center gap-2 text-blue-700 border-blue-200 hover:bg-blue-50"
+                                 onClick={() => handleResetPassword(member.id)}
+                                 disabled={loading}
+                               >
+                                 <KeyRound className="w-4 h-4" /> Enviar Reset Password
+                               </Button>
+                               <p className="text-[10px] text-gray-500 text-center mt-1">
+                                 Um email será enviado para o membro com instruções de recuperação.
+                               </p>
                            </div>
                            
                            <div className="flex flex-col gap-3 pt-2">
