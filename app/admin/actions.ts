@@ -50,7 +50,7 @@ export async function triggerResetPassword(userId: string) {
   const protocol = headerList.get('x-forwarded-proto') || 'https'
   const origin = `${protocol}://${host}`
   
-  const redirectTo = `${origin}/auth/callback?next=/login/reset-password`
+  const redirectTo = `${origin}/login/reset-password`
 
   // Trigger the password reset email
   const { error: resetError } = await supabaseAdmin.auth.resetPasswordForEmail(targetUser.email, {
