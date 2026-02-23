@@ -36,9 +36,11 @@ export async function updateSession(request: NextRequest) {
   // 1. Protected Routes Protection
   if (
     !user &&
+    request.nextUrl.pathname !== '/' &&
     !request.nextUrl.pathname.startsWith('/login') &&
     !request.nextUrl.pathname.startsWith('/auth') &&
-    !request.nextUrl.pathname.startsWith('/leaderboard')
+    !request.nextUrl.pathname.startsWith('/leaderboard') &&
+    !request.nextUrl.pathname.startsWith('/contacts')
   ) {
     const url = request.nextUrl.clone()
     url.pathname = '/login'

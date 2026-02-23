@@ -6,17 +6,25 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Mail } from 'lucide-react'
-import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect, Suspense } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
 
-export default function LoginPage() {
+function LoginContent() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
-  const [isSignUp, setIsSignUp] = useState(false)
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const mode = searchParams.get('mode')
+  const [isSignUp, setIsSignUp] = useState(mode === 'signup')
   const supabase = createClient()
+
+  useEffect(() => {
+    // If mode changes in URL, update state
+    if (mode === 'signup') setIsSignUp(true)
+    if (mode === 'login') setIsSignUp(false)
+  }, [mode])
 
   useEffect(() => {
     // Check hash immediately on mount - the Supabase client processes the hash
@@ -158,5 +166,13 @@ export default function LoginPage() {
         </CardContent>
       </Card>
     </div>
+  )
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-blue-950 flex items-center justify-center text-white">Carregando...</div>}>
+      <LoginContent />
+    </Suspense>
   )
 }

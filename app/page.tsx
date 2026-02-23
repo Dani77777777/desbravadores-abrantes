@@ -9,6 +9,8 @@ import { EventDashboard } from '@/components/events/EventDashboard'
 import { Button } from '@/components/ui/button'
 import { User, Trophy, Coins, Megaphone, ScanLine, History, ListChecks, CheckCircle2, Clock, CalendarDays } from 'lucide-react'
 
+import { LandingPage } from '@/components/landing/LandingPage'
+
 const SECTION_COLORS = {
   rebentos: 'bg-emerald-600',
   ticoes: 'bg-red-800',
@@ -33,7 +35,7 @@ export default async function Dashboard() {
   } = await supabase.auth.getUser()
 
   if (!user) {
-      return <div>Carregando...</div>
+      return <LandingPage />
   }
 
   const { data: profile } = await supabase

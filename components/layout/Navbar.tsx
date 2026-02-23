@@ -12,7 +12,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { Menu, X, LogOut, User, Shield, Tent, MessageSquare, Trophy } from 'lucide-react'
+import { Menu, X, LogOut, User, Shield, Tent, MessageSquare, Trophy, Phone } from 'lucide-react'
 import { createClient } from '@/utils/supabase/client'
 import { useRouter } from 'next/navigation'
 
@@ -70,6 +70,12 @@ export function Navbar({ user, profile }: NavbarProps) {
                   >
                     <Trophy className="w-4 h-4" /> Ranking
                   </Link>
+                  <Link
+                    href="/contacts"
+                    className="hover:bg-blue-800 px-3 py-2 rounded-md text-sm font-medium transition-colors flex items-center gap-1"
+                  >
+                    <Phone className="w-4 h-4" /> Contactos
+                  </Link>
                   {isAdmin && (
                     <Link
                       href="/admin"
@@ -89,6 +95,12 @@ export function Navbar({ user, profile }: NavbarProps) {
                     className="hover:bg-blue-800 px-3 py-2 rounded-md text-sm font-medium transition-colors flex items-center gap-1 text-white"
                   >
                     <Trophy className="w-4 h-4" /> Ranking
+                  </Link>
+                  <Link
+                    href="/contacts"
+                    className="hover:bg-blue-800 px-3 py-2 rounded-md text-sm font-medium transition-colors flex items-center gap-1 text-white"
+                  >
+                    <Phone className="w-4 h-4" /> Contactos
                   </Link>
                 </div>
               </div>
@@ -123,11 +135,18 @@ export function Navbar({ user, profile }: NavbarProps) {
                   </DropdownMenuContent>
                 </DropdownMenu>
               ) : (
-                <Link href="/login">
-                  <Button variant="secondary" className="bg-white text-blue-900 hover:bg-yellow-400 hover:text-blue-900 border-none font-bold">
-                    Entrar
-                  </Button>
-                </Link>
+                <div className="flex items-center gap-3">
+                  <Link href="/login?mode=login">
+                    <Button variant="ghost" className="text-white hover:bg-blue-800 font-medium">
+                      Entrar
+                    </Button>
+                  </Link>
+                  <Link href="/login?mode=signup">
+                    <Button className="bg-white text-blue-900 hover:bg-yellow-400 hover:text-blue-900 border-none font-bold shadow-sm transition-colors">
+                      Registar
+                    </Button>
+                  </Link>
+                </div>
               )}
             </div>
           </div>
@@ -178,6 +197,20 @@ export function Navbar({ user, profile }: NavbarProps) {
                 >
                   <Trophy className="w-4 h-4" /> Ranking
                 </Link>
+                <Link
+                  href="/contacts"
+                  className="text-gray-100 hover:bg-blue-800 hover:text-white block px-3 py-2 rounded-md text-base font-medium flex items-center gap-2"
+                  onClick={() => setIsOpen(false)}
+                >
+                  <Phone className="w-4 h-4" /> Contactos
+                </Link>
+                <Link
+                  href="/contacts"
+                  className="text-gray-100 hover:bg-blue-800 hover:text-white block px-3 py-2 rounded-md text-base font-medium flex items-center gap-2"
+                  onClick={() => setIsOpen(false)}
+                >
+                  <Phone className="w-4 h-4" /> Contactos
+                </Link>
                 {isAdmin && (
                   <Link
                     href="/admin"
@@ -226,10 +259,15 @@ export function Navbar({ user, profile }: NavbarProps) {
                 </div>
               </>
             ) : (
-              <div className="px-5 pt-2">
-                <Link href="/login" onClick={() => setIsOpen(false)}>
-                  <Button className="w-full bg-blue-700 hover:bg-blue-600 text-white">
+              <div className="px-5 pt-2 flex flex-col gap-2">
+                <Link href="/login?mode=login" onClick={() => setIsOpen(false)}>
+                  <Button variant="outline" className="w-full border-blue-400 text-white hover:bg-blue-800">
                     Entrar
+                  </Button>
+                </Link>
+                <Link href="/login?mode=signup" onClick={() => setIsOpen(false)}>
+                  <Button className="w-full bg-white text-blue-900 hover:bg-yellow-400">
+                    Registar
                   </Button>
                 </Link>
               </div>
