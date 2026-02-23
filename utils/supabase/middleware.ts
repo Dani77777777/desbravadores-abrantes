@@ -55,9 +55,10 @@ export async function updateSession(request: NextRequest) {
       .single()
 
     const isOnboarding = request.nextUrl.pathname.startsWith('/onboarding')
+  const isResetPassword = request.nextUrl.pathname.startsWith('/login/reset-password')
 
-    // If no birth_date and not on onboarding, redirect to onboarding
-    if ((!profile || !profile.birth_date) && !isOnboarding) {
+  // If no birth_date and not on onboarding or reset-password, redirect to onboarding
+  if ((!profile || !profile.birth_date) && !isOnboarding && !isResetPassword) {
        const url = request.nextUrl.clone()
        url.pathname = '/onboarding'
        const redirectResponse = NextResponse.redirect(url)
