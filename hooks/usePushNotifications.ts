@@ -40,34 +40,45 @@ export function usePushNotifications() {
   }, [])
 
   const subscribe = async () => {
-    if (!('serviceWorker' in navigator) || !('PushManager' in window)) return
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+      console.error('[Push] Service Workers or Push API not supported')
+      return
+    }
 
     setIsLoading(true)
     try {
-      // Register the service worker
+      console.log('[Push] Registering service worker...')
       const reg = await navigator.serviceWorker.register('/sw.js')
       await navigator.serviceWorker.ready
+      console.log('[Push] Service worker ready:', reg)
 
-      // Request permission
+      console.log('[Push] Requesting notification permission...')
       const perm = await Notification.requestPermission()
       setPermission(perm as PushPermission)
+      console.log('[Push] Permission result:', perm)
 
       if (perm !== 'granted') {
         setIsLoading(false)
         return
       }
 
-      // Subscribe to push
+      if (!process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY) {
+        console.error('[Push] NEXT_PUBLIC_VAPID_PUBLIC_KEY is not set!')
+        return
+      }
+
+      console.log('[Push] Subscribing to push manager...')
       const subscription = await reg.pushManager.subscribe({
         userVisibleOnly: true,
         applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
       })
+      console.log('[Push] Subscription created:', subscription.endpoint)
 
       const subJson = subscription.toJSON()
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error('Not authenticated')
 
-      // Save subscription to Supabase
+      console.log('[Push] Saving subscription to Supabase for user:', user.id)
       const { error } = await supabase.from('push_subscriptions').upsert({
         user_id: user.id,
         endpoint: subJson.endpoint,
@@ -75,8 +86,12 @@ export function usePushNotifications() {
         auth: subJson.keys?.auth,
       }, { onConflict: 'user_id,endpoint' })
 
-      if (error) throw error
+      if (error) {
+        console.error('[Push] Supabase upsert error:', error)
+        throw error
+      }
 
+      console.log('[Push] Subscription saved successfully! ✅')
       setIsSubscribed(true)
     } catch (err) {
       console.error('[Push] Error subscribing:', err)

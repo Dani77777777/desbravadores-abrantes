@@ -2,9 +2,15 @@
 // Desbravadores Abrantes
 
 self.addEventListener('push', (event) => {
-  if (!event.data) return;
+  console.log('[SW] Push received:', event);
+  if (!event.data) {
+    console.warn('[SW] Push event but no data');
+    return;
+  }
 
   const data = event.data.json();
+  console.log('[SW] Notification data:', data);
+  
   const title = data.title || 'Desbravadores Abrantes';
   const options = {
     body: data.message || data.body || '',
