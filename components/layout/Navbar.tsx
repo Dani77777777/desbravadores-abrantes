@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Menu, X, LogOut, User, Shield, Tent, MessageSquare, Trophy, Phone } from 'lucide-react'
+import { PushNotificationButton } from '@/components/notifications/PushNotificationButton'
 import { createClient } from '@/utils/supabase/client'
 import { useRouter } from 'next/navigation'
 
@@ -107,7 +108,8 @@ export function Navbar({ user, profile }: NavbarProps) {
             )}
           </div>
           <div className="hidden md:block">
-            <div className="ml-4 flex items-center md:ml-6">
+            <div className="ml-4 flex items-center md:ml-6 gap-1">
+              {user && <PushNotificationButton />}
               {user ? (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
@@ -286,13 +288,16 @@ export function Navbar({ user, profile }: NavbarProps) {
                       </div>
                     </div>
                   </div>
-                  <Button
-                    variant="ghost"
-                    className="w-full justify-center text-red-100 hover:text-white hover:bg-red-600/20 py-8 text-lg font-bold rounded-2xl border border-red-900/30 transition-all active:scale-95"
-                    onClick={handleLogout}
-                  >
-                    <LogOut className="mr-3 h-5 w-5 text-red-400" /> Encerrar Sessão
-                  </Button>
+                  <div className="flex items-center justify-center gap-3">
+                    <PushNotificationButton />
+                    <Button
+                      variant="ghost"
+                      className="flex-1 justify-center text-red-100 hover:text-white hover:bg-red-600/20 py-8 text-lg font-bold rounded-2xl border border-red-900/30 transition-all active:scale-95"
+                      onClick={handleLogout}
+                    >
+                      <LogOut className="mr-3 h-5 w-5 text-red-400" /> Encerrar Sessão
+                    </Button>
+                  </div>
                 </div>
               ) : (
                 <div className="flex flex-col gap-4">
