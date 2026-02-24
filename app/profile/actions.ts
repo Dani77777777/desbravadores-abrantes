@@ -32,3 +32,21 @@ export async function updateUserProfile(data: {
   revalidatePath('/')
   return { success: true }
 }
+
+export async function transferGoldAction(recipientId: string, amount: number) {
+  const supabase = await createClient()
+
+  const { error } = await supabase.rpc('transfer_gold', {
+    recipient_id: recipientId,
+    amount: amount
+  })
+
+  if (error) {
+    console.error('Transfer error:', error)
+    return { error: error.message }
+  }
+
+  revalidatePath('/')
+  revalidatePath('/points-history')
+  return { success: true }
+}

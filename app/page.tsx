@@ -4,9 +4,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
 import { Badge } from '@/components/ui/badge'
 import Link from 'next/link'
+import { GoldTransferDialog } from '@/components/profile/GoldTransferDialog'
+
+// ... lines 7-9 ...
 import { TaskCompleteButton } from '@/components/tasks/TaskCompleteButton'
 import { EventDashboard } from '@/components/events/EventDashboard'
 import { Button } from '@/components/ui/button'
+// ... (adding import at top) ...
 import { User, Trophy, Coins, Megaphone, ScanLine, History, ListChecks, CheckCircle2, Clock, CalendarDays } from 'lucide-react'
 
 import { LandingPage } from '@/components/landing/LandingPage'
@@ -165,12 +169,15 @@ export default async function Dashboard() {
                                 <p className="text-2xl font-bold text-yellow-900">{profile.current_gold}</p>
                             </div>
                         </div>
-                        <Link href="/points-history">
-                          <Button size="sm" variant="outline" className="border-yellow-300 text-yellow-800 hover:bg-yellow-100 flex items-center gap-1">
-                              <History className="w-4 h-4" />
-                              Histórico
-                          </Button>
-                        </Link>
+                        <div className="flex flex-col gap-2">
+                            <GoldTransferDialog currentUserId={user.id} currentGold={profile.current_gold} />
+                            <Link href="/points-history">
+                              <Button size="sm" variant="outline" className="w-full border-yellow-300 text-yellow-800 hover:bg-yellow-100 flex items-center gap-1">
+                                  <History className="w-4 h-4" />
+                                  Histórico
+                              </Button>
+                            </Link>
+                        </div>
                     </div>
                 </div>
             </CardContent>

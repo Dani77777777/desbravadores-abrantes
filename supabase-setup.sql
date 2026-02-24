@@ -334,6 +334,52 @@ SET
 WHERE p.role = 'desbravador';
 
 -- ============================================
+-- 6. TRANSFERÊNCIA DE GOLD
+-- ============================================
+
+CREATE OR REPLACE FUNCTION public.transfer_gold(recipient_id uuid, amount integer, transfer_description text DEFAULT 'Transferência de Gold')
+RETURNS void LANGUAGE plpgsql SECURITY DEFINER AS $$
+DECLARE
+  sender_id uuid := auth.uid();
+  sender_gold integer;
+  recipient_name text;
+  sender_name text;
+BEGIN
+  -- 1. Validações iniciais
+  IF amount <= 0 THEN
+    RAISE EXCEPTION 'O valor da transferência deve ser superior a zero.';
+  END IF;
+
+  IF sender_id = recipient_id THEN
+    RAISE EXCEPTION 'Não podes transferir Gold para ti mesmo.';
+  END IF;
+
+  -- 2. Verificar saldo do remetente
+  SELECT current_gold, full_name INTO sender_gold, sender_name FROM public.profiles WHERE id = sender_id;
+  
+  IF sender_gold < amount THEN
+    RAISE EXCEPTION 'Saldo insuficiente. Tens apenas % 🪙.', sender_gold;
+  END IF;
+
+  -- 3. Obter nome do destinatário para o log
+  SELECT full_name INTO recipient_name FROM public.profiles WHERE id = recipient_id;
+  IF recipient_name IS NULL THEN
+    RAISE EXCEPTION 'Destinatário não encontrado.';
+  END IF;
+
+  -- 4. Registar a saída (Remetente)
+  INSERT INTO public.points_log (target_user_id, awarded_by_user_id, amount_xp, amount_gold, description)
+  VALUES (sender_id, sender_id, 0, -amount, transfer_description || ' para ' || recipient_name);
+
+  -- 5. Registar a entrada (Destinatário)
+  INSERT INTO public.points_log (target_user_id, awarded_by_user_id, amount_xp, amount_gold, description)
+  VALUES (recipient_id, sender_id, 0, amount, transfer_description || ' de ' || sender_name);
+
+  -- O gatilho 'on_points_log_change' tratará de atualizar os totais em 'public.profiles' automaticamente.
+END;
+$$;
+
+-- ============================================
 -- 6. SUGESTÕES E CRÍTICAS
 -- ============================================
 
