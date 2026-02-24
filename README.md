@@ -1,333 +1,137 @@
 # 🏕️ Clube de Desbravadores - Abrantes
 
-Plataforma de gamificação para o Clube de Desbravadores de Abrantes, seguindo as regras da UPASD Portugal.
-
-## 📋 Sobre o Projeto
-
-Sistema de gestão e gamificação que permite:
-- **Autenticação segura** via Google OAuth
-- **Dashboard personalizado** para cada desbravador
-- **Sistema de XP e Gold** para recompensar atividades
-- **Gestão de membros** para coordenadores e dirigentes
-- **Controlo de investiduras** e progressão por secções
-
-## 🎯 Secções (Baseadas na Idade)
-
-| Secção | Cor | Idade |
-|--------|-----|-------|
-| Rebentos | Verde | Calculado automaticamente |
-| Tições | Bordeaux | pela base de dados |
-| Exploradores | Amarelo/Verde | com base na |
-| Companheiros | Azul | data de nascimento |
-| Embaixadores | Cinza/Dourado | |
-
-## 🛠️ Stack Tecnológica
-
-- **Framework:** Next.js 14+ (App Router)
-- **Linguagem:** TypeScript
-- **Estilo:** Tailwind CSS v4
-- **Componentes:** Shadcn/ui
-- **Ícones:** Lucide React
-- **Backend:** Supabase (Auth + Database)
-
-## 🚀 Instalação e Configuração
-
-### Pré-requisitos
-
-- Node.js 18+ instalado
-- Conta Supabase configurada
-- Credenciais do Google OAuth
-
-### 1. Clonar o Repositório
-
-```bash
-git clone <url-do-repositorio>
-cd desbravadores-abrantes
-```
-
-### 2. Instalar Dependências
-
-```bash
-npm install
-```
-
-### 3. Configurar Variáveis de Ambiente
-
-Crie um ficheiro `.env.local` na raiz do projeto:
-
-```env
-NEXT_PUBLIC_SUPABASE_URL=https://seu-projeto.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=sua-chave-anon-aqui
-```
-
-### 4. Configurar Supabase
-
-#### Estrutura da Base de Dados
-
-O projeto espera as seguintes tabelas:
-
-**profiles**
-```sql
-- id (uuid, FK para auth.users)
-- full_name (text)
-- avatar_url (text, nullable)
-- section (enum: rebentos, ticoes, exploradores, companheiros, embaixadores)
-- role (enum: coordenador, dirigente, desbravador)
-- total_xp (integer, default: 0)
-- current_gold (integer, default: 0)
-- birth_date (date, nullable)
-- is_invested (boolean, default: false)
-- created_at (timestamp)
-```
-
-**points_log**
-```sql
-- id (uuid)
-- target_user_id (uuid, FK para profiles)
-- awarded_by_user_id (uuid, FK para profiles)
-- amount_xp (integer, default: 0)
-- amount_gold (integer, default: 0)
-- description (text)
-- created_at (timestamp)
-```
-
-**announcements**
-```sql
-- id (uuid)
-- title (text)
-- message (text)
-- created_at (timestamp)
-- author_id (uuid, FK para profiles)
-- target_user_id (uuid, nullable, FK para profiles)
-- target_section (enum, nullable)
-- target_role (enum, nullable)
-```
-
-#### Configurar Autenticação
-
-1. Aceda ao painel Supabase → Authentication → Providers
-2. Certifique-se que "Email" está ativado
-3. (Opcional) Para desenvolvimento, desative a confirmação de email:
-   - Authentication → Settings → Email Auth
-   - Desative "Enable email confirmations"
-
-#### Configurar Trigger de Criação de Perfis
-
-**IMPORTANTE:** Execute o SQL em `supabase-setup.sql` no SQL Editor do Supabase.
-
-Este script cria:
-- Trigger automático para criar perfil quando utilizador se regista
-- Políticas RLS (Row Level Security) para proteger os dados
-- Permissões adequadas para coordenadores e desbravadores
-
-Ver ficheiro `supabase-setup.sql` para detalhes.
-
-### 5. Executar em Desenvolvimento
-
-```bash
-npm run dev
-```
-
-Abra [http://localhost:3000](http://localhost:3000) no navegador.
-
-### 6. Build para Produção
-
-```bash
-npm run build
-npm start
-```
-
-## 📱 Funcionalidades
-
-### Para Desbravadores
-
-- ✅ Login com Email/Password
-- ✅ Criação de conta (Sign Up)
-- ✅ Onboarding automático (captura data de nascimento)
-- ✅ Dashboard personalizado com:
-  - Avatar e informações pessoais
-  - Barra de progresso de XP
-  - Saldo de Gold (moedas)
-  - Feed de avisos e notícias
-  - Indicador de investidura
-- ✅ Botão de scan QR (UI preparada)
-
-### Para Coordenadores/Dirigentes
-
-- ✅ Acesso ao painel de gestão (`/admin`)
-- ✅ Listagem de membros da secção
-- ✅ Atribuir XP e Gold com motivo
-- ✅ Marcar/desmarcar investidura
-- ✅ Visualização de estatísticas dos membros
-
-## 🔐 Proteção de Rotas
-
-O middleware protege automaticamente:
-- Redireciona utilizadores não autenticados para `/login`
-- Redireciona novos utilizadores sem `birth_date` para `/onboarding`
-- Restringe `/admin` apenas para coordenadores e dirigentes
-
-## 🎨 Design System
-
-### Cores das Secções
-
-```typescript
-const SECTION_COLORS = {
-  rebentos: 'bg-green-500',
-  ticoes: 'bg-red-800',
-  exploradores: 'bg-yellow-500',
-  companheiros: 'bg-blue-600',
-  embaixadores: 'bg-slate-500',
-}
-```
-
-### Componentes Shadcn/ui Utilizados
-
-- Button
-- Card
-- Progress
-- Avatar
-- Dialog
-- Switch
-- Input
-- Badge
-- Sonner (Toasts)
-- Label
-- Dropdown Menu
-- Skeleton
-- Separator
-
-## 📂 Estrutura do Projeto
-
-```
-desbravadores-abrantes/
-├── app/
-│   ├── admin/
-│   │   ├── components/
-│   │   │   └── MemberList.tsx
-│   │   └── page.tsx
-│   ├── auth/
-│   │   └── callback/
-│   │       └── route.ts
-│   ├── login/
-│   │   └── page.tsx
-│   ├── onboarding/
-│   │   └── page.tsx
-│   ├── layout.tsx
-│   ├── page.tsx (Dashboard)
-│   └── globals.css
-├── components/
-│   ├── layout/
-│   │   └── Navbar.tsx
-│   └── ui/ (Shadcn components)
-├── utils/
-│   └── supabase/
-│       ├── client.ts
-│       ├── server.ts
-│       └── middleware.ts
-├── types/
-│   └── supabase.ts
-├── middleware.ts
-└── .env.local
-```
-
-## 🔄 Fluxo de Autenticação
-
-1. Utilizador acede à aplicação
-2. Middleware verifica sessão
-3. Se não autenticado → redireciona para `/login`
-4. Login com Google OAuth
-5. Callback processa a sessão
-6. Se `birth_date` é NULL → redireciona para `/onboarding`
-7. Após onboarding → redireciona para Dashboard (`/`)
-
-## 🧪 Verificação
-
-Para testar a aplicação:
-
-1. **Login Flow:**
-   - Aceda a `http://localhost:3000`
-   - Clique em "Entrar com Google"
-   - Complete o onboarding (se necessário)
-
-2. **Dashboard:**
-   - Verifique a cor da secção
-   - Confirme barras de XP e Gold
-   - Veja avisos (se existirem)
-
-3. **Painel Admin:**
-   - Faça login com conta de coordenador/dirigente
-   - Aceda a `/admin`
-   - Teste atribuir pontos
-   - Teste toggle de investidura
-
-## 🐛 Resolução de Problemas
-
-### Build Errors
-
-Se encontrar erros de build:
-```bash
-rm -rf .next node_modules
-npm install
-npm run build
-```
-
-### Problemas de Autenticação
-
-- Verifique se as credenciais estão corretas no `.env.local`
-- Limpe os cookies do navegador
-
-### Erro no Onboarding (Birth Date)
-
-Se aparecer erro ao guardar a data de nascimento:
-
-1. **Verifique se executou o SQL do `supabase-setup.sql`**
-   - O trigger deve criar o perfil automaticamente
-   - As políticas RLS devem permitir INSERT e UPDATE
-
-2. **Execute este SQL adicional no Supabase:**
-   ```sql
-   -- Permitir utilizadores criarem o próprio perfil
-   CREATE POLICY "Users can insert own profile"
-     ON public.profiles
-     FOR INSERT
-     WITH CHECK (auth.uid() = id);
-   ```
-
-3. **Verifique no Supabase → Table Editor → profiles**
-   - Se o perfil não foi criado, o código agora cria automaticamente
-
-### Middleware Loops
-
-Se houver loops de redirecionamento:
-- Verifique se o perfil tem `birth_date` preenchido
-- Confirme que a tabela `profiles` existe e está acessível
-
-## 📝 Próximos Passos
-
-- [ ] Implementar funcionalidade de QR Code
-- [ ] Sistema de conquistas/badges
-- [ ] Ranking de desbravadores
-- [ ] Notificações push
-- [ ] Histórico detalhado de pontos
-- [ ] Exportação de relatórios
-
-## 🤝 Contribuir
-
-1. Fork o projeto
-2. Crie uma branch para a feature (`git checkout -b feature/NovaFuncionalidade`)
-3. Commit as mudanças (`git commit -m 'Adiciona nova funcionalidade'`)
-4. Push para a branch (`git push origin feature/NovaFuncionalidade`)
-5. Abra um Pull Request
-
-## 📄 Licença
-
-Este projeto é privado e destinado exclusivamente ao Clube de Desbravadores de Abrantes.
-
-## 👥 Contacto
-
-Para questões ou suporte, contacte a coordenação do clube.
+Plataforma de gamificação e gestão para o Clube de Desbravadores de Abrantes, desenvolvida com foco na motivação e organização seguindo as diretrizes da UPASD Portugal.
 
 ---
 
+## 🌟 Visão Geral
+
+O projeto **Desbravadores Abrantes** é uma plataforma "Mobile-First" que transforma a progressão dos desbravadores numa experiência interativa. Através de um sistema de XP (Experiência) e Gold (Moedas), os membros são recompensados pela sua participação, pontualidade e dedicação às atividades do clube.
+
+### ✨ Funcionalidades Principais
+
+#### 🎒 Para Desbravadores
+- **Dashboard Personalizado:** Visualização de progresso, saldo de Gold e medalha de investidura.
+- **Ranking (Leaderboard):** Tabela classificativa pública em tempo real entre todos os membros.
+- **Agenda de Eventos:** Consulta de próximas atividades, localizações e recompensas previstas.
+- **Sistema de Tarefas:** Lista de objetivos específicos por secção com atribuição automática de pontos.
+- **Transferência de Gold:** Envio de moedas entre amigos para incentivar a cooperação.
+- **Caixa de Sugestões:** Canal direto para enviar críticas ou ideias à liderança.
+- **Histórico de Pontos:** Transparência total sobre como e quando os pontos foram ganhos.
+
+#### 🛡️ Para Liderança (Dirigentes e Coordenadores)
+- **Painel de Gestão Admin:** Visão consolidada de todas as secções.
+- **Controlo de Presenças:** Gestão simplificada com cálculo automático de bonificações por pontualidade.
+- **Emissão de Avisos:** Sistema de anúncios direcionados (por pessoa, secção ou papel).
+- **Gestão de Investiduras:** Toggle manual para marcar a conclusão de classes.
+- **Dashboard de Métricas:** Estatísticas de engajamento, aniversários e distribuição de membros.
+- **Moderação de Sugestões:** Leitura e gestão de feedback enviado pelos membros.
+
+---
+
+## � Secções e Cores
+
+O sistema adapta-se visualmente à secção do utilizador, calculada automaticamente pela data de nascimento:
+
+| Secção | Cor Principal | Faixa Etária (Aprox.) |
+| :--- | :--- | :--- |
+| **Rebentos** | 🟢 Esmeralda | 3 - 5 anos |
+| **Tições** | 🔴 Bordeaux | 6 - 10 anos |
+| **Exploradores** | 🟡 Amarelo | 11 - 15 anos |
+| **Companheiros** | 🔵 Azul | 16 - 23 anos |
+| **Embaixadores** | ⚪ Cinza/Dourado | Liderança / +23 anos |
+
+---
+
+## 🛠️ Stack Tecnológica
+
+- **Frontend:** [Next.js 15+](https://nextjs.org/) (App Router, React 19)
+- **Estilo:** [Tailwind CSS v4](https://tailwindcss.com/) & [Shadcn/UI](https://ui.shadcn.com/)
+- **Backend:** [Supabase](https://supabase.com/) (Auth, PostgreSQL, Real-time, Storage)
+- **Notificações:** Web Push API (Service Workers)
+- **Ícones:** [Lucide React](https://lucide.dev/)
+- **Formulários:** React Hook Form + Zod
+
+---
+
+## 🚀 Guia de Início Rápido
+
+### 1. Requisitos
+- Node.js 18.x ou superior.
+- Conta no Supabase.
+
+### 2. Instalação
+```bash
+git clone <url-do-repositorio>
+cd desbravadores-abrantes
+npm install
+```
+
+### 3. Configuração de Ambiente
+Crie um `.env.local` com:
+```env
+NEXT_PUBLIC_SUPABASE_URL=https://seu-projeto.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=sua-chave-anon
+SUPABASE_SERVICE_ROLE_KEY=sua-chave-service-role
+NEXT_PUBLIC_VAPID_PUBLIC_KEY=sua-chave-push-publica
+VAPID_PRIVATE_KEY=sua-chave-push-privada
+```
+
+### 4. Base de Dados
+O coração do sistema reside no arquivo `supabase-setup.sql`. Execute este script no editor SQL do Supabase para configurar:
+- Tabelas e Enums.
+- **RLS (Row Level Security):** Proteção rigorosa de dados.
+- **Triggers:** Automação de criação de perfis, cálculo de secção por idade e sincronização de totais de XP/Gold.
+- **Functions:** Lógica de transferência de ouro e cálculo de classes.
+
+---
+
+## 📂 Estrutura de Pastas
+
+```text
+app/
+├── (auth)/         # Login, Onboarding e Callbacks
+├── admin/          # Painel de controlo (Tabs: Overview, Members, Events, etc)
+├── contacts/       # Informação útil e redes sociais
+├── leaderboard/    # Ranking público de membresia
+├── points-history/ # Registo detalhado de ganhos/gastos
+├── profile/        # Edição de perfil e transferências
+└── suggestions/    # Sistema de feedback
+components/
+├── events/         # Calendar e Card de eventos
+├── layout/         # Navbar e Footer dinâmicos
+├── profile/        # Dialogs e Avatars
+└── ui/             # Componentes base (Shadcn)
+utils/
+└── supabase/       # Configuração client/server/middleware
+```
+
+---
+
+## � Segurança e Regras
+
+1. **Privacidade:** Membros só vêem os seus próprios dados e o ranking básico.
+2. **Hierarquia:** 
+   - **Dirigentes:** Gerem apenas a sua secção atribuída (`leadership_section`).
+   - **Coordenadores:** Acesso total a todos os dados e ferramentas do clube.
+3. **Persistência:** Todo o XP e Gold é auditado através da tabela `points_log`, impedindo alterações manuais sem rasto.
+
+---
+
+## � Roadmap / Próximos Desafios
+- [x] Web Push Notifications
+- [x] Sistema de Sugestões
+- [x] Ranking Público
+- [x] Gestão de Presenças Automática
+- [ ] Módulo de Inventário / Loja (Troca de Gold por prémios)
+- [ ] Exportação de Relatórios PDF (Quadro de Mérito)
+
+---
+
+## 🤝 Contacto e Suporte
+
+Este projeto é desenvolvido para o **Clube de Desbravadores de Abrantes**. Para suporte técnico ou sugestões, contacte a equipa de tecnologia do clube ou utilize a aba de Sugestões na plataforma.
+
+---
 **Aventura • Amizade • Fé** 🏕️
+
