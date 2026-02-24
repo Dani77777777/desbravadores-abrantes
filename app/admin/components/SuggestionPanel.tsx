@@ -88,7 +88,10 @@ export function SuggestionPanel({ profile, initialSuggestions }: SuggestionPanel
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-lg font-semibold text-gray-800">Sugestões e Críticas</h2>
+          <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+             <MessageSquare className="w-5 h-5 text-blue-800" />
+             Sugestões e Críticas
+          </h2>
           <p className="text-sm text-gray-500">
             {profile.role === 'coordenador' 
               ? 'Todas as sugestões enviadas ao clube.' 
@@ -99,78 +102,77 @@ export function SuggestionPanel({ profile, initialSuggestions }: SuggestionPanel
           variant="outline" 
           size="sm" 
           onClick={() => setShowRead(!showRead)}
-          className="flex items-center gap-2"
+          className="flex items-center gap-2 h-10 px-4 rounded-xl border-slate-200 font-bold text-slate-600 hover:bg-slate-50 transition-all"
         >
           {showRead ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-          {showRead ? 'Ocultar lidas' : 'Mostrar lidas'}
+          {showRead ? 'Ocultar Lidas' : 'Mostrar Lidas'}
         </Button>
       </div>
 
       {filteredSuggestions.length > 0 ? (
         <div className="grid grid-cols-1 gap-4">
           {filteredSuggestions.map((s) => (
-            <Card key={s.id} className={`${s.is_read ? 'bg-gray-50 opacity-75' : 'bg-white border-blue-200'}`}>
-              <CardHeader className="pb-2">
-                <div className="flex justify-between items-start">
-                  <div className="flex items-center gap-2">
-                    <Badge variant={s.target === 'coordenador' ? 'destructive' : 'secondary'} className="capitalize">
+            <Card key={s.id} className={`overflow-hidden transition-all duration-300 ${s.is_read ? 'bg-slate-50/50 border-slate-100 opacity-80' : 'bg-white border-blue-100 shadow-sm hover:shadow-md'}`}>
+              <CardHeader className="pb-3 border-b border-slate-50">
+                <div className="flex justify-between items-start gap-4">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge className={`font-black text-[10px] uppercase tracking-wider rounded-md ${s.target === 'coordenador' ? 'bg-rose-50 text-rose-600' : 'bg-blue-50 text-blue-700'}`}>
                       Para: {s.target}
                     </Badge>
                     {!s.is_read && (
-                      <Badge className="bg-blue-600">Nova</Badge>
+                      <Badge className="bg-blue-800 text-white font-black text-[10px] uppercase tracking-wider">Nova</Badge>
+                    )}
+                    {s.points_awarded && (
+                      <Badge className="bg-yellow-50 text-yellow-700 border-none font-black text-[10px] uppercase tracking-wider flex items-center gap-1">
+                        <Trophy className="w-3 h-3" /> Recompensada
+                      </Badge>
                     )}
                   </div>
-                  <span className="text-xs text-gray-500">
-                    {new Date(s.created_at).toLocaleString('pt-PT')}
+                  <span className="text-[10px] font-bold text-slate-400 whitespace-nowrap bg-slate-100 px-2 py-0.5 rounded-full">
+                    {new Date(s.created_at).toLocaleDateString('pt-PT', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
                   </span>
                 </div>
-                <CardTitle className="text-sm font-bold mt-2">
-                  {s.profiles?.full_name || 'Membro'} • {s.profiles?.section || 'Sem secção'}
-                </CardTitle>
+                <div className="mt-3 flex items-center gap-3">
+                   <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-800 text-xs font-black">
+                      {s.profiles?.full_name?.charAt(0).toUpperCase()}
+                   </div>
+                   <div>
+                      <CardTitle className="text-sm font-bold text-slate-800">
+                        {s.profiles?.full_name || 'Membro'}
+                      </CardTitle>
+                      <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tight">{s.profiles?.section || 'Sem secção'}</p>
+                   </div>
+                </div>
               </CardHeader>
-              <CardContent>
-                <p className="text-sm text-gray-700 whitespace-pre-wrap">{s.content}</p>
-                {!s.is_read && (
-                  <div className="mt-4 flex justify-end">
-                    <Button 
-                      size="sm" 
-                      variant="ghost" 
-                      className="text-blue-700 hover:text-blue-800 hover:bg-blue-50"
-                      onClick={() => markAsRead(s.id)}
-                    >
-                      <CheckCircle2 className="mr-2 h-4 w-4" />
-                      Marcar como lido
-                    </Button>
-                  </div>
-                )}
+              <CardContent className="pt-5">
+                <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100/50">
+                  <p className="text-sm text-slate-700 whitespace-pre-wrap leading-relaxed italic">"{s.content}"</p>
+                </div>
                 
-                {profile.role === 'coordenador' && !s.points_awarded && (
-                  <div className="mt-4 pt-4 border-t border-gray-100 bg-stone-50/50 -mx-6 px-6 -mb-6 pb-6 rounded-b-lg">
-                    <p className="text-xs font-semibold text-gray-500 mb-3 uppercase tracking-wider flex items-center gap-1.5">
-                      <Trophy className="w-3 h-3" /> Atribuir Recompensa
-                    </p>
-                    <div className="flex flex-wrap items-end gap-3">
+                <div className="mt-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                  {profile.role === 'coordenador' && !s.points_awarded ? (
+                    <div className="w-full sm:w-auto flex flex-wrap items-end gap-3 p-4 bg-yellow-50/50 rounded-2xl border border-yellow-100">
                       <div className="space-y-1.5">
-                        <Label className="text-[10px] text-gray-400">XP</Label>
+                        <Label className="text-[10px] font-black text-yellow-700 uppercase">XP</Label>
                         <Input 
                           type="number" 
                           value={xpAmount} 
                           onChange={(e) => setXpAmount(parseInt(e.target.value) || 0)}
-                          className="h-8 w-20 text-xs"
+                          className="h-8 w-20 text-xs border-yellow-200 focus-visible:ring-yellow-400 rounded-lg"
                         />
                       </div>
                       <div className="space-y-1.5">
-                        <Label className="text-[10px] text-gray-400">Gold</Label>
+                        <Label className="text-[10px] font-black text-yellow-700 uppercase">Gold</Label>
                         <Input 
                           type="number" 
                           value={goldAmount} 
                           onChange={(e) => setGoldAmount(parseInt(e.target.value) || 0)}
-                          className="h-8 w-20 text-xs"
+                          className="h-8 w-20 text-xs border-yellow-200 focus-visible:ring-yellow-400 rounded-lg"
                         />
                       </div>
                       <Button 
                         size="sm" 
-                        className="h-8 bg-yellow-600 hover:bg-yellow-700 text-xs"
+                        className="h-8 bg-yellow-600 hover:bg-yellow-700 text-xs font-bold px-4 rounded-lg shadow-sm shadow-yellow-200 ml-auto sm:ml-0"
                         disabled={rewardLoading === s.id}
                         onClick={() => giveReward(s)}
                       >
@@ -182,34 +184,37 @@ export function SuggestionPanel({ profile, initialSuggestions }: SuggestionPanel
                         Dar Recompensa
                       </Button>
                     </div>
-                  </div>
-                )}
+                  ) : <div />}
 
-                {(s.is_read || s.points_awarded) && (
-                    <div className="mt-4 flex items-center gap-3 justify-end">
-                        {s.points_awarded && (
-                           <Badge variant="outline" className="text-[10px] bg-yellow-50 text-yellow-700 border-yellow-200 gap-1">
-                               <Trophy className="w-2.5 h-2.5" /> Recompensada
-                           </Badge>
-                        )}
-                        {s.is_read && (
-                            <div className="flex items-center gap-1.5 text-xs text-green-600 font-medium">
-                                <CheckCircle2 className="w-4 h-4" />
-                                Lida
-                            </div>
-                        )}
+                  {!s.is_read ? (
+                    <Button 
+                      size="sm" 
+                      variant="ghost" 
+                      className="w-full sm:w-auto text-blue-700 hover:text-white hover:bg-blue-800 font-bold text-xs h-9 rounded-xl transition-all"
+                      onClick={() => markAsRead(s.id)}
+                    >
+                      <CheckCircle2 className="mr-2 h-4 w-4" />
+                      Marcar como Lido
+                    </Button>
+                  ) : (
+                    <div className="flex items-center gap-1.5 text-xs text-green-600 font-black uppercase tracking-wider ml-auto">
+                        <CheckCircle2 className="w-4 h-4" />
+                        Lida
                     </div>
-                )}
+                  )}
+                </div>
               </CardContent>
             </Card>
           ))}
         </div>
       ) : (
-        <Card className="border-dashed flex flex-col items-center justify-center p-12 text-center text-gray-500 bg-transparent">
-          <MessageSquare className="w-12 h-12 mb-4 opacity-20" />
-          <p className="text-lg font-medium">Sem sugestões para mostrar.</p>
-          <p className="text-sm mt-1">
-            {showRead ? 'Ainda não foram recebidas sugestões.' : 'Todas as sugestões foram lidas!'}
+        <Card className="border-2 border-dashed border-slate-200 flex flex-col items-center justify-center p-16 text-center text-slate-400 bg-white rounded-3xl">
+          <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mb-4">
+            <MessageSquare className="w-8 h-8 opacity-20" />
+          </div>
+          <p className="text-xl font-black text-slate-300">Sem sugestões</p>
+          <p className="text-sm mt-1 font-medium">
+            {showRead ? 'Ainda não foram recebidas sugestões.' : 'Todas as sugestões foram lidas! 🎉'}
           </p>
         </Card>
       )}
