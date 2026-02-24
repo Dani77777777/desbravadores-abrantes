@@ -202,6 +202,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
           <OverviewPanel
             profile={profile}
             members={members || []}
+            events={events || []}
           />
         )}
 

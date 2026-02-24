@@ -10,12 +10,15 @@ import {
   Cake, 
   BarChart3, 
   ChevronRight,
-  TrendingUp
+  TrendingUp,
+  CalendarDays,
+  MapPin
 } from 'lucide-react'
 
 interface OverviewPanelProps {
   profile: any
   members: any[]
+  events: any[]
 }
 
 const SECTION_LABELS: Record<string, string> = {
@@ -34,7 +37,7 @@ const SECTION_COLORS: Record<string, string> = {
   embaixadores: 'bg-rose-100 text-rose-700',
 }
 
-export function OverviewPanel({ profile, members }: OverviewPanelProps) {
+export function OverviewPanel({ profile, members, events }: OverviewPanelProps) {
   const isCoordenador = profile.role === 'coordenador'
   const targetSection = profile.leadership_section || profile.section
 
@@ -80,6 +83,12 @@ export function OverviewPanel({ profile, members }: OverviewPanelProps) {
     .sort((a, b) => (b.total_xp || 0) - (a.total_xp || 0))
     .slice(0, 5)
 
+  // 5. Upcoming Events
+  const upcomingEvents = events
+    .filter(e => !e.is_finished && new Date(e.start_at) >= today)
+    .sort((a, b) => new Date(a.start_at).getTime() - new Date(b.start_at).getTime())
+    .slice(0, 3)
+
   return (
     <div className="space-y-6">
       {/* Metrics Row */}
@@ -111,88 +120,89 @@ export function OverviewPanel({ profile, members }: OverviewPanelProps) {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left Column: Birthdays & Top Performers */}
+        {/* Left Column (2/3) */}
         <div className="lg:col-span-2 space-y-6">
-          {/* Birthdays */}
-          <Card>
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <Cake className="w-5 h-5 text-pink-500" />
-                  Próximos Aniversários
-                </CardTitle>
-                <Badge variant="outline" className="text-[10px]">Próximos 30 dias</Badge>
-              </div>
-            </CardHeader>
-            <CardContent>
-              {next30DaysBirthdays.length === 0 ? (
-                <p className="text-sm text-gray-400 text-center py-4">Sem aniversários nos próximos 30 dias.</p>
-              ) : (
-                <div className="divide-y divide-gray-100">
-                  {next30DaysBirthdays.map(m => (
-                    <div key={m.id} className="py-3 flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-pink-50 flex items-center justify-center text-pink-600 font-bold text-xs">
-                          {m.full_name.charAt(0).toUpperCase()}
-                        </div>
-                        <div>
-                          <p className="text-sm font-semibold text-gray-800">{m.full_name}</p>
-                          <p className="text-[10px] text-gray-500 uppercase">{SECTION_LABELS[m.section]}</p>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-sm font-bold text-pink-600">
-                          {m.daysUntil === 0 ? 'Hoje! 🎂' : `Em ${m.daysUntil} dias`}
-                        </p>
-                        <p className="text-[10px] text-gray-400">
-                          {new Date(m.birth_date).toLocaleDateString('pt-PT', { day: '2-digit', month: 'long' })}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
+          {/* Sub-grid for Birthdays and Events */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Birthdays */}
+            <Card className="h-full">
+              <CardHeader className="pb-3 px-4 sm:px-6">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-sm sm:text-lg flex items-center gap-2">
+                    <Cake className="w-5 h-5 text-pink-500" />
+                    Aniversários
+                  </CardTitle>
+                  <Badge variant="outline" className="text-[10px]">30 dias</Badge>
                 </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Top Performers */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-lg flex items-center gap-2">
-                <TrendingUp className="w-5 h-5 text-emerald-500" />
-                Membros com Mais XP
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {topPerformers.map((m, idx) => (
-                  <div key={m.id} className="flex items-center gap-4">
-                    <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
-                      idx === 0 ? 'bg-yellow-100 text-yellow-700' : 
-                      idx === 1 ? 'bg-slate-100 text-slate-700' :
-                      idx === 2 ? 'bg-orange-100 text-orange-700' : 'text-gray-400'
-                    }`}>
-                      {idx + 1}
-                    </div>
-                    <div className="flex-1">
-                      <div className="flex justify-between items-center mb-1">
-                        <span className="text-sm font-medium text-gray-800">{m.full_name}</span>
-                        <span className="text-sm font-bold text-blue-700">{m.total_xp.toLocaleString()} XP</span>
+              </CardHeader>
+              <CardContent className="px-4 sm:px-6">
+                {next30DaysBirthdays.length === 0 ? (
+                  <p className="text-sm text-gray-400 text-center py-4">Sem aniversários próximos.</p>
+                ) : (
+                  <div className="divide-y divide-gray-100">
+                    {next30DaysBirthdays.map(m => (
+                      <div key={m.id} className="py-2.5 flex items-center justify-between">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <div className="w-7 h-7 rounded-full bg-pink-50 flex items-center justify-center text-pink-600 font-bold text-[10px] shrink-0">
+                            {m.full_name.charAt(0).toUpperCase()}
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-xs font-semibold text-gray-800 truncate">{m.full_name}</p>
+                            <p className="text-[9px] text-gray-400 capitalize">{m.section}</p>
+                          </div>
+                        </div>
+                        <div className="text-right shrink-0 ml-2">
+                          <p className="text-[10px] font-bold text-pink-600">
+                            {m.daysUntil === 0 ? 'Hoje! 🎂' : `Em ${m.daysUntil}d`}
+                          </p>
+                        </div>
                       </div>
-                      <div className="w-full bg-gray-100 h-1.5 rounded-full overflow-hidden">
-                        <div 
-                          className="bg-blue-600 h-full rounded-full transition-all duration-500" 
-                          style={{ width: `${(m.total_xp / (topPerformers[0].total_xp || 1)) * 100}%` }}
-                        />
-                      </div>
-                    </div>
+                    ))}
                   </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+                )}
+              </CardContent>
+            </Card>
 
-          {/* Non-Invested Members */}
+            {/* Upcoming Events */}
+            <Card className="h-full">
+              <CardHeader className="pb-3 px-4 sm:px-6">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-sm sm:text-lg flex items-center gap-2">
+                    <CalendarDays className="w-5 h-5 text-indigo-600" />
+                    Agenda
+                  </CardTitle>
+                  <Badge variant="outline" className="text-[9px]">Eventos</Badge>
+                </div>
+              </CardHeader>
+              <CardContent className="px-4 sm:px-6">
+                {upcomingEvents.length === 0 ? (
+                  <p className="text-sm text-gray-400 text-center py-4">Sem eventos agendados.</p>
+                ) : (
+                  <div className="space-y-4">
+                    {upcomingEvents.map(event => (
+                      <div key={event.id} className="relative pl-3 border-l-2 border-indigo-100 py-0.5">
+                        <div className="absolute -left-[5px] top-1.5 w-2 h-2 rounded-full bg-indigo-500" />
+                        <p className="text-xs font-bold text-gray-800 line-clamp-1">{event.title}</p>
+                        <div className="flex items-center gap-2 text-[10px] text-gray-500 mt-0.5">
+                          <CalendarDays className="w-3 h-3" />
+                          <span>
+                            {new Date(event.start_at).toLocaleDateString('pt-PT', { 
+                              day: '2-digit', 
+                              month: 'short',
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            })}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Members per Investiture Status */}
           <Card>
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
@@ -212,13 +222,13 @@ export function OverviewPanel({ profile, members }: OverviewPanelProps) {
                 <div className="divide-y divide-gray-100">
                   {members.filter(m => !m.is_invested).map(m => (
                     <div key={m.id} className="py-2.5 flex items-center justify-between">
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-2">
                         <div className="w-7 h-7 rounded-full bg-amber-50 flex items-center justify-center text-amber-600 font-bold text-[10px]">
                           {m.full_name.charAt(0).toUpperCase()}
                         </div>
-                        <span className="text-sm font-medium text-gray-700">{m.full_name}</span>
+                        <span className="text-xs font-medium text-gray-700">{m.full_name}</span>
                       </div>
-                      <Badge variant="secondary" className={`text-[10px] capitalize ${SECTION_COLORS[m.section]}`}>
+                      <Badge variant="secondary" className={`text-[9px] capitalize ${SECTION_COLORS[m.section]}`}>
                         {SECTION_LABELS[m.section]}
                       </Badge>
                     </div>
@@ -229,24 +239,62 @@ export function OverviewPanel({ profile, members }: OverviewPanelProps) {
           </Card>
         </div>
 
-        {/* Right Column: Section Distribution */}
+        {/* Right Column (1/3) */}
         <div className="space-y-6">
-          <Card className="h-full">
+          {/* Top Performers */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-lg flex items-center gap-2">
+                <TrendingUp className="w-5 h-5 text-emerald-500" />
+                Melhores XP
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {topPerformers.map((m, idx) => (
+                  <div key={m.id} className="flex items-center gap-3">
+                    <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${
+                      idx === 0 ? 'bg-yellow-100 text-yellow-700' : 
+                      idx === 1 ? 'bg-slate-100 text-slate-700' :
+                      idx === 2 ? 'bg-orange-100 text-orange-700' : 'text-gray-400'
+                    }`}>
+                      {idx + 1}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex justify-between items-center mb-1">
+                        <span className="text-xs font-medium text-gray-800 truncate pr-2">{m.full_name}</span>
+                        <span className="text-xs font-bold text-blue-700 shrink-0">{m.total_xp.toLocaleString()}</span>
+                      </div>
+                      <div className="w-full bg-gray-100 h-1 rounded-full overflow-hidden">
+                        <div 
+                          className="bg-blue-600 h-full rounded-full transition-all duration-500" 
+                          style={{ width: `${(m.total_xp / (topPerformers[0].total_xp || 1)) * 100}%` }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Section Distribution */}
+          <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-lg flex items-center gap-2">
                 <BarChart3 className="w-5 h-5 text-blue-600" />
-                Distribuição por Classe
+                Classes
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
                 {distribution.map(item => (
                   <div key={item.key} className="space-y-1.5">
-                    <div className="flex justify-between items-center text-sm">
+                    <div className="flex justify-between items-center text-xs">
                       <span className="font-medium text-gray-700">{item.label}</span>
                       <span className="font-bold">{item.count}</span>
                     </div>
-                    <div className="w-full bg-gray-100 h-2.5 rounded-full overflow-hidden">
+                    <div className="w-full bg-gray-100 h-2 rounded-full overflow-hidden">
                       <div 
                         className={`h-full rounded-full transition-all duration-500 ${
                           item.key === 'rebentos' ? 'bg-emerald-500' :
@@ -261,19 +309,14 @@ export function OverviewPanel({ profile, members }: OverviewPanelProps) {
                 ))}
               </div>
 
-              <div className="mt-8 p-4 bg-slate-50 rounded-xl border border-slate-100">
-                <h4 className="text-xs font-bold text-slate-500 uppercase mb-3">Resumo da Classe</h4>
+              <div className="mt-6 p-4 bg-slate-50 rounded-xl border border-slate-100">
                 <div className="space-y-2">
-                  <div className="flex justify-between text-xs">
-                    <span className="text-gray-600">Membros Ativos</span>
-                    <span className="font-bold text-gray-900">{totalMembers}</span>
-                  </div>
-                  <div className="flex justify-between text-xs">
-                    <span className="text-gray-600">Taxa de Investidura</span>
+                  <div className="flex justify-between text-[10px]">
+                    <span className="text-gray-600 italic">Investidura</span>
                     <span className="font-bold text-emerald-600">{investmentRate}%</span>
                   </div>
-                  <div className="flex justify-between text-xs">
-                    <span className="text-gray-600">Média XP / Membro</span>
+                  <div className="flex justify-between text-[10px]">
+                    <span className="text-gray-600 italic">Média XP</span>
                     <span className="font-bold text-blue-600">
                       {totalMembers > 0 ? Math.round(totalXP / totalMembers).toLocaleString() : 0}
                     </span>

@@ -12,7 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
-import { Plus, Trophy, Coins, Calendar, MapPin, Users, Trash2, CheckCircle2, ListChecks, History } from 'lucide-react'
+import { Plus, Trophy, Coins, Calendar, MapPin, Users, Trash2, CheckCircle2, ListChecks, History, Pencil } from 'lucide-react'
 import { EventAttendanceManager } from './EventAttendanceManager'
 
 interface EventPanelProps {
@@ -59,6 +59,15 @@ export function EventPanel({ profile, members, events }: EventPanelProps) {
   // Attendance Manager
   const [attendanceOpen, setAttendanceOpen] = useState(false)
   const [selectedEvent, setSelectedEvent] = useState<any>(null)
+
+  // Edit event state
+  const [editOpen, setEditOpen] = useState(false)
+  const [editingEvent, setEditingEvent] = useState<any>(null)
+  const [editDescription, setEditDescription] = useState('')
+  const [editLocation, setEditLocation] = useState('')
+  const [editXpReward, setEditXpReward] = useState(50)
+  const [editGoldReward, setEditGoldReward] = useState(10)
+  const [updating, setUpdating] = useState(false)
 
   const handleCreateEvent = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -128,6 +137,32 @@ export function EventPanel({ profile, members, events }: EventPanelProps) {
       toast.error(e.message || 'Erro ao reagendar evento.')
     } finally {
       setRescheduling(false)
+    }
+  }
+
+  const handleEditEvent = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!editingEvent) return
+    setUpdating(true)
+    try {
+      const { error } = await supabase.from('events').update({
+        description: editDescription || null,
+        location: editLocation || null,
+        xp_reward: editXpReward,
+        gold_reward: editGoldReward,
+        updated_at: new Date().toISOString()
+      }).eq('id', editingEvent.id)
+
+      if (error) throw error
+
+      toast.success('Evento atualizado com sucesso!')
+      setEditOpen(false)
+      setEditingEvent(null)
+      router.refresh()
+    } catch (e: any) {
+      toast.error(e.message || 'Erro ao atualizar evento.')
+    } finally {
+      setUpdating(false)
     }
   }
 
@@ -331,6 +366,22 @@ export function EventPanel({ profile, members, events }: EventPanelProps) {
                     <Button 
                       variant="ghost" 
                       size="icon" 
+                      className="text-gray-400 hover:text-blue-600 shrink-0" 
+                      title="Editar Evento"
+                      onClick={() => {
+                        setEditingEvent(event)
+                        setEditDescription(event.description || '')
+                        setEditLocation(event.location || '')
+                        setEditXpReward(event.xp_reward)
+                        setEditGoldReward(event.gold_reward)
+                        setEditOpen(true)
+                      }}
+                    >
+                      <Pencil className="w-4 h-4" />
+                    </Button>
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
                       className="text-gray-400 hover:text-orange-600 shrink-0" 
                       title="Cancelar Evento"
                       onClick={() => handleCancelEvent(event)}
@@ -406,6 +457,51 @@ export function EventPanel({ profile, members, events }: EventPanelProps) {
               <Button type="button" variant="outline" onClick={() => setRescheduleOpen(false)}>Cancelar</Button>
               <Button type="submit" className="bg-blue-800 hover:bg-blue-900" disabled={rescheduling}>
                 {rescheduling ? 'A guardar...' : 'Confirmar Reagendamento'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Editar Evento: {editingEvent?.title}</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleEditEvent} className="space-y-4 pt-2">
+            <div className="space-y-2">
+              <Label htmlFor="edit-location">Local</Label>
+              <Input 
+                id="edit-location" 
+                value={editLocation} 
+                onChange={e => setEditLocation(e.target.value)} 
+                placeholder="Ex: Sede do Agrupamento" 
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-desc">Descrição</Label>
+              <Textarea 
+                id="edit-desc" 
+                value={editDescription} 
+                onChange={e => setEditDescription(e.target.value)} 
+                placeholder="O que vai acontecer?" 
+                rows={3} 
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label className="flex items-center gap-1 text-indigo-600"><Trophy className="w-3 h-3" /> XP</Label>
+                <Input type="number" value={editXpReward} onChange={e => setEditXpReward(Number(e.target.value))} />
+              </div>
+              <div className="space-y-2">
+                <Label className="flex items-center gap-1 text-yellow-600"><Coins className="w-3 h-3" /> Ouro</Label>
+                <Input type="number" value={editGoldReward} onChange={e => setEditGoldReward(Number(e.target.value))} />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setEditOpen(false)}>Cancelar</Button>
+              <Button type="submit" className="bg-blue-800 hover:bg-blue-900" disabled={updating}>
+                {updating ? 'A guardar...' : 'Guardar Alterações'}
               </Button>
             </DialogFooter>
           </form>
