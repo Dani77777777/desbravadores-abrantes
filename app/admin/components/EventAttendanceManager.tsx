@@ -208,7 +208,7 @@ export function EventAttendanceManager({ event, members, profile, onComplete }: 
                 <div className="flex items-center gap-3 w-full sm:w-auto">
                   <div className="relative">
                     <Avatar className="h-11 w-11 border-2 border-white shadow-sm">
-                      <AvatarImage src={member.avatar_url} />
+                      <AvatarImage src={member.avatar_url} className="object-cover" />
                       <AvatarFallback className="bg-blue-700 text-white font-bold">{member.full_name?.charAt(0)}</AvatarFallback>
                     </Avatar>
                     {currentStatus === 'presente' && (

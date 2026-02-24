@@ -493,3 +493,42 @@ CREATE POLICY "Leaders can manage attendance" ON public.event_attendance FOR ALL
     AND (SELECT section::text FROM public.profiles WHERE id = user_id) = public.get_my_leadership_section()
   )
 );
+
+-- ============================================
+-- 9. SETUP DE STORAGE (Imagens de Perfil)
+-- ============================================
+
+-- Tentar criar o bucket 'imagens' se não existir
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('imagens', 'imagens', true)
+ON CONFLICT (id) DO NOTHING;
+
+-- POLÍTICAS DE STORAGE
+-- Permitir que qualquer pessoa veja as imagens (bucket público)
+DROP POLICY IF EXISTS "Public Access" ON storage.objects;
+CREATE POLICY "Public Access"
+ON storage.objects FOR SELECT
+USING ( bucket_id = 'imagens' );
+
+-- Permitir que utilizadores autenticados façam upload para a pasta avatars/
+DROP POLICY IF EXISTS "Authenticated users can upload avatars" ON storage.objects;
+CREATE POLICY "Authenticated users can upload avatars"
+ON storage.objects FOR INSERT
+TO authenticated
+WITH CHECK (
+  bucket_id = 'imagens' 
+  AND (storage.foldername(name))[1] = 'avatars'
+);
+
+-- Permitir que os utilizadores atualizem/apaguem os seus próprios ficheiros
+DROP POLICY IF EXISTS "Users can update their own avatars" ON storage.objects;
+CREATE POLICY "Users can update their own avatars"
+ON storage.objects FOR UPDATE
+TO authenticated
+USING ( bucket_id = 'imagens' AND owner = auth.uid() );
+
+DROP POLICY IF EXISTS "Users can delete their own avatars" ON storage.objects;
+CREATE POLICY "Users can delete their own avatars"
+ON storage.objects FOR DELETE
+TO authenticated
+USING ( bucket_id = 'imagens' AND owner = auth.uid() );

@@ -77,7 +77,7 @@ export default async function LeaderboardPage() {
             </div>
 
             <Avatar className="h-12 w-12 border-2 border-gray-100">
-              <AvatarImage src={member.avatar_url} alt={member.full_name} />
+              <AvatarImage src={member.avatar_url} alt={member.full_name} className="object-cover" />
               <AvatarFallback className="bg-gray-100 text-gray-500 font-bold">
                 {member.full_name?.charAt(0) || '?'}
               </AvatarFallback>

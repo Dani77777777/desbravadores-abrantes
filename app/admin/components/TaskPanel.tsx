@@ -227,7 +227,7 @@ export function TaskPanel({ profile, tasks, completions }: TaskPanelProps) {
               <div key={c.id} className="flex items-center justify-between p-3 bg-amber-50 border border-amber-100 rounded-lg">
                 <div className="flex items-center gap-3">
                   <Avatar className="h-8 w-8">
-                    <AvatarImage src={c.profiles?.avatar_url} />
+                    <AvatarImage src={c.profiles?.avatar_url} className="object-cover" />
                     <AvatarFallback className="bg-blue-700 text-white text-xs">{c.profiles?.full_name?.charAt(0)}</AvatarFallback>
                   </Avatar>
                   <div>

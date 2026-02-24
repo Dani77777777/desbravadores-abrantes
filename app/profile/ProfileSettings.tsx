@@ -11,7 +11,9 @@ import { updateUserProfile } from './actions'
 import { User, Image, Mail, Calendar, Award, History } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { Navbar } from '@/components/layout/Navbar'
+import { createClient } from '@/utils/supabase/client'
 import Link from 'next/link'
+import { useRef } from 'react'
 
 interface ProfileSettingsProps {
   profile: {
@@ -32,7 +34,50 @@ export default function ProfileSettings({ profile, user, userEmail }: ProfileSet
   const [fullName, setFullName] = useState(profile.full_name)
   const [avatarUrl, setAvatarUrl] = useState(profile.avatar_url || '')
   const [loading, setLoading] = useState(false)
+  const [uploading, setUploading] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const router = useRouter()
+  const supabase = createClient()
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    setUploading(true)
+    console.log('Iniciando upload para o bucket:', process.env.NEXT_PUBLIC_SUPABASE_STORAGE_BUCKET || 'imagens')
+    try {
+      const fileExt = file.name.split('.').pop()
+      const fileName = `${user.id}-${Math.random()}.${fileExt}`
+      const filePath = `avatars/${fileName}`
+
+      const { error: uploadError, data } = await supabase.storage
+        .from(process.env.NEXT_PUBLIC_SUPABASE_STORAGE_BUCKET || 'imagens')
+        .upload(filePath, file, {
+          cacheControl: '3600',
+          upsert: false
+        })
+
+      if (uploadError) {
+        console.error('Erro no upload do Supabase:', uploadError)
+        throw uploadError
+      }
+
+      console.log('Upload concluído com sucesso:', data)
+
+      const { data: { publicUrl } } = supabase.storage
+        .from(process.env.NEXT_PUBLIC_SUPABASE_STORAGE_BUCKET || 'imagens')
+        .getPublicUrl(filePath)
+
+      console.log('URL Pública gerada:', publicUrl)
+      setAvatarUrl(publicUrl)
+      toast.success('Imagem carregada! Não te esqueças de Guardar no final.')
+    } catch (error: any) {
+      console.error('Error uploading image catch:', error)
+      toast.error('Erro ao carregar imagem: ' + (error.message || 'Erro desconhecido'))
+    } finally {
+      setUploading(false)
+    }
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -77,7 +122,7 @@ export default function ProfileSettings({ profile, user, userEmail }: ProfileSet
           <CardHeader className="text-center">
             <div className="flex justify-center mb-4">
               <Avatar className="w-24 h-24 border-4 border-blue-700">
-                <AvatarImage src={avatarUrl || profile.avatar_url || undefined} />
+                <AvatarImage src={avatarUrl || profile.avatar_url || undefined} className="object-cover" />
                 <AvatarFallback className="bg-blue-700 text-white text-2xl">
                   {fullName.charAt(0).toUpperCase()}
                 </AvatarFallback>
@@ -188,21 +233,56 @@ export default function ProfileSettings({ profile, user, userEmail }: ProfileSet
                 />
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="avatar_url" className="flex items-center gap-2">
+              <div className="space-y-4">
+                <Label htmlFor="avatar_upload" className="flex items-center gap-2">
                   <Image className="w-4 h-4" />
-                  URL da Foto de Perfil
+                  Foto de Perfil
                 </Label>
-                <Input
-                  id="avatar_url"
-                  type="url"
-                  placeholder="https://exemplo.com/foto.jpg"
-                  value={avatarUrl}
-                  onChange={(e) => setAvatarUrl(e.target.value)}
-                />
-                <p className="text-xs text-gray-500">
-                  Deixa em branco para usar a inicial do teu nome
-                </p>
+                
+                <div className="flex items-center gap-4">
+                  <Avatar className="w-16 h-16 border-2 border-blue-100">
+                    <AvatarImage src={avatarUrl || undefined} className="object-cover" />
+                    <AvatarFallback className="bg-blue-700 text-white">
+                      {fullName.charAt(0).toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
+                  
+                  <div className="flex-1">
+                    <Input
+                      id="avatar_upload"
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      ref={fileInputRef}
+                      onChange={handleFileUpload}
+                      disabled={uploading}
+                    />
+                    <Button 
+                      type="button" 
+                      variant="outline" 
+                      className="w-full"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={uploading}
+                    >
+                      {uploading ? 'A carregar...' : 'Escolher Nova Foto'}
+                    </Button>
+                    <p className="text-xs text-gray-500 mt-2">
+                      A imagem será carregada automaticamente para o nosso servidor
+                    </p>
+                  </div>
+                </div>
+
+                <div className="space-y-2 opacity-50">
+                  <Label htmlFor="avatar_url" className="text-xs">Ou URL da imagem (opcional)</Label>
+                  <Input
+                    id="avatar_url"
+                    type="url"
+                    placeholder="https://exemplo.com/foto.jpg"
+                    value={avatarUrl}
+                    onChange={(e) => setAvatarUrl(e.target.value)}
+                    className="text-xs h-8"
+                  />
+                </div>
               </div>
 
               <Button 

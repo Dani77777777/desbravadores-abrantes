@@ -146,7 +146,7 @@ export function MemberList({ members, currentUserRole, adminProfile }: MemberLis
         <div key={member.id} className="flex items-center justify-between p-4 bg-white border rounded-lg shadow-sm hover:bg-slate-50 transition-colors">
            <div className="flex items-center gap-4">
                 <Avatar className="h-10 w-10 border">
-                    <AvatarImage src={member.avatar_url} />
+                    <AvatarImage src={member.avatar_url} className="object-cover" />
                     <AvatarFallback>{member.full_name?.charAt(0)}</AvatarFallback>
                 </Avatar>
                 <div>

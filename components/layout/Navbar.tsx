@@ -113,7 +113,7 @@ export function Navbar({ user, profile }: NavbarProps) {
                   <DropdownMenuTrigger asChild>
                     <Button variant="ghost" className="relative h-10 w-10 rounded-full hover:bg-blue-800 focus:ring-0">
                       <Avatar className="h-9 w-9 border-2 border-yellow-400/60">
-                        <AvatarImage src={profile?.avatar_url || user?.user_metadata?.avatar_url} alt={profile?.full_name} />
+                        <AvatarImage src={profile?.avatar_url || user?.user_metadata?.avatar_url} alt={profile?.full_name} className="object-cover" />
                         <AvatarFallback className="bg-blue-700 text-white">{profile?.full_name?.charAt(0) || 'D'}</AvatarFallback>
                       </Avatar>
                     </Button>
@@ -237,7 +237,7 @@ export function Navbar({ user, profile }: NavbarProps) {
                 <div className="flex items-center px-5">
                   <div className="flex-shrink-0">
                     <Avatar className="h-10 w-10 border-2 border-yellow-400/60">
-                        <AvatarImage src={profile?.avatar_url || user?.user_metadata?.avatar_url} alt={profile?.full_name} />
+                        <AvatarImage src={profile?.avatar_url || user?.user_metadata?.avatar_url} alt={profile?.full_name} className="object-cover" />
                         <AvatarFallback className="bg-blue-700 text-white">{profile?.full_name?.charAt(0) || 'D'}</AvatarFallback>
                     </Avatar>
                   </div>
