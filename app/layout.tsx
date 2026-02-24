@@ -8,6 +8,7 @@ const inter = Inter({ subsets: ['latin'] })
 export const metadata: Metadata = {
   title: 'Clube de Desbravadores - Abrantes',
   description: 'Plataforma de gamificação do Clube de Desbravadores de Abrantes',
+  manifest: '/manifest.json',
 }
 
 export default function RootLayout({
