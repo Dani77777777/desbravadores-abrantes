@@ -165,113 +165,155 @@ export function Navbar({ user, profile }: NavbarProps) {
 
       {/* Mobile menu */}
       {isOpen && (
-        <div className="md:hidden pb-3 border-t border-blue-800">
-          <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3">
-            {user ? (
-              <>
-                <Link
-                  href="/"
-                  className="text-gray-100 hover:bg-blue-800 hover:text-white block px-3 py-2 rounded-md text-base font-medium"
-                  onClick={() => setIsOpen(false)}
-                >
-                  Painel
-                </Link>
-                <Link
-                  href="/profile"
-                  className="text-gray-100 hover:bg-blue-800 hover:text-white block px-3 py-2 rounded-md text-base font-medium flex items-center gap-2"
-                  onClick={() => setIsOpen(false)}
-                >
-                  <User className="w-4 h-4" /> Perfil
-                </Link>
-                <Link
-                  href="/suggestions"
-                  className="text-gray-100 hover:bg-blue-800 hover:text-white block px-3 py-2 rounded-md text-base font-medium flex items-center gap-2"
-                  onClick={() => setIsOpen(false)}
-                >
-                  <MessageSquare className="w-4 h-4" /> Sugestões
-                </Link>
-                <Link
-                  href="/leaderboard"
-                  className="text-gray-100 hover:bg-blue-800 hover:text-white block px-3 py-2 rounded-md text-base font-medium flex items-center gap-2"
-                  onClick={() => setIsOpen(false)}
-                >
-                  <Trophy className="w-4 h-4" /> Ranking
-                </Link>
-                <Link
-                  href="/contacts"
-                  className="text-gray-100 hover:bg-blue-800 hover:text-white block px-3 py-2 rounded-md text-base font-medium flex items-center gap-2"
-                  onClick={() => setIsOpen(false)}
-                >
-                  <Phone className="w-4 h-4" /> Contactos
-                </Link>
-                <Link
-                  href="/contacts"
-                  className="text-gray-100 hover:bg-blue-800 hover:text-white block px-3 py-2 rounded-md text-base font-medium flex items-center gap-2"
-                  onClick={() => setIsOpen(false)}
-                >
-                  <Phone className="w-4 h-4" /> Contactos
-                </Link>
-                {isAdmin && (
+        <div className="md:hidden fixed inset-0 z-[60] bg-blue-900/98 backdrop-blur-xl animate-in fade-in duration-300">
+          {/* Close button inside the overlay for better UX */}
+          <button 
+            onClick={() => setIsOpen(false)}
+            className="absolute top-4 right-4 p-2 text-white/70 hover:text-white transition-colors"
+          >
+            <X className="w-8 h-8" />
+          </button>
+
+          <div className="px-5 py-20 flex flex-col h-full overflow-y-auto">
+            <div className="flex-1 space-y-3">
+              {user ? (
+                <>
                   <Link
-                    href="/admin"
-                    className="text-gray-100 hover:bg-blue-800 hover:text-white block px-3 py-2 rounded-md text-base font-medium flex items-center gap-2"
+                    href="/"
+                    className="flex items-center gap-4 px-5 py-4 rounded-2xl bg-blue-800/40 hover:bg-blue-800 text-white font-bold transition-all border border-blue-700/50 shadow-sm"
                     onClick={() => setIsOpen(false)}
                   >
-                    <Shield className="w-4 h-4" /> Gestão
+                    <div className="p-2 bg-yellow-400 rounded-lg text-blue-900">
+                      <Tent className="w-5 h-5" />
+                    </div>
+                    <span>Painel Principal</span>
                   </Link>
-                )}
-              </>
-            ) : (
-              <Link
-                href="/leaderboard"
-                className="text-gray-100 hover:bg-blue-800 hover:text-white block px-3 py-2 rounded-md text-base font-medium flex items-center gap-2"
-                onClick={() => setIsOpen(false)}
-              >
-                <Trophy className="w-4 h-4" /> Ranking
-              </Link>
-            )}
-          </div>
-          <div className="pt-4 pb-3 border-t border-blue-800">
-            {user ? (
-              <>
-                <div className="flex items-center px-5">
-                  <div className="flex-shrink-0">
-                    <Avatar className="h-10 w-10 border-2 border-yellow-400/60">
-                        <AvatarImage src={profile?.avatar_url || user?.user_metadata?.avatar_url} alt={profile?.full_name} className="object-cover" />
-                        <AvatarFallback className="bg-blue-700 text-white">{profile?.full_name?.charAt(0) || 'D'}</AvatarFallback>
-                    </Avatar>
-                  </div>
-                  <div className="ml-3">
-                    <div className="text-base font-medium leading-none text-white">{profile?.full_name}</div>
-                    <div className="text-sm font-medium leading-none text-blue-200 capitalize mt-1">
-                       {profile?.role} • {profile?.section}
+                  <Link
+                    href="/profile"
+                    className="flex items-center gap-4 px-5 py-4 rounded-2xl hover:bg-blue-800/40 text-gray-100 font-semibold transition-all border border-transparent hover:border-blue-700/50"
+                    onClick={() => setIsOpen(false)}
+                  >
+                    <div className="p-2 bg-blue-700/50 rounded-lg text-blue-300">
+                      <User className="w-5 h-5" />
+                    </div>
+                    <span>O Meu Perfil</span>
+                  </Link>
+                  <Link
+                    href="/suggestions"
+                    className="flex items-center gap-4 px-5 py-4 rounded-2xl hover:bg-blue-800/40 text-gray-100 font-semibold transition-all border border-transparent hover:border-blue-700/50"
+                    onClick={() => setIsOpen(false)}
+                  >
+                    <div className="p-2 bg-blue-700/50 rounded-lg text-blue-300">
+                      <MessageSquare className="w-5 h-5" />
+                    </div>
+                    <span>Sugestões</span>
+                  </Link>
+                  <Link
+                    href="/leaderboard"
+                    className="flex items-center gap-4 px-5 py-4 rounded-2xl hover:bg-blue-800/40 text-gray-100 font-semibold transition-all border border-transparent hover:border-blue-700/50"
+                    onClick={() => setIsOpen(false)}
+                  >
+                    <div className="p-2 bg-blue-700/50 rounded-lg text-blue-300">
+                      <Trophy className="w-5 h-5" />
+                    </div>
+                    <span>Ranking</span>
+                  </Link>
+                  <Link
+                    href="/contacts"
+                    className="flex items-center gap-4 px-5 py-4 rounded-2xl hover:bg-blue-800/40 text-gray-100 font-semibold transition-all border border-transparent hover:border-blue-700/50"
+                    onClick={() => setIsOpen(false)}
+                  >
+                    <div className="p-2 bg-blue-700/50 rounded-lg text-blue-300">
+                      <Phone className="w-5 h-5" />
+                    </div>
+                    <span>Contactos</span>
+                  </Link>
+                  {isAdmin && (
+                    <Link
+                      href="/admin"
+                      className="mt-4 flex items-center gap-4 px-5 py-4 rounded-2xl bg-red-600/10 hover:bg-red-600/20 text-red-400 font-bold transition-all border border-red-500/20"
+                      onClick={() => setIsOpen(false)}
+                    >
+                      <div className="p-2 bg-red-600/20 rounded-lg">
+                        <Shield className="w-5 h-5" />
+                      </div>
+                      <span>Área de Gestão</span>
+                    </Link>
+                  )}
+                </>
+              ) : (
+                <div className="space-y-4">
+                  <Link
+                    href="/leaderboard"
+                    className="flex items-center gap-4 px-5 py-4 rounded-2xl bg-blue-800/40 hover:bg-blue-800 text-white font-bold transition-all border border-blue-700/50"
+                    onClick={() => setIsOpen(false)}
+                  >
+                    <div className="p-2 bg-yellow-400 rounded-lg text-blue-900">
+                      <Trophy className="w-5 h-5" />
+                    </div>
+                    <span>Ranking Público</span>
+                  </Link>
+                  <Link
+                    href="/contacts"
+                    className="flex items-center gap-4 px-5 py-4 rounded-2xl hover:bg-blue-800/40 text-gray-100 font-semibold transition-all border border-transparent hover:border-blue-700/50"
+                    onClick={() => setIsOpen(false)}
+                  >
+                    <div className="p-2 bg-blue-700/50 rounded-lg text-blue-300">
+                      <Phone className="w-5 h-5" />
+                    </div>
+                    <span>Contactos do Clube</span>
+                  </Link>
+                </div>
+              )}
+            </div>
+
+            <div className="mt-8 pt-8 border-t border-blue-800/60 pb-10">
+              {user ? (
+                <div className="space-y-8">
+                  <div className="flex items-center px-2">
+                    <div className="relative">
+                      <Avatar className="h-16 w-16 border-2 border-yellow-400 shadow-lg">
+                          <AvatarImage src={profile?.avatar_url || user?.user_metadata?.avatar_url} alt={profile?.full_name} className="object-cover" />
+                          <AvatarFallback className="bg-blue-700 text-white text-xl font-bold">{profile?.full_name?.charAt(0) || 'D'}</AvatarFallback>
+                      </Avatar>
+                      <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-emerald-500 border-2 border-blue-900 rounded-full" />
+                    </div>
+                    <div className="ml-5">
+                      <div className="text-xl font-bold text-white tracking-tight leading-none mb-1">{profile?.full_name}</div>
+                      <div className="text-sm text-blue-300 font-medium capitalize flex items-center gap-2">
+                         <span className="w-2 h-2 rounded-full bg-blue-400" />
+                         {profile?.role} • {profile?.section}
+                      </div>
                     </div>
                   </div>
-                </div>
-                <div className="mt-3 px-2 space-y-1">
                   <Button
                     variant="ghost"
-                    className="w-full justify-start text-red-300 hover:text-white hover:bg-red-900/50"
+                    className="w-full justify-center text-red-100 hover:text-white hover:bg-red-600/20 py-8 text-lg font-bold rounded-2xl border border-red-900/30 transition-all active:scale-95"
                     onClick={handleLogout}
                   >
-                    <LogOut className="mr-2 h-4 w-4" /> Sair
+                    <LogOut className="mr-3 h-5 w-5 text-red-400" /> Encerrar Sessão
                   </Button>
                 </div>
-              </>
-            ) : (
-              <div className="px-5 pt-2 flex flex-col gap-2">
-                <Link href="/login?mode=login" onClick={() => setIsOpen(false)}>
-                  <Button variant="outline" className="w-full border-blue-400 text-white hover:bg-blue-800">
-                    Entrar
-                  </Button>
-                </Link>
-                <Link href="/login?mode=signup" onClick={() => setIsOpen(false)}>
-                  <Button className="w-full bg-white text-blue-900 hover:bg-yellow-400">
-                    Registar
-                  </Button>
-                </Link>
+              ) : (
+                <div className="flex flex-col gap-4">
+                  <Link href="/login?mode=signup" onClick={() => setIsOpen(false)}>
+                    <Button className="w-full bg-yellow-400 text-blue-900 hover:bg-yellow-500 py-8 text-xl font-bold rounded-2xl border-none shadow-xl transform transition-transform active:scale-[0.98]">
+                      Registar agora
+                    </Button>
+                  </Link>
+                  <Link href="/login?mode=login" onClick={() => setIsOpen(false)}>
+                    <Button variant="ghost" className="w-full border border-blue-400/30 text-white hover:bg-blue-800/50 py-7 text-lg font-semibold rounded-2xl">
+                      Já tenho conta
+                    </Button>
+                  </Link>
+                </div>
+              )}
+              <div className="text-center mt-12">
+                <p className="text-[10px] text-blue-400/60 font-medium tracking-widest uppercase">
+                  Aventura • Amizade • Fé
+                </p>
               </div>
-            )}
+            </div>
           </div>
         </div>
       )}

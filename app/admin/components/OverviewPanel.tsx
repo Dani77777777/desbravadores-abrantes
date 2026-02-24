@@ -83,17 +83,17 @@ export function OverviewPanel({ profile, members }: OverviewPanelProps) {
   return (
     <div className="space-y-6">
       {/* Metrics Row */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <StatCard 
           icon={<Users className="w-5 h-5" />} 
-          label="Membros Totais" 
+          label="Membros" 
           value={totalMembers} 
           color="blue"
         />
         <StatCard 
           icon={<ShieldCheck className="w-5 h-5" />} 
           label="Investidos" 
-          value={`${investedMembers} (${investmentRate}%)`} 
+          value={`${investmentRate}%`} 
           color="emerald"
         />
         <StatCard 
@@ -297,20 +297,15 @@ function StatCard({ icon, label, value, color }: { icon: React.ReactNode, label:
   }
 
   return (
-    <Card className="border-none shadow-sm bg-white overflow-hidden group">
-      <div className={`absolute top-0 left-0 w-1 h-full ${
-        color === 'blue' ? 'bg-blue-500' : 
-        color === 'emerald' ? 'bg-emerald-500' : 
-        color === 'purple' ? 'bg-purple-500' : 'bg-amber-500'
-      }`} />
-      <CardContent className="p-5">
-        <div className="flex items-center gap-4">
-          <div className={`p-2.5 rounded-xl border ${colors[color]}`}>
+    <Card className="border shadow-sm bg-white overflow-hidden group">
+      <CardContent className="p-4 sm:p-5">
+        <div className="flex flex-col sm:flex-row items-center sm:items-start text-center sm:text-left gap-2 sm:gap-4">
+          <div className={`p-2 rounded-xl border ${colors[color]} shrink-0`}>
             {icon}
           </div>
-          <div>
-            <p className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-0.5">{label}</p>
-            <p className="text-xl font-bold text-gray-900">{value}</p>
+          <div className="min-w-0">
+            <p className="text-[10px] sm:text-xs font-bold text-gray-500 uppercase tracking-wider mb-0.5 truncate">{label}</p>
+            <p className="text-sm sm:text-xl font-black text-gray-900 truncate">{value}</p>
           </div>
         </div>
       </CardContent>

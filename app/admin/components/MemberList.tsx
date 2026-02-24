@@ -143,44 +143,48 @@ export function MemberList({ members, currentUserRole, adminProfile }: MemberLis
   return (
     <div className="space-y-4">
       {members.map((member) => (
-        <div key={member.id} className="flex items-center justify-between p-4 bg-white border rounded-lg shadow-sm hover:bg-slate-50 transition-colors">
-           <div className="flex items-center gap-4">
-                <Avatar className="h-10 w-10 border">
+        <div key={member.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-white border rounded-xl shadow-sm hover:shadow-md transition-all gap-4">
+           <div className="flex items-center gap-4 flex-1">
+                <Avatar className="h-12 w-12 border-2 border-slate-100 shrink-0 shadow-sm">
                     <AvatarImage src={member.avatar_url} className="object-cover" />
-                    <AvatarFallback>{member.full_name?.charAt(0)}</AvatarFallback>
+                    <AvatarFallback className="bg-slate-200 text-slate-500 font-bold">{member.full_name?.charAt(0)}</AvatarFallback>
                 </Avatar>
-                <div>
-                    <div className="flex items-center gap-2">
-                      <h3 className="font-medium text-gray-900">{member.full_name}</h3>
-                      <Badge variant="secondary" className="text-[10px] h-4 bg-slate-100 text-slate-600 border-none capitalize">
-                        {member.role === 'desbravador' ? 'Membro' : member.role}
-                      </Badge>
-                      {member.role === 'dirigente' && member.leadership_section && (
-                        <Badge variant="outline" className="text-[10px] h-4 border-blue-200 text-blue-700 bg-blue-50">
-                          Líder {SECTION_LABELS[member.leadership_section] || member.leadership_section}
+                <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h3 className="font-bold text-gray-900 truncate">{member.full_name}</h3>
+                      <div className="flex gap-1.5 flex-wrap">
+                        <Badge variant="secondary" className="text-[10px] h-4 bg-slate-100 text-slate-600 border-none capitalize font-bold leading-none">
+                          {member.role === 'desbravador' ? 'Membro' : member.role}
                         </Badge>
-                      )}
+                        {member.role === 'dirigente' && member.leadership_section && (
+                          <Badge variant="outline" className="text-[10px] h-4 border-blue-200 text-blue-700 bg-blue-50 font-bold leading-none">
+                            Líder {SECTION_LABELS[member.leadership_section] || member.leadership_section}
+                          </Badge>
+                        )}
+                      </div>
                     </div>
-                    <div className="text-xs text-gray-500 flex items-center gap-2">
-                        <span className="flex items-center gap-1 text-indigo-600 font-medium">
-                            <Trophy className="w-3 h-3" /> {member.total_xp} XP
+                    <div className="text-xs text-gray-500 flex flex-wrap items-center gap-x-3 gap-y-1 mt-1">
+                        <span className="flex items-center gap-1 text-indigo-700 font-bold">
+                            <Trophy className="w-3 h-3" /> {member.total_xp} <span className="text-[10px] text-indigo-400">XP</span>
                         </span>
-                        <span className="flex items-center gap-1 text-yellow-600 font-medium">
-                            <Coins className="w-3 h-3" /> {member.current_gold} Ouro
+                        <span className="flex items-center gap-1 text-yellow-700 font-bold">
+                            <Coins className="w-3 h-3" /> {member.current_gold} <span className="text-[10px] text-yellow-500/70">Ouro</span>
                         </span>
-                        <span className="text-gray-300">|</span>
-                        <span className="capitalize">{SECTION_LABELS[member.section] || member.section}</span>
+                        <span className="capitalize font-medium text-slate-400 border-l border-slate-200 pl-3">
+                          {SECTION_LABELS[member.section] || member.section}
+                        </span>
                     </div>
                 </div>
            </div>
 
-           <div className="flex items-center gap-4">
-               <div className="flex flex-col items-end gap-1">
-                   <Label htmlFor={`invested-${member.id}`} className="text-xs text-gray-500 cursor-pointer text-[10px] uppercase font-bold">Investido</Label>
+           <div className="flex items-center justify-between sm:justify-end gap-6 pt-3 sm:pt-0 border-t sm:border-none border-slate-100 w-full sm:w-auto">
+               <div className="flex items-center gap-3">
+                   <Label htmlFor={`invested-${member.id}`} className="text-[10px] uppercase font-bold text-slate-400 cursor-pointer tracking-wider">Investido</Label>
                    <Switch 
                         id={`invested-${member.id}`}
                         checked={member.is_invested}
                         onCheckedChange={() => handleToggleInvested(member.id, member.is_invested)}
+                        className="data-[state=checked]:bg-blue-800"
                    />
                </div>
                

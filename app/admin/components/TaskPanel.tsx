@@ -141,7 +141,7 @@ export function TaskPanel({ profile, tasks, completions }: TaskPanelProps) {
     <div className="space-y-6">
 
       {/* Header + Create button */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <p className="text-sm text-gray-500">
             {profile.role === 'coordenador'
@@ -151,7 +151,7 @@ export function TaskPanel({ profile, tasks, completions }: TaskPanelProps) {
         </div>
         <Dialog open={createOpen} onOpenChange={setCreateOpen}>
           <DialogTrigger asChild>
-            <Button className="bg-blue-800 hover:bg-blue-900 gap-2">
+            <Button className="bg-blue-800 hover:bg-blue-900 gap-2 h-11 px-6 shadow-md shrink-0">
               <Plus className="w-4 h-4" /> Nova Tarefa
             </Button>
           </DialogTrigger>
@@ -215,7 +215,7 @@ export function TaskPanel({ profile, tasks, completions }: TaskPanelProps) {
 
       {/* Pending awards — completions not yet rewarded */}
       {pendingCompletions.length > 0 && (
-        <Card className="border-l-4 border-l-amber-500">
+        <Card className="border-amber-200 bg-amber-50/30">
           <CardHeader className="pb-3">
             <CardTitle className="text-base flex items-center gap-2 text-amber-700">
               <Clock className="w-4 h-4" /> A Aguardar Aprovação ({pendingCompletions.length})
@@ -290,27 +290,41 @@ export function TaskPanel({ profile, tasks, completions }: TaskPanelProps) {
             const taskCompletions = completions.filter(c => c.task_id === task.id)
             const canDelete = task.created_by_user_id === profile.id || profile.role === 'coordenador'
             return (
-              <div key={task.id} className="p-4 border rounded-lg hover:bg-slate-50 transition-colors">
-                <div className="flex items-start justify-between gap-2">
+              <div key={task.id} className="p-4 border rounded-xl hover:shadow-sm transition-all bg-white">
+                <div className="flex items-start justify-between gap-4">
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <h3 className="font-medium text-gray-900 truncate">{task.title}</h3>
-                      <Badge variant="outline" className="text-xs shrink-0">
+                    <div className="flex flex-wrap items-center gap-2 mb-1">
+                      <h3 className="font-bold text-gray-900 truncate">{task.title}</h3>
+                      <Badge variant="secondary" className="text-[10px] bg-slate-100 text-slate-600 border-none font-bold">
                         {task.target_section ? SECTION_LABELS[task.target_section] || task.target_section : 'Todos'}
                       </Badge>
                     </div>
-                    {task.description && <p className="text-sm text-gray-500 mt-1 line-clamp-2">{task.description}</p>}
-                    <div className="flex items-center gap-3 mt-2">
-                      <span className="text-xs text-indigo-600 flex items-center gap-1"><Trophy className="w-3 h-3" /> {task.xp_reward} XP</span>
-                      <span className="text-xs text-yellow-600 flex items-center gap-1"><Coins className="w-3 h-3" /> {task.gold_reward} Ouro</span>
-                      {task.deadline && <span className="text-xs text-gray-400 flex items-center gap-1"><CalendarClock className="w-3 h-3" /> {new Date(task.deadline).toLocaleDateString('pt-PT')}</span>}
-                      <span className="text-xs text-green-700 flex items-center gap-1">
-                        <CheckCircle2 className="w-3 h-3" /> {taskCompletions.filter(c => c.points_awarded).length}/{taskCompletions.length} concluídas
-                      </span>
+                    {task.description && <p className="text-xs text-gray-500 line-clamp-2 leading-relaxed">{task.description}</p>}
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mt-3 pt-3 border-t border-slate-50">
+                      <div className="flex items-center gap-3">
+                        <span className="text-[10px] font-black text-indigo-700 flex items-center gap-1 bg-indigo-50 px-2 py-0.5 rounded-md">
+                          <Trophy className="w-3 h-3" /> {task.xp_reward} XP
+                        </span>
+                        <span className="text-[10px] font-black text-yellow-700 flex items-center gap-1 bg-yellow-50 px-2 py-0.5 rounded-md">
+                          <Coins className="w-3 h-3" /> {task.gold_reward}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-3 text-[10px] font-bold text-slate-400">
+                        {task.deadline && (
+                          <span className="flex items-center gap-1">
+                            <CalendarClock className="w-3 h-3" /> 
+                            {new Date(task.deadline).toLocaleDateString('pt-PT')}
+                          </span>
+                        )}
+                        <span className={`flex items-center gap-1 ${taskCompletions.length > 0 ? 'text-green-600' : ''}`}>
+                          <CheckCircle2 className="w-3 h-3" /> 
+                          {taskCompletions.filter(c => c.points_awarded).length}/{taskCompletions.length} concluídas
+                        </span>
+                      </div>
                     </div>
                   </div>
                   {canDelete && (
-                    <Button variant="ghost" size="icon" className="text-gray-400 hover:text-red-600 shrink-0" onClick={() => handleDeleteTask(task.id)}>
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-gray-400 hover:text-red-600 hover:bg-red-50" onClick={() => handleDeleteTask(task.id)}>
                       <Trash2 className="w-4 h-4" />
                     </Button>
                   )}

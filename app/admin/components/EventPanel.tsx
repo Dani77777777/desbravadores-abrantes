@@ -182,7 +182,7 @@ export function EventPanel({ profile, members, events }: EventPanelProps) {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-xl font-bold text-gray-900">Gestão de Eventos</h2>
           <p className="text-sm text-gray-500">
@@ -191,7 +191,7 @@ export function EventPanel({ profile, members, events }: EventPanelProps) {
         </div>
         <Dialog open={createOpen} onOpenChange={setCreateOpen}>
           <DialogTrigger asChild>
-            <Button className="bg-blue-800 hover:bg-blue-900 gap-2">
+            <Button className="bg-blue-800 hover:bg-blue-900 gap-2 h-11 px-6 shadow-md shrink-0">
               <Plus className="w-4 h-4" /> Novo Evento
             </Button>
           </DialogTrigger>

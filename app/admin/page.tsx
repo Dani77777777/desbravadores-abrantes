@@ -122,14 +122,14 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
         </div>
 
         {/* Tab navigation */}
-        <div className="flex gap-1 border-b border-gray-200 overflow-x-auto">
+        <div className="bg-white p-1.5 rounded-2xl border border-gray-200 shadow-sm overflow-x-auto no-scrollbar scroll-smooth flex gap-1 mb-2">
           {profile.role === 'coordenador' && (
             <a
               href="/admin?tab=overview"
-              className={`flex items-center gap-2 px-4 py-2 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
+              className={`flex items-center gap-2 px-5 py-2.5 text-sm font-bold rounded-xl transition-all whitespace-nowrap ${
                 activeTab === 'overview'
-                  ? 'border-blue-700 text-blue-700'
-                  : 'border-transparent text-gray-500 hover:text-gray-700'
+                  ? 'bg-blue-900 text-white shadow-md'
+                  : 'text-gray-500 hover:bg-gray-100'
               }`}
             >
               <LayoutDashboard className="w-4 h-4" /> Visão Geral
@@ -137,60 +137,60 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
           )}
           <a
             href="/admin?tab=members"
-            className={`flex items-center gap-2 px-4 py-2 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
+            className={`flex items-center gap-2 px-5 py-2.5 text-sm font-bold rounded-xl transition-all whitespace-nowrap ${
               activeTab === 'members'
-                ? 'border-blue-700 text-blue-700'
-                : 'border-transparent text-gray-500 hover:text-gray-700'
+                ? 'bg-blue-900 text-white shadow-md'
+                : 'text-gray-500 hover:bg-gray-100'
             }`}
           >
             <Users className="w-4 h-4" /> Membros
           </a>
           <a
             href="/admin?tab=tasks"
-            className={`flex items-center gap-2 px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+            className={`flex items-center gap-2 px-5 py-2.5 text-sm font-bold rounded-xl transition-all whitespace-nowrap ${
               activeTab === 'tasks'
-                ? 'border-blue-700 text-blue-700'
-                : 'border-transparent text-gray-500 hover:text-gray-700'
+                ? 'bg-blue-900 text-white shadow-md'
+                : 'text-gray-500 hover:bg-gray-100'
             }`}
           >
             <ListChecks className="w-4 h-4" /> Tarefas
           </a>
           <a
             href="/admin?tab=events"
-            className={`flex items-center gap-2 px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+            className={`flex items-center gap-2 px-5 py-2.5 text-sm font-bold rounded-xl transition-all whitespace-nowrap ${
               activeTab === 'events'
-                ? 'border-blue-700 text-blue-700'
-                : 'border-transparent text-gray-500 hover:text-gray-700'
+                ? 'bg-blue-900 text-white shadow-md'
+                : 'text-gray-500 hover:bg-gray-100'
             }`}
           >
             <CalendarDays className="w-4 h-4" /> Eventos
           </a>
           <a
             href="/admin?tab=announcements"
-            className={`flex items-center gap-2 px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+            className={`flex items-center gap-2 px-5 py-2.5 text-sm font-bold rounded-xl transition-all whitespace-nowrap ${
               activeTab === 'announcements'
-                ? 'border-blue-700 text-blue-700'
-                : 'border-transparent text-gray-500 hover:text-gray-700'
+                ? 'bg-blue-900 text-white shadow-md'
+                : 'text-gray-500 hover:bg-gray-100'
             }`}
           >
             <Megaphone className="w-4 h-4" /> Comunicados
             {(sentAnnouncements?.length ?? 0) > 0 && (
-              <span className="ml-1 text-[10px] bg-blue-100 text-blue-700 font-bold rounded-full px-1.5 py-0.5">
+              <span className={`ml-1 text-[10px] font-black rounded-full px-1.5 py-0.5 ${activeTab === 'announcements' ? 'bg-white/20 text-white' : 'bg-blue-100 text-blue-700'}`}>
                 {sentAnnouncements?.length}
               </span>
             )}
           </a>
           <a
             href="/admin?tab=suggestions"
-            className={`flex items-center gap-2 px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+            className={`flex items-center gap-2 px-5 py-2.5 text-sm font-bold rounded-xl transition-all whitespace-nowrap ${
               activeTab === 'suggestions'
-                ? 'border-blue-700 text-blue-700'
-                : 'border-transparent text-gray-500 hover:text-gray-700'
+                ? 'bg-blue-900 text-white shadow-md'
+                : 'text-gray-500 hover:bg-gray-100'
             }`}
           >
             <MessageSquare className="w-4 h-4" /> Sugestões
             {(suggestions?.filter(s => !s.is_read).length ?? 0) > 0 && (
-              <span className="ml-1 text-[10px] bg-red-100 text-red-700 font-bold rounded-full px-1.5 py-0.5">
+              <span className={`ml-1 text-[10px] font-black rounded-full px-1.5 py-0.5 ${activeTab === 'suggestions' ? 'bg-red-500 text-white shadow-sm' : 'bg-red-100 text-red-700'}`}>
                 {suggestions?.filter(s => !s.is_read).length}
               </span>
             )}
