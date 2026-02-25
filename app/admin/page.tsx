@@ -9,7 +9,8 @@ import { AnnouncementPanel } from './components/AnnouncementPanel'
 import { SuggestionPanel } from './components/SuggestionPanel'
 import { EventPanel } from './components/EventPanel'
 import { StorePanel } from './components/StorePanel'
-import { Users, ListChecks, Megaphone, MessageSquare, LayoutDashboard, CalendarDays, ShoppingBag } from 'lucide-react'
+import { QrPanel } from './components/QrPanel'
+import { Users, ListChecks, Megaphone, MessageSquare, LayoutDashboard, CalendarDays, ShoppingBag, QrCode } from 'lucide-react'
 
 export default async function AdminPage({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
   const supabase = await createClient()
@@ -215,6 +216,16 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
               </span>
             )}
           </a>
+          <a
+            href="/admin?tab=qr"
+            className={`flex items-center gap-2 px-5 py-2.5 text-sm font-bold rounded-xl transition-all whitespace-nowrap ${
+              activeTab === 'qr'
+                ? 'bg-blue-900 text-white shadow-md'
+                : 'text-gray-500 hover:bg-gray-100'
+            }`}
+          >
+            <QrCode className="w-4 h-4" /> Questões / QR
+          </a>
           {profile.role === 'coordenador' && (
             <a
               href="/admin?tab=store"
@@ -288,12 +299,16 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
           />
         )}
 
-        {/* Suggestions tab */}
         {activeTab === 'suggestions' && (
           <SuggestionPanel
             profile={profile}
             initialSuggestions={suggestions || []}
           />
+        )}
+
+        {/* QR tab */}
+        {activeTab === 'qr' && (
+          <QrPanel />
         )}
 
         {/* Store tab */}

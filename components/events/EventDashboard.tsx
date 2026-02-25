@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Calendar as CalendarIcon, MapPin, Trophy, Coins, ChevronRight, Clock, Info, User } from 'lucide-react'
 import Link from 'next/link'
 import { CalendarUI } from './CalendarUI'
+import { CodeEntryDialog } from '@/components/dashboard/CodeEntryDialog'
 
 interface EventDashboardProps {
   events: any[]
@@ -39,6 +40,7 @@ export function EventDashboard({ events, profile }: EventDashboardProps) {
             selectedDate={selectedDate} 
             onSelectDate={setSelectedDate} 
           />
+          <CodeEntryDialog />
         </div>
 
         {/* Events List Side */}
