@@ -34,6 +34,14 @@ export function PurchaseDialog({ product, userProfile, disabled, reason }: Purch
   const handlePurchase = async () => {
     setLoading(true)
     try {
+      const userLevel = Math.floor((userProfile.total_xp || 0) / 1000) + 1
+      if (product.min_level > 1 && userLevel < product.min_level) {
+        toast.error(`Nível insuficiente. Precisas de Nível ${product.min_level}!`)
+        setIsOpen(false)
+        setLoading(false)
+        return
+      }
+
       const { data, error } = await supabase.rpc('process_purchase', {
         p_product_id: product.id,
       })

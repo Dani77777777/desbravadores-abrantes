@@ -42,6 +42,7 @@ export function ProductManagement({ products, profile }: ProductManagementProps)
   const [stock, setStock] = useState(0)
   const [imageUrl, setImageUrl] = useState('')
   const [restrictions, setRestrictions] = useState<string[]>([])
+  const [minLevel, setMinLevel] = useState(0)
   const [loading, setLoading] = useState(false)
 
   const resetForm = () => {
@@ -52,6 +53,7 @@ export function ProductManagement({ products, profile }: ProductManagementProps)
     setStock(0)
     setImageUrl('')
     setRestrictions([])
+    setMinLevel(0)
     setEditingProduct(null)
   }
 
@@ -64,6 +66,7 @@ export function ProductManagement({ products, profile }: ProductManagementProps)
     setStock(product.stock)
     setImageUrl(product.image_url || '')
     setRestrictions(product.restrictions || [])
+    setMinLevel(product.min_level || 0)
     setIsDialogOpen(true)
   }
 
@@ -79,6 +82,7 @@ export function ProductManagement({ products, profile }: ProductManagementProps)
         stock: type === 'digital' ? 0 : stock,
         image_url: imageUrl || null,
         restrictions,
+        min_level: minLevel,
         is_active: true
       }
 
@@ -176,6 +180,10 @@ export function ProductManagement({ products, profile }: ProductManagementProps)
                   <Label>URL da Imagem (Opcional)</Label>
                   <Input value={imageUrl} onChange={e => setImageUrl(e.target.value)} placeholder="https://exemplo.com/imagem.jpg" />
                 </div>
+                <div className="space-y-2">
+                  <Label>Nível Mínimo (0 = Livre)</Label>
+                  <Input type="number" min={0} value={minLevel} onChange={e => setMinLevel(Number(e.target.value))} />
+                </div>
                 <div className="space-y-2 col-span-2">
                   <Label>Restrições de Secção (Vazio = Todos)</Label>
                   <div className="flex flex-wrap gap-2 pt-1 font-bold">
@@ -239,6 +247,9 @@ export function ProductManagement({ products, profile }: ProductManagementProps)
                       )}
                       {product.restrictions && product.restrictions.length > 0 && (
                         <span className="text-gray-400 font-bold truncate">• {product.restrictions.join(', ')}</span>
+                      )}
+                      {product.min_level > 1 && (
+                        <span className="text-indigo-600 font-bold">• Nível {product.min_level}+</span>
                       )}
                     </div>
                   </div>

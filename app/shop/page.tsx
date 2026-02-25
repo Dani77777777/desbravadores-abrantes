@@ -21,11 +21,12 @@ export default async function ShopPage() {
 
   if (!profile) redirect('/')
 
-  // Fetch only active products
+  // Fetch only active products with their available keys count
   const { data: products } = await supabase
     .from('store_products')
-    .select('*')
+    .select('*, digital_keys(count)')
     .eq('is_active', true)
+    .eq('digital_keys.is_used', false)
     .order('price', { ascending: true })
 
   return (

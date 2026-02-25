@@ -17,8 +17,13 @@ const SECTION_LABELS: Record<string, string> = {
 
 export function ProductCard({ product, userProfile }: ProductCardProps) {
   const isDigital = product.type === 'digital'
-  const isOutOfStock = !isDigital && product.stock <= 0
+  const digitalKeysCount = product.digital_keys?.[0]?.count || 0
+  const isOutOfStock = isDigital ? digitalKeysCount <= 0 : product.stock <= 0
   const canAfford = userProfile.current_gold >= product.price
+  
+  const userLevel = Math.floor((userProfile.total_xp || 0) / 1000) + 1
+  const hasLevel = !product.min_level || product.min_level <= 1 || userLevel >= product.min_level
+  const levelReason = !hasLevel ? `Nível ${product.min_level} necessário` : undefined
 
   return (
     <Card className="group overflow-hidden border-none shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col bg-white rounded-3xl">
@@ -60,6 +65,22 @@ export function ProductCard({ product, userProfile }: ProductCardProps) {
              </Badge>
           </div>
         )}
+
+        {product.min_level > 1 && (
+          <div className="absolute top-3 left-3 mt-8">
+            <Badge className={`font-black text-[10px] uppercase border-none px-3 py-1 ${hasLevel ? 'bg-indigo-600' : 'bg-red-600 animate-pulse'}`}>
+              Nível {product.min_level}+
+            </Badge>
+          </div>
+        )}
+
+        {isDigital && digitalKeysCount <= 5 && digitalKeysCount > 0 && (
+          <div className="absolute bottom-3 left-3">
+             <Badge className="bg-purple-500 text-white font-black text-[9px] border-none">
+                Apenas {digitalKeysCount} chaves!
+             </Badge>
+          </div>
+        )}
         
         {isOutOfStock && (
           <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px] flex items-center justify-center">
@@ -93,8 +114,8 @@ export function ProductCard({ product, userProfile }: ProductCardProps) {
         <PurchaseDialog 
           product={product} 
           userProfile={userProfile} 
-          disabled={isOutOfStock || !canAfford}
-          reason={!canAfford ? 'Gold insuficiente' : isOutOfStock ? 'Esgotado' : undefined}
+          disabled={isOutOfStock || !canAfford || !hasLevel}
+          reason={levelReason || (!canAfford ? 'Gold insuficiente' : isOutOfStock ? 'Esgotado' : undefined)}
         />
       </CardFooter>
     </Card>

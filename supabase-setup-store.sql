@@ -22,6 +22,7 @@ CREATE TABLE IF NOT EXISTS public.store_products (
   image_url text,
   restrictions jsonb DEFAULT '[]'::jsonb, -- Array of section names
   is_active boolean DEFAULT true,
+  min_level integer DEFAULT 0 CHECK (min_level >= 0),
   created_at timestamptz DEFAULT now(),
   updated_at timestamptz DEFAULT now()
 );
@@ -90,19 +91,25 @@ DECLARE
   v_product_type public.product_type;
   v_stock integer;
   v_user_gold integer;
+  v_user_xp integer;
+  v_min_level integer;
   v_key_id uuid;
   v_key_value text;
   v_purchase_id uuid;
 BEGIN
   -- 1. Checks
-  SELECT name, price, type, stock INTO v_product_name, v_price, v_product_type, v_stock
+  SELECT name, price, type, stock, min_level INTO v_product_name, v_price, v_product_type, v_stock, v_min_level
   FROM public.store_products WHERE id = p_product_id AND is_active = true;
 
   IF NOT FOUND THEN
     RAISE EXCEPTION 'Produto não encontrado ou inativo.';
   END IF;
 
-  SELECT current_gold INTO v_user_gold FROM public.profiles WHERE id = v_user_id;
+  SELECT current_gold, total_xp INTO v_user_gold, v_user_xp FROM public.profiles WHERE id = v_user_id;
+
+  IF v_min_level > 1 AND (floor(v_user_xp / 1000) + 1) < v_min_level THEN
+    RAISE EXCEPTION 'Nível insuficiente. Precisas de Nível %!', v_min_level;
+  END IF;
   
   IF v_user_gold < v_price THEN
     RAISE EXCEPTION 'Saldo insuficiente. Tens % 🪙 e o produto custa % 🪙.', v_user_gold, v_price;
