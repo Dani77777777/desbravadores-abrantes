@@ -21,5 +21,27 @@ export default async function ProfilePage() {
     redirect('/onboarding')
   }
 
-  return <ProfileSettings profile={profile} user={user} userEmail={user.email || ''} />
+  const { data: purchases } = await supabase
+    .from('store_purchases')
+    .select(`
+      id,
+      product_id,
+      status,
+      digital_key_delivered,
+      created_at,
+      store_products (
+        name,
+        type,
+        image_url
+      )
+    `)
+    .eq('user_id', user.id)
+    .order('created_at', { ascending: false })
+
+  return <ProfileSettings 
+    profile={profile} 
+    user={user} 
+    userEmail={user.email || ''} 
+    purchases={purchases || []}
+  />
 }

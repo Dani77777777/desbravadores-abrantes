@@ -12,8 +12,9 @@ import { User, Image, Mail, Calendar, Award, History } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { Navbar } from '@/components/layout/Navbar'
 import { createClient } from '@/utils/supabase/client'
-import Link from 'next/link'
 import { useRef } from 'react'
+import Link from 'next/link'
+import { PurchaseHistory } from './PurchaseHistory'
 
 interface ProfileSettingsProps {
   profile: {
@@ -28,9 +29,10 @@ interface ProfileSettingsProps {
   }
   user: any
   userEmail: string
+  purchases: any[]
 }
 
-export default function ProfileSettings({ profile, user, userEmail }: ProfileSettingsProps) {
+export default function ProfileSettings({ profile, user, userEmail, purchases }: ProfileSettingsProps) {
   const [fullName, setFullName] = useState(profile.full_name)
   const [avatarUrl, setAvatarUrl] = useState(profile.avatar_url || '')
   const [loading, setLoading] = useState(false)
@@ -208,6 +210,9 @@ export default function ProfileSettings({ profile, user, userEmail }: ProfileSet
             </CardContent>
           </Card>
         </div>
+
+        {/* Purchase History */}
+        <PurchaseHistory purchases={purchases} />
 
         {/* Edit Profile */}
         <Card>
