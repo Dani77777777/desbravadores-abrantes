@@ -2,6 +2,11 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { useState } from 'react'
+import { createClient } from '@/utils/supabase/client'
+import { toast } from 'sonner'
+import { useRouter } from 'next/navigation'
+import { Button } from '@/components/ui/button'
 import { 
   Users, 
   ShieldCheck, 
@@ -12,13 +17,16 @@ import {
   ChevronRight,
   TrendingUp,
   CalendarDays,
-  MapPin
+  MapPin,
+  Package,
+  Check
 } from 'lucide-react'
 
 interface OverviewPanelProps {
   profile: any
   members: any[]
   events: any[]
+  purchases: any[]
 }
 
 const SECTION_LABELS: Record<string, string> = {
@@ -37,7 +45,10 @@ const SECTION_COLORS: Record<string, string> = {
   embaixadores: 'bg-rose-100 text-rose-700',
 }
 
-export function OverviewPanel({ profile, members, events }: OverviewPanelProps) {
+export function OverviewPanel({ profile, members, events, purchases }: OverviewPanelProps) {
+  const supabase = createClient()
+  const router = useRouter()
+  const [loading, setLoading] = useState<string | null>(null)
   const isCoordenador = profile.role === 'coordenador'
   const targetSection = profile.leadership_section || profile.section
 
@@ -88,6 +99,30 @@ export function OverviewPanel({ profile, members, events }: OverviewPanelProps) 
     .filter(e => !e.is_finished && new Date(e.start_at) >= today)
     .sort((a, b) => new Date(a.start_at).getTime() - new Date(b.start_at).getTime())
     .slice(0, 3)
+
+  // 6. Pending Deliveries (Physical and Pending status)
+  const pendingDeliveries = purchases
+    .filter(p => p.store_products?.type === 'physical' && p.status === 'pending')
+    .slice(0, 5)
+
+  const handleDeliver = async (purchaseId: string) => {
+    setLoading(purchaseId)
+    try {
+      const { error } = await supabase
+        .from('store_purchases')
+        .update({ status: 'delivered', updated_at: new Date().toISOString() })
+        .eq('id', purchaseId)
+      
+      if (error) throw error
+      
+      toast.success('Artigo marcado como entregue!')
+      router.refresh()
+    } catch (error: any) {
+      toast.error('Erro ao marcar entrega.')
+    } finally {
+      setLoading(null)
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -200,6 +235,7 @@ export function OverviewPanel({ profile, members, events }: OverviewPanelProps) 
                 )}
               </CardContent>
             </Card>
+
           </div>
 
           {/* Members per Investiture Status */}
@@ -233,6 +269,61 @@ export function OverviewPanel({ profile, members, events }: OverviewPanelProps) 
                       </Badge>
                     </div>
                   ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Pending Deliveries Widget */}
+          <Card>
+            <CardHeader className="pb-3 text-left">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Package className="w-5 h-5 text-orange-500" />
+                  Entregas Pendentes
+                </CardTitle>
+                <Badge variant="outline" className="text-[10px] bg-orange-50 text-orange-700 border-orange-200">
+                  {purchases.filter(p => p.store_products?.type === 'physical' && p.status === 'pending').length} Pedidos
+                </Badge>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {pendingDeliveries.length === 0 ? (
+                <p className="text-sm text-gray-400 text-center py-4">Não há entregas físicas pendentes. 🙌</p>
+              ) : (
+                <div className="divide-y divide-gray-100">
+                  {pendingDeliveries.map(p => (
+                    <div key={p.id} className="py-3 flex items-center justify-between gap-4">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-8 h-8 rounded-lg bg-orange-50 flex items-center justify-center text-orange-600 shrink-0">
+                          <Package className="w-4 h-4" />
+                        </div>
+                        <div className="min-w-0 text-left">
+                          <p className="text-xs font-bold text-gray-800 truncate">{p.store_products?.name}</p>
+                          <p className="text-[10px] text-gray-500 truncate">
+                            {p.profiles?.full_name} • {SECTION_LABELS[p.profiles?.section] || p.profiles?.section}
+                          </p>
+                        </div>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-8 px-2 text-[10px] font-black uppercase text-green-600 hover:text-green-700 hover:bg-green-50 shrink-0 gap-1.5"
+                        onClick={() => handleDeliver(p.id)}
+                        disabled={loading === p.id}
+                      >
+                        <Check className="w-3.5 h-3.5" />
+                        {loading === p.id ? '...' : 'Entregar'}
+                      </Button>
+                    </div>
+                  ))}
+                  {purchases.filter(p => p.store_products?.type === 'physical' && p.status === 'pending').length > 5 && (
+                    <div className="pt-2 text-center">
+                      <a href="/admin?tab=store" className="text-[10px] font-bold text-blue-600 hover:underline px-2 py-1">
+                        Ver todas as encomendas...
+                      </a>
+                    </div>
+                  )}
                 </div>
               )}
             </CardContent>

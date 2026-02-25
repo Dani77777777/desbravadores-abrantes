@@ -97,9 +97,10 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
   }
   const { data: events } = await eventsQuery
 
-  // Fetch Store Data (Coordenadores only)
+  // Fetch Store Data
   let products = []
   let purchases = []
+  
   if (profile.role === 'coordenador') {
     const { data: storeProducts } = await supabase.from('store_products').select('*').order('created_at', { ascending: false })
     products = storeProducts || []
@@ -239,6 +240,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
             profile={profile}
             members={members || []}
             events={events || []}
+            purchases={purchases || []}
           />
         )}
 
