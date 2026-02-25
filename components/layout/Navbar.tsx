@@ -40,7 +40,7 @@ export function Navbar({ user, profile }: NavbarProps) {
         <div className="flex items-center justify-between h-16">
           <div className="flex items-center">
             <Link href="/" className="flex-shrink-0 font-bold text-xl tracking-tight flex items-center gap-2">
-              <Tent className="h-6 w-6 text-yellow-400" />
+              <img src="/images/Logo Desbravadores.png" alt="Logo" className="h-8 w-auto" />
               <span className="hidden sm:inline">Desbravadores Abrantes</span>
               <span className="sm:hidden">DBV Abrantes</span>
             </Link>
@@ -191,8 +191,8 @@ export function Navbar({ user, profile }: NavbarProps) {
                     className="flex items-center gap-4 px-5 py-4 rounded-2xl bg-blue-800/40 hover:bg-blue-800 text-white font-bold transition-all border border-blue-700/50 shadow-sm"
                     onClick={() => setIsOpen(false)}
                   >
-                    <div className="p-2 bg-yellow-400 rounded-lg text-blue-900">
-                      <Tent className="w-5 h-5" />
+                    <div className="p-2 bg-white rounded-lg">
+                      <img src="/images/Logo Desbravadores.png" alt="Logo" className="w-5 h-5 object-contain" />
                     </div>
                     <span>Painel Principal</span>
                   </Link>
@@ -266,8 +266,8 @@ export function Navbar({ user, profile }: NavbarProps) {
                     className="flex items-center gap-4 px-5 py-4 rounded-2xl bg-blue-800/40 hover:bg-blue-800 text-white font-bold transition-all border border-blue-700/50"
                     onClick={() => setIsOpen(false)}
                   >
-                    <div className="p-2 bg-yellow-400 rounded-lg text-blue-900">
-                      <Trophy className="w-5 h-5" />
+                    <div className="p-2 bg-white rounded-lg">
+                      <img src="/images/Logo Desbravadores.png" alt="Logo" className="w-5 h-5 object-contain" />
                     </div>
                     <span>Ranking Público</span>
                   </Link>

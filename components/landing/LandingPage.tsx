@@ -174,8 +174,8 @@ export function LandingPage() {
       <footer className="py-12 bg-stone-900 text-stone-400 border-t border-stone-800">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row items-center justify-between gap-8">
           <div className="flex items-center gap-3">
-             <div className="w-8 h-8 bg-red-600 rounded-full flex items-center justify-center border border-yellow-400 shrink-0">
-                <Shield className="w-4 h-4 text-white" />
+             <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center shrink-0 overflow-hidden p-1.5">
+                <img src="/images/Logo Desbravadores.png" alt="Logo" className="w-full h-full object-contain" />
              </div>
              <span className="font-bold text-white">Desbravadores Abrantes</span>
           </div>

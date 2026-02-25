@@ -78,8 +78,8 @@ export default function ResetPasswordPage() {
 
       <Card className="w-full max-w-md mx-4 z-10 bg-white/95 backdrop-blur-sm shadow-xl border-none">
         <CardHeader className="text-center space-y-2">
-          <div className="mx-auto w-16 h-16 bg-blue-800 rounded-full flex items-center justify-center mb-2 shadow-lg border-4 border-yellow-400">
-            <KeyRound className="w-8 h-8 text-white" />
+          <div className="mx-auto w-16 h-16 bg-white rounded-full flex items-center justify-center mb-2 shadow-lg border-4 border-yellow-400 p-2 overflow-hidden">
+            <img src="/images/Logo Desbravadores.png" alt="Logo" className="w-full h-full object-contain" />
           </div>
           <CardTitle className="text-2xl font-bold tracking-tight text-blue-900">
             Nova Password
