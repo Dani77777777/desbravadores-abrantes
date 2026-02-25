@@ -8,7 +8,8 @@ import { OverviewPanel } from './components/OverviewPanel'
 import { AnnouncementPanel } from './components/AnnouncementPanel'
 import { SuggestionPanel } from './components/SuggestionPanel'
 import { EventPanel } from './components/EventPanel'
-import { Users, ListChecks, Megaphone, MessageSquare, LayoutDashboard, CalendarDays } from 'lucide-react'
+import { StorePanel } from './components/StorePanel'
+import { Users, ListChecks, Megaphone, MessageSquare, LayoutDashboard, CalendarDays, ShoppingBag } from 'lucide-react'
 
 export default async function AdminPage({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
   const supabase = await createClient()
@@ -95,6 +96,24 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
     eventsQuery = eventsQuery.or(`target_section.is.null,target_section.eq.${targetSection}`)
   }
   const { data: events } = await eventsQuery
+
+  // Fetch Store Data (Coordenadores only)
+  let products = []
+  let purchases = []
+  if (profile.role === 'coordenador') {
+    const { data: storeProducts } = await supabase.from('store_products').select('*').order('created_at', { ascending: false })
+    products = storeProducts || []
+
+    const { data: storePurchases } = await supabase
+      .from('store_purchases')
+      .select(`
+        *,
+        profiles:user_id(full_name, section),
+        store_products:product_id(name, type, price)
+      `)
+      .order('created_at', { ascending: false })
+    purchases = storePurchases || []
+  }
 
   const resolvedParams = await searchParams
   const defaultTab = profile.role === 'coordenador' ? 'overview' : 'members'
@@ -195,6 +214,23 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
               </span>
             )}
           </a>
+          {profile.role === 'coordenador' && (
+            <a
+              href="/admin?tab=store"
+              className={`flex items-center gap-2 px-5 py-2.5 text-sm font-bold rounded-xl transition-all whitespace-nowrap ${
+                activeTab === 'store'
+                  ? 'bg-blue-900 text-white shadow-md'
+                  : 'text-gray-500 hover:bg-gray-100'
+              }`}
+            >
+              <ShoppingBag className="w-4 h-4" /> Loja
+              {(purchases?.filter(p => p.status === 'pending').length ?? 0) > 0 && (
+                <span className={`ml-1 text-[10px] font-black rounded-full px-1.5 py-0.5 ${activeTab === 'store' ? 'bg-orange-500 text-white shadow-sm' : 'bg-orange-100 text-orange-700'}`}>
+                  {purchases?.filter(p => p.status === 'pending').length}
+                </span>
+              )}
+            </a>
+          )}
         </div>
 
         {/* Overview tab */}
@@ -255,6 +291,15 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
           <SuggestionPanel
             profile={profile}
             initialSuggestions={suggestions || []}
+          />
+        )}
+
+        {/* Store tab */}
+        {activeTab === 'store' && profile.role === 'coordenador' && (
+          <StorePanel
+            profile={profile}
+            products={products}
+            initialPurchases={purchases}
           />
         )}
       </main>
