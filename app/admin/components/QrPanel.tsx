@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { toast } from 'sonner'
 import { Plus, QrCode, Trash2, Trophy, Coins, ExternalLink, RefreshCw, Clock, Users } from 'lucide-react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { QrPrintDialog } from './QrPrintDialog'
 
 export function QrPanel({ profile }: { profile: any }) {
   const isCoordenador = profile?.role === 'coordenador'
@@ -265,11 +266,15 @@ export function QrPanel({ profile }: { profile: any }) {
                     </span>
                   </div>
 
-                  <Button asChild size="sm" variant="outline" className="w-full gap-2 text-[10px] border-slate-100 h-8">
-                    <a href={`/codes/${c.code}`} target="_blank" rel="noreferrer">
-                      Ver Página <ExternalLink className="w-3 h-3" />
-                    </a>
-                  </Button>
+                  <div className="flex flex-col gap-2">
+                    <QrPrintDialog code={c.code} title={c.title} />
+                    
+                    <Button asChild size="sm" variant="ghost" className="w-full gap-2 text-[10px] text-slate-400 h-8">
+                      <a href={`/codes/${c.code}`} target="_blank" rel="noreferrer">
+                        Abrir Link <ExternalLink className="w-3 h-3" />
+                      </a>
+                    </Button>
+                  </div>
                 </CardContent>
               </Card>
             ))
