@@ -37,18 +37,18 @@ ALTER TABLE public.qr_scans ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Authenticated users can view QR codes" ON public.qr_codes
     FOR SELECT TO authenticated USING (true);
 
-CREATE POLICY "Admins can manage QR codes" ON public.qr_codes
+CREATE POLICY "Coordinators can manage QR codes" ON public.qr_codes
     FOR ALL TO authenticated USING (
-        public.get_my_role() IN ('dirigente', 'coordenador')
+        public.get_my_role() = 'coordenador'
     );
 
 -- QR_SCANS: Utilizadores vêm os seus resgates, admins vêm todos
 CREATE POLICY "Users can view own scans" ON public.qr_scans
     FOR SELECT TO authenticated USING (user_id = auth.uid());
 
-CREATE POLICY "Admins can view all scans" ON public.qr_scans
+CREATE POLICY "Coordinators can view all scans" ON public.qr_scans
     FOR SELECT TO authenticated USING (
-        public.get_my_role() IN ('dirigente', 'coordenador')
+        public.get_my_role() = 'coordenador'
     );
 
 -- Permitir inserir scan se for o próprio

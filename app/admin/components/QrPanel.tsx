@@ -14,7 +14,8 @@ import { toast } from 'sonner'
 import { Plus, QrCode, Trash2, Trophy, Coins, ExternalLink, RefreshCw, Clock, Users } from 'lucide-react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 
-export function QrPanel() {
+export function QrPanel({ profile }: { profile: any }) {
+  const isCoordenador = profile?.role === 'coordenador'
   const supabase = createClient()
   const [codes, setCodes] = useState<any[]>([])
   const [scans, setScans] = useState<any[]>([])
@@ -103,6 +104,10 @@ export function QrPanel() {
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (!isCoordenador) {
+      toast.error('Apenas coordenadores podem criar códigos.')
+      return
+    }
     setCreating(true)
     try {
       const { error } = await supabase.from('qr_codes').insert({
@@ -128,6 +133,10 @@ export function QrPanel() {
   }
 
   const handleDelete = async (id: string) => {
+    if (!isCoordenador) {
+      toast.error('Apenas coordenadores podem eliminar códigos.')
+      return
+    }
     if (!confirm('Eliminar este código?')) return
     const { error } = await supabase.from('qr_codes').delete().eq('id', id)
     if (error) toast.error('Erro ao eliminar.')
@@ -154,64 +163,66 @@ export function QrPanel() {
           <h2 className="text-xl font-bold text-gray-900">Questões e QRs Dinâmicos</h2>
           <p className="text-sm text-gray-500">Gere códigos curtos para competições ou pistas.</p>
         </div>
-        <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-          <DialogTrigger asChild>
-            <Button className="bg-blue-800 hover:bg-blue-900 gap-2">
-              <Plus className="w-4 h-4" /> Novo Código
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>Criar Novo Código</DialogTitle>
-            </DialogHeader>
-            <form onSubmit={handleCreate} className="space-y-4 pt-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="title">Título do Código (Admin)</Label>
-                  <Input id="title" placeholder="Ex: Pista 1" value={title} onChange={e => setTitle(e.target.value)} required />
+        {isCoordenador && (
+          <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+            <DialogTrigger asChild>
+              <Button className="bg-blue-800 hover:bg-blue-900 gap-2">
+                <Plus className="w-4 h-4" /> Novo Código
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-xl max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>Criar Novo Código</DialogTitle>
+              </DialogHeader>
+              <form onSubmit={handleCreate} className="space-y-4 pt-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="title">Título do Código (Admin)</Label>
+                    <Input id="title" placeholder="Ex: Pista 1" value={title} onChange={e => setTitle(e.target.value)} required />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="code">Código Curto</Label>
+                    <Input id="code" placeholder="Ex: ARVORE01" value={code} onChange={e => setCode(e.target.value)} required className="uppercase font-mono" />
+                  </div>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="code">Código Curto</Label>
-                  <Input id="code" placeholder="Ex: ARVORE01" value={code} onChange={e => setCode(e.target.value)} required className="uppercase font-mono" />
-                </div>
-              </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="content">Conteúdo (Se Auto-Claim OFF)</Label>
-                <Textarea id="content" placeholder="A próxima pista está..." value={content} onChange={e => setContent(e.target.value)} rows={3} />
-              </div>
-
-              <div className="grid grid-cols-3 gap-4">
                 <div className="space-y-2">
-                  <Label className="flex items-center gap-1"><Trophy className="w-3 h-3 text-indigo-500" /> XP</Label>
-                  <Input type="number" value={xpReward} onChange={e => setXpReward(parseInt(e.target.value))} min={0} />
+                  <Label htmlFor="content">Conteúdo (Se Auto-Claim OFF)</Label>
+                  <Textarea id="content" placeholder="A próxima pista está..." value={content} onChange={e => setContent(e.target.value)} rows={3} />
                 </div>
-                <div className="space-y-2">
-                  <Label className="flex items-center gap-1"><Coins className="w-3 h-3 text-yellow-500" /> GOLD</Label>
-                  <Input type="number" value={goldReward} onChange={e => setGoldReward(parseInt(e.target.value))} min={0} />
-                </div>
-                <div className="space-y-2">
-                  <Label>Limite Global</Label>
-                  <Input type="number" placeholder="Ilimitado" value={maxUsesGlobal} onChange={e => setMaxUsesGlobal(e.target.value)} min={1} />
-                </div>
-              </div>
 
-              <div className="flex items-center justify-between p-4 bg-slate-50 rounded-xl border">
-                <div className="space-y-0.5 text-left">
-                  <Label className="text-base font-bold">Atribuição Automática</Label>
-                  <p className="text-[10px] text-slate-500 leading-tight">ON: Ganha pontos na hora, conteúdo escondido.<br/>OFF: Vê conteúdo, precisa clicar para ganhar.</p>
+                <div className="grid grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <Label className="flex items-center gap-1"><Trophy className="w-3 h-3 text-indigo-500" /> XP</Label>
+                    <Input type="number" value={xpReward} onChange={e => setXpReward(parseInt(e.target.value))} min={0} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="flex items-center gap-1"><Coins className="w-3 h-3 text-yellow-500" /> GOLD</Label>
+                    <Input type="number" value={goldReward} onChange={e => setGoldReward(parseInt(e.target.value))} min={0} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Limite Global</Label>
+                    <Input type="number" placeholder="Ilimitado" value={maxUsesGlobal} onChange={e => setMaxUsesGlobal(e.target.value)} min={1} />
+                  </div>
                 </div>
-                <Switch checked={autoClaim} onCheckedChange={setAutoClaim} />
-              </div>
 
-              <DialogFooter>
-                <Button type="submit" className="w-full bg-blue-800" disabled={creating}>
-                  {creating ? 'A criar...' : 'Criar Código'}
-                </Button>
-              </DialogFooter>
-            </form>
-          </DialogContent>
-        </Dialog>
+                <div className="flex items-center justify-between p-4 bg-slate-50 rounded-xl border">
+                  <div className="space-y-0.5 text-left">
+                    <Label className="text-base font-bold">Atribuição Automática</Label>
+                    <p className="text-[10px] text-slate-500 leading-tight">ON: Ganha pontos na hora, conteúdo escondido.<br/>OFF: Vê conteúdo, precisa clicar para ganhar.</p>
+                  </div>
+                  <Switch checked={autoClaim} onCheckedChange={setAutoClaim} />
+                </div>
+
+                <DialogFooter>
+                  <Button type="submit" className="w-full bg-blue-800" disabled={creating}>
+                    {creating ? 'A criar...' : 'Criar Código'}
+                  </Button>
+                </DialogFooter>
+              </form>
+            </DialogContent>
+          </Dialog>
+        )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -229,9 +240,11 @@ export function QrPanel() {
                       <h3 className="font-bold text-gray-900 group-hover:text-blue-700 transition-colors truncate">{c.title}</h3>
                       <p className="text-xs font-mono text-slate-400 mt-0.5 font-bold uppercase tracking-widest">{c.code}</p>
                     </div>
-                    <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-300 hover:text-red-500 shrink-0" onClick={() => handleDelete(c.id)}>
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
+                    {isCoordenador && (
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-300 hover:text-red-500 shrink-0" onClick={() => handleDelete(c.id)}>
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    )}
                   </div>
 
                   <div className="flex gap-3">

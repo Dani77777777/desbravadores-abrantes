@@ -118,8 +118,17 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
   }
 
   const resolvedParams = await searchParams
-  const defaultTab = profile.role === 'coordenador' ? 'overview' : 'members'
-  const activeTab = resolvedParams?.tab || defaultTab
+  const isCoordenador = profile.role === 'coordenador'
+  const isDirigente = profile.role === 'dirigente'
+  
+  const defaultTab = isCoordenador ? 'overview' : 'members'
+  let activeTab = resolvedParams?.tab || defaultTab
+
+  // Security: If a dirigente tries to access coord-only tabs, redirect to default
+  const coordOnlyTabs = ['overview', 'qr', 'store']
+  if (isDirigente && coordOnlyTabs.includes(activeTab)) {
+    redirect('/admin?tab=members')
+  }
 
   const SECTION_LABELS: Record<string, string> = {
     rebentos: 'Rebentos', ticoes: 'Tições', exploradores: 'Exploradores',
@@ -144,105 +153,40 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
 
         {/* Tab navigation */}
         <div className="bg-white p-1.5 rounded-2xl border border-gray-200 shadow-sm overflow-x-auto no-scrollbar scroll-smooth flex gap-1 mb-2">
-          {profile.role === 'coordenador' && (
-            <a
-              href="/admin?tab=overview"
-              className={`flex items-center gap-2 px-5 py-2.5 text-sm font-bold rounded-xl transition-all whitespace-nowrap ${
-                activeTab === 'overview'
-                  ? 'bg-blue-900 text-white shadow-md'
-                  : 'text-gray-500 hover:bg-gray-100'
-              }`}
-            >
-              <LayoutDashboard className="w-4 h-4" /> Visão Geral
-            </a>
-          )}
-          <a
-            href="/admin?tab=members"
-            className={`flex items-center gap-2 px-5 py-2.5 text-sm font-bold rounded-xl transition-all whitespace-nowrap ${
-              activeTab === 'members'
-                ? 'bg-blue-900 text-white shadow-md'
-                : 'text-gray-500 hover:bg-gray-100'
-            }`}
-          >
-            <Users className="w-4 h-4" /> Membros
-          </a>
-          <a
-            href="/admin?tab=tasks"
-            className={`flex items-center gap-2 px-5 py-2.5 text-sm font-bold rounded-xl transition-all whitespace-nowrap ${
-              activeTab === 'tasks'
-                ? 'bg-blue-900 text-white shadow-md'
-                : 'text-gray-500 hover:bg-gray-100'
-            }`}
-          >
-            <ListChecks className="w-4 h-4" /> Tarefas
-          </a>
-          <a
-            href="/admin?tab=events"
-            className={`flex items-center gap-2 px-5 py-2.5 text-sm font-bold rounded-xl transition-all whitespace-nowrap ${
-              activeTab === 'events'
-                ? 'bg-blue-900 text-white shadow-md'
-                : 'text-gray-500 hover:bg-gray-100'
-            }`}
-          >
-            <CalendarDays className="w-4 h-4" /> Eventos
-          </a>
-          <a
-            href="/admin?tab=announcements"
-            className={`flex items-center gap-2 px-5 py-2.5 text-sm font-bold rounded-xl transition-all whitespace-nowrap ${
-              activeTab === 'announcements'
-                ? 'bg-blue-900 text-white shadow-md'
-                : 'text-gray-500 hover:bg-gray-100'
-            }`}
-          >
-            <Megaphone className="w-4 h-4" /> Comunicados
-            {(sentAnnouncements?.length ?? 0) > 0 && (
-              <span className={`ml-1 text-[10px] font-black rounded-full px-1.5 py-0.5 ${activeTab === 'announcements' ? 'bg-white/20 text-white' : 'bg-blue-100 text-blue-700'}`}>
-                {sentAnnouncements?.length}
-              </span>
-            )}
-          </a>
-          <a
-            href="/admin?tab=suggestions"
-            className={`flex items-center gap-2 px-5 py-2.5 text-sm font-bold rounded-xl transition-all whitespace-nowrap ${
-              activeTab === 'suggestions'
-                ? 'bg-blue-900 text-white shadow-md'
-                : 'text-gray-500 hover:bg-gray-100'
-            }`}
-          >
-            <MessageSquare className="w-4 h-4" /> Sugestões
-            {(suggestions?.filter(s => !s.is_read).length ?? 0) > 0 && (
-              <span className={`ml-1 text-[10px] font-black rounded-full px-1.5 py-0.5 ${activeTab === 'suggestions' ? 'bg-red-500 text-white shadow-sm' : 'bg-red-100 text-red-700'}`}>
-                {suggestions?.filter(s => !s.is_read).length}
-              </span>
-            )}
-          </a>
-          <a
-            href="/admin?tab=qr"
-            className={`flex items-center gap-2 px-5 py-2.5 text-sm font-bold rounded-xl transition-all whitespace-nowrap ${
-              activeTab === 'qr'
-                ? 'bg-blue-900 text-white shadow-md'
-                : 'text-gray-500 hover:bg-gray-100'
-            }`}
-          >
-            <QrCode className="w-4 h-4" /> Questões / QR
-          </a>
-          {profile.role === 'coordenador' && (
-            <a
-              href="/admin?tab=store"
-              className={`flex items-center gap-2 px-5 py-2.5 text-sm font-bold rounded-xl transition-all whitespace-nowrap ${
-                activeTab === 'store'
-                  ? 'bg-blue-900 text-white shadow-md'
-                  : 'text-gray-500 hover:bg-gray-100'
-              }`}
-            >
-              <ShoppingBag className="w-4 h-4" /> Loja
-              {(purchases?.filter(p => p.status === 'pending').length ?? 0) > 0 && (
-                <span className={`ml-1 text-[10px] font-black rounded-full px-1.5 py-0.5 ${activeTab === 'store' ? 'bg-orange-500 text-white shadow-sm' : 'bg-orange-100 text-orange-700'}`}>
-                  {purchases?.filter(p => p.status === 'pending').length}
-                </span>
-              )}
-            </a>
-          )}
+          {([
+            { id: 'overview', label: 'Visão Geral', icon: LayoutDashboard, coordOnly: true, count: 0, countColor: 'blue' },
+            { id: 'members', label: 'Membros', icon: Users, coordOnly: false, count: 0, countColor: 'blue' },
+            { id: 'tasks', label: 'Tarefas', icon: ListChecks, coordOnly: false, count: 0, countColor: 'blue' },
+            { id: 'events', label: 'Eventos', icon: CalendarDays, coordOnly: false, count: 0, countColor: 'blue' },
+            { id: 'announcements', label: 'Comunicados', icon: Megaphone, coordOnly: false, count: sentAnnouncements?.length || 0, countColor: 'blue' },
+            { id: 'suggestions', label: 'Sugestões', icon: MessageSquare, coordOnly: false, count: suggestions?.filter(s => !s.is_read).length || 0, countColor: 'red' },
+            { id: 'qr', label: 'Questões / QR', icon: QrCode, coordOnly: true, count: 0, countColor: 'blue' },
+            { id: 'store', label: 'Loja', icon: ShoppingBag, coordOnly: true, count: purchases?.filter(p => p.status === 'pending').length || 0, countColor: 'orange' }
+          ] as const)
+            .filter(tab => !tab.coordOnly || isCoordenador)
+            .map((tab) => (
+              <a
+                key={tab.id}
+                href={`/admin?tab=${tab.id}`}
+                className={`flex items-center gap-2 px-5 py-2.5 text-sm font-bold rounded-xl transition-all whitespace-nowrap ${
+                  activeTab === tab.id
+                    ? 'bg-blue-900 text-white shadow-md'
+                    : 'text-gray-500 hover:bg-gray-100'
+                }`}
+              >
+                <tab.icon className="w-4 h-4" /> {tab.label}
+                {tab.count !== undefined && tab.count > 0 && (
+                  <span className={`ml-1 text-[10px] font-black rounded-full px-1.5 py-0.5 ${
+                    activeTab === tab.id 
+                      ? 'bg-white/20 text-white' 
+                      : tab.countColor === 'red' ? 'bg-red-100 text-red-700' : 
+                        tab.countColor === 'orange' ? 'bg-orange-100 text-orange-700' : 'bg-blue-100 text-blue-700'
+                  }`}>
+                    {tab.count}
+                  </span>
+                )}
+              </a>
+            ))}
         </div>
 
         {/* Overview tab */}
@@ -307,8 +251,8 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
         )}
 
         {/* QR tab */}
-        {activeTab === 'qr' && (
-          <QrPanel />
+        {activeTab === 'qr' && profile.role === 'coordenador' && (
+          <QrPanel profile={profile} />
         )}
 
         {/* Store tab */}
