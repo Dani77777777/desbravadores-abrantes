@@ -11,7 +11,7 @@ import { Switch } from '@/components/ui/switch'
 import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog'
 import { toast } from 'sonner'
-import { Plus, QrCode, Trash2, Trophy, Coins, ExternalLink, RefreshCw, Clock, Users } from 'lucide-react'
+import { Plus, QrCode, Trash2, Trophy, Coins, ExternalLink, RefreshCw, Clock, Users, Pencil } from 'lucide-react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { QrPrintDialog } from './QrPrintDialog'
 
@@ -32,6 +32,7 @@ export function QrPanel({ profile }: { profile: any }) {
   const [autoClaim, setAutoClaim] = useState(true)
   const [maxUsesGlobal, setMaxUsesGlobal] = useState<string>('')
   const [creating, setCreating] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
 
   const fetchData = async () => {
     try {
@@ -103,15 +104,15 @@ export function QrPanel({ profile }: { profile: any }) {
     }
   }, [])
 
-  const handleCreate = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!isCoordenador) {
-      toast.error('Apenas coordenadores podem criar códigos.')
+      toast.error('Apenas coordenadores podem gerir códigos.')
       return
     }
     setCreating(true)
     try {
-      const { error } = await supabase.from('qr_codes').insert({
+      const payload = {
         title,
         code: code.toUpperCase(),
         content: content || null,
@@ -119,18 +120,45 @@ export function QrPanel({ profile }: { profile: any }) {
         gold_reward: goldReward,
         auto_claim: autoClaim,
         max_uses_global: maxUsesGlobal ? parseInt(maxUsesGlobal) : null
-      })
+      }
 
-      if (error) throw error
-      toast.success('Código criado com sucesso!')
+      if (editingId) {
+        const { error } = await supabase.from('qr_codes').update(payload).eq('id', editingId)
+        if (error) throw error
+        toast.success('Código atualizado com sucesso!')
+      } else {
+        const { error } = await supabase.from('qr_codes').insert(payload)
+        if (error) throw error
+        toast.success('Código criado com sucesso!')
+      }
+
       setIsCreateOpen(false)
       resetForm()
+      setEditingId(null)
       fetchData()
     } catch (e: any) {
-      toast.error(e.message || 'Erro ao criar código.')
+      toast.error(e.message || 'Erro ao guardar código.')
     } finally {
       setCreating(false)
     }
+  }
+
+  const openEdit = (c: any) => {
+    setEditingId(c.id)
+    setTitle(c.title)
+    setCode(c.code)
+    setContent(c.content || '')
+    setXpReward(c.xp_reward)
+    setGoldReward(c.gold_reward)
+    setAutoClaim(c.auto_claim)
+    setMaxUsesGlobal(c.max_uses_global?.toString() || '')
+    setIsCreateOpen(true)
+  }
+
+  const openCreate = () => {
+    setEditingId(null)
+    resetForm()
+    setIsCreateOpen(true)
   }
 
   const handleDelete = async (id: string) => {
@@ -165,17 +193,21 @@ export function QrPanel({ profile }: { profile: any }) {
           <p className="text-sm text-gray-500">Gere códigos curtos para competições ou pistas.</p>
         </div>
         {isCoordenador && (
-          <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-            <DialogTrigger asChild>
-              <Button className="bg-blue-800 hover:bg-blue-900 gap-2">
-                <Plus className="w-4 h-4" /> Novo Código
-              </Button>
-            </DialogTrigger>
+          <Dialog open={isCreateOpen} onOpenChange={(open) => {
+            setIsCreateOpen(open)
+            if (!open) {
+              setEditingId(null)
+              resetForm()
+            }
+          }}>
+            <Button onClick={openCreate} className="bg-blue-800 hover:bg-blue-900 gap-2">
+              <Plus className="w-4 h-4" /> Novo Código
+            </Button>
             <DialogContent className="sm:max-w-xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
-                <DialogTitle>Criar Novo Código</DialogTitle>
+                <DialogTitle>{editingId ? 'Editar Código' : 'Criar Novo Código'}</DialogTitle>
               </DialogHeader>
-              <form onSubmit={handleCreate} className="space-y-4 pt-4">
+              <form onSubmit={handleSubmit} className="space-y-4 pt-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="title">Título do Código (Admin)</Label>
@@ -217,7 +249,7 @@ export function QrPanel({ profile }: { profile: any }) {
 
                 <DialogFooter>
                   <Button type="submit" className="w-full bg-blue-800" disabled={creating}>
-                    {creating ? 'A criar...' : 'Criar Código'}
+                    {creating ? 'A guardar...' : editingId ? 'Guardar Alterações' : 'Criar Código'}
                   </Button>
                 </DialogFooter>
               </form>
@@ -242,9 +274,14 @@ export function QrPanel({ profile }: { profile: any }) {
                       <p className="text-xs font-mono text-slate-400 mt-0.5 font-bold uppercase tracking-widest">{c.code}</p>
                     </div>
                     {isCoordenador && (
-                      <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-300 hover:text-red-500 shrink-0" onClick={() => handleDelete(c.id)}>
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
+                      <div className="flex gap-1 shrink-0">
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-300 hover:text-blue-500" onClick={() => openEdit(c)}>
+                          <Pencil className="w-4 h-4" />
+                        </Button>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-300 hover:text-red-500" onClick={() => handleDelete(c.id)}>
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
                     )}
                   </div>
 
