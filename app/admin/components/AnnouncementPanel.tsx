@@ -36,7 +36,8 @@ const SECTION_LABELS: Record<string, string> = {
 }
 
 type AudienceType =
-  | 'all_desbravadores'   // coord only — todos os desbravadores
+  | 'global'               // coord only — todos (tropa e dirigentes)
+  | 'all_desbravadores'    // coord only — todos os desbravadores
   | 'all_dirigentes'       // coord only — todos os dirigentes
   | 'dirigente_of_section' // coord only — dirigentes de uma classe
   | 'specific_section'     // coord only — desbravadores de uma classe
@@ -52,7 +53,7 @@ export function AnnouncementPanel({ profile, members, sentAnnouncements }: Annou
   const [title, setTitle] = useState('')
   const [message, setMessage] = useState('')
   const [audience, setAudience] = useState<AudienceType>(
-    isCoordenador ? 'all_desbravadores' : 'my_section_all'
+    isCoordenador ? 'global' : 'my_section_all'
   )
   const [specificSection, setSpecificSection] = useState('')
   const [specificMemberId, setSpecificMemberId] = useState('')
@@ -64,6 +65,8 @@ export function AnnouncementPanel({ profile, members, sentAnnouncements }: Annou
   const buildPayload = () => {
     const base = { author_id: profile.id, title: title.trim(), message: message.trim() }
     switch (audience) {
+      case 'global':
+        return base
       case 'all_desbravadores':
         return { ...base, target_role: 'desbravador' }
       case 'all_dirigentes':
@@ -254,6 +257,8 @@ export function AnnouncementPanel({ profile, members, sentAnnouncements }: Annou
 
               {isCoordenador && (
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  <AudienceBtn active={audience==='global'} onClick={()=>setAudience('global')}
+                    icon={<Globe className="w-4 h-4"/>} label="Global (Todos)" color="sky"/>
                   <AudienceBtn active={audience==='all_desbravadores'} onClick={()=>setAudience('all_desbravadores')}
                     icon={<Globe className="w-4 h-4"/>} label="Todos os Desbravadores" color="emerald"/>
                   <AudienceBtn active={audience==='all_dirigentes'} onClick={()=>setAudience('all_dirigentes')}
@@ -414,6 +419,7 @@ export function AnnouncementPanel({ profile, members, sentAnnouncements }: Annou
 // ── Helper components ──
 
 const PALETTE: Record<string, { active: string; inactive: string }> = {
+  sky:      { active: 'bg-sky-600 text-white border-sky-400 shadow-sky-200',         inactive: 'bg-sky-50 text-sky-700 border-sky-100 hover:bg-sky-100' },
   emerald: { active: 'bg-emerald-600 text-white border-emerald-400 shadow-emerald-200', inactive: 'bg-emerald-50 text-emerald-700 border-emerald-100 hover:bg-emerald-100' },
   purple:  { active: 'bg-purple-600 text-white border-purple-400 shadow-purple-200',   inactive: 'bg-purple-50 text-purple-700 border-purple-100 hover:bg-purple-100' },
   violet:  { active: 'bg-violet-600 text-white border-violet-400 shadow-violet-200',   inactive: 'bg-violet-50 text-violet-700 border-violet-100 hover:bg-violet-100' },
@@ -442,6 +448,7 @@ function AudienceBtn({ active, icon, label, onClick, color }: {
 
 function AudienceSummaryChip({ audience, specificSection, specificMemberId, memberOptions, leadershipSection }: any) {
   const configs: Record<AudienceType, { icon: string; label: string; color: string }> = {
+    global:              { icon: '🌎', label: 'Todos os Membros (Global)', color: 'text-sky-700 bg-sky-50 border-sky-200' },
     all_desbravadores:   { icon: '🌍', label: 'Todos os Desbravadores', color: 'text-emerald-700 bg-emerald-50 border-emerald-200' },
     all_dirigentes:      { icon: '🛡️', label: 'Todos os Dirigentes', color: 'text-purple-700 bg-purple-50 border-purple-200' },
     dirigente_of_section:{ icon: '🛡️📚', label: `Dirigentes do${specificSection ? `s ${SECTION_LABELS[specificSection]}` : '...'}`, color: 'text-violet-700 bg-violet-50 border-violet-200' },
