@@ -14,18 +14,20 @@ O projeto **Desbravadores Abrantes** é uma plataforma "Mobile-First" que transf
 - **Dashboard Personalizado:** Visualização de progresso, saldo de Gold e medalha de investidura.
 - **Ranking (Leaderboard):** Tabela classificativa pública em tempo real entre todos os membros.
 - **Agenda de Eventos:** Consulta de próximas atividades, localizações e recompensas previstas.
-- **Sistema de Tarefas:** Lista de objetivos específicos por secção com atribuição automática de pontos.
+- **Sistema de Tarefas e Loja:** Conclusão de objetivos e troca de Gold por recompensas físicas na loja.
 - **Transferência de Gold:** Envio de moedas entre amigos para incentivar a cooperação.
 - **Caixa de Sugestões:** Canal direto para enviar críticas ou ideias à liderança.
 - **Histórico de Pontos:** Transparência total sobre como e quando os pontos foram ganhos.
+- **Anúncios Globais:** Avisos importantes em destaque para todos os membros.
 
 #### 🛡️ Para Liderança (Dirigentes e Coordenadores)
-- **Painel de Gestão Admin:** Visão consolidada de todas as secções.
-- **Controlo de Presenças:** Gestão simplificada com cálculo automático de bonificações por pontualidade.
-- **Emissão de Avisos:** Sistema de anúncios direcionados (por pessoa, secção ou papel).
+- **Painel de Gestão Admin:** Visão consolidada de secções com dashboard horizontal otimizado.
+- **Controlo de Presenças & QR Codes:** Criação, edição e impressão de QR Codes (A4/A5) para check-in por scan.
+- **Gestão de Loja/Entregas:** Widget prático para gerir as entregas pendentes dos produtos da loja.
+- **Emissão de Avisos:** Sistema de anúncios globais ou direcionados (por pessoa, secção ou papel).
 - **Gestão de Investiduras:** Toggle manual para marcar a conclusão de classes.
 - **Dashboard de Métricas:** Estatísticas de engajamento, aniversários e distribuição de membros.
-- **Moderação de Sugestões:** Leitura e gestão de feedback enviado pelos membros.
+- **Moderação de Sugestões:** Leitura, gestão e resolução do feedback recebido.
 
 ---
 
@@ -115,18 +117,6 @@ utils/
    - **Dirigentes:** Gerem apenas a sua secção atribuída (`leadership_section`).
    - **Coordenadores:** Acesso total a todos os dados e ferramentas do clube.
 3. **Persistência:** Todo o XP e Gold é auditado através da tabela `points_log`, impedindo alterações manuais sem rasto.
-
----
-
-## � Roadmap / Próximos Desafios
-- [x] Web Push Notifications
-- [x] Sistema de Sugestões
-- [x] Ranking Público
-- [x] Gestão de Presenças Automática
-- [ ] Módulo de Inventário / Loja (Troca de Gold por prémios)
-- [ ] Exportação de Relatórios PDF (Quadro de Mérito)
-
----
 
 ## 🤝 Contacto e Suporte
 
