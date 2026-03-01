@@ -259,7 +259,7 @@ export function QrPanel({ profile }: { profile: any }) {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
           {loading ? (
              <div className="col-span-full flex justify-center py-12"><RefreshCw className="w-8 h-8 animate-spin text-blue-200" /></div>
           ) : codes.length === 0 ? (

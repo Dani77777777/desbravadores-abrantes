@@ -9,6 +9,7 @@ import { Trophy, Coins, CheckCircle2, AlertTriangle, ArrowLeft } from 'lucide-re
 import Link from 'next/link'
 import { Navbar } from '@/components/layout/Navbar'
 import { AutoClaimHandler } from '@/components/dashboard/AutoClaimHandler'
+import { ManualClaimForm } from '@/components/dashboard/ManualClaimForm'
 
 export default async function CodePage({ params }: { params: { code: string } }) {
   const supabase = await createClient()
@@ -63,6 +64,20 @@ export default async function CodePage({ params }: { params: { code: string } })
 
   const alreadyRedeemed = !!existingScan
 
+  // 4. Verificar limite global
+  let limitReached = false
+  let currentUses = 0
+  if (qrCode.max_uses_global !== null) {
+    const { count } = await supabase
+      .from('qr_scans')
+      .select('*', { count: 'exact', head: true })
+      .eq('qr_code_id', qrCode.id)
+    
+    currentUses = count || 0
+    // Só mostramos como limite atingido se o usuário AINDA NÃO resgatou
+    limitReached = !alreadyRedeemed && currentUses >= qrCode.max_uses_global
+  }
+
   return (
     <div className="min-h-screen bg-stone-50">
       <Navbar user={user} profile={profile} />
@@ -97,33 +112,26 @@ export default async function CodePage({ params }: { params: { code: string } })
                       </div>
                     )}
 
-                    {!alreadyRedeemed ? (
-                      <div className="space-y-4">
-                         <div className="flex justify-center gap-8 py-4 border-y border-gray-100">
-                            <div className="text-center">
-                              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Recompensa</p>
-                              <div className="flex items-center gap-1.5 text-indigo-700 font-black text-2xl">
-                                <Trophy className="w-6 h-6" /> {qrCode.xp_reward} XP
-                              </div>
+                     {!alreadyRedeemed ? (
+                       <div className="space-y-4">
+                          {limitReached ? (
+                            <div className="text-center p-6 bg-red-50 rounded-xl border border-red-100">
+                              <p className="text-red-600 font-medium flex items-center justify-center gap-2">
+                                <AlertTriangle className="w-5 h-5" />
+                                Este código já atingiu o limite de utilizações ({qrCode.max_uses_global}).
+                              </p>
                             </div>
-                            <div className="text-center">
-                              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Bónus</p>
-                              <div className="flex items-center gap-1.5 text-yellow-600 font-black text-2xl">
-                                <Coins className="w-6 h-6" /> {qrCode.gold_reward} Gold
-                              </div>
-                            </div>
-                         </div>
-
-                         <form action={async () => {
-                           'use server'
-                           await claimManualReward(qrCode.id)
-                         }}>
-                            <Button type="submit" className="w-full bg-blue-800 hover:bg-blue-900 h-14 text-lg font-bold shadow-lg shadow-blue-900/10">
-                              Receber Recompensa <Trophy className="ml-2 w-5 h-5" />
-                            </Button>
-                         </form>
-                      </div>
-                    ) : (
+                          ) : (
+                            <ManualClaimForm 
+                              qrCodeId={qrCode.id}
+                              xpReward={qrCode.xp_reward}
+                              goldReward={qrCode.gold_reward}
+                              maxUses={qrCode.max_uses_global}
+                              currentUses={currentUses}
+                            />
+                          )}
+                       </div>
+                     ) : (
                       <div className="text-center p-6 bg-slate-50 rounded-xl">
                         <p className="text-slate-500 font-medium flex items-center justify-center gap-2">
                           <CheckCircle2 className="w-5 h-5 text-green-500" />
