@@ -12,13 +12,14 @@ export function LandingPage() {
   const router = useRouter()
 
   useEffect(() => {
-    // Check hash for auth events that might land here
+    // If there's a hash with auth tokens (user landed on root from an email link),
+    // redirect to /login which handles all auth hash processing
     const hash = window.location.hash
-    if (hash) {
+    if (hash && hash.includes('access_token=')) {
       if (hash.includes('type=recovery')) {
         router.replace('/login/reset-password' + hash)
-      } else if (hash.includes('type=signup') || hash.includes('access_token=')) {
-        // If it's a confirmation link or magic link that landed at root instead of /auth/callback
+      } else {
+        // signup, magiclink, etc.
         router.replace('/login' + hash)
       }
     }

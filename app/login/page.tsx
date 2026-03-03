@@ -28,40 +28,25 @@ function LoginContent() {
 
   useEffect(() => {
     const hash = window.location.hash
-    
-    // 1. Handle Password Recovery first
+
+    // Password Recovery links → redirect to the reset-password page with hash
     if (hash.includes('type=recovery')) {
       router.replace('/login/reset-password' + hash)
       return
     }
 
-    // 2. Proactively process Magic Link/Signup tokens from hash
-    if (hash.includes('access_token=')) {
-      const params = new URLSearchParams(hash.substring(1))
-      const accessToken = params.get('access_token')
-      const refreshToken = params.get('refresh_token')
+    // With implicit flow + detectSessionInUrl, the Supabase client automatically
+    // processes any hash fragments (magic links, signup confirmations, etc.)
+    // and fires onAuthStateChange with the appropriate event.
+    // We just need to listen and redirect.
 
-      if (accessToken && refreshToken) {
-        supabase.auth.setSession({
-          access_token: accessToken,
-          refresh_token: refreshToken,
-        }).then(({ data, error }) => {
-          if (!error && data.session) {
-            // Let the onAuthStateChange handle the redirect to ensure middleware can intercept
-            router.refresh()
-          }
-        })
-      }
-    }
-
-    // 3. Listener for auth state changes
-    // We only redirect if it's a fresh SIGNED_IN event. 
-    // This allows the middleware to handle initial page load redirects (like onboarding)
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'PASSWORD_RECOVERY') {
         router.replace('/login/reset-password' + window.location.hash)
       } else if (event === 'SIGNED_IN' && session) {
-        // Redireciona para root e deixa o middleware decidir se vai para / ou /onboarding
+        // Redirect to root — the middleware will decide:
+        // - New user (no birth_date) → /onboarding
+        // - Existing user → dashboard
         router.push('/')
         router.refresh()
       }
@@ -80,7 +65,9 @@ function LoginContent() {
           email,
           password,
           options: {
-            emailRedirectTo: `${location.origin}/auth/callback`,
+            // With implicit flow, Supabase will redirect here with hash fragments
+            // instead of using /auth/callback with a code parameter
+            emailRedirectTo: `${location.origin}/login`,
           },
         })
         if (error) throw error
