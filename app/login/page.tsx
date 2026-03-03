@@ -9,6 +9,7 @@ import { Mail } from 'lucide-react'
 import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
+import { getSignedCallbackUrl } from './actions'
 
 function LoginContent() {
   const [email, setEmail] = useState('')
@@ -84,11 +85,13 @@ function LoginContent() {
 
     try {
       if (isSignUp) {
+        // Get a signed callback URL that includes the email for auto-login
+        const redirectUrl = await getSignedCallbackUrl(email)
         const { error } = await supabase.auth.signUp({
           email,
           password,
           options: {
-            emailRedirectTo: `${location.origin}/auth/callback`,
+            emailRedirectTo: redirectUrl,
           },
         })
         if (error) throw error
