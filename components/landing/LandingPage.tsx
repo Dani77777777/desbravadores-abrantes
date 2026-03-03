@@ -1,5 +1,7 @@
 'use client'
 
+import { useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import Link from 'next/link'
@@ -7,6 +9,21 @@ import { Navbar } from '@/components/layout/Navbar'
 import { Trophy, Users, Star, ArrowRight, Shield, Heart, Medal, Tent } from 'lucide-react'
 
 export function LandingPage() {
+  const router = useRouter()
+
+  useEffect(() => {
+    // Check hash for auth events that might land here
+    const hash = window.location.hash
+    if (hash) {
+      if (hash.includes('type=recovery')) {
+        router.replace('/login/reset-password' + hash)
+      } else if (hash.includes('type=signup') || hash.includes('access_token=')) {
+        // If it's a confirmation link or magic link that landed at root instead of /auth/callback
+        router.replace('/login' + hash)
+      }
+    }
+  }, [router])
+
   return (
     <div className="min-h-screen bg-stone-50 font-sans text-stone-900">
       <Navbar user={null} profile={null} />

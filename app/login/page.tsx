@@ -27,19 +27,20 @@ function LoginContent() {
   }, [mode])
 
   useEffect(() => {
-    // Check hash immediately on mount - the Supabase client processes the hash
-    // synchronously, so the event may fire before our listener is attached.
+    // Check hash immediately on mount
     const hash = window.location.hash
     if (hash.includes('type=recovery')) {
-      // IMPORTANT: We must pass the hash to the reset page so the session can be established
       router.replace('/login/reset-password' + hash)
       return
     }
 
-    // Also keep the listener for cases where the event fires after mount
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+    // Listener for auth state changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'PASSWORD_RECOVERY') {
         router.replace('/login/reset-password' + window.location.hash)
+      } else if (event === 'SIGNED_IN' && session) {
+        router.push('/')
+        router.refresh()
       }
     })
 
