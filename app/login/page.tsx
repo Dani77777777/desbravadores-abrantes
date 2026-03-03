@@ -34,11 +34,19 @@ function LoginContent() {
       return
     }
 
+    // Check if we already have a session or if one is established via hash
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) {
+        router.push('/')
+        router.refresh()
+      }
+    })
+
     // Listener for auth state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'PASSWORD_RECOVERY') {
         router.replace('/login/reset-password' + window.location.hash)
-      } else if (event === 'SIGNED_IN' && session) {
+      } else if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && session) {
         router.push('/')
         router.refresh()
       }
