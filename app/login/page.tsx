@@ -24,7 +24,13 @@ function LoginContent() {
     // If mode changes in URL, update state
     if (mode === 'signup') setIsSignUp(true)
     if (mode === 'login') setIsSignUp(false)
-  }, [mode])
+
+    // Show success message if user comes from email verification
+    // (redirected here because PKCE code exchange failed — different browser)
+    if (searchParams.get('verified') === 'true') {
+      toast.success('Email verificado com sucesso! Podes entrar agora.', { duration: 6000 })
+    }
+  }, [mode, searchParams])
 
   useEffect(() => {
     const hash = window.location.hash
@@ -35,18 +41,35 @@ function LoginContent() {
       return
     }
 
-    // With implicit flow + detectSessionInUrl, the Supabase client automatically
-    // processes any hash fragments (magic links, signup confirmations, etc.)
-    // and fires onAuthStateChange with the appropriate event.
-    // We just need to listen and redirect.
+    // Handle hash fragments with access tokens (magic links, etc.)
+    // Since @supabase/ssr forces PKCE, it won't auto-process hash fragments.
+    // We need to manually extract tokens and establish the session.
+    if (hash.includes('access_token=')) {
+      const params = new URLSearchParams(hash.substring(1))
+      const accessToken = params.get('access_token')
+      const refreshToken = params.get('refresh_token')
 
+      if (accessToken && refreshToken) {
+        supabase.auth.setSession({
+          access_token: accessToken,
+          refresh_token: refreshToken,
+        }).then(({ data, error }) => {
+          if (!error && data.session) {
+            // Clear the hash from URL and redirect
+            window.location.hash = ''
+            router.push('/')
+            router.refresh()
+          }
+        })
+        return
+      }
+    }
+
+    // Listen for auth state changes (e.g. PKCE auto-processing if same browser)
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'PASSWORD_RECOVERY') {
         router.replace('/login/reset-password' + window.location.hash)
       } else if (event === 'SIGNED_IN' && session) {
-        // Redirect to root — the middleware will decide:
-        // - New user (no birth_date) → /onboarding
-        // - Existing user → dashboard
         router.push('/')
         router.refresh()
       }
@@ -65,9 +88,7 @@ function LoginContent() {
           email,
           password,
           options: {
-            // With implicit flow, Supabase will redirect here with hash fragments
-            // instead of using /auth/callback with a code parameter
-            emailRedirectTo: `${location.origin}/login`,
+            emailRedirectTo: `${location.origin}/auth/callback`,
           },
         })
         if (error) throw error
