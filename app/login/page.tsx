@@ -27,14 +27,35 @@ function LoginContent() {
   }, [mode])
 
   useEffect(() => {
-    // Check hash immediately on mount
     const hash = window.location.hash
+    
+    // 1. Handle Password Recovery first
     if (hash.includes('type=recovery')) {
       router.replace('/login/reset-password' + hash)
       return
     }
 
-    // Check if we already have a session or if one is established via hash
+    // 2. Proactively process Magic Link/Signup tokens from hash
+    // Sometimes the Supabase client doesn't catch them automatically on mount
+    if (hash.includes('access_token=')) {
+      const params = new URLSearchParams(hash.substring(1))
+      const accessToken = params.get('access_token')
+      const refreshToken = params.get('refresh_token')
+
+      if (accessToken && refreshToken) {
+        supabase.auth.setSession({
+          access_token: accessToken,
+          refresh_token: refreshToken,
+        }).then(({ data, error }) => {
+          if (!error && data.session) {
+            router.push('/')
+            router.refresh()
+          }
+        })
+      }
+    }
+
+    // 3. Check for existing session
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) {
         router.push('/')
@@ -42,7 +63,7 @@ function LoginContent() {
       }
     })
 
-    // Listener for auth state changes
+    // 4. Listener for future auth state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'PASSWORD_RECOVERY') {
         router.replace('/login/reset-password' + window.location.hash)
