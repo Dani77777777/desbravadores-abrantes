@@ -36,7 +36,6 @@ function LoginContent() {
     }
 
     // 2. Proactively process Magic Link/Signup tokens from hash
-    // Sometimes the Supabase client doesn't catch them automatically on mount
     if (hash.includes('access_token=')) {
       const params = new URLSearchParams(hash.substring(1))
       const accessToken = params.get('access_token')
@@ -48,26 +47,21 @@ function LoginContent() {
           refresh_token: refreshToken,
         }).then(({ data, error }) => {
           if (!error && data.session) {
-            router.push('/')
+            // Let the onAuthStateChange handle the redirect to ensure middleware can intercept
             router.refresh()
           }
         })
       }
     }
 
-    // 3. Check for existing session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) {
-        router.push('/')
-        router.refresh()
-      }
-    })
-
-    // 4. Listener for future auth state changes
+    // 3. Listener for auth state changes
+    // We only redirect if it's a fresh SIGNED_IN event. 
+    // This allows the middleware to handle initial page load redirects (like onboarding)
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'PASSWORD_RECOVERY') {
         router.replace('/login/reset-password' + window.location.hash)
-      } else if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && session) {
+      } else if (event === 'SIGNED_IN' && session) {
+        // Redireciona para root e deixa o middleware decidir se vai para / ou /onboarding
         router.push('/')
         router.refresh()
       }
