@@ -19,19 +19,40 @@ O projeto **Desbravadores Abrantes** é uma plataforma "Mobile-First" que transf
 - **Caixa de Sugestões:** Canal direto para enviar críticas ou ideias à liderança.
 - **Histórico de Pontos:** Transparência total sobre como e quando os pontos foram ganhos.
 - **Anúncios Globais:** Avisos importantes em destaque para todos os membros.
+- **Resgate de Códigos QR:** Leitura de códigos QR para receber pontos em atividades e eventos.
 
 #### 🛡️ Para Liderança (Dirigentes e Coordenadores)
 - **Painel de Gestão Admin:** Visão consolidada de secções com dashboard horizontal otimizado.
-- **Controlo de Presenças & QR Codes:** Criação, edição e impressão de QR Codes (A4/A5) para check-in por scan.
-- **Gestão de Loja/Entregas:** Widget prático para gerir as entregas pendentes dos produtos da loja.
-- **Emissão de Avisos:** Sistema de anúncios globais ou direcionados (por pessoa, secção ou papel).
+- **Visão Geral (Coordenadores):** Dashboard de métricas com estatísticas de engajamento, aniversários e distribuição de membros.
+- **Controlo de Presenças por Evento:** Gestão de presenças com filtragem automática por faixa etária — os eventos direcionados a uma secção só mostram os membros dessa secção na lista de presenças.
+- **QR Codes:** Criação, edição e impressão de QR Codes (A4/A5) para check-in por scan, com limites globais de resgate.
+- **Gestão de Loja e Entregas:** Widget prático para gerir as entregas pendentes dos produtos da loja.
+- **Emissão de Comunicados:** Sistema de anúncios globais ou direcionados (por pessoa, secção ou papel).
 - **Gestão de Investiduras:** Toggle manual para marcar a conclusão de classes.
-- **Dashboard de Métricas:** Estatísticas de engajamento, aniversários e distribuição de membros.
-- **Moderação de Sugestões:** Leitura, gestão e resolução do feedback recebido.
+- **Moderação de Sugestões:** Leitura, gestão e resolução do feedback recebido, com atribuição de pontos.
+- **Gestão de Tarefas:** Criação de tarefas com recompensas de XP/Gold, aprovação de conclusões.
+- **Gestão de Eventos:** Criação, edição, reagendamento e cancelamento de eventos com notificação automática.
 
 ---
 
-## � Secções e Cores
+## 🔒 Filtragem por Faixa Etária e Hierarquia
+
+O sistema aplica filtragem rigorosa baseada no papel do utilizador:
+
+| Papel | Visibilidade |
+| :--- | :--- |
+| **Desbravador** | Apenas os seus próprios dados e o ranking público. |
+| **Dirigente** | Apenas os membros da sua `leadership_section` (secção de liderança atribuída). |
+| **Coordenador** | Acesso total a todos os dados e ferramentas do clube. |
+
+### Presenças com Faixa Etária
+- Quando um evento é criado com uma secção alvo (ex: "Exploradores"), a lista de presenças **mostra apenas** os membros dessa secção.
+- Os dirigentes vêem apenas os desbravadores da sua faixa etária atribuída, independentemente do público alvo do evento.
+- Os coordenadores vêem os membros filtrados pela secção do evento, ou todos se o evento for para "Todos".
+
+---
+
+## 👤 Secções e Cores
 
 O sistema adapta-se visualmente à secção do utilizador, calculada automaticamente pela data de nascimento:
 
@@ -86,37 +107,54 @@ O coração do sistema reside no arquivo `supabase-setup.sql`. Execute este scri
 - **Triggers:** Automação de criação de perfis, cálculo de secção por idade e sincronização de totais de XP/Gold.
 - **Functions:** Lógica de transferência de ouro e cálculo de classes.
 
+Ficheiros SQL adicionais:
+- `supabase-setup-store.sql` — Configuração da loja (produtos, compras, entregas).
+- `supabase-push-setup.sql` — Configuração de notificações push.
+
 ---
 
 ## 📂 Estrutura de Pastas
 
 ```text
 app/
-├── (auth)/         # Login, Onboarding e Callbacks
-├── admin/          # Painel de controlo (Tabs: Overview, Members, Events, etc)
+├── admin/          # Painel de controlo (Tabs: Overview, Members, Tasks, Events, Announcements, Suggestions, QR, Store)
+│   └── components/ # Componentes do admin (EventPanel, EventAttendanceManager, MemberList, etc.)
+├── auth/           # Callbacks de autenticação
+├── codes/          # Resgate de códigos QR
 ├── contacts/       # Informação útil e redes sociais
 ├── leaderboard/    # Ranking público de membresia
+├── login/          # Login e registo com magic links
+├── onboarding/     # Setup inicial do perfil
 ├── points-history/ # Registo detalhado de ganhos/gastos
 ├── profile/        # Edição de perfil e transferências
+├── shop/           # Loja de recompensas
 └── suggestions/    # Sistema de feedback
 components/
+├── dashboard/      # Componentes do dashboard (CodeEntryDialog, ManualClaimForm)
 ├── events/         # Calendar e Card de eventos
-├── layout/         # Navbar e Footer dinâmicos
+├── layout/         # Navbar dinâmica
+├── notifications/  # Gestor de notificações push
 ├── profile/        # Dialogs e Avatars
+├── shop/           # Componentes da loja
 └── ui/             # Componentes base (Shadcn)
+lib/
+└── actions/        # Server Actions (QR codes)
 utils/
 └── supabase/       # Configuração client/server/middleware
 ```
 
 ---
 
-## � Segurança e Regras
+## 🔐 Segurança e Regras
 
 1. **Privacidade:** Membros só vêem os seus próprios dados e o ranking básico.
 2. **Hierarquia:** 
-   - **Dirigentes:** Gerem apenas a sua secção atribuída (`leadership_section`).
+   - **Dirigentes:** Gerem apenas a sua secção atribuída (`leadership_section`). Presenças, tarefas, sugestões e membros são filtrados pela sua secção.
    - **Coordenadores:** Acesso total a todos os dados e ferramentas do clube.
-3. **Persistência:** Todo o XP e Gold é auditado através da tabela `points_log`, impedindo alterações manuais sem rasto.
+3. **Filtragem de Presenças por Secção:** Eventos com faixa etária específica mostram apenas os membros dessa faixa na lista de presenças.
+4. **Persistência:** Todo o XP e Gold é auditado através da tabela `points_log`, impedindo alterações manuais sem rasto.
+5. **RLS (Row Level Security):** Todas as tabelas têm políticas de segurança ao nível da base de dados, garantindo que mesmo chamadas diretas à API são controladas.
+6. **Limites de Resgate:** Os QR Codes têm limites globais de resgate controlados por trigger na base de dados.
 
 ## 🤝 Contacto e Suporte
 
@@ -124,4 +162,3 @@ Este projeto é desenvolvido para o **Clube de Desbravadores de Abrantes**. Para
 
 ---
 **Aventura • Amizade • Fé** 🏕️
-

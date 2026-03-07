@@ -513,10 +513,18 @@ export function EventPanel({ profile, members, events }: EventPanelProps) {
           <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Controlo de Presenças: {selectedEvent.title}</DialogTitle>
+              {selectedEvent.target_section && (
+                <p className="text-xs text-gray-500 pt-1">
+                  A mostrar apenas membros da secção: <Badge variant="outline" className="ml-1 text-[10px]">{SECTION_LABELS[selectedEvent.target_section] || selectedEvent.target_section}</Badge>
+                </p>
+              )}
             </DialogHeader>
             <EventAttendanceManager 
                event={selectedEvent} 
-               members={members} 
+               members={selectedEvent.target_section 
+                 ? members.filter(m => m.section === selectedEvent.target_section)
+                 : members
+               } 
                profile={profile}
                onComplete={() => {
                  setAttendanceOpen(false)
