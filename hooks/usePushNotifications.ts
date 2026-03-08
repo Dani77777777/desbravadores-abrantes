@@ -16,7 +16,19 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array<ArrayBuffer> {
   return outputArray
 }
 
-export type PushPermission = 'default' | 'granted' | 'denied' | 'unsupported'
+function isIOS(): boolean {
+  if (typeof navigator === 'undefined') return false
+  return /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+}
+
+function isStandalonePWA(): boolean {
+  if (typeof window === 'undefined') return false
+  return ('standalone' in window.navigator && (window.navigator as any).standalone === true) ||
+    window.matchMedia('(display-mode: standalone)').matches
+}
+
+export type PushPermission = 'default' | 'granted' | 'denied' | 'unsupported' | 'ios-needs-install'
 
 export function usePushNotifications() {
   const [permission, setPermission] = useState<PushPermission>('default')
@@ -26,7 +38,12 @@ export function usePushNotifications() {
 
   useEffect(() => {
     if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
-      setPermission('unsupported')
+      // On iOS Safari (not standalone), PushManager is unavailable — guide user to install PWA
+      if (isIOS() && !isStandalonePWA()) {
+        setPermission('ios-needs-install')
+      } else {
+        setPermission('unsupported')
+      }
       return
     }
     setPermission(Notification.permission as PushPermission)
