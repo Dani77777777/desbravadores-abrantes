@@ -10,6 +10,7 @@ import Link from 'next/link'
 import { Navbar } from '@/components/layout/Navbar'
 import { AutoClaimHandler } from '@/components/dashboard/AutoClaimHandler'
 import { ManualClaimForm } from '@/components/dashboard/ManualClaimForm'
+import { QuestQuestionForm } from '@/components/dashboard/QuestQuestionForm'
 
 export default async function CodePage({ params }: { params: { code: string } }) {
   const supabase = await createClient()
@@ -72,6 +73,7 @@ export default async function CodePage({ params }: { params: { code: string } })
       .from('qr_scans')
       .select('*', { count: 'exact', head: true })
       .eq('qr_code_id', qrCode.id)
+      .eq('points_awarded', true)
     
     currentUses = count || 0
     // Só mostramos como limite atingido se o usuário AINDA NÃO resgatou
@@ -103,6 +105,15 @@ export default async function CodePage({ params }: { params: { code: string } })
                 {/* Mode: Auto Claim */}
                 {qrCode.auto_claim ? (
                   <AutoClaimHandler code={code} />
+                ) : qrCode.is_question ? (
+                  /* Mode: Quest Question */
+                  <QuestQuestionForm 
+                    qrCodeId={qrCode.id}
+                    questionText={qrCode.content || ''}
+                    xpReward={qrCode.xp_reward}
+                    goldReward={qrCode.gold_reward}
+                    alreadyRedeemed={alreadyRedeemed}
+                  />
                 ) : (
                   /* Mode: Manual Claim with Content */
                   <div className="space-y-8">

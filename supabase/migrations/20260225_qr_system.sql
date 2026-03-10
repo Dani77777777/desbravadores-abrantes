@@ -12,6 +12,8 @@ CREATE TABLE IF NOT EXISTS public.qr_codes (
     gold_reward integer NOT NULL DEFAULT 0,
     auto_claim boolean NOT NULL DEFAULT true,
     max_uses_global integer, -- NULL significa ilimitado
+    is_question boolean NOT NULL DEFAULT false,
+    correct_answers text[],
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now()
 );

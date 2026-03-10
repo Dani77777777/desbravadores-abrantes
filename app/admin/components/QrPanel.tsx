@@ -31,6 +31,8 @@ export function QrPanel({ profile }: { profile: any }) {
   const [goldReward, setGoldReward] = useState(0)
   const [autoClaim, setAutoClaim] = useState(true)
   const [maxUsesGlobal, setMaxUsesGlobal] = useState<string>('')
+  const [isQuestion, setIsQuestion] = useState(false)
+  const [correctAnswers, setCorrectAnswers] = useState('')
   const [creating, setCreating] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
 
@@ -118,8 +120,10 @@ export function QrPanel({ profile }: { profile: any }) {
         content: content || null,
         xp_reward: xpReward,
         gold_reward: goldReward,
-        auto_claim: autoClaim,
-        max_uses_global: maxUsesGlobal ? parseInt(maxUsesGlobal) : null
+        auto_claim: isQuestion ? false : autoClaim,
+        max_uses_global: maxUsesGlobal ? parseInt(maxUsesGlobal) : null,
+        is_question: isQuestion,
+        correct_answers: isQuestion ? correctAnswers.split(',').map(s => s.trim()).filter(Boolean) : null
       }
 
       if (editingId) {
@@ -152,6 +156,8 @@ export function QrPanel({ profile }: { profile: any }) {
     setGoldReward(c.gold_reward)
     setAutoClaim(c.auto_claim)
     setMaxUsesGlobal(c.max_uses_global?.toString() || '')
+    setIsQuestion(c.is_question || false)
+    setCorrectAnswers(c.correct_answers?.join(', ') || '')
     setIsCreateOpen(true)
   }
 
@@ -183,6 +189,8 @@ export function QrPanel({ profile }: { profile: any }) {
     setGoldReward(0)
     setAutoClaim(true)
     setMaxUsesGlobal('')
+    setIsQuestion(false)
+    setCorrectAnswers('')
   }
 
   return (
@@ -220,9 +228,17 @@ export function QrPanel({ profile }: { profile: any }) {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="content">Conteúdo (Se Auto-Claim OFF)</Label>
-                  <Textarea id="content" placeholder="A próxima pista está..." value={content} onChange={e => setContent(e.target.value)} rows={3} />
+                  <Label htmlFor="content">{isQuestion ? 'Texto da Pergunta' : 'Conteúdo (Se Auto-Claim OFF)'}</Label>
+                  <Textarea id="content" placeholder={isQuestion ? "Qual é a capital de Portugal?" : "A próxima pista está..."} value={content} onChange={e => setContent(e.target.value)} rows={3} />
                 </div>
+
+                {isQuestion && (
+                  <div className="space-y-2 animate-in slide-in-from-top-2">
+                    <Label htmlFor="answers">Respostas Corretas (Separadas por vírgulas)</Label>
+                    <Input id="answers" placeholder="Lisboa, Lx, Alis Ubbo" value={correctAnswers} onChange={e => setCorrectAnswers(e.target.value)} required />
+                    <p className="text-[10px] text-slate-500">Ex: Lisboa, lx (Validação ignora letras grandes e acentos)</p>
+                  </div>
+                )}
 
                 <div className="grid grid-cols-3 gap-4">
                   <div className="space-y-2">
@@ -244,7 +260,18 @@ export function QrPanel({ profile }: { profile: any }) {
                     <Label className="text-base font-bold">Atribuição Automática</Label>
                     <p className="text-[10px] text-slate-500 leading-tight">ON: Ganha pontos na hora, conteúdo escondido.<br/>OFF: Vê conteúdo, precisa clicar para ganhar.</p>
                   </div>
-                  <Switch checked={autoClaim} onCheckedChange={setAutoClaim} />
+                  <Switch checked={autoClaim} onCheckedChange={setAutoClaim} disabled={isQuestion} />
+                </div>
+
+                <div className="flex items-center justify-between p-4 bg-blue-50/50 rounded-xl border border-blue-100">
+                  <div className="space-y-0.5 text-left">
+                    <Label className="text-base font-bold text-blue-900">Questão de Texto</Label>
+                    <p className="text-[10px] text-blue-700/70 leading-tight">O utilizador tem de responder para ganhar.<br/>Desativa o Auto-Claim automaticamente.</p>
+                  </div>
+                  <Switch checked={isQuestion} onCheckedChange={(checked) => {
+                    setIsQuestion(checked)
+                    if (checked) setAutoClaim(false)
+                  }} />
                 </div>
 
                 <DialogFooter>
@@ -296,7 +323,13 @@ export function QrPanel({ profile }: { profile: any }) {
 
                   <div className="flex items-center justify-between pt-2 border-t text-[10px] font-medium text-slate-400">
                     <span className="flex items-center gap-1">
-                      {c.auto_claim ? <Badge className="bg-green-100 text-green-700 border-none h-4 px-1 text-[8px]">AUTO</Badge> : <Badge className="bg-amber-100 text-amber-700 border-none h-4 px-1 text-[8px]">MANUAL</Badge>}
+                      {c.is_question ? (
+                        <Badge className="bg-blue-100 text-blue-700 border-none h-4 px-1 text-[8px]">QUESTÃO</Badge>
+                      ) : c.auto_claim ? (
+                        <Badge className="bg-green-100 text-green-700 border-none h-4 px-1 text-[8px]">AUTO</Badge>
+                      ) : (
+                        <Badge className="bg-amber-100 text-amber-700 border-none h-4 px-1 text-[8px]">MANUAL</Badge>
+                      )}
                     </span>
                     <span className="flex items-center gap-1">
                       <Users className="w-3 h-3" /> {c.max_uses_global || '∞'} total

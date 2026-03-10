@@ -3,6 +3,7 @@
 import { createClient } from '@/utils/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
+import { normalizeText } from '../../utils/text-normalization'
 
 export async function redeemCode(code: string) {
   try {
@@ -33,11 +34,13 @@ export async function redeemCode(code: string) {
       .eq('user_id', user.id)
       .single()
 
+    const alreadyRedeemed = !!existingScan
+
     if (existingScan) {
       return { 
         error: 'Já utilizaste este código anteriormente.',
         qrCode,
-        alreadyRedeemed: true
+        alreadyRedeemed
       }
     }
 
@@ -90,7 +93,12 @@ export async function redeemCode(code: string) {
       return { success: true, qrCode, message: 'Pontos recebidos com sucesso!' }
     }
 
-    // Se não for auto_claim, apenas retornamos os dados para a página mostrar o conteúdo
+    // Se for uma questão, retornamos os dados para mostrar o formulário
+    if (qrCode.is_question) {
+      return { success: true, qrCode, isQuestion: true, alreadyRedeemed }
+    }
+
+    // Se não for auto_claim (Manual), apenas retornamos os dados para a página mostrar o conteúdo
     return { success: true, qrCode, needsManualClaim: true }
   } catch (err) {
     console.error('Error in redeemCode:', err)
@@ -173,6 +181,101 @@ export async function claimManualReward(qrCodeId: string) {
     return { success: true }
   } catch (error) {
     console.error('Error in claimManualReward:', error)
+    return { error: 'Ocorreu um erro inesperado.' }
+  }
+}
+
+export async function submitQuestAnswer(qrCodeId: string, answer: string) {
+  try {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return { error: 'Não autorizado' }
+
+    // 1. Obter dados do código
+    const { data: qrCode, error: qrError } = await supabase
+      .from('qr_codes')
+      .select('*')
+      .eq('id', qrCodeId)
+      .single()
+
+    if (qrError || !qrCode) return { error: 'Código não encontrado' }
+    if (!qrCode.is_question) return { error: 'Este código não é uma questão' }
+
+    // 2. Verificar se já resgatou
+    const { data: existingScan } = await supabase
+      .from('qr_scans')
+      .select('*')
+      .eq('qr_code_id', qrCodeId)
+      .eq('user_id', user.id)
+      .single()
+
+    if (existingScan && existingScan.points_awarded) {
+      return { error: 'Já respondeste corretamente e recebeste a recompensa.' }
+    }
+
+    // 3. Validar Resposta
+    const normalizedUserInput = normalizeText(answer)
+    const isCorrect = qrCode.correct_answers?.some((correct: string) => 
+      normalizeText(correct) === normalizedUserInput
+    )
+
+    if (!isCorrect) {
+      return { error: 'Resposta incorreta. Tenta novamente!' }
+    }
+
+    // 4. Verificar limite global (Apenas para quem responder CORRETAMENTE)
+    if (qrCode.max_uses_global !== null) {
+      const { count, error: countError } = await supabase
+        .from('qr_scans')
+        .select('*', { count: 'exact', head: true })
+        .eq('qr_code_id', qrCodeId)
+        .eq('points_awarded', true) // Apenas contamos quem já levou os pontos
+
+      if (countError) return { error: 'Erro ao verificar limites.' }
+
+      if (count !== null && count >= qrCode.max_uses_global) {
+        return { error: 'Infelizmente, o limite de vencedores para esta questão já foi atingido.' }
+      }
+    }
+
+    // 5. Registar ou atualizar scan como ganho
+    if (existingScan) {
+      const { error: updateError } = await supabase
+        .from('qr_scans')
+        .update({ points_awarded: true })
+        .eq('id', existingScan.id)
+      if (updateError) return { error: 'Erro ao atualizar recompensa.' }
+    } else {
+      const { error: insertError } = await supabase
+        .from('qr_scans')
+        .insert({
+          qr_code_id: qrCodeId,
+          user_id: user.id,
+          points_awarded: true
+        })
+      if (insertError) {
+        if (insertError.code === '23505') return { error: 'Já respondeste a esta questão.' }
+        return { error: 'Erro ao registar recompensa.' }
+      }
+    }
+
+    // 6. Atribuir pontos
+    if (qrCode.xp_reward > 0 || qrCode.gold_reward > 0) {
+      const { error: pointsError } = await supabase.from('points_log').insert({
+        target_user_id: user.id,
+        amount_xp: qrCode.xp_reward,
+        amount_gold: qrCode.gold_reward,
+        description: `Questão resolvida: ${qrCode.title}`,
+        awarded_by_user_id: user.id
+      })
+      if (pointsError) console.error('Error awarding points:', pointsError)
+    }
+
+    revalidatePath('/')
+    revalidatePath('/points-history')
+    return { success: true, message: 'Resposta correta! Recompensa atribuída.' }
+  } catch (error) {
+    console.error('Error in submitQuestAnswer:', error)
     return { error: 'Ocorreu um erro inesperado.' }
   }
 }
