@@ -201,7 +201,7 @@ export function EventAttendanceManager({ event, members, profile, onComplete }: 
                 key={member.id} 
                 className={`flex flex-col sm:flex-row items-center justify-between p-4 border-b last:border-0 hover:bg-slate-50 transition-all gap-4 group cursor-pointer ${currentStatus === 'presente' ? 'bg-green-50/30' : ''}`}
                 onClick={(e) => {
-                  if ((e.target as HTMLElement).closest('button')) return
+                  if (event.is_finished || (e.target as HTMLElement).closest('button')) return
                   toggleCheckIn(member.id)
                 }}
               >
@@ -230,7 +230,8 @@ export function EventAttendanceManager({ event, members, profile, onComplete }: 
                     size="sm" 
                     variant={currentStatus === 'presente' ? 'default' : 'ghost'}
                     className={`flex-1 sm:flex-none gap-1 text-[10px] h-9 px-3 rounded-lg transition-all ${currentStatus === 'presente' ? 'bg-green-600 hover:bg-green-700 shadow-sm' : 'text-gray-400 hover:text-green-600'}`}
-                    onClick={() => setStatus(member.id, 'presente')}
+                    onClick={() => !event.is_finished && setStatus(member.id, 'presente')}
+                    disabled={event.is_finished && currentStatus !== 'presente'}
                   >
                     <CheckCircle2 className="w-3.5 h-3.5" /> Presente
                   </Button>
@@ -238,7 +239,8 @@ export function EventAttendanceManager({ event, members, profile, onComplete }: 
                     size="sm" 
                     variant={currentStatus === 'atrasado' ? 'default' : 'ghost'}
                     className={`flex-1 sm:flex-none gap-1 text-[10px] h-9 px-3 rounded-lg transition-all ${currentStatus === 'atrasado' ? 'bg-amber-500 hover:bg-amber-600 shadow-sm' : 'text-gray-400 hover:text-amber-500'}`}
-                    onClick={() => setStatus(member.id, 'atrasado')}
+                    onClick={() => !event.is_finished && setStatus(member.id, 'atrasado')}
+                    disabled={event.is_finished && currentStatus !== 'atrasado'}
                   >
                     <Clock className="w-3.5 h-3.5" /> Atrasado
                   </Button>
@@ -246,7 +248,8 @@ export function EventAttendanceManager({ event, members, profile, onComplete }: 
                     size="sm" 
                     variant={currentStatus === 'faltou' ? 'default' : 'ghost'}
                     className={`flex-1 sm:flex-none gap-1 text-[10px] h-9 px-3 rounded-lg transition-all ${currentStatus === 'faltou' ? 'bg-red-500 hover:bg-red-600 shadow-sm' : 'text-gray-400 hover:text-red-500'}`}
-                    onClick={() => setStatus(member.id, 'faltou')}
+                    onClick={() => !event.is_finished && setStatus(member.id, 'faltou')}
+                    disabled={event.is_finished && currentStatus !== 'faltou'}
                   >
                     <XCircle className="w-3.5 h-3.5" /> Faltou
                   </Button>
@@ -257,30 +260,37 @@ export function EventAttendanceManager({ event, members, profile, onComplete }: 
         </div>
       </div>
 
-      <div className="flex flex-col gap-3 pt-2">
-        <div className="grid grid-cols-2 gap-3">
-          <Button 
-            variant="outline"
-            className="py-6 text-sm font-bold gap-2 rounded-2xl border-2 border-slate-200 hover:bg-slate-50 transition-all text-slate-600"
-            onClick={handleSaveDraft}
-            disabled={savingDraft || saving || !hasChanges}
-          >
-            {savingDraft ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-            Salvar Rascunho
-          </Button>
-          <Button 
-            className="bg-blue-800 hover:bg-blue-900 py-6 text-sm font-bold gap-2 rounded-2xl shadow-lg shadow-blue-200 transition-all"
-            onClick={handleSaveAndFinalize}
-            disabled={saving || savingDraft}
-          >
-            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
-            Finalizar Evento
-          </Button>
+      {!event.is_finished ? (
+        <div className="flex flex-col gap-3 pt-2">
+          <div className="grid grid-cols-2 gap-3">
+            <Button 
+              variant="outline"
+              className="py-6 text-sm font-bold gap-2 rounded-2xl border-2 border-slate-200 hover:bg-slate-50 transition-all text-slate-600"
+              onClick={handleSaveDraft}
+              disabled={savingDraft || saving || !hasChanges}
+            >
+              {savingDraft ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+              Salvar Rascunho
+            </Button>
+            <Button 
+              className="bg-blue-800 hover:bg-blue-900 py-6 text-sm font-bold gap-2 rounded-2xl shadow-lg shadow-blue-200 transition-all"
+              onClick={handleSaveAndFinalize}
+              disabled={saving || savingDraft}
+            >
+              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
+              Finalizar Evento
+            </Button>
+          </div>
+          <p className="text-[10px] text-center text-gray-400 font-medium px-4">
+             * Podes salvar o rascunho a qualquer momento. Os pontos só serão atribuídos quando clicares em "Finalizar Evento".
+          </p>
         </div>
-        <p className="text-[10px] text-center text-gray-400 font-medium px-4">
-           * Podes salvar o rascunho a qualquer momento. Os pontos só serão atribuídos quando clicares em "Finalizar Evento".
-        </p>
-      </div>
+      ) : (
+        <div className="bg-green-50 p-4 border border-green-100 rounded-2xl flex items-center justify-center gap-2">
+          <CheckCircle2 className="w-4 h-4 text-green-600" />
+          <p className="text-xs font-bold text-green-700">Este evento foi finalizado e os pontos já foram atribuídos.</p>
+        </div>
+      )}
     </div>
   )
 }

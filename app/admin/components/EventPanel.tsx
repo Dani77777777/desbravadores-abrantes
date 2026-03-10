@@ -408,7 +408,17 @@ export function EventPanel({ profile, members, events }: EventPanelProps) {
                     <p className="text-sm font-medium">{event.title}</p>
                     <p className="text-[10px] text-gray-500">{new Date(event.start_at).toLocaleDateString('pt-PT')}</p>
                   </div>
-                  <Badge className="bg-green-100 text-green-700 border-green-200">Concluído</Badge>
+                  <div className="flex items-center gap-2">
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="text-gray-600 hover:text-blue-600 gap-1 text-[10px] h-8"
+                      onClick={() => { setSelectedEvent(event); setAttendanceOpen(true) }}
+                    >
+                      <ListChecks className="w-3 h-3" /> Ver Histórico
+                    </Button>
+                    <Badge className="bg-green-100 text-green-700 border-green-200">Concluído</Badge>
+                  </div>
                 </div>
               ))}
             </CardContent>
