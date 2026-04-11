@@ -10,7 +10,7 @@ import { SuggestionPanel } from './components/SuggestionPanel'
 import { EventPanel } from './components/EventPanel'
 import { StorePanel } from './components/StorePanel'
 import { QrPanel } from './components/QrPanel'
-import { Users, ListChecks, Megaphone, MessageSquare, LayoutDashboard, CalendarDays, ShoppingBag, QrCode } from 'lucide-react'
+import { Users, ListChecks, Megaphone, MessageSquare, LayoutDashboard, CalendarDays, ShoppingBag, QrCode, Gamepad2 } from 'lucide-react'
 
 export default async function AdminPage({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
   const supabase = await createClient()
@@ -153,7 +153,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
 
         {/* Tab navigation */}
         <div className="bg-white p-1.5 rounded-2xl border border-gray-200 shadow-sm overflow-x-auto no-scrollbar scroll-smooth flex gap-1 mb-2">
-          {([
+          {( [
             { id: 'overview', label: 'Visão Geral', icon: LayoutDashboard, coordOnly: true, count: 0, countColor: 'blue' },
             { id: 'members', label: 'Membros', icon: Users, coordOnly: false, count: 0, countColor: 'blue' },
             { id: 'tasks', label: 'Tarefas', icon: ListChecks, coordOnly: false, count: 0, countColor: 'blue' },
@@ -161,13 +161,14 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
             { id: 'announcements', label: 'Comunicados', icon: Megaphone, coordOnly: false, count: sentAnnouncements?.length || 0, countColor: 'blue' },
             { id: 'suggestions', label: 'Sugestões', icon: MessageSquare, coordOnly: false, count: suggestions?.filter(s => !s.is_read).length || 0, countColor: 'red' },
             { id: 'qr', label: 'Questões / QR', icon: QrCode, coordOnly: true, count: 0, countColor: 'blue' },
+            { id: 'vantur', label: 'Vantur', icon: Gamepad2, coordOnly: true, count: 0, countColor: 'blue', href: '/admin/vantur' },
             { id: 'store', label: 'Loja', icon: ShoppingBag, coordOnly: true, count: purchases?.filter(p => p.status === 'pending').length || 0, countColor: 'orange' }
-          ] as const)
+          ] as { id: string, label: string, icon: any, coordOnly: boolean, count: number, countColor: string, href?: string }[])
             .filter(tab => !tab.coordOnly || isCoordenador)
             .map((tab) => (
               <a
                 key={tab.id}
-                href={`/admin?tab=${tab.id}`}
+                href={tab.href || `/admin?tab=${tab.id}`}
                 className={`flex items-center gap-2 px-5 py-2.5 text-sm font-bold rounded-xl transition-all whitespace-nowrap ${
                   activeTab === tab.id
                     ? 'bg-blue-900 text-white shadow-md'

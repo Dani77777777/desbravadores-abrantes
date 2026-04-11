@@ -1,0 +1,335 @@
+/* =============================================
+   VANTUR — Termo-inspired layout, light theme
+   ============================================= */
+
+.vantur-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  background: #fafaf9;
+  padding: 0.75rem 0.5rem 0.5rem;
+  box-sizing: border-box;
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+/* ---- Header ---- */
+.vantur-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  padding-bottom: 0.6rem;
+}
+
+.vantur-mode-badge {
+  background: #f1f5f9;
+  color: #475569;
+  padding: 0.3rem 1rem;
+  border-radius: 99px;
+  font-weight: 800;
+  font-size: 0.65rem;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  border: 1px solid #e2e8f0;
+}
+
+/* ---- Grids Container ---- */
+.vantur-grids-container {
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+  align-items: stretch;
+  gap: 0;
+  width: 100%;
+  padding: 0.5rem 1rem;
+  flex-wrap: nowrap;
+}
+
+/* Separator between grids */
+.wordle-grid + .wordle-grid {
+  border-left: 2px solid #e2e8f0;
+  padding-left: 10px;
+  margin-left: 10px;
+}
+
+/* ---- Wordle Grid ---- */
+.wordle-grid {
+  display: flex;
+  flex-direction: column;
+  /* equal width trick: width:0 + flex:1 forces strict equal distribution */
+  width: 0;
+  flex: 1 1 0;
+  min-width: 0;
+  max-width: 330px;
+  gap: 4px;
+  transition: opacity 0.4s;
+}
+
+.wordle-grid.completed {
+  opacity: 0.35;
+  filter: saturate(0.4);
+}
+
+.wordle-row {
+  display: flex;
+  gap: 4px;
+  justify-content: center;
+}
+
+/* ---- Cell ---- */
+.vantur-cell {
+  flex: 1;
+  aspect-ratio: 1;
+  max-width: 62px;
+  max-height: 62px;
+  border: 2px solid #d1d5db;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: clamp(0.85rem, 2.5vw, 1.5rem);
+  font-weight: 900;
+  text-transform: uppercase;
+  border-radius: 4px;
+  color: #1e293b;
+  background: #ffffff;
+  transition: border-color 0.1s, transform 0.08s;
+  font-family: 'Inter', 'Segoe UI', sans-serif;
+  line-height: 1;
+  user-select: none;
+}
+
+.vantur-cell.typing {
+  border-color: #94a3b8;
+  background: #ffffff;
+}
+
+.vantur-cell.cursor {
+  border-color: #334155;
+  border-width: 3px;
+  cursor: text;
+}
+
+.vantur-cell.typing {
+  cursor: text;
+}
+
+.vantur-cell.filled:not(.correct):not(.present):not(.absent) {
+  border-color: #64748b;
+  animation: cellPop 0.08s ease-out;
+}
+
+.vantur-cell.correct {
+  background: #538d4e !important;
+  border-color: #538d4e !important;
+  color: #fff !important;
+}
+
+.vantur-cell.present {
+  background: #b59f3b !important;
+  border-color: #b59f3b !important;
+  color: #fff !important;
+}
+
+.vantur-cell.absent {
+  background: #787c7e !important;
+  border-color: #787c7e !important;
+  color: #fff !important;
+}
+
+/* ---- Keyboard ---- */
+.vantur-keyboard {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  max-width: 500px;
+  padding: 0.5rem 0.5rem 0.75rem;
+  flex-shrink: 0;
+}
+
+.keyboard-row {
+  display: flex;
+  justify-content: center;
+  gap: 5px;
+}
+
+.key-btn {
+  background: #d3d6da;
+  border: none;
+  color: #1e293b;
+  font-weight: 800;
+  font-size: clamp(0.75rem, 2vw, 0.9rem);
+  font-family: inherit;
+  min-width: 0;
+  flex: 1;
+  max-width: 42px;
+  height: 58px;
+  border-radius: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.1s, transform 0.08s;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: manipulation;
+}
+
+.key-btn:active {
+  transform: scale(0.92);
+  filter: brightness(0.9);
+}
+
+.key-btn.wide {
+  flex: 1.5;
+  max-width: 64px;
+  font-size: clamp(0.6rem, 1.5vw, 0.75rem);
+  background: #bfc3c8;
+  letter-spacing: -0.03em;
+}
+
+.key-btn.correct { background: #538d4e; color: #fff; }
+.key-btn.present { background: #b59f3b; color: #fff; }
+.key-btn.absent  { background: #787c7e; color: #fff; }
+
+/* ---- Message Toast ---- */
+.vantur-message {
+  background: #1e293b;
+  color: #fff;
+  font-weight: 800;
+  font-size: 0.8rem;
+  padding: 0.45rem 1.25rem;
+  border-radius: 99px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+/* ---- Victory Modal ---- */
+.vantur-victory-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.5);
+  backdrop-filter: blur(12px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 40;
+  padding: 1.5rem;
+}
+
+.vantur-victory-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 2rem;
+  padding: 3rem 2.5rem;
+  text-align: center;
+  max-width: 400px;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.5rem;
+  box-shadow: 0 25px 50px -12px rgba(0,0,0,0.15);
+}
+
+.vantur-victory-title {
+  font-size: 2.25rem;
+  font-weight: 900;
+  color: #0f172a;
+  letter-spacing: -0.03em;
+}
+
+.vantur-victory-subtitle {
+  color: #64748b;
+  font-weight: 500;
+  font-size: 0.95rem;
+  margin-top: 0.25rem;
+}
+
+.vantur-victory-words {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.vantur-victory-word-chip {
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  color: #334155;
+  font-weight: 800;
+  padding: 0.4rem 1rem;
+  border-radius: 99px;
+  font-size: 0.9rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.vantur-victory-btn {
+  width: 100%;
+  padding: 1rem;
+  background: #0f172a;
+  color: #fff;
+  font-weight: 900;
+  font-size: 0.95rem;
+  border: none;
+  border-radius: 1rem;
+  cursor: pointer;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  transition: background 0.2s, transform 0.1s;
+}
+
+.vantur-victory-btn:hover  { background: #1e293b; }
+.vantur-victory-btn:active { transform: scale(0.97); }
+
+/* ---- Animations ---- */
+@keyframes cellPop {
+  0%   { transform: scale(1.15); }
+  100% { transform: scale(1); }
+}
+
+/* ---- MOBILE ---- */
+@media (max-width: 640px) {
+  .vantur-container {
+    padding: 0.4rem 0.2rem 0;
+  }
+
+  .vantur-grids-container {
+    gap: 4px;
+    padding: 0.25rem 0.15rem;
+  }
+
+  .wordle-row  { gap: 4px; }
+  .wordle-grid { gap: 4px; }
+
+  .vantur-cell {
+    border-radius: 3px;
+    font-size: clamp(0.7rem, 4.5vw, 1.1rem);
+  }
+
+  .vantur-keyboard {
+    padding: 0.5rem 0.25rem 0.75rem;
+    gap: 5px;
+  }
+
+  .keyboard-row { gap: 4px; }
+
+  .key-btn {
+    height: 44px;
+    border-radius: 4px;
+    max-width: 36px;
+  }
+
+  .key-btn.wide { max-width: 56px; }
+}
+
+/* ---- Very small screens (Plex — 4 grids) ---- */
+@media (max-width: 380px) {
+  .vantur-cell { font-size: clamp(0.6rem, 4vw, 0.9rem); }
+
+  .key-btn       { height: 40px; max-width: 30px; font-size: 0.65rem; }
+  .key-btn.wide  { max-width: 48px; font-size: 0.55rem; }
+}
