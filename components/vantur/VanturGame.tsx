@@ -232,7 +232,7 @@ const VanturGame: React.FC<VanturGameProps> = ({ initialSession, userId }) => {
         )}
       </div>
 
-      <div className="vantur-grids-container">
+      <div className={`vantur-grids-container mode-${session.mode}`}>
         {cleanSecretWords.map((word, index) => {
           const gridDone = session.completed_indices.includes(index) ||
             session.attempts.some(a => normalizeText(a) === normalizeText(word));
