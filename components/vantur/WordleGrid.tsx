@@ -3,6 +3,8 @@
 import React from 'react';
 import { normalizeText } from '@/utils/text-normalization';
 
+const REVEAL_DELAY_MS = 300;
+
 interface WordleGridProps {
   secretWord: string;
   attempts: string[];
@@ -13,6 +15,7 @@ interface WordleGridProps {
   isDone: boolean;
   maxAttempts: number;
   shakeCurrentRow?: boolean;
+  revealingAttemptIndex?: number | null;
 }
 
 const WordleGrid: React.FC<WordleGridProps> = ({
@@ -25,6 +28,7 @@ const WordleGrid: React.FC<WordleGridProps> = ({
   isDone,
   maxAttempts,
   shakeCurrentRow = false,
+  revealingAttemptIndex = null,
 }) => {
   const secretClean = normalizeText(secretWord);
   const wordLength = secretWord.length;
@@ -69,6 +73,8 @@ const WordleGrid: React.FC<WordleGridProps> = ({
       let char = '';
       let statusClass = '';
 
+      const isRevealing = isPastRow && i === revealingAttemptIndex;
+
       if (isPastRow) {
         char = attempt[j] || '';
         statusClass = getCellStatus(attempt, j);
@@ -78,12 +84,15 @@ const WordleGrid: React.FC<WordleGridProps> = ({
       }
 
       const isCursor = isCurrentRow && j === cursorPos;
+      const revealStyle = isRevealing
+        ? { '--reveal-delay': `${j * REVEAL_DELAY_MS}ms` } as React.CSSProperties
+        : undefined;
 
       rowCells.push(
         <div
           key={j}
-          className={`vantur-cell ${statusClass}${isCursor ? ' cursor' : ''}${char && !isPastRow ? ' filled' : ''}`}
-          style={isPastRow ? { animationDelay: `${j * 0.08}s` } : undefined}
+          className={`vantur-cell ${statusClass}${isCursor ? ' cursor' : ''}${char && !isPastRow ? ' filled' : ''}${isRevealing ? ' reveal' : ''}`}
+          style={revealStyle}
           onClick={isCurrentRow ? () => onCellClick(j) : undefined}
         >
           {char}

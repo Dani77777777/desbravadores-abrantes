@@ -121,21 +121,21 @@
 }
 
 .vantur-cell.correct {
-  background: #538d4e !important;
-  border-color: #538d4e !important;
-  color: #fff !important;
+  background: #538d4e;
+  border-color: #538d4e;
+  color: #fff;
 }
 
 .vantur-cell.present {
-  background: #b59f3b !important;
-  border-color: #b59f3b !important;
-  color: #fff !important;
+  background: #b59f3b;
+  border-color: #b59f3b;
+  color: #fff;
 }
 
 .vantur-cell.absent {
-  background: #787c7e !important;
-  border-color: #787c7e !important;
-  color: #fff !important;
+  background: #787c7e;
+  border-color: #787c7e;
+  color: #fff;
 }
 
 /* ---- Keyboard ---- */
@@ -289,6 +289,29 @@
 @keyframes cellPop {
   0%   { transform: scale(1.15); }
   100% { transform: scale(1); }
+}
+
+/* Revelação letra a letra — flip vertical */
+@keyframes cellReveal {
+  0%   {
+    transform: scaleY(1);
+    background-color: #ffffff;
+    border-color: #d1d5db;
+    color: #1e293b;
+  }
+  45%  {
+    transform: scaleY(0);
+    background-color: #ffffff;
+    border-color: #d1d5db;
+    color: #1e293b;
+  }
+  55%  { transform: scaleY(0); }
+  100% { transform: scaleY(1); }
+}
+
+.vantur-cell.reveal {
+  animation: cellReveal 0.5s ease both;
+  animation-delay: var(--reveal-delay, 0s);
 }
 
 /* ---- MOBILE ---- */

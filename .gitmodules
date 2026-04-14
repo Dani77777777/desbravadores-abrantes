@@ -1,0 +1,3 @@
+[submodule "vendor/pt-br"]
+	path = vendor/pt-br
+	url = https://github.com/fserb/pt-br
