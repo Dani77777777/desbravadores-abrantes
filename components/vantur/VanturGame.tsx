@@ -25,6 +25,8 @@ interface VanturGameProps {
 
 const REVEAL_DELAY_MS = 300;
 const REVEAL_DURATION_MS = 500;
+const CELEBRATE_DELAY_MS = 70;
+const CELEBRATE_DURATION_MS = 500;
 
 const VanturGame: React.FC<VanturGameProps> = ({ initialSession, userId }) => {
   const supabase = createClient();
@@ -33,7 +35,10 @@ const VanturGame: React.FC<VanturGameProps> = ({ initialSession, userId }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [shakeRow, setShakeRow] = useState(false);
   const [revealingAttemptIndex, setRevealingAttemptIndex] = useState<number | null>(null);
+  const [celebratingInfo, setCelebratingInfo] = useState<{ attemptIdx: number; gridIdx: number } | null>(null);
+  const [fadedGridIndices, setFadedGridIndices] = useState<number[]>(initialSession.completed_indices);
   const isRevealing = revealingAttemptIndex !== null;
+  const isCelebrating = celebratingInfo !== null;
 
   const cleanSecretWords = useMemo(() => {
     return session.secret_words.map(w =>
@@ -110,7 +115,7 @@ const VanturGame: React.FC<VanturGameProps> = ({ initialSession, userId }) => {
   }, [session.is_finished, isLoading]);
 
   const onEnter = useCallback(async () => {
-    if (session.is_finished || isLoading || isRevealing) return;
+    if (session.is_finished || isLoading || isRevealing || isCelebrating) return;
 
     if (currentGuess.some(c => !c)) {
       setShakeRow(true);
@@ -140,10 +145,12 @@ const VanturGame: React.FC<VanturGameProps> = ({ initialSession, userId }) => {
       const newAttempts = [...session.attempts, displayWord];
       const newCompletedIndices = [...session.completed_indices];
 
+      let justCompletedGridIdx = -1;
       cleanSecretWords.forEach((secret, index) => {
         if (!newCompletedIndices.includes(index)) {
           if (normalizeText(secret) === normalizeText(guessString)) {
             newCompletedIndices.push(index);
+            justCompletedGridIdx = index;
           }
         }
       });
@@ -171,14 +178,25 @@ const VanturGame: React.FC<VanturGameProps> = ({ initialSession, userId }) => {
       setCurrentGuess([...emptyGuess]);
       setCursorPos(0);
 
-      // Arrancar revelação letra a letra
+      // Arrancar revelação antes do await para garantir que isRevealing=true
+      // na mesma batch que is_finished=true — evita flash do modal
       const revealIdx = newAttempts.length - 1;
       setRevealingAttemptIndex(revealIdx);
+
+      if (isFinished && newCompletedIndices.length === cleanSecretWords.length) {
+        await supabase.rpc('award_vantur_rewards', { user_id: userId, mode: session.mode });
+      }
       const totalRevealMs = (wordLength - 1) * REVEAL_DELAY_MS + REVEAL_DURATION_MS + 150;
-      setTimeout(async () => {
+      setTimeout(() => {
         setRevealingAttemptIndex(null);
-        if (isFinished && newCompletedIndices.length === cleanSecretWords.length) {
-          await supabase.rpc('award_vantur_rewards', { user_id: userId, mode: session.mode });
+        // Após reveal, celebrar se acertou numa palavra
+        if (justCompletedGridIdx !== -1) {
+          setCelebratingInfo({ attemptIdx: revealIdx, gridIdx: justCompletedGridIdx });
+          const totalCelebrateMs = (wordLength - 1) * CELEBRATE_DELAY_MS + CELEBRATE_DURATION_MS + 100;
+          setTimeout(() => {
+            setCelebratingInfo(null);
+            setFadedGridIndices(prev => [...new Set([...prev, justCompletedGridIdx])]);
+          }, totalCelebrateMs);
         }
       }, totalRevealMs);
     } catch (error) {
@@ -186,10 +204,10 @@ const VanturGame: React.FC<VanturGameProps> = ({ initialSession, userId }) => {
     } finally {
       setIsLoading(false);
     }
-  }, [currentGuess, session, cleanSecretWords, wordLength, maxAttempts, supabase, userId, isLoading, isRevealing, emptyGuess]);
+  }, [currentGuess, session, cleanSecretWords, wordLength, maxAttempts, supabase, userId, isLoading, isRevealing, isCelebrating, emptyGuess]);
 
   const onDelete = useCallback(() => {
-    if (session.is_finished || isLoading || isRevealing) return;
+    if (session.is_finished || isLoading || isRevealing || isCelebrating) return;
     if (currentGuess[cursorPos]) {
       // Clear the letter at cursor, stay at same position
       setCurrentGuess(prev => {
@@ -207,10 +225,10 @@ const VanturGame: React.FC<VanturGameProps> = ({ initialSession, userId }) => {
         return next;
       });
     }
-  }, [currentGuess, cursorPos, session.is_finished, isLoading, isRevealing]);
+  }, [currentGuess, cursorPos, session.is_finished, isLoading, isRevealing, isCelebrating]);
 
   const onKey = useCallback((key: string) => {
-    if (session.is_finished || isLoading || isRevealing) return;
+    if (session.is_finished || isLoading || isRevealing || isCelebrating) return;
     const char = key.toLowerCase();
     const statuses = getCombinedKeyStatuses();
     if (statuses[char] === 'absent') return;
@@ -222,7 +240,7 @@ const VanturGame: React.FC<VanturGameProps> = ({ initialSession, userId }) => {
       });
       setCursorPos(prev => Math.min(prev + 1, wordLength - 1));
     }
-  }, [cursorPos, wordLength, session.is_finished, isLoading, isRevealing, getCombinedKeyStatuses]);
+  }, [cursorPos, wordLength, session.is_finished, isLoading, isRevealing, isCelebrating, getCombinedKeyStatuses]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -266,6 +284,9 @@ const VanturGame: React.FC<VanturGameProps> = ({ initialSession, userId }) => {
               maxAttempts={maxAttempts}
               shakeCurrentRow={shakeRow && !gridDone}
               revealingAttemptIndex={revealingAttemptIndex}
+              celebratingInfo={celebratingInfo}
+              gridIndex={index}
+              isFaded={fadedGridIndices.includes(index)}
             />
           );
         })}
@@ -278,7 +299,7 @@ const VanturGame: React.FC<VanturGameProps> = ({ initialSession, userId }) => {
         keyStatusesPerGrid={getKeyStatusesPerGrid()}
       />
 
-      {session.is_finished && !isRevealing && (
+      {session.is_finished && !isRevealing && !isCelebrating && (
         <div className="vantur-victory-overlay">
           <div className="vantur-victory-card">
             <div style={{ fontSize: '3rem', lineHeight: 1 }}>{won ? '🎉' : '😔'}</div>

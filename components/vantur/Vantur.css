@@ -68,8 +68,9 @@
 }
 
 .wordle-grid.completed {
-  opacity: 0.35;
-  filter: saturate(0.4);
+  opacity: 0.65;
+  filter: saturate(0.55);
+  transition: opacity 0.7s ease, filter 0.7s ease;
 }
 
 .wordle-row {
@@ -293,18 +294,8 @@
 
 /* Revelação letra a letra — flip vertical */
 @keyframes cellReveal {
-  0%   {
-    transform: scaleY(1);
-    background-color: #ffffff;
-    border-color: #d1d5db;
-    color: #1e293b;
-  }
-  45%  {
-    transform: scaleY(0);
-    background-color: #ffffff;
-    border-color: #d1d5db;
-    color: #1e293b;
-  }
+  0%   { transform: scaleY(1); background-color: #ffffff; border-color: #d1d5db; color: #1e293b; }
+  45%  { transform: scaleY(0); background-color: #ffffff; border-color: #d1d5db; color: #1e293b; }
   55%  { transform: scaleY(0); }
   100% { transform: scaleY(1); }
 }
@@ -312,6 +303,20 @@
 .vantur-cell.reveal {
   animation: cellReveal 0.5s ease both;
   animation-delay: var(--reveal-delay, 0s);
+}
+
+/* Celebração após ganhar — bounce em onda */
+@keyframes cellCelebrate {
+  0%   { transform: translateY(0);     }
+  35%  { transform: translateY(-20px); }
+  60%  { transform: translateY(0);     }
+  80%  { transform: translateY(-8px);  }
+  100% { transform: translateY(0);     }
+}
+
+.vantur-cell.celebrate {
+  animation: cellCelebrate 0.5s ease both;
+  animation-delay: var(--celebrate-delay, 0s);
 }
 
 /* ---- MOBILE ---- */

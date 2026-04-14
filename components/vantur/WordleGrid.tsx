@@ -4,6 +4,7 @@ import React from 'react';
 import { normalizeText } from '@/utils/text-normalization';
 
 const REVEAL_DELAY_MS = 300;
+const CELEBRATE_DELAY_MS = 70;
 
 interface WordleGridProps {
   secretWord: string;
@@ -13,9 +14,12 @@ interface WordleGridProps {
   onCellClick: (pos: number) => void;
   isCompleted: boolean;
   isDone: boolean;
+  isFaded?: boolean;
   maxAttempts: number;
   shakeCurrentRow?: boolean;
   revealingAttemptIndex?: number | null;
+  celebratingInfo?: { attemptIdx: number; gridIdx: number } | null;
+  gridIndex?: number;
 }
 
 const WordleGrid: React.FC<WordleGridProps> = ({
@@ -29,6 +33,9 @@ const WordleGrid: React.FC<WordleGridProps> = ({
   maxAttempts,
   shakeCurrentRow = false,
   revealingAttemptIndex = null,
+  celebratingInfo = null,
+  gridIndex = 0,
+  isFaded = false,
 }) => {
   const secretClean = normalizeText(secretWord);
   const wordLength = secretWord.length;
@@ -74,6 +81,8 @@ const WordleGrid: React.FC<WordleGridProps> = ({
       let statusClass = '';
 
       const isRevealing = isPastRow && i === revealingAttemptIndex;
+      const isCelebrating = isPastRow && celebratingInfo !== null &&
+        i === celebratingInfo.attemptIdx && gridIndex === celebratingInfo.gridIdx;
 
       if (isPastRow) {
         char = attempt[j] || '';
@@ -84,15 +93,17 @@ const WordleGrid: React.FC<WordleGridProps> = ({
       }
 
       const isCursor = isCurrentRow && j === cursorPos;
-      const revealStyle = isRevealing
+      const cellStyle = isRevealing
         ? { '--reveal-delay': `${j * REVEAL_DELAY_MS}ms` } as React.CSSProperties
+        : isCelebrating
+        ? { '--celebrate-delay': `${j * CELEBRATE_DELAY_MS}ms` } as React.CSSProperties
         : undefined;
 
       rowCells.push(
         <div
           key={j}
-          className={`vantur-cell ${statusClass}${isCursor ? ' cursor' : ''}${char && !isPastRow ? ' filled' : ''}${isRevealing ? ' reveal' : ''}`}
-          style={revealStyle}
+          className={`vantur-cell ${statusClass}${isCursor ? ' cursor' : ''}${char && !isPastRow ? ' filled' : ''}${isRevealing ? ' reveal' : ''}${isCelebrating ? ' celebrate' : ''}`}
+          style={cellStyle}
           onClick={isCurrentRow ? () => onCellClick(j) : undefined}
         >
           {char}
@@ -112,7 +123,7 @@ const WordleGrid: React.FC<WordleGridProps> = ({
   }
 
   return (
-    <div className={`wordle-grid${isDone ? ' completed' : ''}`}>
+    <div className={`wordle-grid${isFaded ? ' completed' : ''}`}>
       <style>{`
         @keyframes rowShake {
           0%, 100% { transform: translateX(0); }
