@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { createClient } from '@/utils/supabase/client';
 import { normalizeText } from '@/utils/text-normalization';
 import { WORD_LIST } from '@/utils/vantur-word-list';
+import { toast } from 'sonner';
 import WordleGrid from './WordleGrid';
 import VanturKeyboard from './VanturKeyboard';
 import './Vantur.css';
@@ -183,12 +184,27 @@ const VanturGame: React.FC<VanturGameProps> = ({ initialSession, userId }) => {
       const revealIdx = newAttempts.length - 1;
       setRevealingAttemptIndex(revealIdx);
 
-      if (isFinished && newCompletedIndices.length === cleanSecretWords.length) {
-        await supabase.rpc('award_vantur_rewards', { user_id: userId, mode: session.mode });
-      }
       const totalRevealMs = (wordLength - 1) * REVEAL_DELAY_MS + REVEAL_DURATION_MS + 150;
+      
+      // Chamar RPC logo, mas guardar resultado para mostrar o toast depois do suspense
+      let rewardData: any = null;
+      if (isFinished && newCompletedIndices.length === cleanSecretWords.length) {
+        const { data } = await supabase.rpc('award_vantur_rewards', { 
+          user_id: userId, 
+          mode: session.mode 
+        });
+        rewardData = data;
+      }
+
       setTimeout(() => {
         setRevealingAttemptIndex(null);
+
+        // Se ganhou pontos, mostrar o toast agora que a revelação acabou
+        if (rewardData?.awarded) {
+          toast.success(rewardData.message, {
+            duration: 5000,
+          });
+        }
         // Após reveal, celebrar se acertou numa palavra
         if (justCompletedGridIdx !== -1) {
           setCelebratingInfo({ attemptIdx: revealIdx, gridIdx: justCompletedGridIdx });

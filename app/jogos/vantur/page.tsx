@@ -101,26 +101,16 @@ export default async function VanturGamePage() {
       const wordCount = modeVal === 'solo' ? 1 : modeVal === 'mix' ? 2 : 4;
       let secretWords: string[] = [];
       
-      // 1. Try RPC first
+      // 1. Tentar obter do dicionário Vantur (Bíblico) via RPC (Aleatório Real)
       const { data: words } = await supabaseAction.rpc('get_random_vantur_words', { count: wordCount });
       
-      if (words && words.length > 0) {
-        secretWords = words.map((w: any) => w.word || w.word_display || w.word_clean || w.text);
+      if (words && words.length >= wordCount) {
+        secretWords = words.map((w: any) => w.word);
       } else {
-        // 2. Fallback: Fetch a larger sample and pick randomly in JS
-        const { data: fallback } = await supabaseAction.from('vantur_dictionary').select('word').limit(50);
-        if (fallback && fallback.length > 0) {
-          const shuffled = [...fallback].sort(() => 0.5 - Math.random());
-          secretWords = shuffled.slice(0, wordCount).map(w => w.word);
-        }
-      }
-
-      // 3. Last resort fallback (Portuguese common words if dictionary is empty)
-      if (secretWords.length < wordCount) {
-        const { data: last } = await supabaseAction.from('portuguese_words').select('word_clean').limit(50);
-        if (last && last.length > 0) {
-          const shuffled = [...last].sort(() => 0.5 - Math.random());
-          secretWords = shuffled.slice(0, wordCount).map(w => w.word_clean);
+        // 2. Fallback: Se o dicionário Vantur falhar ou for pequeno, tenta o dicionário geral via RPC
+        const { data: genWords } = await supabaseAction.rpc('get_random_general_words', { count: wordCount });
+        if (genWords && genWords.length >= wordCount) {
+          secretWords = genWords.map((w: any) => w.word_clean);
         }
       }
 
@@ -169,7 +159,7 @@ export default async function VanturGamePage() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8 w-full max-w-6xl mt-8">
               <ModeCard 
                 title="Solo" 
-                description="Uma palavra. 6 tentativas."
+                description="Uma palavra. 6 tentativas. Recompensa: 1 XP, 1 Gold"
                 mode="solo"
                 icon={<Brain className={`w-12 h-12 ${finishedModes.includes('solo') ? 'text-gray-300' : 'text-blue-500'}`} />}
                 userId={user.id}
@@ -178,7 +168,7 @@ export default async function VanturGamePage() {
               />
               <ModeCard 
                 title="Mix" 
-                description="Duas palavras. 7 tentativas."
+                description="Duas palavras. 7 tentativas. Recompensa: 2 XP, 2 Gold"
                 mode="mix"
                 icon={<Zap className={`w-12 h-12 ${finishedModes.includes('mix') ? 'text-gray-300' : 'text-amber-500'}`} />}
                 userId={user.id}
@@ -187,7 +177,7 @@ export default async function VanturGamePage() {
               />
               <ModeCard 
                 title="Plex" 
-                description="Quatro palavras. 9 tentativas."
+                description="Quatro palavras. 9 tentativas. Recompensa: 4 XP, 4 Gold"
                 mode="plex"
                 icon={<Layers className={`w-12 h-12 ${finishedModes.includes('plex') ? 'text-gray-300' : 'text-purple-500'}`} />}
                 userId={user.id}
