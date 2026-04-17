@@ -189,21 +189,22 @@ const VanturGame: React.FC<VanturGameProps> = ({ initialSession, userId }) => {
       // Chamar RPC logo, mas guardar resultado para mostrar o toast depois do suspense
       let rewardData: any = null;
       if (isFinished && newCompletedIndices.length === cleanSecretWords.length) {
-        const { data } = await supabase.rpc('award_vantur_rewards', { 
+        console.log('Vantur: Vitória detetada. A chamar recompensas...');
+        const { data, error } = await supabase.rpc('award_vantur_rewards', { 
           user_id: userId, 
           mode: session.mode 
         });
+        if (error) console.error('Erro RPC Vantur:', error);
         rewardData = data;
       }
 
       setTimeout(() => {
         setRevealingAttemptIndex(null);
 
-        // Se ganhou pontos, mostrar o toast agora que a revelação acabou
-        if (rewardData?.awarded) {
-          toast.success(rewardData.message, {
-            duration: 5000,
-          });
+        // Se o RPC retornou dados, mostramos a mensagem (ganhou pontos ou já os tinha ganho hoje)
+        if (rewardData && rewardData.message) {
+          console.log('Vantur: A mostrar toast:', rewardData.message);
+          toast.success(rewardData.message);
         }
         // Após reveal, celebrar se acertou numa palavra
         if (justCompletedGridIdx !== -1) {
@@ -246,8 +247,6 @@ const VanturGame: React.FC<VanturGameProps> = ({ initialSession, userId }) => {
   const onKey = useCallback((key: string) => {
     if (session.is_finished || isLoading || isRevealing || isCelebrating) return;
     const char = key.toLowerCase();
-    const statuses = getCombinedKeyStatuses();
-    if (statuses[char] === 'absent') return;
     if (/^[a-zç]$/.test(char)) {
       setCurrentGuess(prev => {
         const next = [...prev];

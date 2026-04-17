@@ -38,6 +38,7 @@ const WordleGrid: React.FC<WordleGridProps> = ({
   isFaded = false,
 }) => {
   const secretClean = normalizeText(secretWord);
+  // Usamos o tamanho da palavra secreta para desenhar a grelha
   const wordLength = secretWord.length;
 
   let displayAttempts = attempts;

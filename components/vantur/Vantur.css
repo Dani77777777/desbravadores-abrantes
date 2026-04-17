@@ -41,17 +41,25 @@
   flex-direction: row;
   justify-content: center;
   align-items: stretch;
-  gap: 0;
+  gap: 32px; /* Criamos um gap fixo e igual para todos */
   width: 100%;
   padding: 0.5rem 1rem;
   flex-wrap: nowrap;
 }
 
-/* Separator between grids */
+/* Separator between grids - Centrado perfeitamente no gap via pseudo-elemento */
 .wordle-grid + .wordle-grid {
-  border-left: 2px solid #e2e8f0;
-  padding-left: 10px;
-  margin-left: 10px;
+  position: relative;
+}
+
+.wordle-grid + .wordle-grid::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -17px; /* Posiciona no centro exato do gap de 32px (16px + metade da linha) */
+  width: 2px;
+  background-color: #e2e8f0;
 }
 
 /* ---- Wordle Grid ---- */
@@ -348,10 +356,8 @@
   }
 
   /* Remove separadores entre grids no layout plex mobile */
-  .vantur-grids-container.mode-plex .wordle-grid + .wordle-grid {
-    border-left: none;
-    padding-left: 0;
-    margin-left: 0;
+  .vantur-grids-container.mode-plex .wordle-grid + .wordle-grid::before {
+    display: none;
   }
 
   .wordle-row  { gap: 4px; }
