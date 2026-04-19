@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { ChevronLeft, Brain, Zap, Layers } from 'lucide-react';
 import { Navbar } from '@/components/layout/Navbar';
 import VanturGame from '@/components/vantur/VanturGame';
+import VanturHowToPlay from '@/components/vantur/VanturHowToPlay';
 
 interface ModeCardProps {
   title: string;
@@ -154,6 +155,9 @@ export default async function VanturGamePage() {
               </div>
               <h1 className="text-6xl font-black text-blue-900 tracking-tighter">VANTUR</h1>
               <p className="text-gray-500 max-w-md mx-auto text-lg">Desafio Bíblico Diário. Conclui os 3 modos todos os dias!</p>
+              <div className="flex justify-center pt-2">
+                <VanturHowToPlay variant="button" />
+              </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8 w-full max-w-6xl mt-8">

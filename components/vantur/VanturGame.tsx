@@ -7,6 +7,7 @@ import { WORD_LIST } from '@/utils/vantur-word-list';
 import { toast } from 'sonner';
 import WordleGrid from './WordleGrid';
 import VanturKeyboard from './VanturKeyboard';
+import VanturHowToPlay from './VanturHowToPlay';
 import './Vantur.css';
 
 interface VanturSession {
@@ -273,9 +274,12 @@ const VanturGame: React.FC<VanturGameProps> = ({ initialSession, userId }) => {
   const won = session.completed_indices.length === cleanSecretWords.length;
 
   return (
-    <div className="vantur-container">
-      <div className="vantur-header">
+    <div className="vantur-container relative">
+      <div className="vantur-header relative w-full flex flex-col items-center justify-center min-h-[40px]">
         <span className="vantur-mode-badge">VANTUR — {session.mode.toUpperCase()}</span>
+        <div className="absolute right-0 top-0">
+          <VanturHowToPlay variant="icon" />
+        </div>
         {message && (
           <div className="vantur-message mt-2">{message}</div>
         )}
