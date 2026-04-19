@@ -334,8 +334,12 @@
   }
 
   .vantur-grids-container {
-    gap: 4px;
+    gap: 16px;
     padding: 0.25rem 0.15rem;
+  }
+
+  .wordle-grid + .wordle-grid::before {
+    left: -9px;
   }
 
   /* Plex: 2×2 grid no mobile */
@@ -343,9 +347,10 @@
     display: grid;
     grid-template-columns: 1fr 1fr;
     grid-template-rows: auto auto;
-    gap: 8px;
+    gap: 12px;
     padding: 0.25rem 0.25rem;
     align-items: start;
+    position: relative;
   }
 
   .vantur-grids-container.mode-plex .wordle-grid {
@@ -355,7 +360,30 @@
     min-width: 0;
   }
 
-  /* Remove separadores entre grids no layout plex mobile */
+  /* Divisórias cruzadas para o modo plex mobile */
+  .vantur-grids-container.mode-plex::before {
+    content: "";
+    position: absolute;
+    top: 0.25rem;
+    bottom: 0.25rem;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 2px;
+    background-color: #e2e8f0;
+  }
+
+  .vantur-grids-container.mode-plex::after {
+    content: "";
+    position: absolute;
+    left: 0.25rem;
+    right: 0.25rem;
+    top: 50%;
+    transform: translateY(-50%);
+    height: 2px;
+    background-color: #e2e8f0;
+  }
+
+  /* Remove separadores padrão entre grids */
   .vantur-grids-container.mode-plex .wordle-grid + .wordle-grid::before {
     display: none;
   }
