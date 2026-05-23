@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import Link from 'next/link'
 import { Navbar } from '@/components/layout/Navbar'
-import { Trophy, Users, Star, ArrowRight, Shield, Heart, Medal, Tent } from 'lucide-react'
+import { Trophy, Users, Star, ArrowRight, Shield, Heart, Gamepad2 } from 'lucide-react'
 
 export function LandingPage() {
   const router = useRouter()
@@ -163,6 +163,62 @@ export function LandingPage() {
               <h3 className="text-xl font-bold text-stone-900">Serviço e Fé</h3>
               <p className="text-stone-600">O sistema também destaca a tua participação em projetos sociais e o teu crescimento espiritual.</p>
             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Games Section */}
+      <section className="py-20 bg-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center max-w-2xl mx-auto mb-12">
+            <h2 className="text-3xl font-bold text-stone-900 mb-4 flex items-center justify-center gap-3">
+              <Gamepad2 className="w-8 h-8 text-blue-600" /> Centro de Jogos
+            </h2>
+            <p className="text-lg text-stone-600">
+              Joga, aprende e acumula XP enquanto te diverte com os teus amigos.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 max-w-3xl mx-auto mb-10">
+            {/* Vantur card */}
+            <div className="rounded-2xl overflow-hidden shadow-md hover:shadow-xl transition-shadow group">
+              <div className="h-24 bg-gradient-to-br from-amber-400 to-orange-600 flex items-center justify-center relative overflow-hidden">
+                <div className="bg-white p-3 rounded-2xl shadow-lg transform group-hover:rotate-6 transition-transform z-10">
+                  <img src="/images/vantur.png" alt="Vantur" className="w-10 h-10 object-contain" />
+                </div>
+              </div>
+              <div className="bg-white p-4">
+                <h3 className="font-bold text-stone-900 text-lg">VANTUR</h3>
+                <p className="text-stone-500 text-sm">Advinha palavras bíblicas. Solo, Mix ou Plex!</p>
+                <p className="text-xs text-amber-600 font-semibold mt-2 flex items-center gap-1">
+                  <span>🔒</span> Requer conta
+                </p>
+              </div>
+            </div>
+
+            {/* VanaQuest card */}
+            <div className="rounded-2xl overflow-hidden shadow-md hover:shadow-xl transition-shadow group">
+              <div className="h-24 bg-gradient-to-br from-violet-500 to-purple-700 flex items-center justify-center relative overflow-hidden">
+                <div className="bg-white p-3 rounded-2xl shadow-lg transform group-hover:rotate-6 transition-transform z-10">
+                  <img src="/images/VanaQuest.png" alt="VanaQuest" className="w-10 h-10 object-contain" />
+                </div>
+              </div>
+              <div className="bg-white p-4">
+                <h3 className="font-bold text-stone-900 text-lg">VanaQuest</h3>
+                <p className="text-stone-500 text-sm">Quiz ao vivo estilo Kahoot. Convidados também podem jogar!</p>
+                <p className="text-xs text-green-600 font-semibold mt-2 flex items-center gap-1">
+                  <span>✓</span> Acessível a todos
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="text-center">
+            <Link href="/jogos">
+              <Button size="lg" className="bg-blue-700 hover:bg-blue-800 text-white px-8 py-6 rounded-full font-bold">
+                Ver todos os jogos <ArrowRight className="ml-2 w-4 h-4" />
+              </Button>
+            </Link>
           </div>
         </div>
       </section>
