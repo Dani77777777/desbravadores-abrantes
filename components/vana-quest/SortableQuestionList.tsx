@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
   DndContext,
   closestCenter,
@@ -272,6 +272,21 @@ export function SortableQuestionList({ questions: initial, questId, onEdit, onCa
   const [questions, setQuestions] = useState(initial)
   const [activeId, setActiveId] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+
+  // Sync local state when server props change (added, removed, or content edited)
+  // — but preserve order if only the IDs are the same (user is mid-drag/save)
+  useEffect(() => {
+    const localIds = questions.map((q) => q.id).join(',')
+    const propIds = initial.map((q) => q.id).join(',')
+    if (localIds !== propIds || initial.length !== questions.length) {
+      setQuestions(initial)
+    } else {
+      // Same set of IDs — just refresh content (text/options/etc. may have changed)
+      const idToProp = new Map(initial.map((q) => [q.id, q]))
+      setQuestions((prev) => prev.map((q) => idToProp.get(q.id) || q))
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initial])
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
