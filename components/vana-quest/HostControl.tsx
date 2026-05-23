@@ -8,6 +8,7 @@ import {
   Users, ChevronRight, Trophy, Zap, Clock, Maximize2,
   CheckCircle2, Flame, Play, MonitorPlay, Copy, Check
 } from 'lucide-react'
+import { PlayerAvatar } from './PlayerAvatar'
 
 const OPTION_COLORS = ['bg-red-500', 'bg-blue-500', 'bg-yellow-400', 'bg-green-500']
 const OPTION_LABELS = ['▲ A', '● B', '◆ C', '■ D']
@@ -40,6 +41,7 @@ interface Participant {
   correct_answers: number
   current_streak: number
   is_guest: boolean
+  avatar_url?: string | null
 }
 
 interface Answer {
@@ -301,9 +303,13 @@ export function HostControl({ sessionId, initialSession, questions, siteUrl }: P
                 <div className="space-y-1.5 max-h-60 overflow-y-auto">
                   {participants.map((p) => (
                     <div key={p.id} className="flex items-center gap-2 bg-white/5 rounded-xl px-3 py-2">
-                      <div className="w-6 h-6 rounded-full bg-blue-500/40 flex items-center justify-center text-[10px] font-black">
-                        {p.display_name[0]?.toUpperCase()}
-                      </div>
+                      <PlayerAvatar
+                        name={p.display_name}
+                        avatarUrl={p.avatar_url}
+                        className="w-6 h-6"
+                        textClassName="text-[10px]"
+                        fallbackBg="bg-blue-500/40"
+                      />
                       <span className="text-sm font-semibold truncate flex-1">{p.display_name}</span>
                       {p.is_guest && <span className="text-[9px] text-sky-400 bg-blue-500/10 rounded-full px-1.5 py-0.5">conv.</span>}
                     </div>

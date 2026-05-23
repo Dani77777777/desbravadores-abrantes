@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { joinSession } from '@/lib/actions/vana-quest'
+import { PlayerAvatar } from './PlayerAvatar'
 
 interface Props {
   user: any
@@ -90,9 +91,13 @@ export function JoinForm({ user, profile, initialPin }: Props) {
 
           {user && (
             <div className="bg-white/10 rounded-2xl px-4 py-3 flex items-center gap-3">
-              <div className="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center text-white font-bold text-sm">
-                {profile?.full_name?.[0] || '?'}
-              </div>
+              <PlayerAvatar
+                name={profile?.full_name || '?'}
+                avatarUrl={profile?.avatar_url}
+                className="w-9 h-9"
+                textClassName="text-sm"
+                fallbackBg="bg-white/20"
+              />
               <div>
                 <p className="text-white font-semibold text-sm">{profile?.full_name}</p>
                 <p className="text-sky-300 text-xs">Desbravador registado</p>

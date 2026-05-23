@@ -4,6 +4,7 @@ import { useEffect, useState, useRef } from 'react'
 import { createClient } from '@/utils/supabase/client'
 import { submitAnswer, setRewardsRecipient } from '@/lib/actions/vana-quest'
 import { CheckCircle2, XCircle, Trophy, Zap, Flame, Users } from 'lucide-react'
+import { PlayerAvatar } from './PlayerAvatar'
 
 const OPTION_COLORS = [
   'bg-red-500 active:bg-red-700',
@@ -223,8 +224,14 @@ export function PlayerScreen({ sessionId, userId, userProfile, initialSession, q
         <img src="/images/VanaQuest.png" alt="" className="w-20 h-20 object-contain animate-bounce" />
         <h1 className="text-3xl font-black text-white">{questTitle}</h1>
         <div className="bg-white/10 backdrop-blur rounded-3xl p-6 border border-white/20">
-          <div className="w-12 h-12 rounded-full bg-sky-300/30 flex items-center justify-center text-white font-black text-xl mx-auto mb-3">
-            {(userProfile?.full_name || 'C')[0]?.toUpperCase()}
+          <div className="flex justify-center mb-3">
+            <PlayerAvatar
+              name={userProfile?.full_name || 'C'}
+              avatarUrl={userProfile?.avatar_url}
+              className="w-12 h-12"
+              textClassName="text-xl"
+              fallbackBg="bg-sky-300/30"
+            />
           </div>
           <p className="text-white font-bold text-lg">{userProfile?.full_name || 'Convidado'}</p>
           {isGuest && <p className="text-sky-300 text-sm">Jogador convidado</p>}

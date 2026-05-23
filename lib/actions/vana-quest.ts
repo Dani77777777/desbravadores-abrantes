@@ -171,7 +171,16 @@ export async function joinSession(
   const displayName = guestName || 'Jogador'
   const isGuest = !userId
 
+  // Para utilizadores registados, obter o avatar do profile para denormalizar
+  let avatarUrl: string | null = null
   if (userId) {
+    const { data: prof } = await supabase
+      .from('profiles')
+      .select('avatar_url')
+      .eq('id', userId)
+      .single()
+    avatarUrl = prof?.avatar_url || null
+
     const { data: existing } = await supabase
       .from('vana_quest_participants')
       .select('id')
@@ -196,6 +205,7 @@ export async function joinSession(
       guest_name: isGuest ? displayName : null,
       is_guest: isGuest,
       display_name: displayName,
+      avatar_url: avatarUrl,
     })
     .select()
     .single()

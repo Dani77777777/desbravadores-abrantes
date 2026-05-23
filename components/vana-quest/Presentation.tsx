@@ -4,6 +4,7 @@ import { useEffect, useState, useRef } from 'react'
 import { createClient } from '@/utils/supabase/client'
 import { QRCodeSVG } from 'qrcode.react'
 import { Users, Trophy, Zap, Flame, CheckCircle2 } from 'lucide-react'
+import { PlayerAvatar } from './PlayerAvatar'
 
 const OPTION_COLORS = ['bg-red-500', 'bg-blue-500', 'bg-yellow-400', 'bg-green-500']
 const OPTION_LABELS = ['▲', '●', '◆', '■']
@@ -37,6 +38,7 @@ interface Participant {
   current_streak: number
   max_streak: number
   is_guest: boolean
+  avatar_url?: string | null
 }
 
 interface Answer {
@@ -184,9 +186,13 @@ export function Presentation({ sessionId, initialSession, questions, siteUrl }: 
               ) : (
                 participants.map((p) => (
                   <div key={p.id} className="flex items-center gap-3 bg-white/5 rounded-xl px-3 py-2.5 animate-in slide-in-from-right-2 duration-300">
-                    <div className="w-9 h-9 rounded-full bg-blue-500/40 flex items-center justify-center text-white font-black">
-                      {p.display_name[0]?.toUpperCase()}
-                    </div>
+                    <PlayerAvatar
+                      name={p.display_name}
+                      avatarUrl={p.avatar_url}
+                      className="w-9 h-9"
+                      textClassName="text-base"
+                      fallbackBg="bg-blue-500/40"
+                    />
                     <span className="text-white font-semibold flex-1 truncate">{p.display_name}</span>
                     {p.is_guest && <span className="text-[10px] text-sky-400 bg-blue-500/10 rounded-full px-2 py-0.5">convidado</span>}
                   </div>
@@ -436,18 +442,25 @@ function CinematicPodium({ participants }: { participants: Participant[] }) {
                   } ${
                     isEmpty
                       ? 'bg-white/5 border-2 border-dashed border-white/15'
-                      : `${avatarColors[rank]} ring-4 ring-offset-4 ring-offset-blue-950 shadow-2xl`
+                      : `${avatarColors[rank]} ring-4 ring-offset-4 ring-offset-blue-950 shadow-2xl overflow-hidden`
                   } flex items-center justify-center`}
                 >
                   {isEmpty ? (
                     <span className="text-3xl text-white/30">—</span>
+                  ) : p!.avatar_url ? (
+                    <img
+                      src={p!.avatar_url}
+                      alt={p!.display_name}
+                      className="w-full h-full object-cover"
+                      referrerPolicy="no-referrer"
+                    />
                   ) : (
                     <span className="text-3xl md:text-5xl font-black text-white drop-shadow-lg">
                       {p!.display_name[0]?.toUpperCase()}
                     </span>
                   )}
                   {!isEmpty && rank === 0 && isRevealed && (
-                    <div className="absolute -top-3 -right-3 text-3xl md:text-4xl drop-shadow-lg animate-bounce">
+                    <div className="absolute -top-3 -right-3 text-3xl md:text-4xl drop-shadow-lg animate-bounce z-10">
                       👑
                     </div>
                   )}
@@ -703,6 +716,13 @@ function LeaderboardScreen({
                 }`}>
                   {i + 1}
                 </div>
+                <PlayerAvatar
+                  name={p.display_name}
+                  avatarUrl={p.avatar_url}
+                  className="w-12 h-12"
+                  textClassName="text-base"
+                  fallbackBg="bg-white/15"
+                />
                 <div className="flex-1 min-w-0">
                   <p className="text-white font-black text-xl truncate">{p.display_name}</p>
                   <div className="flex items-center gap-2 text-xs">
