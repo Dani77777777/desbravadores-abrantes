@@ -39,7 +39,7 @@ export default async function GamesHubPage() {
       icon: <img src="/images/VanaQuest.png" alt="VanaQuest" className="w-12 h-12 object-contain" />,
       href: '/jogos/vana-quest',
       loginHref: '/jogos/vana-quest',
-      color: 'from-violet-500 to-purple-700',
+      color: 'from-blue-700 via-blue-900 to-yellow-500',
       status: 'Disponível',
       requiresAuth: false,
     },

@@ -43,6 +43,7 @@ export async function updateSession(request: NextRequest) {
     !request.nextUrl.pathname.startsWith('/contacts') &&
     !request.nextUrl.pathname.startsWith('/codes') &&
     !request.nextUrl.pathname.startsWith('/jogos/vana-quest') &&
+    !request.nextUrl.pathname.includes('/present') &&
     request.nextUrl.pathname !== '/jogos'
   ) {
     const url = request.nextUrl.clone()

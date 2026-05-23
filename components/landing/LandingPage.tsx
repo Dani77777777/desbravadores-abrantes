@@ -198,7 +198,7 @@ export function LandingPage() {
 
             {/* VanaQuest card */}
             <div className="rounded-2xl overflow-hidden shadow-md hover:shadow-xl transition-shadow group">
-              <div className="h-24 bg-gradient-to-br from-violet-500 to-purple-700 flex items-center justify-center relative overflow-hidden">
+              <div className="h-24 bg-gradient-to-br from-blue-700 via-blue-900 to-yellow-500 flex items-center justify-center relative overflow-hidden">
                 <div className="bg-white p-3 rounded-2xl shadow-lg transform group-hover:rotate-6 transition-transform z-10">
                   <img src="/images/VanaQuest.png" alt="VanaQuest" className="w-10 h-10 object-contain" />
                 </div>

@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
 import { Navbar } from '@/components/layout/Navbar'
 import Link from 'next/link'
-import { ChevronLeft, Plus, Trash2, Pencil, ListChecks, BookOpen } from 'lucide-react'
+import { ChevronLeft, Plus, Trash2, Pencil, ListChecks, BookOpen, History, Users, Trophy, ChevronRight } from 'lucide-react'
 import { startSession } from '@/lib/actions/vana-quest'
 
 export default async function VanaQuestAdminPage() {
@@ -19,6 +19,12 @@ export default async function VanaQuestAdminPage() {
     .from('vana_quests')
     .select('*, vana_quest_questions(count)')
     .order('created_at', { ascending: false })
+
+  const { data: sessions } = await supabase
+    .from('vana_quest_sessions')
+    .select('*, vana_quests(title), vana_quest_participants(count)')
+    .order('created_at', { ascending: false })
+    .limit(30)
 
   async function handleCreate(formData: FormData) {
     'use server'
@@ -45,7 +51,7 @@ export default async function VanaQuestAdminPage() {
     'use server'
     const questId = formData.get('questId') as string
     const sessionId = await startSession(questId)
-    redirect(`/jogos/vana-quest/${sessionId}/host`)
+    redirect(`/jogos/vana-quest/${sessionId}/control`)
   }
 
   return (
@@ -156,6 +162,53 @@ export default async function VanaQuestAdminPage() {
             )
           })}
         </div>
+
+        {/* Past sessions */}
+        {sessions && sessions.length > 0 && (
+          <div className="space-y-3 pt-6">
+            <h2 className="font-bold text-gray-900 flex items-center gap-2">
+              <History className="w-4 h-4 text-gray-500" /> Sessões anteriores
+            </h2>
+
+            <div className="space-y-2">
+              {sessions.map((s) => {
+                const playerCount = (s.vana_quest_participants as any)?.[0]?.count ?? 0
+                const statusLabel: Record<string, { label: string; color: string }> = {
+                  waiting: { label: 'Em sala de espera', color: 'bg-purple-100 text-purple-700' },
+                  question_intro: { label: 'A decorrer', color: 'bg-blue-100 text-blue-700' },
+                  question_active: { label: 'A decorrer', color: 'bg-blue-100 text-blue-700' },
+                  question_results: { label: 'A decorrer', color: 'bg-blue-100 text-blue-700' },
+                  question_leaderboard: { label: 'A decorrer', color: 'bg-blue-100 text-blue-700' },
+                  finished: { label: 'Terminada', color: 'bg-green-100 text-green-700' },
+                }
+                const sLabel = statusLabel[s.status] || statusLabel.waiting
+
+                return (
+                  <Link
+                    key={s.id}
+                    href={`/admin/vana-quest/sessions/${s.id}`}
+                    className="bg-white rounded-2xl border shadow-sm p-4 flex items-center gap-4 hover:shadow-md hover:border-blue-200 transition-all"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${sLabel.color}`}>
+                          {sLabel.label}
+                        </span>
+                        <span className="text-xs text-gray-400 font-mono">PIN {s.pin}</span>
+                      </div>
+                      <p className="font-semibold text-gray-900 text-sm truncate">{(s.vana_quests as any)?.title || 'Sem título'}</p>
+                      <div className="flex items-center gap-3 mt-1 text-xs text-gray-500">
+                        <span className="flex items-center gap-1"><Users className="w-3 h-3" /> {playerCount}</span>
+                        <span>{new Date(s.created_at).toLocaleString('pt-PT', { dateStyle: 'short', timeStyle: 'short' })}</span>
+                      </div>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-gray-300 flex-shrink-0" />
+                  </Link>
+                )
+              })}
+            </div>
+          </div>
+        )}
       </main>
     </div>
   )

@@ -209,7 +209,11 @@ export async function joinSession(
   }
 }
 
-export async function advanceQuestion(sessionId: string) {
+/**
+ * State machine for the live game flow.
+ * waiting → question_intro → question_active → question_results → question_leaderboard → (next intro) | finished
+ */
+export async function nextStage(sessionId: string) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error('Não autorizado')
@@ -231,29 +235,55 @@ export async function advanceQuestion(sessionId: string) {
   const totalQuestions = questions?.length || 0
   const nextIndex = session.current_question_index + 1
 
-  if (session.status === 'waiting' || session.status === 'question_results') {
-    if (nextIndex >= totalQuestions) {
+  switch (session.status) {
+    case 'waiting':
+    case 'question_leaderboard':
+      if (nextIndex >= totalQuestions) {
+        await supabase.from('vana_quest_sessions').update({
+          status: 'finished',
+          ended_at: new Date().toISOString(),
+        }).eq('id', sessionId)
+        return
+      }
       await supabase.from('vana_quest_sessions').update({
-        status: 'finished',
-        ended_at: new Date().toISOString(),
+        status: 'question_intro',
+        current_question_index: nextIndex,
+        question_started_at: null,
       }).eq('id', sessionId)
       return
+
+    case 'question_intro':
+      await supabase.from('vana_quest_sessions').update({
+        status: 'question_active',
+        question_started_at: new Date().toISOString(),
+      }).eq('id', sessionId)
+      return
+
+    case 'question_active':
+      await supabase.from('vana_quest_sessions').update({
+        status: 'question_results',
+      }).eq('id', sessionId)
+      return
+
+    case 'question_results': {
+      const isLastQuestion = session.current_question_index >= totalQuestions - 1
+      if (isLastQuestion) {
+        await supabase.from('vana_quest_sessions').update({
+          status: 'finished',
+          ended_at: new Date().toISOString(),
+        }).eq('id', sessionId)
+      } else {
+        await supabase.from('vana_quest_sessions').update({
+          status: 'question_leaderboard',
+        }).eq('id', sessionId)
+      }
+      return
     }
-
-    await supabase.from('vana_quest_sessions').update({
-      status: 'question_active',
-      current_question_index: nextIndex,
-      question_started_at: new Date().toISOString(),
-    }).eq('id', sessionId)
-    return
-  }
-
-  if (session.status === 'question_active') {
-    await supabase.from('vana_quest_sessions').update({
-      status: 'question_results',
-    }).eq('id', sessionId)
   }
 }
+
+// Keep the old name for backwards compat
+export const advanceQuestion = nextStage
 
 export async function submitAnswer(
   participantId: string,
@@ -345,6 +375,11 @@ export async function setRewardsRecipient(
     .eq('is_guest', true)
 }
 
+/**
+ * XP/Gold awards são baseados nos pontos totais ganhos no jogo.
+ * Arredondamento half-up: 15.5 → 16, 15.4 → 15
+ * Gold = round(total_points), XP = gold * 2
+ */
 export async function awardSessionPoints(sessionId: string): Promise<void> {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -354,47 +389,29 @@ export async function awardSessionPoints(sessionId: string): Promise<void> {
 
   const { data: participants } = await service
     .from('vana_quest_participants')
-    .select('*, vana_quest_answers!vana_quest_answers_participant_id_fkey(*)')
+    .select('*')
     .eq('session_id', sessionId)
 
   if (!participants) return
 
   for (const p of participants) {
-    const answers = (p.vana_quest_answers || []) as any[]
-    const correctCount = answers.filter((a: any) => a.is_correct).length
-    if (correctCount === 0) continue
+    const totalPoints = Number(p.total_points) || 0
+    if (totalPoints <= 0) continue
 
     const targetUserId = p.is_guest ? p.rewards_recipient_id : p.user_id
     if (!targetUserId) continue
 
-    const { data: questAnswers } = await service
-      .from('vana_quest_answers')
-      .select('is_correct, vana_quest_questions(points_multiplier)')
-      .eq('participant_id', p.id)
+    const gold = Math.round(totalPoints) // half-up by default in JS for positives
+    const xp = gold * 2
 
-    let totalGold = 0
-    let totalXp = 0
-    for (const a of questAnswers || []) {
-      if (a.is_correct) {
-        const mult = (a.vana_quest_questions as any)?.points_multiplier || 1
-        totalGold += 10 * mult
-        totalXp += 20 * mult
-      }
-    }
-
-    if (totalGold > 0 || totalXp > 0) {
+    if (gold > 0 || xp > 0) {
       await service.from('points_log').insert({
         target_user_id: targetUserId,
         awarded_by_user_id: user.id,
-        amount_xp: totalXp,
-        amount_gold: totalGold,
-        description: `VanaQuest — ${correctCount} resposta${correctCount !== 1 ? 's' : ''} correcta${correctCount !== 1 ? 's' : ''}${p.is_guest ? ` (doado por ${p.display_name})` : ''}`,
+        amount_xp: xp,
+        amount_gold: gold,
+        description: `VanaQuest — ${totalPoints.toFixed(3)} pts${p.is_guest ? ` (doado por ${p.display_name})` : ''}`,
       })
     }
   }
-
-  await service
-    .from('vana_quest_sessions')
-    .update({ status: 'finished' })
-    .eq('id', sessionId)
 }

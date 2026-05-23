@@ -1,8 +1,8 @@
 import { createClient } from '@/utils/supabase/server'
 import { redirect } from 'next/navigation'
-import { HostScreen } from '@/components/vana-quest/HostScreen'
+import { HostControl } from '@/components/vana-quest/HostControl'
 
-export default async function HostPage({ params }: { params: Promise<{ sessionId: string }> }) {
+export default async function ControlPage({ params }: { params: Promise<{ sessionId: string }> }) {
   const { sessionId } = await params
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -14,7 +14,7 @@ export default async function HostPage({ params }: { params: Promise<{ sessionId
 
   const { data: session } = await supabase
     .from('vana_quest_sessions')
-    .select('*, vana_quests(title, description)')
+    .select('*, vana_quests(title)')
     .eq('id', sessionId)
     .single()
 
@@ -29,12 +29,11 @@ export default async function HostPage({ params }: { params: Promise<{ sessionId
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'
 
   return (
-    <HostScreen
+    <HostControl
       sessionId={sessionId}
       initialSession={session}
       questions={questions || []}
       siteUrl={siteUrl}
-      adminProfile={profile}
     />
   )
 }

@@ -20,10 +20,10 @@ export default async function PlayPage({ params }: { params: Promise<{ sessionId
 
   if (!session) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-violet-900 to-indigo-900 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-blue-900 to-indigo-900 flex items-center justify-center">
         <div className="text-center text-white">
           <p className="text-2xl font-bold">Sessão não encontrada.</p>
-          <a href="/jogos/vana-quest" className="mt-4 text-purple-300 underline block">Voltar</a>
+          <a href="/jogos/vana-quest" className="mt-4 text-sky-300 underline block">Voltar</a>
         </div>
       </div>
     )

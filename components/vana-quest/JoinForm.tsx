@@ -49,12 +49,12 @@ export function JoinForm({ user, profile, initialPin }: Props) {
             className="w-24 h-24 object-contain mx-auto mb-4 drop-shadow-2xl"
           />
           <h1 className="text-4xl font-black text-white tracking-tight">VanaQuest</h1>
-          <p className="text-purple-200 mt-1">Entra no jogo com o teu PIN</p>
+          <p className="text-sky-200 mt-1">Entra no jogo com o teu PIN</p>
         </div>
 
         <form onSubmit={handleJoin} className="bg-white/10 backdrop-blur-sm rounded-3xl p-8 border border-white/20 space-y-4">
           <div>
-            <label className="block text-xs font-bold text-purple-200 uppercase tracking-wider mb-2">
+            <label className="block text-xs font-bold text-sky-200 uppercase tracking-wider mb-2">
               PIN do jogo
             </label>
             <input
@@ -70,7 +70,7 @@ export function JoinForm({ user, profile, initialPin }: Props) {
 
           {!user && (
             <div>
-              <label className="block text-xs font-bold text-purple-200 uppercase tracking-wider mb-2">
+              <label className="block text-xs font-bold text-sky-200 uppercase tracking-wider mb-2">
                 O teu nome
               </label>
               <input
@@ -82,7 +82,7 @@ export function JoinForm({ user, profile, initialPin }: Props) {
                 maxLength={30}
                 className="w-full bg-white/20 border border-white/30 text-white placeholder-white/40 rounded-2xl px-5 py-3.5 text-lg font-semibold focus:outline-none focus:ring-2 focus:ring-white/50"
               />
-              <p className="text-xs text-purple-300 mt-1.5">
+              <p className="text-xs text-sky-300 mt-1.5">
                 Estás a jogar como convidado. No final podes escolher um desbravador para receber os teus prémios.
               </p>
             </div>
@@ -95,7 +95,7 @@ export function JoinForm({ user, profile, initialPin }: Props) {
               </div>
               <div>
                 <p className="text-white font-semibold text-sm">{profile?.full_name}</p>
-                <p className="text-purple-300 text-xs">Desbravador registado</p>
+                <p className="text-sky-300 text-xs">Desbravador registado</p>
               </div>
             </div>
           )}
@@ -109,7 +109,7 @@ export function JoinForm({ user, profile, initialPin }: Props) {
           <button
             type="submit"
             disabled={loading || pin.length !== 6 || (!user && guestName.trim().length < 2)}
-            className="w-full bg-white text-purple-900 font-black text-lg py-4 rounded-2xl hover:bg-purple-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-95"
+            className="w-full bg-white text-blue-900 font-black text-lg py-4 rounded-2xl hover:bg-sky-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-95"
           >
             {loading ? 'A entrar...' : 'Entrar no jogo'}
           </button>

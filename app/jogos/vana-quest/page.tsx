@@ -18,7 +18,7 @@ export default async function VanaQuestJoinPage({
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-violet-900 via-purple-900 to-indigo-900">
+    <div className="min-h-screen bg-gradient-to-br from-blue-900 via-blue-900 to-indigo-900">
       {user && <Navbar user={user} profile={profile} />}
       <JoinForm user={user} profile={profile} initialPin={pin || ''} />
     </div>

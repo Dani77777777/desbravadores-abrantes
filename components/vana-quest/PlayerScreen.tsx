@@ -3,15 +3,16 @@
 import { useEffect, useState, useRef } from 'react'
 import { createClient } from '@/utils/supabase/client'
 import { submitAnswer, setRewardsRecipient } from '@/lib/actions/vana-quest'
-import { CheckCircle2, XCircle, Trophy, Zap, Flame } from 'lucide-react'
+import { CheckCircle2, XCircle, Trophy, Zap, Flame, Users } from 'lucide-react'
 
 const OPTION_COLORS = [
-  'bg-red-500 active:bg-red-600',
-  'bg-blue-500 active:bg-blue-600',
-  'bg-yellow-400 active:bg-yellow-500',
-  'bg-green-500 active:bg-green-600',
+  'bg-red-500 active:bg-red-700',
+  'bg-blue-500 active:bg-blue-700',
+  'bg-yellow-400 active:bg-yellow-600',
+  'bg-green-500 active:bg-green-700',
 ]
-const OPTION_LABELS = ['▲ A', '● B', '◆ C', '■ D']
+const OPTION_SYMBOLS = ['▲', '●', '◆', '■']
+const OPTION_LETTERS = ['A', 'B', 'C', 'D']
 
 interface QuestionData {
   id: string
@@ -23,7 +24,6 @@ interface QuestionData {
   correct_option: string
   time_seconds: number
   points_multiplier: number
-  question_order: number
 }
 
 interface Session {
@@ -64,8 +64,11 @@ export function PlayerScreen({ sessionId, userId, userProfile, initialSession, q
   const [totalPoints, setTotalPoints] = useState(0)
   const [streak, setStreak] = useState(0)
   const [correctCount, setCorrectCount] = useState(0)
+  const [showPointsBurst, setShowPointsBurst] = useState(false)
 
-  // Guest donation state
+  const [totalAnswered, setTotalAnswered] = useState(0)
+  const [totalPlayers, setTotalPlayers] = useState(0)
+
   const [donationSearch, setDonationSearch] = useState('')
   const [donating, setDonating] = useState(false)
   const [donationSuccess, setDonationSuccess] = useState(false)
@@ -82,43 +85,56 @@ export function PlayerScreen({ sessionId, userId, userProfile, initialSession, q
 
   const questTitle = (initialSession.vana_quests as any)?.title || 'VanaQuest'
 
-  // Retrieve participantId from localStorage
   useEffect(() => {
     const stored = localStorage.getItem(`vana_participant_${sessionId}`)
     setParticipantId(stored)
   }, [sessionId])
 
-  // Supabase Realtime
+  // Realtime: session + counters (without revealing distribution)
   useEffect(() => {
     const channel = supabase
-      .channel(`player-session-${sessionId}-${userId || 'guest'}`)
-      .on('postgres_changes', {
-        event: 'UPDATE',
-        schema: 'public',
-        table: 'vana_quest_sessions',
-        filter: `id=eq.${sessionId}`,
-      }, (payload) => {
-        const newSession = payload.new as Session
-        setSession(newSession)
-        // Reset answer state for new questions
-        if (newSession.status === 'question_active') {
-          const newQKey = `${newSession.current_question_index}`
-          if (questionKey.current !== newQKey) {
-            questionKey.current = newQKey
-            setAnswerResult(null)
-            setSubmitting(false)
-            startTimeRef.current = newSession.question_started_at
-              ? new Date(newSession.question_started_at).getTime()
-              : Date.now()
+      .channel(`player-${sessionId}-${userId || 'g'}`)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'vana_quest_sessions', filter: `id=eq.${sessionId}` },
+        (p) => {
+          const ns = p.new as Session
+          setSession(ns)
+          if (ns.status === 'question_active') {
+            const k = `${ns.current_question_index}`
+            if (questionKey.current !== k) {
+              questionKey.current = k
+              setAnswerResult(null)
+              setSubmitting(false)
+              setTotalAnswered(0)
+              startTimeRef.current = ns.question_started_at
+                ? new Date(ns.question_started_at).getTime()
+                : Date.now()
+            }
           }
-        }
-      })
+        })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'vana_quest_answers', filter: `session_id=eq.${sessionId}` },
+        (p) => {
+          const ans = p.new as any
+          if (currentQuestion && ans.question_id === currentQuestion.id) {
+            setTotalAnswered((c) => c + 1)
+          }
+        })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'vana_quest_participants', filter: `session_id=eq.${sessionId}` },
+        () => setTotalPlayers((c) => c + 1))
       .subscribe()
-
     return () => { supabase.removeChannel(channel) }
-  }, [sessionId, userId])
+  }, [sessionId, userId, currentQuestion?.id])
 
-  // Sync startTime when question activates
+  // Load total player count
+  useEffect(() => {
+    supabase.from('vana_quest_participants').select('id', { count: 'exact', head: true }).eq('session_id', sessionId)
+      .then(({ count }) => { if (count !== null) setTotalPlayers(count) })
+  }, [sessionId])
+
+  // Reset answered count when question changes
+  useEffect(() => {
+    if (currentQuestion) setTotalAnswered(0)
+  }, [currentQuestion?.id])
+
   useEffect(() => {
     if (session.status === 'question_active' && session.question_started_at) {
       startTimeRef.current = new Date(session.question_started_at).getTime()
@@ -126,15 +142,15 @@ export function PlayerScreen({ sessionId, userId, userProfile, initialSession, q
     }
   }, [session.status, session.question_started_at])
 
-  // Countdown timer
+  // Timer
   useEffect(() => {
     if (timerRef.current) clearInterval(timerRef.current)
     if (session.status === 'question_active' && currentQuestion && session.question_started_at) {
-      const endTime = new Date(session.question_started_at).getTime() + currentQuestion.time_seconds * 1000
+      const end = new Date(session.question_started_at).getTime() + currentQuestion.time_seconds * 1000
       timerRef.current = setInterval(() => {
-        const remaining = Math.max(0, (endTime - Date.now()) / 1000)
-        setTimeLeft(remaining)
-        if (remaining === 0 && timerRef.current) clearInterval(timerRef.current)
+        const r = Math.max(0, (end - Date.now()) / 1000)
+        setTimeLeft(r)
+        if (r === 0 && timerRef.current) clearInterval(timerRef.current)
       }, 50)
     }
     return () => { if (timerRef.current) clearInterval(timerRef.current) }
@@ -145,31 +161,44 @@ export function PlayerScreen({ sessionId, userId, userProfile, initialSession, q
     setSubmitting(true)
 
     const elapsedMs = Math.max(0, Date.now() - startTimeRef.current)
-
-    const result = await submitAnswer(
-      participantId,
-      sessionId,
-      currentQuestion.id,
-      optionLetter,
-      elapsedMs
-    )
+    const result = await submitAnswer(participantId, sessionId, currentQuestion.id, optionLetter, elapsedMs)
 
     if (result.ok) {
+      // Don't reveal correctness yet — only store the chosen option
+      // Correctness, points and streak are revealed when session.status hits 'question_results'
       setAnswerResult({
         isCorrect: result.isCorrect!,
         finalPoints: result.finalPoints!,
         chosen: optionLetter,
       })
-      setTotalPoints((prev) => prev + (result.finalPoints || 0))
-      if (result.isCorrect) {
-        setStreak((s) => s + 1)
-        setCorrectCount((c) => c + 1)
-      } else {
-        setStreak(0)
-      }
     }
     setSubmitting(false)
   }
+
+  // Reveal points/streak/correctCount only when entering question_results
+  const revealedKey = useRef<string>('')
+  useEffect(() => {
+    if (session.status !== 'question_results' || !currentQuestion) return
+    const key = currentQuestion.id
+    if (revealedKey.current === key) return
+    revealedKey.current = key
+
+    if (!answerResult) {
+      // Didn't answer in time → streak breaks
+      setStreak(0)
+      return
+    }
+
+    setTotalPoints((prev) => prev + (answerResult.finalPoints || 0))
+    if (answerResult.isCorrect) {
+      setStreak((s) => s + 1)
+      setCorrectCount((c) => c + 1)
+      setShowPointsBurst(true)
+      setTimeout(() => setShowPointsBurst(false), 1500)
+    } else {
+      setStreak(0)
+    }
+  }, [session.status, answerResult, currentQuestion?.id])
 
   async function handleDonate(recipientId: string) {
     if (!participantId) return
@@ -179,144 +208,152 @@ export function PlayerScreen({ sessionId, userId, userProfile, initialSession, q
     setDonationSuccess(true)
   }
 
-  const options = currentQuestion
-    ? [currentQuestion.option_a, currentQuestion.option_b, currentQuestion.option_c, currentQuestion.option_d]
-    : []
-
   const filteredMembers = allMembers.filter((m) =>
     m.full_name.toLowerCase().includes(donationSearch.toLowerCase())
   )
 
+  // Calculated rewards (rounded half-up)
+  const goldEarned = Math.round(totalPoints)
+  const xpEarned = goldEarned * 2
+
   // ── WAITING ────────────────────────────────────────────────────
   if (session.status === 'waiting') {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-violet-900 via-purple-900 to-indigo-900 flex flex-col items-center justify-center p-6 gap-6 text-center">
-        <img src="/images/VanaQuest.png" alt="VanaQuest" className="w-20 h-20 object-contain animate-bounce" />
+      <div className="min-h-screen bg-gradient-to-br from-blue-900 via-blue-900 to-indigo-900 flex flex-col items-center justify-center p-6 gap-6 text-center">
+        <img src="/images/VanaQuest.png" alt="" className="w-20 h-20 object-contain animate-bounce" />
         <h1 className="text-3xl font-black text-white">{questTitle}</h1>
         <div className="bg-white/10 backdrop-blur rounded-3xl p-6 border border-white/20">
-          <div className="w-12 h-12 rounded-full bg-purple-300/30 flex items-center justify-center text-white font-black text-xl mx-auto mb-3">
-            {((userProfile?.full_name || 'C')[0]).toUpperCase()}
+          <div className="w-12 h-12 rounded-full bg-sky-300/30 flex items-center justify-center text-white font-black text-xl mx-auto mb-3">
+            {(userProfile?.full_name || 'C')[0]?.toUpperCase()}
           </div>
           <p className="text-white font-bold text-lg">{userProfile?.full_name || 'Convidado'}</p>
-          {isGuest && <p className="text-purple-300 text-sm">Jogador convidado</p>}
+          {isGuest && <p className="text-sky-300 text-sm">Jogador convidado</p>}
         </div>
         <div className="flex items-center gap-2">
           <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
-          <p className="text-purple-200">À espera que o jogo comece...</p>
+          <p className="text-sky-200">À espera que o jogo comece...</p>
         </div>
       </div>
     )
   }
 
-  // ── QUESTION ACTIVE ────────────────────────────────────────────
+  // ── QUESTION INTRO (player sees only "prepare yourself") ──────
+  if (session.status === 'question_intro') {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-indigo-950 via-blue-900 to-blue-950 flex flex-col items-center justify-center p-6 text-center">
+        <p className="text-sky-300 text-xs font-black uppercase tracking-[0.3em] mb-2">Pergunta {session.current_question_index + 1}</p>
+        <p className="text-white text-3xl font-black animate-pulse mb-6">Prepara-te...</p>
+        <div className="flex items-center gap-2 text-sky-300">
+          <Trophy className="w-4 h-4 text-yellow-400" />
+          <span className="font-bold tabular-nums">{totalPoints.toFixed(1)} pts</span>
+        </div>
+      </div>
+    )
+  }
+
+  // ── QUESTION ACTIVE (2x2 colored grid, no text on mobile) ─────
   if (session.status === 'question_active' && currentQuestion) {
-    const timerPct = currentQuestion.time_seconds > 0
-      ? (timeLeft / currentQuestion.time_seconds) * 100
-      : 0
-    const timerColor = timeLeft > currentQuestion.time_seconds * 0.5
-      ? 'bg-green-400'
-      : timeLeft > currentQuestion.time_seconds * 0.25
-        ? 'bg-yellow-400'
-        : 'bg-red-400'
+    const timerPct = (timeLeft / currentQuestion.time_seconds) * 100
 
     return (
-      <div className="min-h-screen bg-slate-900 flex flex-col p-4 gap-3">
+      <div className="min-h-screen bg-slate-900 flex flex-col p-3 gap-3 relative">
         {/* Top bar */}
-        <div className="flex items-center justify-between">
-          <div>
+        <div className="flex items-center justify-between text-xs">
+          <div className="flex items-center gap-2">
             {streak >= 3 && (
-              <span className={`flex items-center gap-1 text-xs font-black px-2.5 py-1 rounded-full text-white ${streak >= 5 ? 'bg-orange-500' : 'bg-amber-500'}`}>
-                <Flame className="w-3 h-3" />
-                Streak ×{streak >= 5 ? 3 : 2}!
+              <span className={`flex items-center gap-1 font-black px-2.5 py-1 rounded-full text-white ${streak >= 5 ? 'bg-orange-500' : 'bg-amber-500'}`}>
+                <Flame className="w-3 h-3" /> ×{streak >= 5 ? 3 : 2}
+              </span>
+            )}
+            {currentQuestion.points_multiplier > 1 && (
+              <span className="bg-yellow-400 text-yellow-900 font-black px-2.5 py-1 rounded-full flex items-center gap-1">
+                <Zap className="w-3 h-3" /> ×{currentQuestion.points_multiplier}
               </span>
             )}
           </div>
-          <div className="flex items-center gap-1.5 text-white/60 text-sm font-bold">
-            <Trophy className="w-3.5 h-3.5 text-yellow-400" />
-            {totalPoints.toFixed(3)} pts
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1 text-white/60 font-bold">
+              <Users className="w-3 h-3" /> {totalAnswered}/{totalPlayers}
+            </div>
+            <div className="flex items-center gap-1 text-white/60 font-bold">
+              <Trophy className="w-3 h-3 text-yellow-400" /> {totalPoints.toFixed(1)}
+            </div>
           </div>
         </div>
 
         {/* Timer */}
-        <div className="relative h-2.5 bg-white/10 rounded-full overflow-hidden">
+        <div className="h-2 bg-white/10 rounded-full overflow-hidden">
           <div
-            className={`h-full ${timerColor} rounded-full transition-all duration-100`}
+            className={`h-full transition-all duration-100 ${
+              timeLeft > currentQuestion.time_seconds * 0.5 ? 'bg-green-400' :
+              timeLeft > currentQuestion.time_seconds * 0.25 ? 'bg-yellow-400' : 'bg-red-400'
+            }`}
             style={{ width: `${timerPct}%` }}
           />
         </div>
-        <p className="text-center text-4xl font-black text-white tabular-nums">{Math.ceil(timeLeft)}</p>
+        <p className="text-center text-2xl font-black text-white tabular-nums">{Math.ceil(timeLeft)}</p>
 
-        {currentQuestion.points_multiplier > 1 && (
-          <div className="text-center">
-            <span className="bg-yellow-400 text-yellow-900 text-xs font-black px-3 py-1 rounded-full inline-flex items-center gap-1">
-              <Zap className="w-3 h-3" /> Pergunta ×{currentQuestion.points_multiplier}
-            </span>
-          </div>
-        )}
-
-        {/* After answering */}
+        {/* If already answered — neutral waiting state, no hint of correct/wrong */}
         {answerResult ? (
           <div className="flex-1 flex flex-col items-center justify-center gap-5">
-            {answerResult.isCorrect ? (
-              <>
-                <div className="w-20 h-20 rounded-full bg-green-500 flex items-center justify-center">
-                  <CheckCircle2 className="w-10 h-10 text-white" />
-                </div>
-                <p className="text-white font-black text-2xl">Correcto!</p>
-                <p className="text-4xl font-black text-yellow-400">+{answerResult.finalPoints.toFixed(3)}</p>
-                {streak >= 3 && (
-                  <p className="text-orange-400 font-bold text-sm">
-                    🔥 Streak ×{streak >= 5 ? 3 : 2} aplicado!
-                  </p>
-                )}
-              </>
-            ) : (
-              <>
-                <div className="w-20 h-20 rounded-full bg-red-500 flex items-center justify-center">
-                  <XCircle className="w-10 h-10 text-white" />
-                </div>
-                <p className="text-white font-black text-2xl">Errado!</p>
-                <p className="text-white/40">Streak perdida.</p>
-              </>
-            )}
-            <p className="text-white/30 text-sm animate-pulse mt-4">À espera da próxima pergunta...</p>
+            <div className="w-24 h-24 rounded-full bg-white/10 border-2 border-white/20 flex items-center justify-center animate-in zoom-in duration-300">
+              <span className="text-white text-4xl font-black">{answerResult.chosen}</span>
+            </div>
+            <p className="text-white font-bold text-2xl">Resposta enviada</p>
+            <p className="text-white/40 text-sm animate-pulse">À espera dos outros...</p>
           </div>
         ) : (
-          /* Answer buttons */
-          <div className="flex-1 flex flex-col justify-center gap-3 mt-2">
-            {options.map((opt, i) => (
+          /* 2x2 GRID — colored buttons with only symbol, no text */
+          <div className="flex-1 grid grid-cols-2 gap-3">
+            {OPTION_LETTERS.map((letter, i) => (
               <button
-                key={i}
-                onClick={() => handleAnswer(['A', 'B', 'C', 'D'][i])}
+                key={letter}
+                onClick={() => handleAnswer(letter)}
                 disabled={submitting || timeLeft === 0}
-                className={`${OPTION_COLORS[i]} text-white font-bold py-5 px-5 rounded-2xl transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-3 shadow-lg text-left`}
+                className={`${OPTION_COLORS[i]} rounded-3xl flex items-center justify-center transition-all active:scale-95 disabled:opacity-50 shadow-2xl relative overflow-hidden group`}
               >
-                <span className="font-black text-sm shrink-0">{OPTION_LABELS[i]}</span>
-                <span className="text-base">{opt}</span>
+                <span className="text-white text-7xl font-black drop-shadow-lg group-active:scale-90 transition-transform">
+                  {OPTION_SYMBOLS[i]}
+                </span>
+                <span className="absolute top-3 left-3 text-white/70 text-xs font-black tracking-widest">
+                  {letter}
+                </span>
               </button>
             ))}
           </div>
         )}
+
+        <style jsx>{`
+          @keyframes pointsBurst {
+            0% { transform: scale(0.5) translateY(0); opacity: 0; }
+            30% { transform: scale(1.2) translateY(-10px); opacity: 1; }
+            70% { transform: scale(1) translateY(-15px); opacity: 1; }
+            100% { transform: scale(1) translateY(-20px); opacity: 0; }
+          }
+          .animate-points-burst {
+            animation: pointsBurst 1.5s ease-out forwards;
+          }
+        `}</style>
       </div>
     )
   }
 
-  // ── QUESTION RESULTS ───────────────────────────────────────────
+  // ── RESULTS ────────────────────────────────────────────────────
   if (session.status === 'question_results') {
     return (
-      <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-6 gap-6 text-center">
+      <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-6 gap-5 text-center">
         {answerResult ? (
           answerResult.isCorrect ? (
             <>
-              <div className="w-24 h-24 rounded-full bg-green-500 flex items-center justify-center mx-auto">
+              <div className="w-24 h-24 rounded-full bg-green-500 flex items-center justify-center animate-in zoom-in duration-500">
                 <CheckCircle2 className="w-12 h-12 text-white" />
               </div>
-              <p className="text-white font-black text-3xl">Correcto! ✓</p>
+              <p className="text-white font-black text-3xl">Correcto!</p>
               <p className="text-4xl font-black text-yellow-400">+{answerResult.finalPoints.toFixed(3)}</p>
             </>
           ) : (
             <>
-              <div className="w-24 h-24 rounded-full bg-red-500 flex items-center justify-center mx-auto">
+              <div className="w-24 h-24 rounded-full bg-red-500 flex items-center justify-center">
                 <XCircle className="w-12 h-12 text-white" />
               </div>
               <p className="text-white font-black text-3xl">Errado!</p>
@@ -324,7 +361,7 @@ export function PlayerScreen({ sessionId, userId, userProfile, initialSession, q
           )
         ) : (
           <>
-            <div className="w-24 h-24 rounded-full bg-gray-700 flex items-center justify-center mx-auto">
+            <div className="w-24 h-24 rounded-full bg-gray-700 flex items-center justify-center">
               <XCircle className="w-12 h-12 text-gray-500" />
             </div>
             <p className="text-gray-400 font-bold text-xl">Tempo esgotado.</p>
@@ -332,40 +369,55 @@ export function PlayerScreen({ sessionId, userId, userProfile, initialSession, q
         )}
 
         <div className="bg-white/10 rounded-2xl p-4 mt-2 w-full max-w-xs">
-          <p className="text-purple-300 text-xs font-bold uppercase tracking-wide mb-1">Total acumulado</p>
+          <p className="text-sky-300 text-xs font-bold uppercase tracking-wide mb-1">Total acumulado</p>
           <p className="text-white font-black text-3xl tabular-nums">{totalPoints.toFixed(3)} pts</p>
-          <p className="text-purple-400 text-sm mt-1">{correctCount} ✓ correcta{correctCount !== 1 ? 's' : ''}</p>
         </div>
+      </div>
+    )
+  }
 
-        <p className="text-white/30 text-sm animate-pulse">À espera do host...</p>
+  // ── LEADERBOARD (player view) ─────────────────────────────────
+  if (session.status === 'question_leaderboard') {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-900 to-indigo-950 flex flex-col items-center justify-center p-6 gap-5 text-center">
+        <Trophy className="w-16 h-16 text-yellow-400" />
+        <p className="text-sky-300 text-xs font-black uppercase tracking-widest">A tua pontuação</p>
+        <p className="text-white text-6xl font-black tabular-nums">{totalPoints.toFixed(1)}</p>
+        <div className="flex gap-4 text-sm">
+          <div className="bg-white/10 rounded-xl px-4 py-2">
+            <p className="text-white/60 text-xs">Certas</p>
+            <p className="text-green-400 font-black text-xl">{correctCount}</p>
+          </div>
+          {streak >= 2 && (
+            <div className="bg-orange-500/20 border border-orange-400/30 rounded-xl px-4 py-2">
+              <p className="text-orange-300 text-xs flex items-center gap-1 justify-center"><Flame className="w-3 h-3" /> Streak</p>
+              <p className="text-orange-400 font-black text-xl">×{streak}</p>
+            </div>
+          )}
+        </div>
+        <p className="text-white/40 text-xs animate-pulse mt-4">Olha para o ecrã principal...</p>
       </div>
     )
   }
 
   // ── FINISHED ───────────────────────────────────────────────────
   if (session.status === 'finished') {
-    const goldEarned = correctCount * 10
-    const xpEarned = correctCount * 20
-
-    // Guest: donation flow
+    // Guest donation flow
     if (isGuest && !donationSuccess && !donationSkipped) {
       return (
-        <div className="min-h-screen bg-gradient-to-br from-violet-900 to-indigo-900 flex flex-col p-6 gap-6 overflow-y-auto">
+        <div className="min-h-screen bg-gradient-to-br from-blue-900 to-indigo-900 flex flex-col p-6 gap-5 overflow-y-auto">
           <div className="text-center pt-4">
-            <img src="/images/VanaQuest.png" alt="VanaQuest" className="w-14 h-14 object-contain mx-auto mb-3" />
+            <img src="/images/VanaQuest.png" alt="" className="w-14 h-14 object-contain mx-auto mb-2" />
             <h2 className="text-2xl font-black text-white">Jogo terminado!</h2>
-            <p className="text-purple-200 mt-1">{correctCount} resposta{correctCount !== 1 ? 's' : ''} correcta{correctCount !== 1 ? 's' : ''}</p>
+            <p className="text-sky-200 mt-1">{totalPoints.toFixed(1)} pontos</p>
           </div>
 
-          {correctCount > 0 ? (
+          {goldEarned > 0 ? (
             <div className="bg-white/10 rounded-2xl p-5 border border-white/20 space-y-4">
               <div className="text-center">
-                <p className="text-purple-200 text-sm">Podes enviar ao teu Desbravador:</p>
-                <p className="text-yellow-400 font-black text-2xl mt-1">
-                  {goldEarned} 🪙 + {xpEarned} ⭐ XP
-                </p>
+                <p className="text-sky-200 text-sm">Podes enviar ao teu Desbravador:</p>
+                <p className="text-yellow-400 font-black text-2xl mt-1">{goldEarned} 🪙 + {xpEarned} ⭐ XP</p>
               </div>
-
               <input
                 type="text"
                 value={donationSearch}
@@ -373,7 +425,6 @@ export function PlayerScreen({ sessionId, userId, userProfile, initialSession, q
                 placeholder="Pesquisar desbravador..."
                 className="w-full bg-white/20 border border-white/30 text-white placeholder-white/40 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-white/40"
               />
-
               <div className="space-y-1.5 max-h-64 overflow-y-auto">
                 {filteredMembers.map((m) => (
                   <button
@@ -382,30 +433,19 @@ export function PlayerScreen({ sessionId, userId, userProfile, initialSession, q
                     disabled={donating}
                     className="w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-white/10 hover:bg-white/20 transition-colors text-left disabled:opacity-60"
                   >
-                    <div className="w-8 h-8 rounded-full bg-purple-500 flex items-center justify-center text-white font-bold text-sm shrink-0">
-                      {m.full_name[0]}
-                    </div>
+                    <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-white font-bold text-sm shrink-0">{m.full_name[0]}</div>
                     <div>
                       <p className="text-white font-semibold text-sm">{m.full_name}</p>
-                      <p className="text-purple-300 text-xs">{SECTION_LABELS[m.section] || m.section}</p>
+                      <p className="text-sky-300 text-xs">{SECTION_LABELS[m.section] || m.section}</p>
                     </div>
                   </button>
                 ))}
-                {filteredMembers.length === 0 && (
-                  <p className="text-purple-300 text-sm text-center py-4">Nenhum resultado.</p>
-                )}
               </div>
-
-              <button
-                onClick={() => setDonationSkipped(true)}
-                className="w-full text-purple-400 text-sm py-2 underline"
-              >
-                Dispensar prémios
-              </button>
+              <button onClick={() => setDonationSkipped(true)} className="w-full text-sky-400 text-sm py-2 underline">Dispensar prémios</button>
             </div>
           ) : (
-            <div className="text-center text-purple-300 space-y-3">
-              <p>Não acertaste nenhuma pergunta desta vez.</p>
+            <div className="text-center text-sky-300 space-y-3">
+              <p>Não acumulaste pontos desta vez.</p>
               <a href="/jogos/vana-quest" className="text-white underline block">Jogar novamente</a>
             </div>
           )}
@@ -415,48 +455,31 @@ export function PlayerScreen({ sessionId, userId, userProfile, initialSession, q
 
     if (donationSuccess) {
       return (
-        <div className="min-h-screen bg-gradient-to-br from-violet-900 to-indigo-900 flex flex-col items-center justify-center p-6 gap-5 text-center">
-          <div className="w-20 h-20 rounded-full bg-green-500 flex items-center justify-center">
-            <CheckCircle2 className="w-10 h-10 text-white" />
-          </div>
+        <div className="min-h-screen bg-gradient-to-br from-blue-900 to-indigo-900 flex flex-col items-center justify-center p-6 gap-5 text-center">
+          <div className="w-20 h-20 rounded-full bg-green-500 flex items-center justify-center"><CheckCircle2 className="w-10 h-10 text-white" /></div>
           <h2 className="text-3xl font-black text-white">Enviado!</h2>
-          <p className="text-purple-200">O teu desbravador receberá os prémios quando o host fechar o jogo.</p>
-          <a href="/jogos/vana-quest" className="text-purple-300 underline">Jogar novamente</a>
+          <p className="text-sky-200">O teu desbravador receberá os prémios.</p>
+          <a href="/jogos/vana-quest" className="text-sky-300 underline">Jogar novamente</a>
         </div>
       )
     }
 
-    // Registered user (or guest who skipped)
     return (
-      <div className="min-h-screen bg-gradient-to-br from-violet-900 to-indigo-900 flex flex-col items-center justify-center p-6 gap-6 text-center">
-        <img src="/images/VanaQuest.png" alt="VanaQuest" className="w-20 h-20 object-contain" />
-        <h1 className="text-3xl font-black text-white">🏆 Jogo concluído!</h1>
-
+      <div className="min-h-screen bg-gradient-to-br from-blue-900 to-indigo-900 flex flex-col items-center justify-center p-6 gap-6 text-center">
+        <img src="/images/VanaQuest.png" alt="" className="w-20 h-20 object-contain" />
+        <h1 className="text-3xl font-black text-white">🏆 Concluído!</h1>
         <div className="bg-white/10 backdrop-blur rounded-3xl p-6 border border-white/20 w-full max-w-sm space-y-4">
           <div>
-            <p className="text-purple-300 text-xs font-bold uppercase tracking-wide">Pontuação final</p>
+            <p className="text-sky-300 text-xs font-bold uppercase tracking-wide">Pontuação final</p>
             <p className="text-white font-black text-4xl tabular-nums">{totalPoints.toFixed(3)}</p>
           </div>
           <div className="flex justify-around border-t border-white/10 pt-4">
-            <div>
-              <p className="text-yellow-400 font-black text-2xl">+{goldEarned}</p>
-              <p className="text-purple-300 text-xs">🪙 Gold</p>
-            </div>
-            <div>
-              <p className="text-blue-400 font-black text-2xl">+{xpEarned}</p>
-              <p className="text-purple-300 text-xs">⭐ XP</p>
-            </div>
-            <div>
-              <p className="text-green-400 font-black text-2xl">{correctCount}</p>
-              <p className="text-purple-300 text-xs">✓ Certas</p>
-            </div>
+            <div><p className="text-yellow-400 font-black text-2xl">+{goldEarned}</p><p className="text-sky-300 text-xs">🪙 Gold</p></div>
+            <div><p className="text-blue-400 font-black text-2xl">+{xpEarned}</p><p className="text-sky-300 text-xs">⭐ XP</p></div>
+            <div><p className="text-green-400 font-black text-2xl">{correctCount}</p><p className="text-sky-300 text-xs">✓</p></div>
           </div>
-          {!isGuest && (
-            <p className="text-purple-300 text-xs">Prémios atribuídos quando o host fechar o jogo.</p>
-          )}
         </div>
-
-        <a href="/jogos" className="text-purple-300 underline">Voltar aos jogos</a>
+        <a href="/jogos" className="text-sky-300 underline">Voltar aos jogos</a>
       </div>
     )
   }
