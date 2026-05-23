@@ -272,7 +272,7 @@ export function Presentation({ sessionId, initialSession, questions, siteUrl }: 
 
         {/* Question */}
         <div className="bg-white/10 backdrop-blur rounded-3xl border border-white/20 p-6 max-w-5xl mx-auto w-full">
-          <p className="text-white text-3xl md:text-4xl font-bold text-center leading-tight">
+          <p className="text-white text-4xl md:text-5xl font-bold text-center leading-tight">
             {currentQuestion.question_text}
           </p>
         </div>
@@ -280,9 +280,9 @@ export function Presentation({ sessionId, initialSession, questions, siteUrl }: 
         {/* Answers (presentation shows text + colored bg) */}
         <div className="flex-1 grid grid-cols-2 gap-4 max-w-5xl mx-auto w-full">
           {options.map((opt, i) => (
-            <div key={i} className={`${OPTION_COLORS[i]} rounded-2xl p-6 md:p-8 flex items-center gap-5 shadow-xl`}>
-              <span className="text-white text-5xl md:text-6xl font-black flex-shrink-0 drop-shadow-lg">{OPTION_LABELS[i]}</span>
-              <p className="text-white text-2xl md:text-4xl font-black leading-tight drop-shadow-md">{opt}</p>
+            <div key={i} className={`${OPTION_COLORS[i]} rounded-2xl p-7 md:p-10 flex items-center gap-6 shadow-xl`}>
+              <span className="text-white text-6xl md:text-7xl font-black flex-shrink-0 drop-shadow-lg">{OPTION_LABELS[i]}</span>
+              <p className="text-white text-3xl md:text-5xl font-black leading-tight drop-shadow-md">{opt}</p>
             </div>
           ))}
         </div>

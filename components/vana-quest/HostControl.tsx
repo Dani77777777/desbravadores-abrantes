@@ -400,8 +400,15 @@ export function HostControl({ sessionId, initialSession, questions, siteUrl }: P
             </p>
             <div className="space-y-1.5 max-h-72 overflow-y-auto">
               {[...participants].sort((a, b) => b.total_points - a.total_points).map((p, i) => (
-                <div key={p.id} className="flex items-center gap-3 bg-white/5 rounded-xl px-3 py-2">
+                <div key={p.id} className="flex items-center gap-2 bg-white/5 rounded-xl px-3 py-2">
                   <span className={`text-xs font-black w-5 text-center ${i === 0 ? 'text-yellow-400' : i === 1 ? 'text-gray-300' : i === 2 ? 'text-amber-600' : 'text-white/40'}`}>{i + 1}</span>
+                  <PlayerAvatar
+                    name={p.display_name}
+                    avatarUrl={p.avatar_url}
+                    className="w-7 h-7"
+                    textClassName="text-[10px]"
+                    fallbackBg="bg-blue-500/40"
+                  />
                   <span className="text-sm font-semibold truncate flex-1">{p.display_name}</span>
                   {p.current_streak >= 2 && <Flame className="w-3 h-3 text-orange-400" />}
                   <span className="text-sm font-black tabular-nums">{p.total_points.toFixed(1)}</span>
