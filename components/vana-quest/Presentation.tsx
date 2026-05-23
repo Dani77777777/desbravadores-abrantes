@@ -5,6 +5,7 @@ import { createClient } from '@/utils/supabase/client'
 import { QRCodeSVG } from 'qrcode.react'
 import { Users, Trophy, Zap, Flame, CheckCircle2 } from 'lucide-react'
 import { PlayerAvatar } from './PlayerAvatar'
+import { getIntroSeconds } from '@/utils/vana-quest'
 
 const OPTION_COLORS = ['bg-red-500', 'bg-blue-500', 'bg-yellow-400', 'bg-green-500']
 const OPTION_LABELS = ['▲', '●', '◆', '■']
@@ -123,15 +124,17 @@ export function Presentation({ sessionId, initialSession, questions, siteUrl }: 
   }, [session.status, session.question_started_at, currentQuestion?.id])
 
   // Intro countdown — começa só DEPOIS do aviso de multiplicador (se houver)
+  // Tempo proporcional ao tamanho da pergunta
   useEffect(() => {
-    if (session.status === 'question_intro' && !showMultiplierWarning) {
-      setIntroCountdown(4)
+    if (session.status === 'question_intro' && !showMultiplierWarning && currentQuestion) {
+      const totalSec = getIntroSeconds(currentQuestion.question_text)
+      setIntroCountdown(totalSec)
       const interval = setInterval(() => {
         setIntroCountdown((c) => Math.max(0, c - 1))
       }, 1000)
       return () => clearInterval(interval)
     }
-  }, [session.status, session.current_question_index, showMultiplierWarning])
+  }, [session.status, session.current_question_index, showMultiplierWarning, currentQuestion?.id])
 
   // Aviso de multiplicador (x2/x3) antes da pergunta
   useEffect(() => {

@@ -1,3 +1,16 @@
+/**
+ * Calcula o tempo de leitura da pergunta no ecrã de intro (em segundos)
+ * baseado no número de caracteres.
+ *
+ * Pressupõe ~25 caracteres por segundo de leitura confortável + 3s de buffer.
+ * Mínimo 4s, máximo 10s.
+ */
+export function getIntroSeconds(questionText: string): number {
+  const len = (questionText || '').length
+  const seconds = Math.round(3 + len / 25)
+  return Math.max(4, Math.min(10, seconds))
+}
+
 export function calcPoints(
   timeSeconds: number,
   elapsedMs: number,

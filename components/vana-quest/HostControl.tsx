@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef } from 'react'
 import { createClient } from '@/utils/supabase/client'
 import { nextStage, awardSessionPoints } from '@/lib/actions/vana-quest'
+import { getIntroSeconds } from '@/utils/vana-quest'
 import { QRCodeSVG } from 'qrcode.react'
 import {
   Users, ChevronRight, Trophy, Zap, Clock, Maximize2,
@@ -155,15 +156,17 @@ export function HostControl({ sessionId, initialSession, questions, siteUrl }: P
     return () => { if (timerRef.current) clearInterval(timerRef.current) }
   }, [session.status, session.question_started_at, currentQuestion?.id])
 
-  // Auto-advance intro after 4s (+ 2.8s extra para o aviso x2/x3)
+  // Auto-advance intro — tempo proporcional ao tamanho da pergunta
+  // (+ 2.8s extra para o aviso x2/x3)
   useEffect(() => {
-    if (session.status === 'question_intro') {
-      const hasMultiplier = (currentQuestion?.points_multiplier ?? 1) > 1
-      const delay = hasMultiplier ? 4000 + 2800 : 4000
+    if (session.status === 'question_intro' && currentQuestion) {
+      const hasMultiplier = currentQuestion.points_multiplier > 1
+      const introSec = getIntroSeconds(currentQuestion.question_text)
+      const delay = introSec * 1000 + (hasMultiplier ? 2800 : 0)
       const t = setTimeout(() => handleNext(), delay)
       return () => clearTimeout(t)
     }
-  }, [session.status, session.current_question_index, currentQuestion?.points_multiplier])
+  }, [session.status, session.current_question_index, currentQuestion?.id])
 
   // Auto-advance quest intro after 4s
   useEffect(() => {
@@ -371,7 +374,9 @@ export function HostControl({ sessionId, initialSession, questions, siteUrl }: P
               <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> {currentQuestion.time_seconds}s</span>
               <span className="flex items-center gap-1"><Zap className="w-3 h-3" /> ×{currentQuestion.points_multiplier}</span>
             </div>
-            <p className="text-sky-400 text-xs italic">Avança automaticamente em 4 segundos...</p>
+            <p className="text-sky-400 text-xs italic">
+              Avança automaticamente em {getIntroSeconds(currentQuestion.question_text) + (currentQuestion.points_multiplier > 1 ? 3 : 0)} segundos...
+            </p>
           </div>
         )}
 

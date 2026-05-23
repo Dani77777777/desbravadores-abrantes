@@ -1,4 +1,5 @@
 import { createClient } from '@/utils/supabase/server'
+import { createServiceClient } from '@/utils/supabase/service'
 import { PlayerScreen } from '@/components/vana-quest/PlayerScreen'
 
 export default async function PlayPage({ params }: { params: Promise<{ sessionId: string }> }) {
@@ -39,11 +40,32 @@ export default async function PlayPage({ params }: { params: Promise<{ sessionId
     .eq('vana_quest_id', session.vana_quest_id)
     .order('question_order')
 
-  const { data: allMembers } = await supabase
+  const { data: profilesData } = await supabase
     .from('profiles')
-    .select('id, full_name, section')
+    .select('id, full_name, section, avatar_url')
     .eq('role', 'desbravador')
     .order('full_name')
+
+  // Fallback: para profiles sem avatar_url, buscar do auth.users metadata (Google OAuth etc)
+  const missingAvatarIds = (profilesData || []).filter((p) => !p.avatar_url).map((p) => p.id)
+  const metaAvatars = new Map<string, string>()
+  if (missingAvatarIds.length > 0) {
+    try {
+      const service = createServiceClient()
+      const { data: usersData } = await service.auth.admin.listUsers({ perPage: 1000 })
+      ;(usersData?.users || []).forEach((u) => {
+        const meta = u.user_metadata?.avatar_url || u.user_metadata?.picture
+        if (meta && missingAvatarIds.includes(u.id)) {
+          metaAvatars.set(u.id, meta)
+        }
+      })
+    } catch {}
+  }
+
+  const allMembers = (profilesData || []).map((p) => ({
+    ...p,
+    avatar_url: p.avatar_url || metaAvatars.get(p.id) || null,
+  }))
 
   return (
     <PlayerScreen

@@ -41,7 +41,7 @@ interface Props {
   userProfile: any
   initialSession: Session
   questions: QuestionData[]
-  allMembers: { id: string; full_name: string; section: string }[]
+  allMembers: { id: string; full_name: string; section: string; avatar_url?: string | null }[]
 }
 
 interface AnswerResult {
@@ -548,7 +548,13 @@ export function PlayerScreen({ sessionId, userId, userProfile, initialSession, q
                     disabled={donating}
                     className="w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-white/10 hover:bg-white/20 transition-colors text-left disabled:opacity-60"
                   >
-                    <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-white font-bold text-sm shrink-0">{m.full_name[0]}</div>
+                    <PlayerAvatar
+                      name={m.full_name}
+                      avatarUrl={m.avatar_url}
+                      className="w-8 h-8"
+                      textClassName="text-sm"
+                      fallbackBg="bg-blue-500"
+                    />
                     <div>
                       <p className="text-white font-semibold text-sm">{m.full_name}</p>
                       <p className="text-sky-300 text-xs">{SECTION_LABELS[m.section] || m.section}</p>
