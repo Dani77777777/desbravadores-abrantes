@@ -66,6 +66,7 @@ export function PlayerScreen({ sessionId, userId, userProfile, initialSession, q
   const [streak, setStreak] = useState(0)
   const [correctCount, setCorrectCount] = useState(0)
   const [showPointsBurst, setShowPointsBurst] = useState(false)
+  const [showMultiplierWarning, setShowMultiplierWarning] = useState(false)
 
   const [totalAnswered, setTotalAnswered] = useState(0)
   const [totalPlayers, setTotalPlayers] = useState(0)
@@ -90,6 +91,16 @@ export function PlayerScreen({ sessionId, userId, userProfile, initialSession, q
     const stored = localStorage.getItem(`vana_participant_${sessionId}`)
     setParticipantId(stored)
   }, [sessionId])
+
+  // Aviso de multiplicador (x2/x3) no início do question_intro
+  useEffect(() => {
+    if (session.status === 'question_intro' && currentQuestion && currentQuestion.points_multiplier > 1) {
+      setShowMultiplierWarning(true)
+      const t = setTimeout(() => setShowMultiplierWarning(false), 2800)
+      return () => clearTimeout(t)
+    }
+    setShowMultiplierWarning(false)
+  }, [session.status, currentQuestion?.id])
 
   // Sincronizar stats com a BD ao montar (após termos o participantId) e
   // sempre que entrarmos em question_results ou question_leaderboard.
@@ -301,6 +312,48 @@ export function PlayerScreen({ sessionId, userId, userProfile, initialSession, q
 
   // ── QUESTION INTRO (player sees only "prepare yourself") ──────
   if (session.status === 'question_intro') {
+    // Aviso x2/x3 primeiro
+    if (showMultiplierWarning && currentQuestion && currentQuestion.points_multiplier > 1) {
+      const mult = currentQuestion.points_multiplier
+      const label = mult === 2 ? 'A DOBRAR!' : 'A TRIPLICAR!'
+      const gradient = mult === 2
+        ? 'from-yellow-300 via-yellow-400 to-orange-500'
+        : 'from-orange-400 via-red-500 to-pink-600'
+      return (
+        <div className={`min-h-screen bg-gradient-to-br ${gradient} flex flex-col items-center justify-center p-6 text-center relative overflow-hidden`}>
+          {[...Array(5)].map((_, i) => (
+            <div
+              key={i}
+              className="absolute text-white/25 animate-bounce"
+              style={{
+                top: `${20 + Math.random() * 60}%`,
+                left: `${10 + Math.random() * 80}%`,
+                fontSize: `${30 + Math.random() * 40}px`,
+                animationDelay: `${Math.random() * 0.8}s`,
+              }}
+            >
+              ⚡
+            </div>
+          ))}
+          <div className="relative z-10 flex flex-col items-center gap-3">
+            <Zap className="w-20 h-20 text-white drop-shadow-2xl animate-in zoom-in duration-500" fill="white" />
+            <h1
+              className="text-white font-black drop-shadow-2xl leading-none animate-in zoom-in fade-in duration-700"
+              style={{ fontSize: '8rem', animationDelay: '200ms', animationFillMode: 'backwards' }}
+            >
+              ×{mult}
+            </h1>
+            <p
+              className="text-white font-black tracking-[0.2em] drop-shadow-lg uppercase text-xl animate-in fade-in slide-in-from-bottom duration-700"
+              style={{ animationDelay: '700ms', animationFillMode: 'backwards' }}
+            >
+              PONTOS {label}
+            </p>
+          </div>
+        </div>
+      )
+    }
+
     return (
       <div className="min-h-screen bg-gradient-to-br from-indigo-950 via-blue-900 to-blue-950 flex flex-col items-center justify-center p-6 text-center">
         <p className="text-sky-300 text-xs font-black uppercase tracking-[0.3em] mb-2">Pergunta {session.current_question_index + 1}</p>

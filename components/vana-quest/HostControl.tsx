@@ -155,13 +155,15 @@ export function HostControl({ sessionId, initialSession, questions, siteUrl }: P
     return () => { if (timerRef.current) clearInterval(timerRef.current) }
   }, [session.status, session.question_started_at, currentQuestion?.id])
 
-  // Auto-advance intro after 4s
+  // Auto-advance intro after 4s (+ 2.8s extra para o aviso x2/x3)
   useEffect(() => {
     if (session.status === 'question_intro') {
-      const t = setTimeout(() => handleNext(), 4000)
+      const hasMultiplier = (currentQuestion?.points_multiplier ?? 1) > 1
+      const delay = hasMultiplier ? 4000 + 2800 : 4000
+      const t = setTimeout(() => handleNext(), delay)
       return () => clearTimeout(t)
     }
-  }, [session.status, session.current_question_index])
+  }, [session.status, session.current_question_index, currentQuestion?.points_multiplier])
 
   // Auto-advance quest intro after 4s
   useEffect(() => {
@@ -535,6 +537,81 @@ export function HostControl({ sessionId, initialSession, questions, siteUrl }: P
               <p className="font-black text-xl">Jogo terminado!</p>
               <p className="text-sky-300 text-sm">{participants.length} jogador{participants.length !== 1 ? 'es' : ''}</p>
             </div>
+
+            {/* Classificação final completa */}
+            {participants.length > 0 && (() => {
+              const podium = [...participants].sort((a, b) => b.total_points - a.total_points)
+              const medals = ['🥇', '🥈', '🥉']
+              return (
+                <div className="bg-white/10 rounded-3xl p-4 border border-white/10">
+                  <p className="text-orange-400 text-[10px] font-black uppercase tracking-widest mb-3 flex items-center gap-1.5">
+                    <Trophy className="w-3 h-3" /> Classificação final
+                  </p>
+                  <div className="space-y-2 max-h-[28rem] overflow-y-auto">
+                    {podium.map((p, i) => {
+                      const gold = Math.round(Number(p.total_points))
+                      const xp = gold * 2
+                      return (
+                        <div
+                          key={p.id}
+                          className={`flex items-center gap-2.5 rounded-xl px-3 py-2.5 border ${
+                            i === 0 ? 'bg-yellow-400/15 border-yellow-400/30' :
+                            i === 1 ? 'bg-gray-300/10 border-gray-300/20' :
+                            i === 2 ? 'bg-amber-600/15 border-amber-600/30' :
+                            'bg-white/5 border-white/10'
+                          }`}
+                        >
+                          <div className="flex-shrink-0 w-7 text-center">
+                            {i < 3 ? (
+                              <span className="text-xl leading-none">{medals[i]}</span>
+                            ) : (
+                              <span className="text-sm font-black text-white/40 tabular-nums">{i + 1}</span>
+                            )}
+                          </div>
+                          <PlayerAvatar
+                            name={p.display_name}
+                            avatarUrl={p.avatar_url}
+                            className="w-9 h-9"
+                            textClassName="text-xs"
+                            fallbackBg="bg-blue-500/40"
+                          />
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-1.5">
+                              <p className="font-bold text-sm truncate">{p.display_name}</p>
+                              {p.is_guest && (
+                                <span className="text-[8px] uppercase tracking-wider text-sky-400 bg-sky-500/10 rounded-full px-1.5 py-0.5 flex-shrink-0">
+                                  conv.
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2.5 text-[11px] text-white/50 mt-0.5">
+                              <span className="flex items-center gap-0.5">
+                                <CheckCircle2 className="w-3 h-3 text-green-400" />
+                                <span className="font-bold">{p.correct_answers}</span>
+                              </span>
+                              {p.max_streak >= 2 && (
+                                <span className="flex items-center gap-0.5 text-amber-300 font-bold">
+                                  <Flame className="w-3 h-3" /> máx ×{p.max_streak}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex-shrink-0 text-right">
+                            <p className="font-black text-lg tabular-nums leading-none">{Number(p.total_points).toFixed(1)}</p>
+                            {gold > 0 && (
+                              <p className="text-[10px] mt-0.5 leading-none">
+                                <span className="text-yellow-400 font-bold">+{gold}🪙</span>
+                                <span className="text-blue-300 font-bold ml-1">+{xp}⭐</span>
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )
+            })()}
 
             {!awarded ? (
               <button

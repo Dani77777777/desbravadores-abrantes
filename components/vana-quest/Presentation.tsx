@@ -63,6 +63,7 @@ export function Presentation({ sessionId, initialSession, questions, siteUrl }: 
   const [timeLeft, setTimeLeft] = useState(0)
   const [introCountdown, setIntroCountdown] = useState(4)
   const [qrZoomed, setQrZoomed] = useState(false)
+  const [showMultiplierWarning, setShowMultiplierWarning] = useState(false)
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   // Snapshot of points shown last time (per participant id) — used to animate from previous → new
   const prevPointsRef = useRef<Record<string, number>>({})
@@ -121,16 +122,26 @@ export function Presentation({ sessionId, initialSession, questions, siteUrl }: 
     return () => { if (timerRef.current) clearInterval(timerRef.current) }
   }, [session.status, session.question_started_at, currentQuestion?.id])
 
-  // Intro countdown
+  // Intro countdown — começa só DEPOIS do aviso de multiplicador (se houver)
   useEffect(() => {
-    if (session.status === 'question_intro') {
+    if (session.status === 'question_intro' && !showMultiplierWarning) {
       setIntroCountdown(4)
       const interval = setInterval(() => {
         setIntroCountdown((c) => Math.max(0, c - 1))
       }, 1000)
       return () => clearInterval(interval)
     }
-  }, [session.status, session.current_question_index])
+  }, [session.status, session.current_question_index, showMultiplierWarning])
+
+  // Aviso de multiplicador (x2/x3) antes da pergunta
+  useEffect(() => {
+    if (session.status === 'question_intro' && currentQuestion && currentQuestion.points_multiplier > 1) {
+      setShowMultiplierWarning(true)
+      const t = setTimeout(() => setShowMultiplierWarning(false), 2800)
+      return () => clearTimeout(t)
+    }
+    setShowMultiplierWarning(false)
+  }, [session.status, currentQuestion?.id])
 
   const currentAnswers = currentQuestion ? answers.filter((a) => a.question_id === currentQuestion.id) : []
   const correctIdx = currentQuestion ? OPTION_NAMES.indexOf(currentQuestion.correct_option) : -1
@@ -261,8 +272,63 @@ export function Presentation({ sessionId, initialSession, questions, siteUrl }: 
 
   // ── QUESTION INTRO ────────────────────────────────────────────
   if (session.status === 'question_intro' && currentQuestion) {
+    // Fase 1: aviso de multiplicador (se x2/x3) — visível por 2.8s
+    if (showMultiplierWarning && currentQuestion.points_multiplier > 1) {
+      const mult = currentQuestion.points_multiplier
+      const label = mult === 2 ? 'PONTOS A DOBRAR!' : 'PONTOS A TRIPLICAR!'
+      const gradient = mult === 2
+        ? 'from-yellow-300 via-yellow-400 to-orange-500'
+        : 'from-orange-400 via-red-500 to-pink-600'
+      return (
+        <div className={`h-screen w-screen bg-gradient-to-br ${gradient} flex flex-col items-center justify-center p-8 relative overflow-hidden`}>
+          {/* Raios dispersos no fundo */}
+          {[...Array(8)].map((_, i) => (
+            <div
+              key={i}
+              className="absolute text-white/20 animate-bounce"
+              style={{
+                top: `${10 + Math.random() * 80}%`,
+                left: `${5 + Math.random() * 90}%`,
+                fontSize: `${40 + Math.random() * 60}px`,
+                animationDelay: `${Math.random() * 1}s`,
+                animationDuration: `${1 + Math.random()}s`,
+              }}
+            >
+              ⚡
+            </div>
+          ))}
+
+          <div className="relative z-10 flex flex-col items-center gap-6 text-center">
+            <Zap
+              className="w-32 h-32 md:w-40 md:h-40 text-white drop-shadow-2xl animate-in zoom-in fade-in duration-500"
+              fill="white"
+            />
+            <h1
+              className="text-white font-black drop-shadow-2xl leading-none animate-in zoom-in fade-in duration-700"
+              style={{ fontSize: 'clamp(8rem, 25vw, 20rem)', animationDelay: '200ms', animationFillMode: 'backwards' }}
+            >
+              ×{mult}
+            </h1>
+            <p
+              className="text-white font-black tracking-[0.2em] drop-shadow-lg uppercase animate-in fade-in slide-in-from-bottom duration-700"
+              style={{ fontSize: 'clamp(1.5rem, 4vw, 3.5rem)', animationDelay: '700ms', animationFillMode: 'backwards' }}
+            >
+              {label}
+            </p>
+            <p
+              className="text-white/80 font-bold text-lg md:text-2xl animate-in fade-in duration-500"
+              style={{ animationDelay: '1500ms', animationFillMode: 'backwards' }}
+            >
+              Pergunta a valer max {10 * mult} pontos
+            </p>
+          </div>
+        </div>
+      )
+    }
+
+    // Fase 2: pergunta normal
     return (
-      <div className="min-h-screen bg-gradient-to-br from-indigo-950 via-blue-900 to-blue-950 flex flex-col items-center justify-center p-8">
+      <div className="h-screen w-screen bg-gradient-to-br from-indigo-950 via-blue-900 to-blue-950 flex flex-col items-center justify-center p-8 md:p-12 relative">
         <div className="absolute top-6 left-6 flex items-center gap-2 bg-white/10 rounded-2xl px-4 py-2 border border-white/10">
           <span className="text-white/60 text-sm font-bold">{session.current_question_index + 1} / {questions.length}</span>
           {currentQuestion.points_multiplier > 1 && (
@@ -272,13 +338,18 @@ export function Presentation({ sessionId, initialSession, questions, siteUrl }: 
           )}
         </div>
 
-        <div className="text-center max-w-4xl space-y-8 animate-in fade-in zoom-in-95 duration-500">
-          <p className="text-sky-400 text-sm font-black uppercase tracking-[0.3em]">Pergunta {session.current_question_index + 1}</p>
-          <h2 className="text-white text-5xl md:text-7xl font-black leading-tight">{currentQuestion.question_text}</h2>
+        <div className="text-center max-w-7xl w-full space-y-6 animate-in fade-in zoom-in-95 duration-500">
+          <p className="text-sky-400 text-sm md:text-base font-black uppercase tracking-[0.3em]">Pergunta {session.current_question_index + 1}</p>
+          <h2
+            className="text-white font-black leading-[1.1] drop-shadow-lg"
+            style={{ fontSize: 'clamp(2.5rem, 6.5vw, 7rem)' }}
+          >
+            {currentQuestion.question_text}
+          </h2>
         </div>
 
         <div className="absolute bottom-12 flex flex-col items-center gap-3">
-          <div className="text-9xl font-black text-white/80 tabular-nums animate-in zoom-in duration-500" key={introCountdown}>
+          <div className="text-8xl md:text-9xl font-black text-white/80 tabular-nums animate-in zoom-in duration-500" key={introCountdown}>
             {introCountdown || ''}
           </div>
           <p className="text-sky-300 text-sm font-semibold">Prepara-te...</p>
@@ -327,8 +398,11 @@ export function Presentation({ sessionId, initialSession, questions, siteUrl }: 
         </div>
 
         {/* Question — takes remaining space at top */}
-        <div className="bg-white/10 backdrop-blur rounded-3xl border border-white/20 px-6 py-5 md:py-8 flex items-center justify-center flex-shrink-0">
-          <p className="text-white text-3xl md:text-5xl font-bold text-center leading-tight">
+        <div className="bg-white/10 backdrop-blur rounded-3xl border border-white/20 px-6 py-5 md:py-7 flex items-center justify-center flex-shrink-0">
+          <p
+            className="text-white font-bold text-center leading-tight"
+            style={{ fontSize: 'clamp(1.75rem, 3.5vw, 3.5rem)' }}
+          >
             {currentQuestion.question_text}
           </p>
         </div>
@@ -340,8 +414,18 @@ export function Presentation({ sessionId, initialSession, questions, siteUrl }: 
               key={i}
               className={`${OPTION_COLORS[i]} rounded-2xl p-4 md:p-6 flex items-center gap-5 shadow-xl min-h-0`}
             >
-              <span className="text-white text-5xl md:text-7xl font-black flex-shrink-0 drop-shadow-lg">{OPTION_LABELS[i]}</span>
-              <p className="text-white text-2xl md:text-5xl font-black leading-tight drop-shadow-md flex-1">{opt}</p>
+              <span
+                className="text-white font-black flex-shrink-0 drop-shadow-lg"
+                style={{ fontSize: 'clamp(2.5rem, 5vw, 5rem)' }}
+              >
+                {OPTION_LABELS[i]}
+              </span>
+              <p
+                className="text-white font-black leading-tight drop-shadow-md flex-1"
+                style={{ fontSize: 'clamp(1.5rem, 3.2vw, 3.5rem)' }}
+              >
+                {opt}
+              </p>
             </div>
           ))}
         </div>
