@@ -919,15 +919,26 @@ function LeaderboardScreen({
       </div>
 
       {onFire.length > 0 && (
-        <div className="bg-white/5 rounded-2xl border border-orange-400/20 p-4 max-w-3xl mx-auto w-full animate-in slide-in-from-bottom duration-500">
-          <p className="text-orange-300 text-xs font-black uppercase tracking-widest mb-2 flex items-center gap-1.5">
-            <Flame className="w-3.5 h-3.5" /> Em chamas! ×{maxStreak} streak
+        <div className="bg-white/5 rounded-3xl border-2 border-orange-400/30 p-5 md:p-6 max-w-6xl mx-auto w-full animate-in slide-in-from-bottom duration-500 shadow-2xl">
+          <p
+            className="text-orange-300 font-black uppercase tracking-widest mb-3 flex items-center gap-2"
+            style={{ fontSize: 'clamp(1rem, 1.6vw, 1.5rem)' }}
+          >
+            <Flame className="w-6 h-6 md:w-8 md:h-8" /> Em chamas! ×{maxStreak} streak
           </p>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-3">
             {onFire.map((p) => (
-              <div key={p.id} className="flex items-center gap-2 bg-orange-500/20 border border-orange-400/30 rounded-full px-3 py-1.5">
-                <Flame className="w-3.5 h-3.5 text-orange-400" />
-                <span className="text-white font-bold text-sm">{p.display_name}</span>
+              <div
+                key={p.id}
+                className="flex items-center gap-2.5 bg-orange-500/25 border-2 border-orange-400/40 rounded-full px-4 py-2 md:px-5 md:py-2.5"
+              >
+                <Flame className="w-5 h-5 md:w-6 md:h-6 text-orange-400" />
+                <span
+                  className="text-white font-black"
+                  style={{ fontSize: 'clamp(1rem, 1.4vw, 1.5rem)' }}
+                >
+                  {p.display_name}
+                </span>
               </div>
             ))}
           </div>
