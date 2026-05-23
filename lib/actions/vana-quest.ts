@@ -255,6 +255,28 @@ export async function nextStage(sessionId: string) {
 
   switch (session.status) {
     case 'waiting':
+      if (totalQuestions === 0) {
+        await supabase.from('vana_quest_sessions').update({
+          status: 'finished',
+          ended_at: new Date().toISOString(),
+        }).eq('id', sessionId)
+        return
+      }
+      // Start with the quest intro screen (shown once before the first question)
+      await supabase.from('vana_quest_sessions').update({
+        status: 'quest_intro',
+      }).eq('id', sessionId)
+      return
+
+    case 'quest_intro':
+      // After quest intro → first question intro
+      await supabase.from('vana_quest_sessions').update({
+        status: 'question_intro',
+        current_question_index: 0,
+        question_started_at: null,
+      }).eq('id', sessionId)
+      return
+
     case 'question_leaderboard':
       if (nextIndex >= totalQuestions) {
         await supabase.from('vana_quest_sessions').update({

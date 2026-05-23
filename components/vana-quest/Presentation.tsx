@@ -207,6 +207,58 @@ export function Presentation({ sessionId, initialSession, questions, siteUrl }: 
     )
   }
 
+  // ── QUEST INTRO (uma vez no arranque) ─────────────────────────
+  if (session.status === 'quest_intro') {
+    const title = (initialSession.vana_quests as any)?.title || 'VanaQuest'
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-950 via-blue-900 to-indigo-950 flex flex-col items-center justify-center p-8 relative overflow-hidden">
+        {/* Spotlight */}
+        <div
+          className="absolute left-1/2 -top-32 w-[900px] h-[1100px] -translate-x-1/2 opacity-40 pointer-events-none"
+          style={{
+            background: 'radial-gradient(ellipse at top, rgba(250,204,21,0.25) 0%, transparent 60%)',
+            filter: 'blur(20px)',
+          }}
+        />
+
+        <div className="relative z-10 flex flex-col items-center gap-8 text-center max-w-4xl">
+          {/* Logo entry */}
+          <div className="animate-in zoom-in fade-in duration-1000">
+            <img
+              src="/images/VanaQuest.png"
+              alt="VanaQuest"
+              className="w-40 h-40 md:w-48 md:h-48 object-contain drop-shadow-2xl"
+            />
+          </div>
+
+          {/* Bem-vindo */}
+          <p
+            className="text-sky-300 text-base md:text-xl font-black uppercase tracking-[0.4em] drop-shadow-lg animate-in fade-in slide-in-from-bottom-4 duration-700"
+            style={{ animationDelay: '500ms', animationFillMode: 'backwards' }}
+          >
+            Bem-vindo ao
+          </p>
+
+          {/* Quiz title - dramático */}
+          <h1
+            className="text-white text-6xl md:text-8xl font-black drop-shadow-2xl leading-tight animate-in fade-in zoom-in-90 duration-1000"
+            style={{ animationDelay: '1000ms', animationFillMode: 'backwards' }}
+          >
+            {title}
+          </h1>
+
+          {/* Prepara-te */}
+          <p
+            className="text-sky-200 text-xl md:text-2xl font-bold animate-in fade-in slide-in-from-bottom-4 duration-700"
+            style={{ animationDelay: '2200ms', animationFillMode: 'backwards' }}
+          >
+            ✨ Prepara-te... vai começar!
+          </p>
+        </div>
+      </div>
+    )
+  }
+
   // ── QUESTION INTRO ────────────────────────────────────────────
   if (session.status === 'question_intro' && currentQuestion) {
     return (

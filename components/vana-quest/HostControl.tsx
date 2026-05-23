@@ -158,6 +158,14 @@ export function HostControl({ sessionId, initialSession, questions, siteUrl }: P
     }
   }, [session.status, session.current_question_index])
 
+  // Auto-advance quest intro after 4s
+  useEffect(() => {
+    if (session.status === 'quest_intro') {
+      const t = setTimeout(() => handleNext(), 4000)
+      return () => clearTimeout(t)
+    }
+  }, [session.status])
+
   // Auto-advance when all players have answered (during question_active)
   useEffect(() => {
     if (session.status !== 'question_active' || !currentQuestion) return
@@ -196,6 +204,7 @@ export function HostControl({ sessionId, initialSession, questions, siteUrl }: P
   // ── STATUS LABELS ─────────────────────────────────────────────
   const statusInfo: Record<string, { label: string; color: string; nextLabel: string }> = {
     waiting: { label: 'Sala de espera', color: 'bg-blue-500', nextLabel: 'Iniciar jogo' },
+    quest_intro: { label: 'Intro do quiz', color: 'bg-blue-500', nextLabel: '(auto em 4s)' },
     question_intro: { label: 'A mostrar pergunta', color: 'bg-blue-500', nextLabel: '(auto em 4s)' },
     question_active: { label: 'Tempo de resposta', color: 'bg-green-500', nextLabel: 'Mostrar resultado' },
     question_results: { label: 'Resposta correcta', color: 'bg-yellow-500', nextLabel: session.current_question_index >= questions.length - 1 ? '🏆 Revelar pódio final' : 'Mostrar classificação' },
@@ -318,6 +327,16 @@ export function HostControl({ sessionId, initialSession, questions, siteUrl }: P
               )}
             </div>
           </>
+        )}
+
+        {/* QUEST INTRO (only at the very start) */}
+        {session.status === 'quest_intro' && (
+          <div className="bg-white/10 rounded-3xl p-5 border border-white/10 space-y-3 text-center">
+            <img src="/images/VanaQuest.png" alt="" className="w-16 h-16 object-contain mx-auto" />
+            <p className="text-sky-300 text-[10px] font-black uppercase tracking-widest">Intro do quiz</p>
+            <p className="font-black text-xl">{(initialSession.vana_quests as any)?.title}</p>
+            <p className="text-sky-400 text-xs italic">Avança automaticamente em 4 segundos...</p>
+          </div>
         )}
 
         {/* QUESTION INTRO */}
@@ -447,7 +466,7 @@ export function HostControl({ sessionId, initialSession, questions, siteUrl }: P
       </div>
 
       {/* Bottom fixed action bar */}
-      {session.status !== 'finished' && session.status !== 'question_intro' && (
+      {session.status !== 'finished' && session.status !== 'question_intro' && session.status !== 'quest_intro' && (
         <div className="fixed bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 via-black/70 to-transparent pt-6 pb-4 px-4 z-30">
           <div className="max-w-md mx-auto">
             <button

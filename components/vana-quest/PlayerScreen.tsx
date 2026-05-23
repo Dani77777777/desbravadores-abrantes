@@ -244,6 +244,36 @@ export function PlayerScreen({ sessionId, userId, userProfile, initialSession, q
     )
   }
 
+  // ── QUEST INTRO (uma vez no arranque) ─────────────────────────
+  if (session.status === 'quest_intro') {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-950 via-blue-900 to-indigo-950 flex flex-col items-center justify-center p-6 gap-5 text-center">
+        <img
+          src="/images/VanaQuest.png"
+          alt=""
+          className="w-24 h-24 object-contain drop-shadow-2xl animate-in zoom-in fade-in duration-700"
+        />
+        <p
+          className="text-sky-300 text-xs font-black uppercase tracking-[0.3em] animate-in fade-in slide-in-from-bottom-2 duration-500"
+          style={{ animationDelay: '400ms', animationFillMode: 'backwards' }}
+        >
+          Bem-vindo ao
+        </p>
+        <h1
+          className="text-white text-4xl font-black drop-shadow-lg leading-tight animate-in fade-in zoom-in-90 duration-700"
+          style={{ animationDelay: '700ms', animationFillMode: 'backwards' }}
+        >
+          {questTitle}
+        </h1>
+        <p
+          className="text-sky-200 font-bold text-sm mt-4 animate-pulse"
+        >
+          ✨ Vai começar!
+        </p>
+      </div>
+    )
+  }
+
   // ── QUESTION INTRO (player sees only "prepare yourself") ──────
   if (session.status === 'question_intro') {
     return (
