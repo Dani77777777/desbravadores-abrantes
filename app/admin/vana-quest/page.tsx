@@ -5,6 +5,7 @@ import { Navbar } from '@/components/layout/Navbar'
 import Link from 'next/link'
 import { ChevronLeft, Plus, Trash2, Pencil, ListChecks, BookOpen, History, Users, Trophy, ChevronRight } from 'lucide-react'
 import { startSession } from '@/lib/actions/vana-quest'
+import { DeleteSessionButton } from '@/components/vana-quest/DeleteSessionButton'
 
 export default async function VanaQuestAdminPage() {
   const supabase = await createClient()
@@ -184,26 +185,39 @@ export default async function VanaQuestAdminPage() {
                 const sLabel = statusLabel[s.status] || statusLabel.waiting
 
                 return (
-                  <Link
+                  <div
                     key={s.id}
-                    href={`/admin/vana-quest/sessions/${s.id}`}
-                    className="bg-white rounded-2xl border shadow-sm p-4 flex items-center gap-4 hover:shadow-md hover:border-blue-200 transition-all"
+                    className="bg-white rounded-2xl border shadow-sm hover:shadow-md hover:border-blue-200 transition-all flex items-center"
                   >
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${sLabel.color}`}>
-                          {sLabel.label}
-                        </span>
-                        <span className="text-xs text-gray-400 font-mono">PIN {s.pin}</span>
+                    <Link
+                      href={`/admin/vana-quest/sessions/${s.id}`}
+                      className="flex-1 min-w-0 flex items-center gap-4 p-4"
+                    >
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${sLabel.color}`}>
+                            {sLabel.label}
+                          </span>
+                          <span className="text-xs text-gray-400 font-mono">PIN {s.pin}</span>
+                        </div>
+                        <p className="font-semibold text-gray-900 text-sm truncate">{(s.vana_quests as any)?.title || 'Sem título'}</p>
+                        <div className="flex items-center gap-3 mt-1 text-xs text-gray-500">
+                          <span className="flex items-center gap-1"><Users className="w-3 h-3" /> {playerCount}</span>
+                          <span>{new Date(s.created_at).toLocaleString('pt-PT', { dateStyle: 'short', timeStyle: 'short' })}</span>
+                        </div>
                       </div>
-                      <p className="font-semibold text-gray-900 text-sm truncate">{(s.vana_quests as any)?.title || 'Sem título'}</p>
-                      <div className="flex items-center gap-3 mt-1 text-xs text-gray-500">
-                        <span className="flex items-center gap-1"><Users className="w-3 h-3" /> {playerCount}</span>
-                        <span>{new Date(s.created_at).toLocaleString('pt-PT', { dateStyle: 'short', timeStyle: 'short' })}</span>
+                      <ChevronRight className="w-4 h-4 text-gray-300 flex-shrink-0" />
+                    </Link>
+                    {s.status === 'finished' && (
+                      <div className="pr-3 flex-shrink-0">
+                        <DeleteSessionButton
+                          sessionId={s.id}
+                          sessionTitle={(s.vana_quests as any)?.title || 'sessão'}
+                          compact
+                        />
                       </div>
-                    </div>
-                    <ChevronRight className="w-4 h-4 text-gray-300 flex-shrink-0" />
-                  </Link>
+                    )}
+                  </div>
                 )
               })}
             </div>

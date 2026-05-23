@@ -228,6 +228,34 @@ export async function joinSession(
 }
 
 /**
+ * Apaga uma sessão e tudo o que está associado (participants, answers).
+ * Só admins. ON DELETE CASCADE trata do resto.
+ */
+export async function deleteSession(sessionId: string): Promise<void> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('Não autorizado')
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', user.id)
+    .single()
+
+  if (!profile || (profile.role !== 'coordenador' && profile.role !== 'dirigente')) {
+    throw new Error('Sem permissões')
+  }
+
+  const { error } = await supabase
+    .from('vana_quest_sessions')
+    .delete()
+    .eq('id', sessionId)
+
+  if (error) throw new Error(error.message)
+  revalidatePath('/admin/vana-quest')
+}
+
+/**
  * State machine for the live game flow.
  * waiting → question_intro → question_active → question_results → question_leaderboard → (next intro) | finished
  */

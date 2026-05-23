@@ -7,6 +7,7 @@ import {
   Calendar, Zap, Award, Play, MonitorPlay, UserPlus
 } from 'lucide-react'
 import { PlayerAvatar } from '@/components/vana-quest/PlayerAvatar'
+import { DeleteSessionButton } from '@/components/vana-quest/DeleteSessionButton'
 
 const OPTION_COLORS: Record<string, string> = {
   A: 'bg-red-500', B: 'bg-blue-500', C: 'bg-yellow-400', D: 'bg-green-500',
@@ -140,6 +141,15 @@ export default async function SessionDetailPage({
               )}
             </p>
           </div>
+
+          {session.status === 'finished' && (
+            <div className="flex-shrink-0">
+              <DeleteSessionButton
+                sessionId={sessionId}
+                sessionTitle={(session.vana_quests as any)?.title || 'sessão'}
+              />
+            </div>
+          )}
         </div>
 
         {/* Live actions — only if session is still active */}
