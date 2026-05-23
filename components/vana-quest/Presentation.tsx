@@ -830,16 +830,21 @@ function LeaderboardScreen({
   const maxStreak = Math.max(...participants.map((p) => p.current_streak), 0)
   const onFire = maxStreak >= 2 ? participants.filter((p) => p.current_streak === maxStreak) : []
 
+  const rowHeight = 130 // px entre rows
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-950 via-indigo-900 to-blue-950 flex flex-col p-8 gap-8 overflow-hidden relative">
+    <div className="min-h-screen bg-gradient-to-br from-blue-950 via-indigo-900 to-blue-950 flex flex-col p-6 md:p-10 gap-6 overflow-hidden relative">
       <div className="text-center space-y-1">
-        <p className="text-sky-300 text-sm font-black uppercase tracking-[0.3em]">Classificação</p>
-        <h2 className="text-white text-5xl font-black flex items-center justify-center gap-3">
-          <Trophy className="w-10 h-10 text-yellow-400" /> Top jogadores
+        <p className="text-sky-300 text-base font-black uppercase tracking-[0.3em]">Classificação</p>
+        <h2 className="text-white font-black flex items-center justify-center gap-3" style={{ fontSize: 'clamp(2.5rem, 5vw, 4.5rem)' }}>
+          <Trophy className="w-12 h-12 md:w-16 md:h-16 text-yellow-400" /> Top jogadores
         </h2>
       </div>
 
-      <div className="flex-1 max-w-3xl mx-auto w-full relative" style={{ minHeight: `${top.length * 90}px` }}>
+      <div
+        className="flex-1 max-w-6xl mx-auto w-full relative"
+        style={{ minHeight: `${top.length * rowHeight}px` }}
+      >
         {top.map((p, i) => {
           const value = animatedPoints[p.id] ?? 0
           const delta = deltasRef.current[p.id] ?? 0
@@ -849,50 +854,63 @@ function LeaderboardScreen({
             <div
               key={p.id}
               className="absolute left-0 right-0 transition-all duration-700 ease-out"
-              style={{ top: `${i * 90}px` }}
+              style={{ top: `${i * rowHeight}px` }}
             >
-              <div className={`flex items-center gap-4 rounded-2xl p-4 border-2 ${
+              <div className={`flex items-center gap-5 rounded-3xl p-5 md:p-6 border-2 ${
                 i === 0 ? 'bg-yellow-400/20 border-yellow-400/40' :
                 i === 1 ? 'bg-gray-300/15 border-gray-300/30' :
                 i === 2 ? 'bg-amber-600/15 border-amber-600/30' :
                 'bg-white/10 border-white/10'
-              } shadow-xl backdrop-blur-sm`}>
-                <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-2xl font-black flex-shrink-0 transition-colors ${
+              } shadow-2xl backdrop-blur-sm`}>
+                <div className={`w-16 h-16 md:w-20 md:h-20 rounded-2xl flex items-center justify-center font-black flex-shrink-0 transition-colors ${
                   i === 0 ? 'bg-yellow-400 text-yellow-900' :
                   i === 1 ? 'bg-gray-300 text-gray-800' :
                   i === 2 ? 'bg-amber-600 text-amber-50' :
                   'bg-white/10 text-white'
-                }`}>
+                }`} style={{ fontSize: 'clamp(1.75rem, 3vw, 2.5rem)' }}>
                   {i + 1}
                 </div>
                 <PlayerAvatar
                   name={p.display_name}
                   avatarUrl={p.avatar_url}
-                  className="w-12 h-12"
-                  textClassName="text-base"
+                  className="w-16 h-16 md:w-20 md:h-20"
+                  textClassName="text-2xl"
                   fallbackBg="bg-white/15"
                 />
                 <div className="flex-1 min-w-0">
-                  <p className="text-white font-black text-xl truncate">{p.display_name}</p>
-                  <div className="flex items-center gap-2 text-xs">
-                    {p.is_guest && <span className="text-sky-300/70">convidado</span>}
+                  <p
+                    className="text-white font-black truncate leading-tight"
+                    style={{ fontSize: 'clamp(1.5rem, 3vw, 2.75rem)' }}
+                  >
+                    {p.display_name}
+                  </p>
+                  <div className="flex items-center gap-3 mt-1">
+                    {p.is_guest && <span className="text-sky-300/70 text-base font-semibold">convidado</span>}
                     {p.current_streak >= 2 && (
-                      <span className="flex items-center gap-1 text-orange-400 font-bold">
-                        <Flame className="w-3 h-3" /> ×{p.current_streak}
+                      <span className="flex items-center gap-1.5 text-orange-400 font-bold text-base">
+                        <Flame className="w-4 h-4" /> ×{p.current_streak}
                       </span>
                     )}
                   </div>
                 </div>
 
                 {showDelta && (
-                  <span className="bg-green-500/30 border border-green-400/40 rounded-full px-3 py-1 text-green-300 text-sm font-black tabular-nums animate-in slide-in-from-right fade-in duration-500">
+                  <span
+                    className="bg-green-500/30 border border-green-400/40 rounded-full px-4 py-1.5 text-green-300 font-black tabular-nums animate-in slide-in-from-right fade-in duration-500"
+                    style={{ fontSize: 'clamp(1rem, 1.5vw, 1.5rem)' }}
+                  >
                     +{delta.toFixed(1)}
                   </span>
                 )}
 
-                <div className="text-right min-w-[6.5rem]">
-                  <p className="text-white font-black text-3xl tabular-nums">{value.toFixed(1)}</p>
-                  <p className="text-white/40 text-xs font-bold uppercase tracking-wider">pontos</p>
+                <div className="text-right min-w-[8rem] md:min-w-[10rem]">
+                  <p
+                    className="text-white font-black tabular-nums leading-none"
+                    style={{ fontSize: 'clamp(2.5rem, 4.5vw, 4rem)' }}
+                  >
+                    {value.toFixed(1)}
+                  </p>
+                  <p className="text-white/40 text-sm font-bold uppercase tracking-wider mt-1">pontos</p>
                 </div>
               </div>
             </div>
