@@ -40,6 +40,7 @@ interface Participant {
   total_points: number
   correct_answers: number
   current_streak: number
+  max_streak: number
   is_guest: boolean
   avatar_url?: string | null
 }
@@ -70,6 +71,10 @@ export function HostControl({ sessionId, initialSession, questions, siteUrl }: P
   const [busy, setBusy] = useState(false)
   const [copied, setCopied] = useState(false)
   const inFlight = useRef(false)
+  // Pontos do jogador no início do leaderboard (para calcular delta da última ronda)
+  const prevPointsRef = useRef<Record<string, number>>({})
+  // Capturar os deltas ao entrar no leaderboard (e congelar até sair)
+  const [deltas, setDeltas] = useState<Record<string, number>>({})
 
   async function copyLink() {
     try {
@@ -164,6 +169,22 @@ export function HostControl({ sessionId, initialSession, questions, siteUrl }: P
       const t = setTimeout(() => handleNext(), 4000)
       return () => clearTimeout(t)
     }
+  }, [session.status])
+
+  // Capturar deltas (pontos ganhos nesta ronda) quando entramos no leaderboard
+  useEffect(() => {
+    if (session.status === 'question_leaderboard') {
+      const d: Record<string, number> = {}
+      participants.forEach((p) => {
+        d[p.id] = Number(p.total_points) - (prevPointsRef.current[p.id] ?? 0)
+      })
+      setDeltas(d)
+      // Atualiza o snapshot para a próxima ronda
+      const snap: Record<string, number> = {}
+      participants.forEach((p) => { snap[p.id] = Number(p.total_points) })
+      prevPointsRef.current = snap
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session.status])
 
   // Auto-advance when all players have answered (during question_active)
@@ -411,31 +432,100 @@ export function HostControl({ sessionId, initialSession, questions, siteUrl }: P
           </div>
         )}
 
-        {/* LEADERBOARD */}
-        {session.status === 'question_leaderboard' && (
-          <div className="bg-white/10 rounded-3xl p-5 border border-white/10">
-            <p className="text-orange-400 text-[10px] font-black uppercase tracking-widest mb-3 flex items-center gap-1.5">
-              <Trophy className="w-3 h-3" /> Classificação
-            </p>
-            <div className="space-y-1.5 max-h-72 overflow-y-auto">
-              {[...participants].sort((a, b) => b.total_points - a.total_points).map((p, i) => (
-                <div key={p.id} className="flex items-center gap-2 bg-white/5 rounded-xl px-3 py-2">
-                  <span className={`text-xs font-black w-5 text-center ${i === 0 ? 'text-yellow-400' : i === 1 ? 'text-gray-300' : i === 2 ? 'text-amber-600' : 'text-white/40'}`}>{i + 1}</span>
-                  <PlayerAvatar
-                    name={p.display_name}
-                    avatarUrl={p.avatar_url}
-                    className="w-7 h-7"
-                    textClassName="text-[10px]"
-                    fallbackBg="bg-blue-500/40"
-                  />
-                  <span className="text-sm font-semibold truncate flex-1">{p.display_name}</span>
-                  {p.current_streak >= 2 && <Flame className="w-3 h-3 text-orange-400" />}
-                  <span className="text-sm font-black tabular-nums">{p.total_points.toFixed(1)}</span>
-                </div>
-              ))}
+        {/* LEADERBOARD — vista completa para o host */}
+        {session.status === 'question_leaderboard' && (() => {
+          const sorted = [...participants].sort((a, b) => b.total_points - a.total_points)
+          const medals = ['🥇', '🥈', '🥉']
+          return (
+            <div className="bg-white/10 rounded-3xl p-4 border border-white/10">
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-orange-400 text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5">
+                  <Trophy className="w-3 h-3" /> Classificação
+                </p>
+                <p className="text-white/40 text-[10px] font-bold">
+                  {participants.length} jogador{participants.length !== 1 ? 'es' : ''}
+                </p>
+              </div>
+
+              <div className="space-y-2 max-h-[28rem] overflow-y-auto">
+                {sorted.map((p, i) => {
+                  const delta = deltas[p.id] || 0
+                  const showDelta = delta > 0.005
+
+                  return (
+                    <div
+                      key={p.id}
+                      className={`flex items-center gap-2.5 rounded-xl px-3 py-2.5 border ${
+                        i === 0 ? 'bg-yellow-400/15 border-yellow-400/30' :
+                        i === 1 ? 'bg-gray-300/10 border-gray-300/20' :
+                        i === 2 ? 'bg-amber-600/15 border-amber-600/30' :
+                        'bg-white/5 border-white/10'
+                      }`}
+                    >
+                      {/* Posição */}
+                      <div className="flex-shrink-0 w-7 text-center">
+                        {i < 3 ? (
+                          <span className="text-xl leading-none">{medals[i]}</span>
+                        ) : (
+                          <span className="text-sm font-black text-white/40 tabular-nums">{i + 1}</span>
+                        )}
+                      </div>
+
+                      {/* Avatar */}
+                      <PlayerAvatar
+                        name={p.display_name}
+                        avatarUrl={p.avatar_url}
+                        className="w-9 h-9"
+                        textClassName="text-xs"
+                        fallbackBg="bg-blue-500/40"
+                      />
+
+                      {/* Nome + sub-info */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          <p className="font-bold text-sm truncate">{p.display_name}</p>
+                          {p.is_guest && (
+                            <span className="text-[8px] uppercase tracking-wider text-sky-400 bg-sky-500/10 rounded-full px-1.5 py-0.5 flex-shrink-0">
+                              conv.
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2.5 text-[11px] text-white/50 mt-0.5">
+                          <span className="flex items-center gap-0.5">
+                            <CheckCircle2 className="w-3 h-3 text-green-400" />
+                            <span className="font-bold">{p.correct_answers}</span>
+                          </span>
+                          {p.current_streak >= 2 && (
+                            <span className="flex items-center gap-0.5 text-orange-400 font-bold">
+                              <Flame className="w-3 h-3" /> ×{p.current_streak}
+                            </span>
+                          )}
+                          {p.max_streak >= 2 && p.max_streak !== p.current_streak && (
+                            <span className="text-amber-300/70 font-bold">
+                              máx ×{p.max_streak}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Pontos + delta */}
+                      <div className="flex-shrink-0 text-right">
+                        <p className="font-black text-lg tabular-nums leading-none">{p.total_points.toFixed(1)}</p>
+                        {showDelta ? (
+                          <p className="text-green-400 text-[10px] font-black tabular-nums mt-0.5">
+                            +{delta.toFixed(1)}
+                          </p>
+                        ) : (
+                          <p className="text-white/30 text-[10px] mt-0.5">—</p>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
             </div>
-          </div>
-        )}
+          )
+        })()}
 
         {/* FINISHED */}
         {session.status === 'finished' && (

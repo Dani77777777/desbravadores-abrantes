@@ -293,9 +293,9 @@ export function Presentation({ sessionId, initialSession, questions, siteUrl }: 
     const timerPct = (timeLeft / currentQuestion.time_seconds) * 100
 
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-950 to-indigo-950 flex flex-col p-6 gap-4">
+      <div className="h-screen w-screen bg-gradient-to-br from-slate-950 to-indigo-950 flex flex-col p-4 md:p-6 gap-3 overflow-hidden">
         {/* Top bar */}
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between flex-shrink-0">
           <span className="bg-white/10 text-white text-sm font-bold px-3 py-1.5 rounded-full">
             {session.current_question_index + 1} / {questions.length}
           </span>
@@ -310,31 +310,38 @@ export function Presentation({ sessionId, initialSession, questions, siteUrl }: 
           </div>
         </div>
 
-        {/* Timer bar */}
-        <div className="h-3 bg-white/10 rounded-full overflow-hidden">
-          <div
-            className={`h-full rounded-full transition-all duration-100 ${
-              timeLeft > currentQuestion.time_seconds * 0.5 ? 'bg-green-400' :
-              timeLeft > currentQuestion.time_seconds * 0.25 ? 'bg-yellow-400' : 'bg-red-400'
-            }`}
-            style={{ width: `${timerPct}%` }}
-          />
+        {/* Timer row: bar + big number side by side */}
+        <div className="flex items-center gap-4 flex-shrink-0">
+          <div className="flex-1 h-3 bg-white/10 rounded-full overflow-hidden">
+            <div
+              className={`h-full rounded-full transition-all duration-100 ${
+                timeLeft > currentQuestion.time_seconds * 0.5 ? 'bg-green-400' :
+                timeLeft > currentQuestion.time_seconds * 0.25 ? 'bg-yellow-400' : 'bg-red-400'
+              }`}
+              style={{ width: `${timerPct}%` }}
+            />
+          </div>
+          <p className="text-5xl md:text-6xl font-black text-white tabular-nums leading-none min-w-[3.5rem] text-right">
+            {Math.ceil(timeLeft)}
+          </p>
         </div>
-        <p className="text-center text-7xl font-black text-white tabular-nums">{Math.ceil(timeLeft)}</p>
 
-        {/* Question */}
-        <div className="bg-white/10 backdrop-blur rounded-3xl border border-white/20 p-6 max-w-5xl mx-auto w-full">
-          <p className="text-white text-4xl md:text-5xl font-bold text-center leading-tight">
+        {/* Question — takes remaining space at top */}
+        <div className="bg-white/10 backdrop-blur rounded-3xl border border-white/20 px-6 py-5 md:py-8 flex items-center justify-center flex-shrink-0">
+          <p className="text-white text-3xl md:text-5xl font-bold text-center leading-tight">
             {currentQuestion.question_text}
           </p>
         </div>
 
-        {/* Answers (presentation shows text + colored bg) */}
-        <div className="flex-1 grid grid-cols-2 gap-4 max-w-5xl mx-auto w-full">
+        {/* Answers — fills remaining vertical space */}
+        <div className="flex-1 min-h-0 grid grid-cols-2 grid-rows-2 gap-3 md:gap-4 w-full">
           {options.map((opt, i) => (
-            <div key={i} className={`${OPTION_COLORS[i]} rounded-2xl p-7 md:p-10 flex items-center gap-6 shadow-xl`}>
-              <span className="text-white text-6xl md:text-7xl font-black flex-shrink-0 drop-shadow-lg">{OPTION_LABELS[i]}</span>
-              <p className="text-white text-3xl md:text-5xl font-black leading-tight drop-shadow-md">{opt}</p>
+            <div
+              key={i}
+              className={`${OPTION_COLORS[i]} rounded-2xl p-4 md:p-6 flex items-center gap-5 shadow-xl min-h-0`}
+            >
+              <span className="text-white text-5xl md:text-7xl font-black flex-shrink-0 drop-shadow-lg">{OPTION_LABELS[i]}</span>
+              <p className="text-white text-2xl md:text-5xl font-black leading-tight drop-shadow-md flex-1">{opt}</p>
             </div>
           ))}
         </div>
