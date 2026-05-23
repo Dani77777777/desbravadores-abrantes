@@ -280,9 +280,9 @@ export function Presentation({ sessionId, initialSession, questions, siteUrl }: 
         {/* Answers (presentation shows text + colored bg) */}
         <div className="flex-1 grid grid-cols-2 gap-4 max-w-5xl mx-auto w-full">
           {options.map((opt, i) => (
-            <div key={i} className={`${OPTION_COLORS[i]} rounded-2xl p-6 flex items-center gap-4 shadow-xl`}>
-              <span className="text-white text-4xl font-black flex-shrink-0">{OPTION_LABELS[i]}</span>
-              <p className="text-white text-xl md:text-2xl font-bold">{opt}</p>
+            <div key={i} className={`${OPTION_COLORS[i]} rounded-2xl p-6 md:p-8 flex items-center gap-5 shadow-xl`}>
+              <span className="text-white text-5xl md:text-6xl font-black flex-shrink-0 drop-shadow-lg">{OPTION_LABELS[i]}</span>
+              <p className="text-white text-2xl md:text-4xl font-black leading-tight drop-shadow-md">{opt}</p>
             </div>
           ))}
         </div>
@@ -300,10 +300,10 @@ export function Presentation({ sessionId, initialSession, questions, siteUrl }: 
       <div className="min-h-screen bg-gradient-to-br from-slate-950 to-indigo-950 flex flex-col p-8 gap-6">
         <div className="text-center space-y-3 animate-in slide-in-from-top duration-500">
           <p className="text-sky-300 text-sm font-black uppercase tracking-[0.3em]">Resposta correcta</p>
-          <div className={`inline-flex items-center gap-4 px-8 py-5 rounded-3xl ${OPTION_COLORS[correctIdx]} shadow-2xl`}>
-            <span className="text-white text-4xl font-black">{OPTION_LABELS[correctIdx]}</span>
-            <span className="text-white text-3xl font-black">{options[correctIdx]}</span>
-            <CheckCircle2 className="w-8 h-8 text-white" />
+          <div className={`inline-flex items-center gap-5 px-10 py-6 rounded-3xl ${OPTION_COLORS[correctIdx]} shadow-2xl`}>
+            <span className="text-white text-5xl md:text-6xl font-black drop-shadow-lg">{OPTION_LABELS[correctIdx]}</span>
+            <span className="text-white text-4xl md:text-5xl font-black drop-shadow-md">{options[correctIdx]}</span>
+            <CheckCircle2 className="w-10 h-10 text-white" />
           </div>
           <p className="text-white/60 text-lg">{correctCount} de {participants.length} acertou</p>
         </div>
@@ -442,25 +442,28 @@ function CinematicPodium({ participants }: { participants: Participant[] }) {
                   } ${
                     isEmpty
                       ? 'bg-white/5 border-2 border-dashed border-white/15'
-                      : `${avatarColors[rank]} ring-4 ring-offset-4 ring-offset-blue-950 shadow-2xl overflow-hidden`
+                      : `${avatarColors[rank]} ring-4 ring-offset-4 ring-offset-blue-950 shadow-2xl`
                   } flex items-center justify-center`}
                 >
-                  {isEmpty ? (
-                    <span className="text-3xl text-white/30">—</span>
-                  ) : p!.avatar_url ? (
-                    <img
-                      src={p!.avatar_url}
-                      alt={p!.display_name}
-                      className="w-full h-full object-cover"
-                      referrerPolicy="no-referrer"
-                    />
-                  ) : (
-                    <span className="text-3xl md:text-5xl font-black text-white drop-shadow-lg">
-                      {p!.display_name[0]?.toUpperCase()}
-                    </span>
-                  )}
+                  {/* Inner circle clips the image but not the crown */}
+                  <div className={`w-full h-full rounded-full ${!isEmpty ? 'overflow-hidden' : ''} flex items-center justify-center`}>
+                    {isEmpty ? (
+                      <span className="text-3xl text-white/30">—</span>
+                    ) : p!.avatar_url ? (
+                      <img
+                        src={p!.avatar_url}
+                        alt={p!.display_name}
+                        className="w-full h-full object-cover"
+                        referrerPolicy="no-referrer"
+                      />
+                    ) : (
+                      <span className="text-3xl md:text-5xl font-black text-white drop-shadow-lg">
+                        {p!.display_name[0]?.toUpperCase()}
+                      </span>
+                    )}
+                  </div>
                   {!isEmpty && rank === 0 && isRevealed && (
-                    <div className="absolute -top-3 -right-3 text-3xl md:text-4xl drop-shadow-lg animate-bounce z-10">
+                    <div className="absolute -top-4 -right-4 text-4xl md:text-5xl drop-shadow-2xl animate-bounce z-20 pointer-events-none">
                       👑
                     </div>
                   )}
