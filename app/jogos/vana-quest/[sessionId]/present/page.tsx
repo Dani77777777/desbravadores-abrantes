@@ -1,5 +1,6 @@
 import { createClient } from '@/utils/supabase/server'
 import { Presentation } from '@/components/vana-quest/Presentation'
+import { getSiteUrl } from '@/utils/site-url'
 
 export default async function PresentPage({ params }: { params: Promise<{ sessionId: string }> }) {
   const { sessionId } = await params
@@ -25,7 +26,7 @@ export default async function PresentPage({ params }: { params: Promise<{ sessio
     .eq('vana_quest_id', session.vana_quest_id)
     .order('question_order')
 
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'
+  const siteUrl = await getSiteUrl()
 
   return (
     <Presentation
