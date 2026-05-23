@@ -153,7 +153,8 @@ export async function startSession(vanaQuestId: string): Promise<string> {
 export async function joinSession(
   pin: string,
   guestName: string | null,
-  userId: string | null
+  userId: string | null,
+  clientAvatarUrl?: string | null
 ): Promise<{ participantId: string; sessionId: string; questTitle: string } | { error: string }> {
   const supabase = createServiceClient()
 
@@ -171,24 +172,31 @@ export async function joinSession(
   const displayName = guestName || 'Jogador'
   const isGuest = !userId
 
-  // Para utilizadores registados, obter o avatar do profile para denormalizar
-  let avatarUrl: string | null = null
+  // Avatar: prioriza o que o cliente passa (tem acesso a profile.avatar_url + user_metadata.avatar_url),
+  // senão tenta buscar do profile (fallback para chamadas server-side antigas)
+  let avatarUrl: string | null = clientAvatarUrl ?? null
   if (userId) {
-    const { data: prof } = await supabase
-      .from('profiles')
-      .select('avatar_url')
-      .eq('id', userId)
-      .single()
-    avatarUrl = prof?.avatar_url || null
+    if (!avatarUrl) {
+      const { data: prof } = await supabase
+        .from('profiles')
+        .select('avatar_url')
+        .eq('id', userId)
+        .single()
+      avatarUrl = prof?.avatar_url || null
+    }
 
     const { data: existing } = await supabase
       .from('vana_quest_participants')
-      .select('id')
+      .select('id, avatar_url')
       .eq('session_id', session.id)
       .eq('user_id', userId)
       .single()
 
     if (existing) {
+      // Backfill the avatar if missing (covers participants who joined before this fix)
+      if (!existing.avatar_url && avatarUrl) {
+        await supabase.from('vana_quest_participants').update({ avatar_url: avatarUrl }).eq('id', existing.id)
+      }
       return {
         participantId: existing.id,
         sessionId: session.id,

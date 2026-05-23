@@ -23,10 +23,15 @@ export function JoinForm({ user, profile, initialPin }: Props) {
     setLoading(true)
     setError('')
 
+    const avatarUrl = user
+      ? profile?.avatar_url || user?.user_metadata?.avatar_url || null
+      : null
+
     const result = await joinSession(
       pin.trim(),
       user ? profile?.full_name || 'Jogador' : guestName.trim() || 'Convidado',
-      user?.id || null
+      user?.id || null,
+      avatarUrl
     )
 
     if ('error' in result) {
@@ -93,7 +98,7 @@ export function JoinForm({ user, profile, initialPin }: Props) {
             <div className="bg-white/10 rounded-2xl px-4 py-3 flex items-center gap-3">
               <PlayerAvatar
                 name={profile?.full_name || '?'}
-                avatarUrl={profile?.avatar_url}
+                avatarUrl={profile?.avatar_url || user?.user_metadata?.avatar_url}
                 className="w-9 h-9"
                 textClassName="text-sm"
                 fallbackBg="bg-white/20"

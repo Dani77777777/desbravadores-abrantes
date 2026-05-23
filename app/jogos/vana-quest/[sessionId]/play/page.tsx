@@ -6,10 +6,14 @@ export default async function PlayPage({ params }: { params: Promise<{ sessionId
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
-  let profile = null
+  let profile: any = null
   if (user) {
     const { data } = await supabase.from('profiles').select('*').eq('id', user.id).single()
     profile = data
+    // Fallback do avatar para o user_metadata (Google OAuth, etc.)
+    if (profile && !profile.avatar_url) {
+      profile.avatar_url = user.user_metadata?.avatar_url || null
+    }
   }
 
   const { data: session } = await supabase
