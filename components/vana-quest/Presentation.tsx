@@ -445,58 +445,126 @@ function CinematicPodium({ participants }: { participants: Participant[] }) {
     )
   }
 
-  // Phase 3: all together
+  // Phase 3: all together — Kahoot-style podium
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-950 via-blue-900 to-indigo-950 flex flex-col items-center p-8 gap-6 relative overflow-hidden">
+    <div className="min-h-screen bg-gradient-to-b from-blue-950 via-blue-900 to-indigo-950 flex flex-col items-center px-6 pt-8 pb-0 gap-4 relative overflow-hidden">
       {/* Lingering confetti */}
       <Confetti />
 
-      <div className="text-center space-y-2 z-10 animate-in fade-in slide-in-from-top duration-700">
-        <img src="/images/VanaQuest.png" alt="" className="w-20 h-20 object-contain mx-auto drop-shadow-2xl" />
-        <h1 className="text-white text-5xl font-black drop-shadow-lg">🏆 Pódio Final</h1>
+      <div className="text-center z-10 animate-in fade-in slide-in-from-top duration-700">
+        <h1 className="text-white text-4xl md:text-5xl font-black drop-shadow-2xl tracking-tight">
+          🏆 Pódio Final
+        </h1>
       </div>
 
-      {/* Floor glow */}
-      <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[1000px] h-40 rounded-full bg-gradient-to-t from-yellow-400 via-yellow-300/40 to-transparent opacity-40 blur-3xl" />
+      {/* Spotlight from above */}
+      <div
+        className="absolute top-0 left-1/2 -translate-x-1/2 w-[1200px] h-[600px] pointer-events-none opacity-60"
+        style={{
+          background: 'radial-gradient(ellipse at top, rgba(255,255,255,0.18) 0%, transparent 60%)',
+          filter: 'blur(20px)',
+        }}
+      />
 
-      {/* Podium bars: 2nd, 1st, 3rd order so 1st is in middle and tallest */}
-      <div className="flex-1 flex items-end gap-4 md:gap-8 max-w-4xl w-full z-10 pt-12">
+      {/* Floor glow */}
+      <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[1200px] h-48 rounded-full bg-gradient-to-t from-yellow-400 via-yellow-300/40 to-transparent opacity-50 blur-3xl pointer-events-none" />
+
+      {/* Podium row */}
+      <div className="flex-1 flex items-end justify-center gap-3 md:gap-6 max-w-5xl w-full z-10 pt-4">
         {[1, 0, 2].map((rank, idx) => {
           const p = podium[rank]
-          const heights = ['h-56', 'h-80', 'h-40'] // 2nd, 1st, 3rd
-          const colors = ['bg-gradient-to-b from-gray-200 to-gray-400', 'bg-gradient-to-b from-yellow-300 to-yellow-500', 'bg-gradient-to-b from-amber-500 to-amber-700']
-          const labelColors = ['text-gray-800', 'text-yellow-900', 'text-amber-50']
           const isEmpty = !p
+
+          // Pedestal heights: 1st tallest, then 2nd, then 3rd
+          const heights = ['h-72 md:h-80', 'h-96 md:h-[28rem]', 'h-56 md:h-64'] // 2nd, 1st, 3rd
+          const widths = ['w-full', 'w-full', 'w-full']
+
+          // Pedestal colors (solid, vibrant)
+          const pedestalBg = [
+            'bg-gradient-to-b from-slate-300 via-slate-400 to-slate-500',     // 2nd silver
+            'bg-gradient-to-b from-yellow-300 via-yellow-400 to-yellow-600',  // 1st gold
+            'bg-gradient-to-b from-amber-600 via-amber-700 to-amber-800',     // 3rd bronze
+          ]
+          const numberColors = [
+            'text-slate-700', 'text-yellow-800', 'text-amber-200',
+          ]
+          // Avatar bubble colors per rank
+          const avatarColors = [
+            'bg-gradient-to-br from-slate-200 to-slate-400 ring-slate-300',
+            'bg-gradient-to-br from-yellow-300 to-yellow-500 ring-yellow-400',
+            'bg-gradient-to-br from-amber-500 to-amber-700 ring-amber-600',
+          ]
 
           return (
             <div
               key={rank}
-              className="flex-1 flex flex-col items-center gap-3 animate-in slide-in-from-bottom duration-700"
-              style={{ animationDelay: `${idx * 250}ms`, animationFillMode: 'backwards' }}
+              className={`flex-1 max-w-xs flex flex-col items-center ${isEmpty ? 'opacity-40' : ''}`}
             >
-              {/* Player label above bar */}
-              <div className="text-center space-y-1">
-                <div className={`w-14 h-14 mx-auto rounded-full ring-2 flex items-center justify-center font-black text-lg ${
+              {/* Avatar + name + points (above pedestal, animates in first) */}
+              <div
+                className="flex flex-col items-center mb-3 animate-in fade-in slide-in-from-bottom duration-700"
+                style={{ animationDelay: `${idx * 300}ms`, animationFillMode: 'backwards' }}
+              >
+                <div className={`relative w-20 h-20 md:w-28 md:h-28 rounded-full ${
                   isEmpty
-                    ? 'bg-white/5 ring-white/10 border border-dashed border-white/20 text-white/30'
-                    : 'bg-white/10 ring-white/30 text-white'
-                }`}>
-                  {isEmpty ? '—' : p.display_name[0]?.toUpperCase()}
+                    ? 'bg-white/5 border-2 border-dashed border-white/15'
+                    : `${avatarColors[rank]} ring-4 ring-offset-4 ring-offset-blue-950 shadow-2xl`
+                } flex items-center justify-center`}>
+                  {isEmpty ? (
+                    <span className="text-3xl text-white/30">—</span>
+                  ) : (
+                    <span className="text-3xl md:text-5xl font-black text-white drop-shadow-lg">
+                      {p.display_name[0]?.toUpperCase()}
+                    </span>
+                  )}
+                  {!isEmpty && rank === 0 && (
+                    <div className="absolute -top-3 -right-3 text-3xl md:text-4xl drop-shadow-lg animate-bounce">
+                      👑
+                    </div>
+                  )}
                 </div>
-                <p className={`font-black text-base md:text-xl leading-tight px-1 ${isEmpty ? 'text-white/30 italic' : 'text-white'}`}>
-                  {isEmpty ? '—' : p.display_name}
-                </p>
-                <p className={`text-sm font-bold tabular-nums ${isEmpty ? 'text-white/20' : 'text-white/70'}`}>
-                  {isEmpty ? '—' : `${p.total_points.toFixed(1)} pts`}
-                </p>
+                <div className="text-center mt-3 space-y-0.5 max-w-[10rem]">
+                  <p className={`font-black leading-tight px-1 drop-shadow-lg ${
+                    isEmpty ? 'text-white/30 italic text-sm' :
+                    rank === 0 ? 'text-white text-xl md:text-2xl' : 'text-white text-base md:text-lg'
+                  }`}>
+                    {isEmpty ? 'sem participante' : p.display_name}
+                  </p>
+                  {!isEmpty && (
+                    <p className="text-white/80 text-sm md:text-base font-bold tabular-nums">
+                      {p.total_points.toFixed(1)} <span className="text-white/50 text-xs">pts</span>
+                    </p>
+                  )}
+                  {!isEmpty && p.max_streak >= 2 && (
+                    <p className="text-orange-400 text-xs font-bold flex items-center justify-center gap-1">
+                      <Flame className="w-3 h-3" /> ×{p.max_streak}
+                    </p>
+                  )}
+                </div>
               </div>
 
-              {/* Bar */}
-              <div className={`w-full ${colors[rank]} ${heights[rank]} ${isEmpty ? 'opacity-30 grayscale' : ''} rounded-t-3xl flex flex-col items-center justify-start pt-6 gap-2 shadow-2xl relative`}>
-                <span className="text-7xl md:text-8xl drop-shadow-lg">{medals[rank]}</span>
-                <span className={`text-4xl md:text-6xl font-black ${labelColors[rank]} drop-shadow-md`}>
-                  {rank + 1}º
-                </span>
+              {/* Pedestal (rises from bottom) */}
+              <div
+                className={`${widths[idx]} ${pedestalBg[rank]} ${heights[idx]} rounded-t-2xl shadow-2xl relative overflow-hidden animate-in slide-in-from-bottom origin-bottom`}
+                style={{
+                  animationDelay: `${idx * 300 + 200}ms`,
+                  animationDuration: '900ms',
+                  animationFillMode: 'backwards',
+                  animationTimingFunction: 'cubic-bezier(0.34, 1.56, 0.64, 1)',
+                }}
+              >
+                {/* Top shine */}
+                <div className="absolute top-0 left-0 right-0 h-3 bg-white/30" />
+
+                {/* Side gradient for 3D effect */}
+                <div className="absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-black/20 to-transparent" />
+
+                {/* Big rank number — centered */}
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <span className={`text-7xl md:text-9xl font-black ${numberColors[rank]} drop-shadow-2xl select-none`}>
+                    {rank + 1}
+                  </span>
+                </div>
               </div>
             </div>
           )
@@ -505,9 +573,12 @@ function CinematicPodium({ participants }: { participants: Participant[] }) {
 
       {/* Rest of leaderboard */}
       {podium.length > 3 && (
-        <div className="bg-white/10 backdrop-blur rounded-2xl border border-white/20 p-4 w-full max-w-2xl z-10 animate-in fade-in slide-in-from-bottom duration-700" style={{ animationDelay: '1200ms', animationFillMode: 'backwards' }}>
+        <div
+          className="bg-white/10 backdrop-blur rounded-2xl border border-white/20 p-3 w-full max-w-2xl z-10 animate-in fade-in slide-in-from-bottom duration-700 mb-4"
+          style={{ animationDelay: '1500ms', animationFillMode: 'backwards' }}
+        >
           {podium.slice(3, 10).map((p, i) => (
-            <div key={p.id} className="flex items-center gap-3 py-1.5 border-b border-white/10 last:border-0">
+            <div key={p.id} className="flex items-center gap-3 py-1.5 px-2 border-b border-white/10 last:border-0">
               <span className="text-sm font-black w-7 text-center text-white/40">{i + 4}</span>
               <span className="flex-1 text-white font-semibold text-sm truncate">{p.display_name}</span>
               {p.max_streak >= 2 && (
