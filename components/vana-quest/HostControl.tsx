@@ -529,6 +529,60 @@ export function HostControl({ sessionId, initialSession, questions, siteUrl }: P
           )
         })()}
 
+        {/* PRÓXIMA PERGUNTA — preview por baixo da classificação */}
+        {session.status === 'question_leaderboard' && (() => {
+          const nextIdx = session.current_question_index + 1
+          const nextQ = questions[nextIdx]
+          const isLast = !nextQ
+
+          if (isLast) {
+            return (
+              <div className="bg-gradient-to-r from-yellow-400 to-amber-500 rounded-3xl p-4 shadow-lg flex items-center gap-3">
+                <div className="text-4xl">🏆</div>
+                <div className="flex-1">
+                  <p className="text-yellow-900 text-[10px] font-black uppercase tracking-widest">A seguir</p>
+                  <p className="text-yellow-900 font-black text-base sm:text-lg">Pódio final!</p>
+                </div>
+              </div>
+            )
+          }
+
+          const mult = nextQ.points_multiplier
+          const multStyle = mult === 3
+            ? { bg: 'from-orange-400 to-red-500', label: '×3 TRIPLO', icon: '⚡⚡⚡' }
+            : mult === 2
+              ? { bg: 'from-yellow-300 to-amber-500', label: '×2 DUPLO', icon: '⚡⚡' }
+              : { bg: 'from-blue-700 to-indigo-700', label: 'Normal', icon: '◆' }
+
+          return (
+            <div className={`bg-gradient-to-r ${multStyle.bg} rounded-3xl p-4 shadow-lg`}>
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                  <p className={`text-[10px] font-black uppercase tracking-widest ${mult > 1 ? 'text-yellow-900' : 'text-blue-200'}`}>
+                    Próxima pergunta ({nextIdx + 1}/{questions.length})
+                  </p>
+                  <div className="flex items-center gap-2 mt-1 flex-wrap">
+                    <span className={`font-black text-base sm:text-lg ${mult > 1 ? 'text-yellow-900' : 'text-white'}`}>
+                      {multStyle.label}
+                    </span>
+                    {mult > 1 && (
+                      <span className="text-yellow-900/80 font-bold text-xs">
+                        · max {10 * mult} pts
+                      </span>
+                    )}
+                  </div>
+                  <p className={`text-xs mt-1 flex items-center gap-1 ${mult > 1 ? 'text-yellow-900/80' : 'text-blue-200'}`}>
+                    <Clock className="w-3 h-3" /> {nextQ.time_seconds}s
+                  </p>
+                </div>
+                <div className={`text-3xl sm:text-4xl flex-shrink-0 ${mult > 1 ? 'drop-shadow-lg' : 'opacity-70'}`}>
+                  {multStyle.icon}
+                </div>
+              </div>
+            </div>
+          )
+        })()}
+
         {/* FINISHED */}
         {session.status === 'finished' && (
           <div className="space-y-3">
