@@ -365,12 +365,32 @@ export function HostControl({ sessionId, initialSession, questions, siteUrl }: P
           </div>
         )}
 
-        {/* QUESTION INTRO */}
+        {/* QUESTION INTRO — pergunta + preview das opções (para o host poder ler) */}
         {session.status === 'question_intro' && currentQuestion && (
           <div className="bg-white/10 rounded-3xl p-5 border border-white/10 space-y-3">
             <p className="text-sky-300 text-[10px] font-black uppercase tracking-widest">A mostrar pergunta</p>
-            <p className="text-base font-semibold">{currentQuestion.question_text}</p>
-            <div className="flex items-center gap-3 text-xs text-sky-300">
+            <p className="font-semibold text-base leading-snug">{currentQuestion.question_text}</p>
+
+            {/* Preview das opções em 2x2 */}
+            <div className="grid grid-cols-2 gap-2 pt-1">
+              {[currentQuestion.option_a, currentQuestion.option_b, currentQuestion.option_c, currentQuestion.option_d].map((opt, i) => {
+                const isCorrect = correctIdx === i
+                return (
+                  <div
+                    key={i}
+                    className={`${OPTION_COLORS[i]} rounded-xl p-2.5 flex items-start gap-2 shadow ${isCorrect ? 'ring-2 ring-white/80' : 'opacity-90'}`}
+                  >
+                    <span className="text-white font-black text-sm flex-shrink-0">{OPTION_LABELS[i]}</span>
+                    <p className="text-white text-xs font-semibold leading-snug flex-1">{opt}</p>
+                    {isCorrect && (
+                      <CheckCircle2 className="w-3.5 h-3.5 text-white flex-shrink-0" />
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+
+            <div className="flex items-center gap-3 text-xs text-sky-300 pt-1">
               <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> {currentQuestion.time_seconds}s</span>
               <span className="flex items-center gap-1"><Zap className="w-3 h-3" /> ×{currentQuestion.points_multiplier}</span>
             </div>
