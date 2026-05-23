@@ -299,11 +299,45 @@ export async function nextStage(sessionId: string) {
       }).eq('id', sessionId)
       return
 
-    case 'question_active':
+    case 'question_active': {
+      // A pergunta acabou. Quem não respondeu, perde a streak (reset a 0).
+      const currentQuestionId = questions?.[session.current_question_index]?.id
+      if (currentQuestionId) {
+        // Participantes que responderam a esta pergunta
+        const { data: answered } = await supabase
+          .from('vana_quest_answers')
+          .select('participant_id')
+          .eq('session_id', sessionId)
+          .eq('question_id', currentQuestionId)
+        const answeredIds = new Set((answered || []).map((a) => a.participant_id))
+
+        // Todos os participantes da sessão
+        const { data: allParticipants } = await supabase
+          .from('vana_quest_participants')
+          .select('id, current_streak')
+          .eq('session_id', sessionId)
+
+        // Reset à streak de quem não respondeu (e tinha streak > 0)
+        const missing = (allParticipants || []).filter(
+          (p) => !answeredIds.has(p.id) && (p.current_streak || 0) > 0
+        )
+        if (missing.length > 0) {
+          await Promise.all(
+            missing.map((p) =>
+              supabase
+                .from('vana_quest_participants')
+                .update({ current_streak: 0 })
+                .eq('id', p.id)
+            )
+          )
+        }
+      }
+
       await supabase.from('vana_quest_sessions').update({
         status: 'question_results',
       }).eq('id', sessionId)
       return
+    }
 
     case 'question_results': {
       const isLastQuestion = session.current_question_index >= totalQuestions - 1
