@@ -495,6 +495,10 @@ function CinematicPodium({ participants }: { participants: Participant[] }) {
             'bg-gradient-to-br from-amber-500 to-amber-700 ring-amber-600',
           ]
 
+          // Animation order: 3rd (rank=2) first, then 2nd (rank=1), then 1st (rank=0)
+          const animOrder = 2 - rank // rank 2 → 0, rank 1 → 1, rank 0 → 2
+          const baseDelay = animOrder * 600
+
           return (
             <div
               key={rank}
@@ -503,7 +507,7 @@ function CinematicPodium({ participants }: { participants: Participant[] }) {
               {/* Avatar + name + points (above pedestal, animates in first) */}
               <div
                 className="flex flex-col items-center mb-3 animate-in fade-in slide-in-from-bottom duration-700"
-                style={{ animationDelay: `${idx * 300}ms`, animationFillMode: 'backwards' }}
+                style={{ animationDelay: `${baseDelay}ms`, animationFillMode: 'backwards' }}
               >
                 <div className={`relative w-20 h-20 md:w-28 md:h-28 rounded-full ${
                   isEmpty
@@ -547,7 +551,7 @@ function CinematicPodium({ participants }: { participants: Participant[] }) {
               <div
                 className={`${widths[idx]} ${pedestalBg[rank]} ${heights[idx]} rounded-t-2xl shadow-2xl relative overflow-hidden animate-in slide-in-from-bottom origin-bottom`}
                 style={{
-                  animationDelay: `${idx * 300 + 200}ms`,
+                  animationDelay: `${baseDelay + 200}ms`,
                   animationDuration: '900ms',
                   animationFillMode: 'backwards',
                   animationTimingFunction: 'cubic-bezier(0.34, 1.56, 0.64, 1)',
@@ -575,7 +579,7 @@ function CinematicPodium({ participants }: { participants: Participant[] }) {
       {podium.length > 3 && (
         <div
           className="bg-white/10 backdrop-blur rounded-2xl border border-white/20 p-3 w-full max-w-2xl z-10 animate-in fade-in slide-in-from-bottom duration-700 mb-4"
-          style={{ animationDelay: '1500ms', animationFillMode: 'backwards' }}
+          style={{ animationDelay: '2200ms', animationFillMode: 'backwards' }}
         >
           {podium.slice(3, 10).map((p, i) => (
             <div key={p.id} className="flex items-center gap-3 py-1.5 px-2 border-b border-white/10 last:border-0">
