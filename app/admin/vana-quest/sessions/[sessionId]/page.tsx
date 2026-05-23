@@ -6,6 +6,7 @@ import {
   ChevronLeft, Users, Trophy, Clock, Flame, CheckCircle2, Hash,
   Calendar, Zap, Award, Play, MonitorPlay, UserPlus
 } from 'lucide-react'
+import { PlayerAvatar } from '@/components/vana-quest/PlayerAvatar'
 
 const OPTION_COLORS: Record<string, string> = {
   A: 'bg-red-500', B: 'bg-blue-500', C: 'bg-yellow-400', D: 'bg-green-500',
@@ -59,6 +60,35 @@ export default async function SessionDetailPage({
     .from('vana_quest_answers')
     .select('*')
     .eq('session_id', sessionId)
+
+  // Recompute true max streak per participant from the answer history (ordered by question_order).
+  // Treats unanswered questions as streak-breaking.
+  const questionOrderMap = new Map<string, number>()
+  ;(questions || []).forEach((q) => questionOrderMap.set(q.id, q.question_order))
+  const trueMaxStreak = new Map<string, number>()
+  const trueCorrect = new Map<string, number>()
+  ;(participants || []).forEach((p) => {
+    const myAnswered = new Map<string, boolean>()
+    ;(answers || [])
+      .filter((a) => a.participant_id === p.id)
+      .forEach((a) => myAnswered.set(a.question_id, a.is_correct))
+    let streak = 0
+    let max = 0
+    let correct = 0
+    ;(questions || []).forEach((q) => {
+      const ans = myAnswered.get(q.id)
+      if (ans === true) {
+        streak += 1
+        correct += 1
+        if (streak > max) max = streak
+      } else {
+        // wrong OR didn't answer → break streak
+        streak = 0
+      }
+    })
+    trueMaxStreak.set(p.id, max)
+    trueCorrect.set(p.id, correct)
+  })
 
   const status = STATUS_LABELS[session.status] || STATUS_LABELS.waiting
   const durationMin = session.ended_at
@@ -174,6 +204,8 @@ export default async function SessionDetailPage({
               {participants.map((p, i) => {
                 const recipient = (p.recipient as any)?.full_name
                 const linkedUser = (p.user as any)?.full_name
+                const realMax = trueMaxStreak.get(p.id) ?? 0
+                const realCorrect = trueCorrect.get(p.id) ?? p.correct_answers
                 return (
                   <div key={p.id} className="flex items-center gap-3 py-2 border-b last:border-0">
                     <span className={`text-base font-black w-7 text-center ${
@@ -181,9 +213,13 @@ export default async function SessionDetailPage({
                     }`}>
                       {i + 1}
                     </span>
-                    <div className="w-9 h-9 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 font-black text-sm flex-shrink-0">
-                      {p.display_name[0]?.toUpperCase()}
-                    </div>
+                    <PlayerAvatar
+                      name={p.display_name}
+                      avatarUrl={p.avatar_url}
+                      className="w-9 h-9"
+                      textClassName="text-sm"
+                      fallbackBg="bg-blue-100 text-blue-700"
+                    />
                     <div className="flex-1 min-w-0">
                       <p className="font-semibold text-gray-900 text-sm truncate">{p.display_name}</p>
                       <p className="text-xs text-gray-500 truncate">
@@ -194,11 +230,11 @@ export default async function SessionDetailPage({
                     </div>
                     <div className="hidden sm:flex items-center gap-3 text-xs text-gray-500 flex-shrink-0">
                       <span className="flex items-center gap-1">
-                        <CheckCircle2 className="w-3 h-3 text-green-600" /> {p.correct_answers}
+                        <CheckCircle2 className="w-3 h-3 text-green-600" /> {realCorrect}
                       </span>
-                      {p.max_streak >= 2 && (
+                      {realMax >= 2 && (
                         <span className="flex items-center gap-1 text-orange-500">
-                          <Flame className="w-3 h-3" /> {p.max_streak}
+                          <Flame className="w-3 h-3" /> {realMax}
                         </span>
                       )}
                     </div>

@@ -300,38 +300,60 @@ export async function nextStage(sessionId: string) {
       return
 
     case 'question_active': {
-      // A pergunta acabou. Quem não respondeu, perde a streak (reset a 0).
-      const currentQuestionId = questions?.[session.current_question_index]?.id
-      if (currentQuestionId) {
-        // Participantes que responderam a esta pergunta
-        const { data: answered } = await supabase
-          .from('vana_quest_answers')
-          .select('participant_id')
-          .eq('session_id', sessionId)
-          .eq('question_id', currentQuestionId)
-        const answeredIds = new Set((answered || []).map((a) => a.participant_id))
+      // A pergunta acabou. Recalcula stats verdadeiras (streak/max_streak/correct_answers)
+      // a partir do histórico de respostas — fonte única de verdade.
+      const allQuestionsOrdered = questions || []
+      const upToIndex = session.current_question_index
 
-        // Todos os participantes da sessão
-        const { data: allParticipants } = await supabase
-          .from('vana_quest_participants')
-          .select('id, current_streak')
-          .eq('session_id', sessionId)
+      const { data: allAnswers } = await supabase
+        .from('vana_quest_answers')
+        .select('participant_id, question_id, is_correct')
+        .eq('session_id', sessionId)
 
-        // Reset à streak de quem não respondeu (e tinha streak > 0)
-        const missing = (allParticipants || []).filter(
-          (p) => !answeredIds.has(p.id) && (p.current_streak || 0) > 0
-        )
-        if (missing.length > 0) {
-          await Promise.all(
-            missing.map((p) =>
-              supabase
-                .from('vana_quest_participants')
-                .update({ current_streak: 0 })
-                .eq('id', p.id)
-            )
-          )
+      const { data: allParticipants } = await supabase
+        .from('vana_quest_participants')
+        .select('id')
+        .eq('session_id', sessionId)
+
+      // Para cada participante, percorre as perguntas em ordem até à actual,
+      // reconstruindo streak/max/correct.
+      const updates = (allParticipants || []).map((p) => {
+        const answered = new Map<string, boolean>()
+        ;(allAnswers || [])
+          .filter((a) => a.participant_id === p.id)
+          .forEach((a) => answered.set(a.question_id, a.is_correct))
+
+        let streak = 0
+        let max = 0
+        let correct = 0
+        for (let i = 0; i <= upToIndex; i++) {
+          const q = allQuestionsOrdered[i]
+          if (!q) continue
+          const ans = answered.get(q.id)
+          if (ans === true) {
+            streak += 1
+            correct += 1
+            if (streak > max) max = streak
+          } else {
+            // errada ou sem resposta → quebra streak
+            streak = 0
+          }
         }
-      }
+        return { id: p.id, current_streak: streak, max_streak: max, correct_answers: correct }
+      })
+
+      await Promise.all(
+        updates.map((u) =>
+          supabase
+            .from('vana_quest_participants')
+            .update({
+              current_streak: u.current_streak,
+              max_streak: u.max_streak,
+              correct_answers: u.correct_answers,
+            })
+            .eq('id', u.id)
+        )
+      )
 
       await supabase.from('vana_quest_sessions').update({
         status: 'question_results',

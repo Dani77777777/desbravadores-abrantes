@@ -91,6 +91,31 @@ export function PlayerScreen({ sessionId, userId, userProfile, initialSession, q
     setParticipantId(stored)
   }, [sessionId])
 
+  // Sincronizar stats com a BD ao montar (após termos o participantId) e
+  // sempre que entrarmos em question_results ou question_leaderboard.
+  // Isto garante que mesmo após refresh ou se entrarmos a meio do jogo,
+  // os valores mostrados (streak, certas, pontos) batem com a BD.
+  useEffect(() => {
+    if (!participantId) return
+    const shouldSync =
+      session.status === 'question_results' ||
+      session.status === 'question_leaderboard' ||
+      session.status === 'finished'
+    if (!shouldSync) return
+
+    supabase
+      .from('vana_quest_participants')
+      .select('total_points, correct_answers, current_streak')
+      .eq('id', participantId)
+      .single()
+      .then(({ data }) => {
+        if (!data) return
+        setTotalPoints(Number(data.total_points) || 0)
+        setCorrectCount(data.correct_answers || 0)
+        setStreak(data.current_streak || 0)
+      })
+  }, [participantId, session.status])
+
   // Realtime: session + counters (without revealing distribution)
   useEffect(() => {
     const channel = supabase
@@ -330,11 +355,11 @@ export function PlayerScreen({ sessionId, userId, userProfile, initialSession, q
         </div>
         <p className="text-center text-2xl font-black text-white tabular-nums">{Math.ceil(timeLeft)}</p>
 
-        {/* If already answered — neutral waiting state, no hint of correct/wrong */}
+        {/* If already answered — neutral state, no hint of which option was chosen */}
         {answerResult ? (
           <div className="flex-1 flex flex-col items-center justify-center gap-5">
             <div className="w-24 h-24 rounded-full bg-white/10 border-2 border-white/20 flex items-center justify-center animate-in zoom-in duration-300">
-              <span className="text-white text-4xl font-black">{answerResult.chosen}</span>
+              <CheckCircle2 className="w-12 h-12 text-white/60" />
             </div>
             <p className="text-white font-bold text-2xl">Resposta enviada</p>
             <p className="text-white/40 text-sm animate-pulse">À espera dos outros...</p>
