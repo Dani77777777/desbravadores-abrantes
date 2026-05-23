@@ -3,8 +3,8 @@ import { redirect } from 'next/navigation'
 import { Navbar } from '@/components/layout/Navbar'
 import Link from 'next/link'
 import {
-  ChevronLeft, Users, Trophy, Clock, Flame, CheckCircle2, XCircle, Hash,
-  Calendar, Zap, Award
+  ChevronLeft, Users, Trophy, Clock, Flame, CheckCircle2, Hash,
+  Calendar, Zap, Award, Play, MonitorPlay, UserPlus
 } from 'lucide-react'
 
 const OPTION_COLORS: Record<string, string> = {
@@ -111,6 +111,47 @@ export default async function SessionDetailPage({
             </p>
           </div>
         </div>
+
+        {/* Live actions — only if session is still active */}
+        {session.status !== 'finished' && (
+          <div className="bg-gradient-to-r from-blue-900 to-indigo-900 rounded-2xl p-4 sm:p-5 shadow-lg border border-blue-800/30">
+            <div className="flex items-start gap-3 mb-3">
+              <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse mt-1.5 flex-shrink-0" />
+              <div>
+                <p className="text-white font-bold text-sm">Sessão ao vivo</p>
+                <p className="text-blue-200 text-xs">Esta sessão ainda está {session.status === 'waiting' ? 'em sala de espera' : 'a decorrer'}.</p>
+              </div>
+            </div>
+            <div className="flex flex-col sm:flex-row gap-2">
+              {session.host_id === user.id && (
+                <Link
+                  href={`/jogos/vana-quest/${sessionId}/control`}
+                  className="flex-1 flex items-center justify-center gap-2 bg-white text-blue-900 font-bold text-sm py-2.5 px-4 rounded-xl hover:bg-yellow-300 transition-colors"
+                >
+                  <Play className="w-4 h-4" /> Voltar ao controlo
+                </Link>
+              )}
+              <a
+                href={`/jogos/vana-quest/${sessionId}/present`}
+                target="_blank"
+                rel="noopener"
+                className="flex-1 flex items-center justify-center gap-2 bg-white/10 hover:bg-white/20 text-white font-bold text-sm py-2.5 px-4 rounded-xl border border-white/20 transition-colors"
+              >
+                <MonitorPlay className="w-4 h-4" /> Abrir apresentação
+              </a>
+              {session.status === 'waiting' && (
+                <a
+                  href={`/jogos/vana-quest?pin=${session.pin}`}
+                  target="_blank"
+                  rel="noopener"
+                  className="flex-1 flex items-center justify-center gap-2 bg-white/10 hover:bg-white/20 text-white font-bold text-sm py-2.5 px-4 rounded-xl border border-white/20 transition-colors"
+                >
+                  <UserPlus className="w-4 h-4" /> Entrar como jogador
+                </a>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Quick stats */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
