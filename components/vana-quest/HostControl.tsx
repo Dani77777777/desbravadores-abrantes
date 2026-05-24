@@ -7,8 +7,9 @@ import { getIntroSeconds } from '@/utils/vana-quest'
 import { QRCodeSVG } from 'qrcode.react'
 import {
   Users, ChevronRight, Trophy, Zap, Clock, Maximize2,
-  CheckCircle2, Flame, Play, MonitorPlay, Copy, Check, Volume2, VolumeX
+  CheckCircle2, Flame, Play, MonitorPlay, Copy, Check, Volume2, VolumeX, Share2, Download
 } from 'lucide-react'
+import { PodiumShareCard } from './PodiumShareCard'
 import { PlayerAvatar } from './PlayerAvatar'
 
 const OPTION_COLORS = ['bg-red-500', 'bg-blue-500', 'bg-yellow-400', 'bg-green-500']
@@ -72,7 +73,60 @@ export function HostControl({ sessionId, initialSession, questions, siteUrl }: P
   const [busy, setBusy] = useState(false)
   const [copied, setCopied] = useState(false)
   const [musicEnabled, setMusicEnabled] = useState(true)
+  const [sharing, setSharing] = useState(false)
+  const [shareToast, setShareToast] = useState<string | null>(null)
   const inFlight = useRef(false)
+  const podiumCardRef = useRef<HTMLDivElement | null>(null)
+
+  async function handleSharePodium() {
+    if (sharing) return
+    setSharing(true)
+    setShareToast(null)
+    try {
+      const { toPng } = await import('html-to-image')
+      const node = podiumCardRef.current
+      if (!node) throw new Error('Card não pronto')
+
+      const dataUrl = await toPng(node, {
+        pixelRatio: 2,
+        cacheBust: true,
+        backgroundColor: '#0c1a3d',
+      })
+
+      const questTitle = (initialSession.vana_quests as any)?.title || 'VanaQuest'
+      const fileName = `podio-${questTitle.replace(/[^a-z0-9]+/gi, '-').toLowerCase()}-${Date.now()}.png`
+
+      // Tentar Web Share API (mobile)
+      try {
+        const res = await fetch(dataUrl)
+        const blob = await res.blob()
+        const file = new File([blob], fileName, { type: 'image/png' })
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+          await navigator.share({
+            files: [file],
+            title: `🏆 Pódio Final — ${questTitle}`,
+            text: `Resultados do VanaQuest: ${questTitle}`,
+          })
+          setShareToast('Partilhado!')
+          return
+        }
+      } catch {
+        // ignora, faz download
+      }
+
+      // Fallback: download
+      const link = document.createElement('a')
+      link.href = dataUrl
+      link.download = fileName
+      link.click()
+      setShareToast('Imagem transferida!')
+    } catch (e) {
+      setShareToast('Erro ao gerar imagem')
+    } finally {
+      setSharing(false)
+      setTimeout(() => setShareToast(null), 3000)
+    }
+  }
   // Pontos do jogador no início do leaderboard (para calcular delta da última ronda)
   const prevPointsRef = useRef<Record<string, number>>({})
   // Capturar os deltas ao entrar no leaderboard (e congelar até sair)
@@ -461,24 +515,60 @@ export function HostControl({ sessionId, initialSession, questions, siteUrl }: P
           </div>
         )}
 
-        {/* RESULTS */}
-        {session.status === 'question_results' && currentQuestion && (
-          <div className="bg-white/10 rounded-3xl p-5 border border-white/10 space-y-3">
-            <p className="text-yellow-400 text-[10px] font-black uppercase tracking-widest">Resposta correcta</p>
-            <div className={`${OPTION_COLORS[correctIdx]} rounded-2xl p-4 flex items-center gap-3`}>
-              <CheckCircle2 className="w-6 h-6 text-white flex-shrink-0" />
-              <div>
-                <p className="text-[10px] font-black text-white/80">{OPTION_LABELS[correctIdx]}</p>
-                <p className="font-bold text-white text-sm">
-                  {[currentQuestion.option_a, currentQuestion.option_b, currentQuestion.option_c, currentQuestion.option_d][correctIdx]}
-                </p>
+        {/* RESULTS — resposta correcta + distribuição compacta */}
+        {session.status === 'question_results' && currentQuestion && (() => {
+          const opts = [currentQuestion.option_a, currentQuestion.option_b, currentQuestion.option_c, currentQuestion.option_d]
+          const maxCount = Math.max(...answerCounts, 1)
+          return (
+            <div className="bg-white/10 rounded-3xl p-5 border border-white/10 space-y-3">
+              <p className="text-yellow-400 text-[10px] font-black uppercase tracking-widest">Resposta correcta</p>
+              <div className={`${OPTION_COLORS[correctIdx]} rounded-2xl p-4 flex items-center gap-3`}>
+                <CheckCircle2 className="w-6 h-6 text-white flex-shrink-0" />
+                <div>
+                  <p className="text-[10px] font-black text-white/80">{OPTION_LABELS[correctIdx]}</p>
+                  <p className="font-bold text-white text-sm">{opts[correctIdx]}</p>
+                </div>
               </div>
+
+              {/* Distribuição compacta — uma barra por opção */}
+              <div className="space-y-1.5 pt-1">
+                <p className="text-white/50 text-[10px] font-black uppercase tracking-widest mb-1">
+                  Distribuição
+                </p>
+                {opts.map((opt, i) => {
+                  const count = answerCounts[i]
+                  const pct = (count / maxCount) * 100
+                  const isCorrect = i === correctIdx
+                  return (
+                    <div key={i} className="flex items-center gap-2">
+                      <span className={`w-6 h-6 ${OPTION_COLORS[i]} rounded flex items-center justify-center text-white text-xs font-black flex-shrink-0`}>
+                        {OPTION_LABELS[i].split(' ')[0]}
+                      </span>
+                      <div className="flex-1 relative h-6 rounded-lg bg-white/5 overflow-hidden">
+                        <div
+                          className={`absolute inset-y-0 left-0 ${OPTION_COLORS[i]} ${isCorrect ? 'opacity-100' : 'opacity-40'} transition-all`}
+                          style={{ width: `${Math.max(2, pct)}%` }}
+                        />
+                        <div className="relative h-full flex items-center justify-between px-2 text-[11px]">
+                          <span className={`font-semibold truncate ${pct > 30 ? 'text-white' : 'text-white/70'}`}>{opt}</span>
+                          <span className={`font-black tabular-nums shrink-0 ml-2 ${pct > 30 ? 'text-white' : 'text-white/70'}`}>{count}</span>
+                        </div>
+                      </div>
+                      {isCorrect && <CheckCircle2 className="w-3.5 h-3.5 text-green-400 flex-shrink-0" />}
+                    </div>
+                  )
+                })}
+              </div>
+
+              <p className="text-sky-300 text-xs text-center pt-1">
+                {currentAnswers.filter((a) => a.is_correct).length} de {participants.length} acertaram
+                {currentAnswers.length < participants.length && (
+                  <span className="text-white/40"> · {participants.length - currentAnswers.length} sem resposta</span>
+                )}
+              </p>
             </div>
-            <p className="text-sky-300 text-xs text-center">
-              {currentAnswers.filter((a) => a.is_correct).length} de {participants.length} acertaram
-            </p>
-          </div>
-        )}
+          )
+        })()}
 
         {/* LEADERBOARD — vista completa para o host */}
         {session.status === 'question_leaderboard' && (() => {
@@ -727,10 +817,49 @@ export function HostControl({ sessionId, initialSession, questions, siteUrl }: P
               </div>
             )}
 
+            {/* Botão de partilha do pódio */}
+            <button
+              onClick={handleSharePodium}
+              disabled={sharing || participants.length === 0}
+              className="w-full bg-white/10 hover:bg-white/15 disabled:opacity-50 border border-white/15 font-bold text-base py-3 rounded-2xl transition-all flex items-center justify-center gap-2"
+            >
+              {sharing ? (
+                <>A gerar imagem...</>
+              ) : (
+                <>
+                  <Share2 className="w-4 h-4" /> Partilhar pódio
+                </>
+              )}
+            </button>
+            {shareToast && (
+              <div className="bg-blue-500/20 border border-blue-400/30 rounded-2xl p-3 text-blue-200 font-semibold text-center text-sm flex items-center justify-center gap-2">
+                <Download className="w-4 h-4" /> {shareToast}
+              </div>
+            )}
+
             <a href="/admin/vana-quest" className="block text-center text-sky-300 underline text-sm py-2">Voltar à gestão</a>
           </div>
         )}
       </div>
+
+      {/* Card escondido para captura (off-screen mas renderizado) */}
+      {session.status === 'finished' && participants.length > 0 && (
+        <div
+          style={{
+            position: 'fixed',
+            left: '-99999px',
+            top: 0,
+            pointerEvents: 'none',
+          }}
+          aria-hidden="true"
+        >
+          <PodiumShareCard
+            ref={podiumCardRef}
+            participants={participants}
+            questTitle={(initialSession.vana_quests as any)?.title || 'VanaQuest'}
+          />
+        </div>
+      )}
 
       {/* Bottom fixed action bar */}
       {session.status !== 'finished' && session.status !== 'question_intro' && session.status !== 'quest_intro' && (

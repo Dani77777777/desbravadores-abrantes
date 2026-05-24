@@ -599,7 +599,10 @@ export function Presentation({ sessionId, initialSession, questions, siteUrl }: 
         </div>
 
         {/* Answers — fills remaining vertical space */}
-        <div className="flex-1 min-h-0 grid grid-cols-2 grid-rows-2 gap-3 md:gap-4 w-full">
+        <div
+          className="flex-1 min-h-0 grid grid-cols-2 grid-rows-2 gap-3 md:gap-4 w-full"
+          style={{ paddingRight: 'clamp(7rem, 11vw, 13rem)' }}
+        >
           {options.map((opt, i) => (
             <div
               key={i}
