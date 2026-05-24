@@ -8,6 +8,7 @@ import {
 } from 'lucide-react'
 import { PlayerAvatar } from '@/components/vana-quest/PlayerAvatar'
 import { DeleteSessionButton } from '@/components/vana-quest/DeleteSessionButton'
+import { AwardSessionButton } from '@/components/vana-quest/AwardSessionButton'
 
 const OPTION_COLORS: Record<string, string> = {
   A: 'bg-red-500', B: 'bg-blue-500', C: 'bg-yellow-400', D: 'bg-green-500',
@@ -200,6 +201,15 @@ export default async function SessionDetailPage({
           <StatCard icon={<CheckCircle2 className="w-5 h-5" />} label="Acerto" value={`${accuracy}%`} color="green" />
           <StatCard icon={<Hash className="w-5 h-5" />} label="Respostas" value={totalAnswers} color="indigo" />
         </div>
+
+        {/* Atribuir XP/Gold — só se a sessão está terminada */}
+        {session.status === 'finished' && participants && participants.length > 0 && (
+          <AwardSessionButton
+            sessionId={sessionId}
+            alreadyAwarded={!!(session as any).points_awarded_at}
+            awardedAt={(session as any).points_awarded_at}
+          />
+        )}
 
         {/* Leaderboard */}
         <section className="bg-white rounded-2xl border shadow-sm p-5 space-y-3">

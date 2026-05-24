@@ -503,20 +503,33 @@ export async function setRewardsRecipient(
  * XP/Gold awards são baseados nos pontos totais ganhos no jogo.
  * Arredondamento half-up: 15.5 → 16, 15.4 → 15
  * Gold = round(total_points), XP = gold * 2
+ *
+ * Protecção: se já foi atribuído antes (points_awarded_at != null), não duplica.
  */
-export async function awardSessionPoints(sessionId: string): Promise<void> {
+export async function awardSessionPoints(sessionId: string): Promise<{ ok: boolean; alreadyAwarded?: boolean; error?: string }> {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error('Não autorizado')
 
   const service = createServiceClient()
 
+  // Verificar se já foi atribuído
+  const { data: sessionCheck } = await service
+    .from('vana_quest_sessions')
+    .select('points_awarded_at')
+    .eq('id', sessionId)
+    .single()
+
+  if (sessionCheck?.points_awarded_at) {
+    return { ok: false, alreadyAwarded: true, error: 'Os prémios já foram atribuídos a esta sessão.' }
+  }
+
   const { data: participants } = await service
     .from('vana_quest_participants')
     .select('*')
     .eq('session_id', sessionId)
 
-  if (!participants) return
+  if (!participants) return { ok: true }
 
   for (const p of participants) {
     const totalPoints = Number(p.total_points) || 0
@@ -538,4 +551,12 @@ export async function awardSessionPoints(sessionId: string): Promise<void> {
       })
     }
   }
+
+  // Marcar sessão como já atribuída
+  await service
+    .from('vana_quest_sessions')
+    .update({ points_awarded_at: new Date().toISOString() })
+    .eq('id', sessionId)
+
+  return { ok: true }
 }

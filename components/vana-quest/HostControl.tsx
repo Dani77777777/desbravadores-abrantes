@@ -296,8 +296,10 @@ export function HostControl({ sessionId, initialSession, questions, siteUrl }: P
 
   async function handleAward() {
     setAwarding(true)
-    await awardSessionPoints(sessionId)
-    setAwarded(true)
+    const result = await awardSessionPoints(sessionId)
+    if (result?.ok || result?.alreadyAwarded) {
+      setAwarded(true)
+    }
     setAwarding(false)
   }
 
