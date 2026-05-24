@@ -218,10 +218,12 @@ export function Presentation({ sessionId, initialSession, questions, siteUrl }: 
   }, [session.status, musicEnabled, audioUnlocked])
 
   // Quando Podium Intro acaba → muda para Victory Celebration (loop)
+  // Usa decodeURIComponent para apanhar nomes com %20 (espaços codificados)
   function handleMusicEnded() {
     const el = musicRef.current
     if (!el) return
-    if (currentTrackRef.current.includes('Podium Intro')) {
+    const current = decodeURIComponent(currentTrackRef.current || '')
+    if (current.includes('Podium Intro')) {
       const victory = sound('VanaQuest - Victory Celebration.mp3')
       currentTrackRef.current = victory
       el.src = victory
