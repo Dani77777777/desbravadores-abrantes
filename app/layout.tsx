@@ -9,6 +9,9 @@ export const metadata: Metadata = {
   title: 'Clube de Desbravadores - Abrantes',
   description: 'Plataforma de gamificação do Clube de Desbravadores de Abrantes',
   manifest: '/manifest.json',
+  verification: {
+    google: 'SZS_Lo-vdaAFESv_G192-3wDUL5nAM3lQGeTp90EChE',
+  },
 }
 
 export default function RootLayout({
