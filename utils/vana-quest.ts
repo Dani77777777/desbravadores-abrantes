@@ -11,6 +11,34 @@ export function getIntroSeconds(questionText: string): number {
   return Math.max(4, Math.min(10, seconds))
 }
 
+/**
+ * Calcula o tamanho da fonte da pergunta com base no comprimento do texto.
+ * Quanto maior o texto, menor a fonte — para evitar que faça overflow.
+ * Retorna uma string CSS clamp() pronta para usar.
+ */
+export function questionFontSize(text: string): string {
+  const len = (text || '').length
+  if (len <= 40) return 'clamp(2.5rem, 6.5vw, 7rem)'
+  if (len <= 70) return 'clamp(2.25rem, 5vw, 5.5rem)'
+  if (len <= 110) return 'clamp(1.75rem, 4vw, 4.5rem)'
+  if (len <= 160) return 'clamp(1.5rem, 3.2vw, 3.75rem)'
+  if (len <= 220) return 'clamp(1.25rem, 2.6vw, 3rem)'
+  return 'clamp(1.1rem, 2.2vw, 2.5rem)'
+}
+
+/**
+ * Tamanho de fonte para o texto de cada opção (presentation question_active).
+ * Considera o texto mais longo das opções para dimensionar todas igualmente.
+ */
+export function optionFontSize(longestText: string): string {
+  const len = (longestText || '').length
+  if (len <= 15) return 'clamp(1.75rem, 3.5vw, 4rem)'
+  if (len <= 30) return 'clamp(1.5rem, 3vw, 3.25rem)'
+  if (len <= 50) return 'clamp(1.25rem, 2.5vw, 2.5rem)'
+  if (len <= 80) return 'clamp(1.1rem, 2vw, 2rem)'
+  return 'clamp(1rem, 1.6vw, 1.5rem)'
+}
+
 export function calcPoints(
   timeSeconds: number,
   elapsedMs: number,

@@ -89,8 +89,26 @@ export function PlayerScreen({ sessionId, userId, userProfile, initialSession, q
 
   useEffect(() => {
     const stored = localStorage.getItem(`vana_participant_${sessionId}`)
-    setParticipantId(stored)
-  }, [sessionId])
+    if (stored) {
+      setParticipantId(stored)
+      return
+    }
+    // Failsafe: se não há localStorage mas o user está autenticado, procura o participante na BD
+    if (userId) {
+      supabase
+        .from('vana_quest_participants')
+        .select('id')
+        .eq('session_id', sessionId)
+        .eq('user_id', userId)
+        .single()
+        .then(({ data }) => {
+          if (data?.id) {
+            setParticipantId(data.id)
+            localStorage.setItem(`vana_participant_${sessionId}`, data.id)
+          }
+        })
+    }
+  }, [sessionId, userId])
 
   // Aviso de multiplicador (x2/x3) no início do question_intro
   useEffect(() => {

@@ -5,7 +5,7 @@ import { createClient } from '@/utils/supabase/client'
 import { QRCodeSVG } from 'qrcode.react'
 import { Users, Trophy, Zap, Flame, CheckCircle2 } from 'lucide-react'
 import { PlayerAvatar } from './PlayerAvatar'
-import { getIntroSeconds } from '@/utils/vana-quest'
+import { getIntroSeconds, questionFontSize, optionFontSize } from '@/utils/vana-quest'
 
 const OPTION_COLORS = ['bg-red-500', 'bg-blue-500', 'bg-yellow-400', 'bg-green-500']
 const OPTION_LABELS = ['▲', '●', '◆', '■']
@@ -547,11 +547,11 @@ export function Presentation({ sessionId, initialSession, questions, siteUrl }: 
           )}
         </div>
 
-        <div className="text-center max-w-7xl w-full space-y-6 animate-in fade-in zoom-in-95 duration-500">
+        <div className="text-center max-w-7xl w-full space-y-6 animate-in fade-in zoom-in-95 duration-500 px-4">
           <p className="text-sky-400 text-sm md:text-base font-black uppercase tracking-[0.3em]">Pergunta {session.current_question_index + 1}</p>
           <h2
-            className="text-white font-black leading-[1.1] drop-shadow-lg"
-            style={{ fontSize: 'clamp(2.5rem, 6.5vw, 7rem)' }}
+            className="text-white font-black leading-[1.15] drop-shadow-lg"
+            style={{ fontSize: questionFontSize(currentQuestion.question_text) }}
           >
             {currentQuestion.question_text}
           </h2>
@@ -624,7 +624,7 @@ export function Presentation({ sessionId, initialSession, questions, siteUrl }: 
         <div className="bg-white/10 backdrop-blur rounded-3xl border border-white/20 px-6 py-5 md:py-7 flex items-center justify-center flex-shrink-0">
           <p
             className="text-white font-bold text-center leading-tight"
-            style={{ fontSize: 'clamp(1.75rem, 3.5vw, 3.5rem)' }}
+            style={{ fontSize: questionFontSize(currentQuestion.question_text) }}
           >
             {currentQuestion.question_text}
           </p>
@@ -638,7 +638,7 @@ export function Presentation({ sessionId, initialSession, questions, siteUrl }: 
           {options.map((opt, i) => (
             <div
               key={i}
-              className={`${OPTION_COLORS[i]} rounded-2xl p-4 md:p-6 flex items-center gap-5 shadow-xl min-h-0`}
+              className={`${OPTION_COLORS[i]} rounded-2xl p-4 md:p-6 flex items-center gap-5 shadow-xl min-h-0 overflow-hidden`}
             >
               <span
                 className="text-white font-black flex-shrink-0 drop-shadow-lg"
@@ -648,7 +648,7 @@ export function Presentation({ sessionId, initialSession, questions, siteUrl }: 
               </span>
               <p
                 className="text-white font-black leading-tight drop-shadow-md flex-1"
-                style={{ fontSize: 'clamp(1.5rem, 3.2vw, 3.5rem)' }}
+                style={{ fontSize: optionFontSize(options.reduce((a, b) => a.length > b.length ? a : b, '')) }}
               >
                 {opt}
               </p>

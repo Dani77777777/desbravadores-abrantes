@@ -2,16 +2,35 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
+import { Play, RotateCcw } from 'lucide-react'
 import { joinSession } from '@/lib/actions/vana-quest'
 import { PlayerAvatar } from './PlayerAvatar'
+
+interface ActiveSession {
+  id: string
+  pin: string
+  status: string
+  title: string
+}
 
 interface Props {
   user: any
   profile: any
   initialPin: string
+  activeSessions?: ActiveSession[]
 }
 
-export function JoinForm({ user, profile, initialPin }: Props) {
+const STATUS_LABEL: Record<string, string> = {
+  waiting: 'Sala de espera',
+  quest_intro: 'A começar',
+  question_intro: 'A decorrer',
+  question_active: 'Pergunta activa',
+  question_results: 'A revelar resposta',
+  question_leaderboard: 'Classificação',
+}
+
+export function JoinForm({ user, profile, initialPin, activeSessions = [] }: Props) {
   const router = useRouter()
   const [pin, setPin] = useState(initialPin)
   const [guestName, setGuestName] = useState('')
@@ -124,6 +143,45 @@ export function JoinForm({ user, profile, initialPin }: Props) {
             {loading ? 'A entrar...' : 'Entrar no jogo'}
           </button>
         </form>
+
+        {/* Failsafe: jogos a decorrer onde já estás como participante */}
+        {activeSessions.length > 0 && (
+          <div className="mt-6 space-y-3">
+            <div className="flex items-center gap-2">
+              <RotateCcw className="w-4 h-4 text-sky-300" />
+              <p className="text-sky-300 text-xs font-black uppercase tracking-widest">
+                Jogo{activeSessions.length !== 1 ? 's' : ''} a decorrer
+              </p>
+            </div>
+            {activeSessions.map((s) => (
+              <Link
+                key={s.id}
+                href={`/jogos/vana-quest/${s.id}/play`}
+                className="block bg-gradient-to-r from-green-500/20 to-emerald-500/20 border border-green-400/40 rounded-2xl p-4 hover:from-green-500/30 hover:to-emerald-500/30 transition-all active:scale-[0.98]"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-green-400/30 flex items-center justify-center flex-shrink-0">
+                    <Play className="w-5 h-5 text-green-300 fill-green-300" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-0.5">
+                      <span className="inline-flex items-center gap-1 text-[10px] font-black uppercase tracking-wider text-green-300 bg-green-500/20 rounded-full px-2 py-0.5">
+                        <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
+                        {STATUS_LABEL[s.status] || 'A decorrer'}
+                      </span>
+                      <span className="text-white/40 text-[10px] font-mono">PIN {s.pin}</span>
+                    </div>
+                    <p className="text-white font-bold text-sm truncate">{s.title}</p>
+                  </div>
+                  <span className="text-white/60 text-xs font-bold flex-shrink-0">Voltar →</span>
+                </div>
+              </Link>
+            ))}
+            <p className="text-sky-300/60 text-[11px] text-center pt-1">
+              Reentras no jogo onde estavas, com a tua pontuação intacta.
+            </p>
+          </div>
+        )}
       </div>
     </div>
   )

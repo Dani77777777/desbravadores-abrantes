@@ -683,6 +683,34 @@ export function HostControl({ sessionId, initialSession, questions, siteUrl }: P
           )
         })()}
 
+        {/* EM CHAMAS — jogadores com a streak mais alta */}
+        {session.status === 'question_leaderboard' && (() => {
+          const maxStreak = Math.max(...participants.map((p) => p.current_streak || 0), 0)
+          if (maxStreak < 2) return null
+          const onFire = participants.filter((p) => (p.current_streak || 0) === maxStreak)
+          return (
+            <div className="bg-white/5 rounded-3xl border border-orange-400/30 p-4">
+              <p className="text-orange-300 text-[10px] font-black uppercase tracking-widest mb-2 flex items-center gap-1.5">
+                <Flame className="w-3.5 h-3.5" /> Em chamas! ×{maxStreak} streak
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {onFire.map((p) => (
+                  <div key={p.id} className="flex items-center gap-2 bg-orange-500/20 border border-orange-400/30 rounded-full pl-1 pr-3 py-1">
+                    <PlayerAvatar
+                      name={p.display_name}
+                      avatarUrl={p.avatar_url}
+                      className="w-6 h-6"
+                      textClassName="text-[10px]"
+                      fallbackBg="bg-orange-500/40"
+                    />
+                    <span className="text-white font-bold text-sm">{p.display_name}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )
+        })()}
+
         {/* PRÓXIMA PERGUNTA — preview por baixo da classificação */}
         {session.status === 'question_leaderboard' && (() => {
           const nextIdx = session.current_question_index + 1
