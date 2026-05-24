@@ -522,7 +522,7 @@ export function HostControl({ sessionId, initialSession, questions, siteUrl }: P
                       <span className="text-xs font-black">{OPTION_LABELS[i]}</span>
                       <span className="font-black text-base">{answerCounts[i]}</span>
                     </div>
-                    <p className="text-[11px] mt-1 line-clamp-2">{opt}</p>
+                    <p className="text-[11px] mt-1 leading-snug">{opt}</p>
                     {i === correctIdx && (
                       <p className="text-[9px] font-bold mt-0.5 uppercase tracking-wider">✓ correcta</p>
                     )}
