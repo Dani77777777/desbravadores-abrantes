@@ -158,20 +158,22 @@ export function Presentation({ sessionId, initialSession, questions, siteUrl }: 
   }, [session.status, session.current_question_index, showMultiplierWarning, currentQuestion?.id])
 
   // ── ÁUDIO ─────────────────────────────────────────────────────
-  // Determinar a música conforme o estado do jogo
+  // encodeURI para escapar espaços/caracteres especiais nos nomes dos ficheiros
+  // (essencial em produção / Vercel)
   const SOUNDS = '/sounds/VanaQuest - soundboard'
+  const sound = (file: string) => encodeURI(`${SOUNDS}/${file}`)
   const trackForStatus = (status: string): string => {
     switch (status) {
       case 'waiting':
       case 'quest_intro':
-        return `${SOUNDS}/VanaQuest - Lobby Theme.mp3`
+        return sound('VanaQuest - Lobby Theme.mp3')
       case 'question_intro':
       case 'question_active':
-        return `${SOUNDS}/VanaQuest - Think Fast.mp3`
+        return sound('VanaQuest - Think Fast.mp3')
       case 'question_leaderboard':
-        return `${SOUNDS}/VanaQuest - Standings.mp3`
+        return sound('VanaQuest - Standings.mp3')
       case 'finished':
-        return `${SOUNDS}/VanaQuest - Podium Intro.mp3`
+        return sound('VanaQuest - Podium Intro.mp3')
       // question_results: silêncio (deixa o SFX 'theend' destacar-se)
       default:
         return ''
@@ -209,9 +211,9 @@ export function Presentation({ sessionId, initialSession, questions, siteUrl }: 
       el.src = next
       el.loop = session.status !== 'finished' // Podium Intro NÃO faz loop (transita para Victory)
       el.volume = 0.5
-      el.play().catch(() => {})
+      el.play().catch((err) => console.warn('[VQ] Music play error:', err, 'src:', next))
     } else if (el.paused) {
-      el.play().catch(() => {})
+      el.play().catch((err) => console.warn('[VQ] Music resume error:', err))
     }
   }, [session.status, musicEnabled, audioUnlocked])
 
@@ -220,30 +222,33 @@ export function Presentation({ sessionId, initialSession, questions, siteUrl }: 
     const el = musicRef.current
     if (!el) return
     if (currentTrackRef.current.includes('Podium Intro')) {
-      const victory = `${SOUNDS}/VanaQuest - Victory Celebration.mp3`
+      const victory = sound('VanaQuest - Victory Celebration.mp3')
       currentTrackRef.current = victory
       el.src = victory
       el.loop = true
       el.volume = 0.5
-      el.play().catch(() => {})
+      el.play().catch((err) => console.warn('[VQ] Victory celebration play error:', err))
     }
   }
 
   // Criar elementos <audio> uma vez (vivem fora da árvore JSX para sobreviver a re-renders entre estados)
   useEffect(() => {
     if (typeof window === 'undefined') return
-    const make = (src: string) => {
+    const make = (src: string, label: string) => {
       const a = new Audio()
       a.src = src
       a.preload = 'auto'
+      a.addEventListener('error', () => {
+        console.warn(`[VQ] Failed to load ${label}:`, src, a.error)
+      })
       return a
     }
-    musicRef.current = make('')
+    musicRef.current = make('', 'music')
     musicRef.current.addEventListener('ended', handleMusicEnded)
-    sfxAnsweredRef.current = make(`${SOUNDS}/player-answered.mp3`)
-    sfxLightningRef.current = make(`${SOUNDS}/lightning - x2 and x3 points.mp3`)
-    sfxEarningRef.current = make(`${SOUNDS}/earning points.mp3`)
-    sfxEndRef.current = make(`${SOUNDS}/theend.mp3`)
+    sfxAnsweredRef.current = make(sound('player-answered.mp3'), 'sfx-answered')
+    sfxLightningRef.current = make(sound('lightning - x2 and x3 points.mp3'), 'sfx-lightning')
+    sfxEarningRef.current = make(sound('earning points.mp3'), 'sfx-earning')
+    sfxEndRef.current = make(sound('theend.mp3'), 'sfx-end')
     ;[sfxAnsweredRef, sfxLightningRef, sfxEarningRef, sfxEndRef].forEach((r) => {
       if (r.current) r.current.volume = 0.7
     })
@@ -323,6 +328,31 @@ export function Presentation({ sessionId, initialSession, questions, siteUrl }: 
   const currentAnswers = currentQuestion ? answers.filter((a) => a.question_id === currentQuestion.id) : []
   const correctIdx = currentQuestion ? OPTION_NAMES.indexOf(currentQuestion.correct_option) : -1
   const answerCounts = OPTION_NAMES.map((opt) => currentAnswers.filter((a) => a.chosen_option === opt).length)
+
+  // Overlay para desbloquear áudio — renderizado fora da árvore de cada estado
+  // (DOM directo via useEffect para sobreviver a qualquer return)
+  useEffect(() => {
+    if (audioUnlocked || typeof document === 'undefined') return
+
+    const overlay = document.createElement('div')
+    overlay.setAttribute('id', 'vq-audio-unlock')
+    overlay.style.cssText = 'position:fixed;inset:0;z-index:100;background:rgba(0,0,0,0.7);backdrop-filter:blur(8px);display:flex;align-items:center;justify-content:center;cursor:pointer;animation:vqFade 0.3s ease-out'
+    overlay.innerHTML = `
+      <style>@keyframes vqFade{from{opacity:0}to{opacity:1}}</style>
+      <div style="background:rgba(255,255,255,0.1);border:2px solid rgba(255,255,255,0.2);border-radius:24px;padding:32px 40px;text-align:center;box-shadow:0 25px 50px -12px rgba(0,0,0,0.5);max-width:28rem;margin:0 16px">
+        <div style="font-size:3rem;margin-bottom:12px">🔊</div>
+        <p style="color:white;font-size:1.5rem;font-weight:900;margin:0">Clica para activar o áudio</p>
+        <p style="color:#7dd3fc;font-size:0.875rem;margin-top:8px">Os browsers exigem uma interacção antes de tocar música</p>
+      </div>
+    `
+    const handler = () => setAudioUnlocked(true)
+    overlay.addEventListener('click', handler)
+    document.body.appendChild(overlay)
+    return () => {
+      overlay.removeEventListener('click', handler)
+      overlay.remove()
+    }
+  }, [audioUnlocked])
 
   // ── WAITING LOBBY ─────────────────────────────────────────────
   if (session.status === 'waiting') {
