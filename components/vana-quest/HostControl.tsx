@@ -7,7 +7,7 @@ import { getIntroSeconds } from '@/utils/vana-quest'
 import { QRCodeSVG } from 'qrcode.react'
 import {
   Users, ChevronRight, Trophy, Zap, Clock, Maximize2,
-  CheckCircle2, Flame, Play, MonitorPlay, Copy, Check
+  CheckCircle2, Flame, Play, MonitorPlay, Copy, Check, Volume2, VolumeX
 } from 'lucide-react'
 import { PlayerAvatar } from './PlayerAvatar'
 
@@ -71,6 +71,7 @@ export function HostControl({ sessionId, initialSession, questions, siteUrl }: P
   const [awarded, setAwarded] = useState(false)
   const [busy, setBusy] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [musicEnabled, setMusicEnabled] = useState(true)
   const inFlight = useRef(false)
   // Pontos do jogador no início do leaderboard (para calcular delta da última ronda)
   const prevPointsRef = useRef<Record<string, number>>({})
@@ -109,6 +110,11 @@ export function HostControl({ sessionId, initialSession, questions, siteUrl }: P
   useEffect(() => {
     broadcast({ qrZoomed })
   }, [qrZoomed])
+
+  // Sync music on/off to presentation
+  useEffect(() => {
+    broadcast({ musicEnabled })
+  }, [musicEnabled])
 
   // Realtime
   useEffect(() => {
@@ -251,14 +257,29 @@ export function HostControl({ sessionId, initialSession, questions, siteUrl }: P
               <p className="font-bold text-sm truncate">{(initialSession.vana_quests as any)?.title}</p>
             </div>
           </div>
-          <a
-            href={presentUrl}
-            target="_blank"
-            rel="noopener"
-            className="flex items-center gap-1.5 bg-white/10 hover:bg-white/20 px-3 py-2 rounded-xl text-xs font-bold transition-colors flex-shrink-0"
-          >
-            <MonitorPlay className="w-3.5 h-3.5" /> Abrir apresentação
-          </a>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            {/* Toggle música — controla a /present */}
+            <button
+              onClick={() => setMusicEnabled((v) => !v)}
+              title={musicEnabled ? 'Música ligada (clica para desligar)' : 'Música desligada (clica para ligar)'}
+              className={`p-2 rounded-xl transition-colors ${
+                musicEnabled
+                  ? 'bg-green-500/20 text-green-300 hover:bg-green-500/30'
+                  : 'bg-white/10 text-white/50 hover:bg-white/20'
+              }`}
+            >
+              {musicEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
+            </button>
+            {/* Abrir apresentação — só desktop */}
+            <a
+              href={presentUrl}
+              target="_blank"
+              rel="noopener"
+              className="hidden sm:flex items-center gap-1.5 bg-white/10 hover:bg-white/20 px-3 py-2 rounded-xl text-xs font-bold transition-colors"
+            >
+              <MonitorPlay className="w-3.5 h-3.5" /> Abrir apresentação
+            </a>
+          </div>
         </div>
 
         {/* Status pill */}

@@ -65,9 +65,20 @@ export function Presentation({ sessionId, initialSession, questions, siteUrl }: 
   const [introCountdown, setIntroCountdown] = useState(4)
   const [qrZoomed, setQrZoomed] = useState(false)
   const [showMultiplierWarning, setShowMultiplierWarning] = useState(false)
+  const [musicEnabled, setMusicEnabled] = useState(true)
+  const [audioUnlocked, setAudioUnlocked] = useState(false)
+  const [answerPulseKey, setAnswerPulseKey] = useState(0)
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   // Snapshot of points shown last time (per participant id) — used to animate from previous → new
   const prevPointsRef = useRef<Record<string, number>>({})
+  // Audio refs
+  const musicRef = useRef<HTMLAudioElement | null>(null)
+  const sfxAnsweredRef = useRef<HTMLAudioElement | null>(null)
+  const sfxLightningRef = useRef<HTMLAudioElement | null>(null)
+  const sfxEarningRef = useRef<HTMLAudioElement | null>(null)
+  const sfxEndRef = useRef<HTMLAudioElement | null>(null)
+  const currentTrackRef = useRef<string>('')
+  const knownAnswersRef = useRef<Set<string>>(new Set())
 
   const currentQuestion = session.current_question_index >= 0
     ? questions[session.current_question_index]
@@ -79,6 +90,7 @@ export function Presentation({ sessionId, initialSession, questions, siteUrl }: 
     const ch = supabase.channel(`vq-present-${sessionId}`, { config: { broadcast: { self: false } } })
     ch.on('broadcast', { event: 'cmd' }, ({ payload }) => {
       if (typeof payload?.qrZoomed === 'boolean') setQrZoomed(payload.qrZoomed)
+      if (typeof payload?.musicEnabled === 'boolean') setMusicEnabled(payload.musicEnabled)
     })
     ch.subscribe()
     return () => { supabase.removeChannel(ch) }
@@ -95,7 +107,16 @@ export function Presentation({ sessionId, initialSession, questions, siteUrl }: 
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'vana_quest_participants', filter: `session_id=eq.${sessionId}` },
         (p) => setParticipants((prev) => prev.map((x) => x.id === (p.new as Participant).id ? (p.new as Participant) : x)))
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'vana_quest_answers', filter: `session_id=eq.${sessionId}` },
-        (p) => setAnswers((prev) => [...prev, p.new as Answer]))
+        (p) => {
+          const ans = p.new as Answer & { id?: string }
+          const key = (ans as any).id || `${ans.participant_id}-${ans.question_id}`
+          if (!knownAnswersRef.current.has(key)) {
+            knownAnswersRef.current.add(key)
+            playSfx(sfxAnsweredRef)
+            setAnswerPulseKey((k) => k + 1)
+          }
+          setAnswers((prev) => [...prev, p.new as Answer])
+        })
       .subscribe()
     return () => { supabase.removeChannel(channel) }
   }, [sessionId])
@@ -135,6 +156,159 @@ export function Presentation({ sessionId, initialSession, questions, siteUrl }: 
       return () => clearInterval(interval)
     }
   }, [session.status, session.current_question_index, showMultiplierWarning, currentQuestion?.id])
+
+  // ── ÁUDIO ─────────────────────────────────────────────────────
+  // Determinar a música conforme o estado do jogo
+  const SOUNDS = '/sounds/VanaQuest - soundboard'
+  const trackForStatus = (status: string): string => {
+    switch (status) {
+      case 'waiting':
+      case 'quest_intro':
+        return `${SOUNDS}/VanaQuest - Lobby Theme.mp3`
+      case 'question_intro':
+      case 'question_active':
+        return `${SOUNDS}/VanaQuest - Think Fast.mp3`
+      case 'question_leaderboard':
+        return `${SOUNDS}/VanaQuest - Standings.mp3`
+      case 'finished':
+        return `${SOUNDS}/VanaQuest - Podium Intro.mp3`
+      // question_results: silêncio (deixa o SFX 'theend' destacar-se)
+      default:
+        return ''
+    }
+  }
+
+  // Helper para tocar SFX (sempre, ignora musicEnabled)
+  function playSfx(ref: React.RefObject<HTMLAudioElement | null>) {
+    const el = ref.current
+    if (!el) return
+    try {
+      el.currentTime = 0
+      el.play().catch(() => {})
+    } catch {}
+  }
+
+  // Mudar de música conforme estado / musicEnabled
+  useEffect(() => {
+    const el = musicRef.current
+    if (!el) return
+
+    if (!musicEnabled || !audioUnlocked) {
+      el.pause()
+      return
+    }
+
+    const next = trackForStatus(session.status)
+    if (!next) {
+      el.pause()
+      return
+    }
+
+    if (currentTrackRef.current !== next) {
+      currentTrackRef.current = next
+      el.src = next
+      el.loop = session.status !== 'finished' // Podium Intro NÃO faz loop (transita para Victory)
+      el.volume = 0.5
+      el.play().catch(() => {})
+    } else if (el.paused) {
+      el.play().catch(() => {})
+    }
+  }, [session.status, musicEnabled, audioUnlocked])
+
+  // Quando Podium Intro acaba → muda para Victory Celebration (loop)
+  function handleMusicEnded() {
+    const el = musicRef.current
+    if (!el) return
+    if (currentTrackRef.current.includes('Podium Intro')) {
+      const victory = `${SOUNDS}/VanaQuest - Victory Celebration.mp3`
+      currentTrackRef.current = victory
+      el.src = victory
+      el.loop = true
+      el.volume = 0.5
+      el.play().catch(() => {})
+    }
+  }
+
+  // Criar elementos <audio> uma vez (vivem fora da árvore JSX para sobreviver a re-renders entre estados)
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const make = (src: string) => {
+      const a = new Audio()
+      a.src = src
+      a.preload = 'auto'
+      return a
+    }
+    musicRef.current = make('')
+    musicRef.current.addEventListener('ended', handleMusicEnded)
+    sfxAnsweredRef.current = make(`${SOUNDS}/player-answered.mp3`)
+    sfxLightningRef.current = make(`${SOUNDS}/lightning - x2 and x3 points.mp3`)
+    sfxEarningRef.current = make(`${SOUNDS}/earning points.mp3`)
+    sfxEndRef.current = make(`${SOUNDS}/theend.mp3`)
+    ;[sfxAnsweredRef, sfxLightningRef, sfxEarningRef, sfxEndRef].forEach((r) => {
+      if (r.current) r.current.volume = 0.7
+    })
+    return () => {
+      musicRef.current?.pause()
+      musicRef.current?.removeEventListener('ended', handleMusicEnded)
+      musicRef.current = null
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Desbloquear áudio na primeira interacção (necessário para autoplay)
+  useEffect(() => {
+    if (audioUnlocked) return
+    const unlock = () => {
+      setAudioUnlocked(true)
+      // Tentar arrancar a música imediatamente
+      const el = musicRef.current
+      if (el && musicEnabled) {
+        const next = trackForStatus(session.status)
+        if (next) {
+          currentTrackRef.current = next
+          el.src = next
+          el.loop = session.status !== 'finished'
+          el.volume = 0.5
+          el.play().catch(() => {})
+        }
+      }
+    }
+    window.addEventListener('click', unlock, { once: true })
+    window.addEventListener('keydown', unlock, { once: true })
+    window.addEventListener('touchstart', unlock, { once: true })
+    return () => {
+      window.removeEventListener('click', unlock)
+      window.removeEventListener('keydown', unlock)
+      window.removeEventListener('touchstart', unlock)
+    }
+  }, [audioUnlocked, musicEnabled, session.status])
+
+  // SFX: lightning quando começa o aviso de multiplicador
+  useEffect(() => {
+    if (showMultiplierWarning && currentQuestion && currentQuestion.points_multiplier > 1) {
+      playSfx(sfxLightningRef)
+    }
+  }, [showMultiplierWarning, currentQuestion?.id])
+
+  // SFX: theend quando a pergunta passa para resultados
+  const prevStatusRef = useRef<string>(session.status)
+  useEffect(() => {
+    if (prevStatusRef.current === 'question_active' && session.status === 'question_results') {
+      playSfx(sfxEndRef)
+    }
+    // SFX earning points ao entrar no leaderboard (se houver delta para algum jogador)
+    if (prevStatusRef.current !== 'question_leaderboard' && session.status === 'question_leaderboard') {
+      const hasDelta = participants.some((p) => {
+        const prev = prevPointsRef.current[p.id] ?? 0
+        return Number(p.total_points) - prev > 0.005
+      })
+      if (hasDelta) {
+        // Pequeno delay para coincidir com o início da animação dos números
+        setTimeout(() => playSfx(sfxEarningRef), 500)
+      }
+    }
+    prevStatusRef.current = session.status
+  }, [session.status])
 
   // Aviso de multiplicador (x2/x3) antes da pergunta
   useEffect(() => {
@@ -367,7 +541,7 @@ export function Presentation({ sessionId, initialSession, questions, siteUrl }: 
     const timerPct = (timeLeft / currentQuestion.time_seconds) * 100
 
     return (
-      <div className="h-screen w-screen bg-gradient-to-br from-slate-950 to-indigo-950 flex flex-col p-4 md:p-6 gap-3 overflow-hidden">
+      <div className="h-screen w-screen bg-gradient-to-br from-slate-950 to-indigo-950 flex flex-col p-4 md:p-6 gap-3 overflow-hidden relative">
         {/* Top bar */}
         <div className="flex items-center justify-between flex-shrink-0">
           <span className="bg-white/10 text-white text-sm font-bold px-3 py-1.5 rounded-full">
@@ -378,10 +552,24 @@ export function Presentation({ sessionId, initialSession, questions, siteUrl }: 
               <Zap className="w-4 h-4" /> ×{currentQuestion.points_multiplier}
             </span>
           )}
-          <div className="flex items-center gap-2 text-white/70 font-bold">
-            <Users className="w-4 h-4" />
-            <span className="tabular-nums">{currentAnswers.length} / {participants.length}</span>
+          <div className="w-32" /> {/* placeholder para manter o layout balanceado */}
+        </div>
+
+        {/* Bola lateral estilo Kahoot — contador de respostas com pulse a cada nova resposta */}
+        <div className="absolute right-4 md:right-8 top-1/2 -translate-y-1/2 z-20 flex flex-col items-center gap-2">
+          <div
+            key={answerPulseKey}
+            className="bg-gradient-to-br from-blue-500 to-indigo-700 rounded-full shadow-2xl border-4 border-white/30 flex flex-col items-center justify-center transition-transform animate-in zoom-in-90 duration-300"
+            style={{ width: 'clamp(6rem, 9vw, 10rem)', height: 'clamp(6rem, 9vw, 10rem)' }}
+          >
+            <Users className="text-white/80" style={{ width: 'clamp(1.25rem, 2vw, 2rem)', height: 'clamp(1.25rem, 2vw, 2rem)' }} />
+            <span className="text-white font-black tabular-nums leading-none mt-1" style={{ fontSize: 'clamp(2rem, 4vw, 4rem)' }}>
+              {currentAnswers.length}
+            </span>
           </div>
+          <p className="text-white/50 text-xs font-bold uppercase tracking-wider">
+            de {participants.length}
+          </p>
         </div>
 
         {/* Timer row: bar + big number side by side */}
