@@ -10,6 +10,7 @@ import {
   CheckCircle2, Flame, Play, MonitorPlay, Copy, Check, Volume2, VolumeX, Share2, Download
 } from 'lucide-react'
 import { PodiumShareCard } from './PodiumShareCard'
+import { detectGender, articleFor, winnerWord } from '@/utils/name-gender'
 import { PlayerAvatar } from './PlayerAvatar'
 
 const OPTION_COLORS = ['bg-red-500', 'bg-blue-500', 'bg-yellow-400', 'bg-green-500']
@@ -96,6 +97,23 @@ export function HostControl({ sessionId, initialSession, questions, siteUrl }: P
       const questTitle = (initialSession.vana_quests as any)?.title || 'VanaQuest'
       const fileName = `podio-${questTitle.replace(/[^a-z0-9]+/gi, '-').toLowerCase()}-${Date.now()}.png`
 
+      // Construir texto motivacional
+      const podium = [...participants].sort((a, b) => b.total_points - a.total_points)
+      const winner = podium[0]
+      const today = new Date().toLocaleDateString('pt-PT', {
+        day: 'numeric', month: 'long', year: 'numeric'
+      })
+      let text: string
+      if (winner) {
+        const gender = detectGender(winner.display_name)
+        const article = articleFor(gender) // o / a
+        const word = winnerWord(gender)    // vencedor / vencedora
+        const firstName = winner.display_name.split(' ')[0]
+        text = `🎯 VanaQuest "${questTitle}" — ${today}\n\n👑 ${article.toUpperCase()} ${word} foi ${article} ${firstName} com ${winner.total_points.toFixed(1)} pontos!\n\nNão participaste? Junta-te ao próximo VanaQuest e podes ser tu ${article === 'a' ? 'a próxima' : 'o próximo'} a brilhar! 🌟`
+      } else {
+        text = `🎯 VanaQuest "${questTitle}" — ${today}\n\nNão percas o próximo desafio! 🌟`
+      }
+
       // Tentar Web Share API (mobile)
       try {
         const res = await fetch(dataUrl)
@@ -105,7 +123,7 @@ export function HostControl({ sessionId, initialSession, questions, siteUrl }: P
           await navigator.share({
             files: [file],
             title: `🏆 Pódio Final — ${questTitle}`,
-            text: `Resultados do VanaQuest: ${questTitle}`,
+            text,
           })
           setShareToast('Partilhado!')
           return
