@@ -75,6 +75,7 @@ export function PlayerScreen({ sessionId, userId, userProfile, initialSession, q
   const [donating, setDonating] = useState(false)
   const [donationSuccess, setDonationSuccess] = useState(false)
   const [donationSkipped, setDonationSkipped] = useState(false)
+  const [showSkipConfirm, setShowSkipConfirm] = useState(false)
 
   const isGuest = !userId
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -580,7 +581,56 @@ export function PlayerScreen({ sessionId, userId, userProfile, initialSession, q
                   </button>
                 ))}
               </div>
-              <button onClick={() => setDonationSkipped(true)} className="w-full text-sky-400 text-sm py-2 underline">Dispensar prémios</button>
+              <button
+                onClick={() => setShowSkipConfirm(true)}
+                className="w-full text-sky-400 text-sm py-2 underline"
+              >
+                Dispensar prémios
+              </button>
+
+              {/* Modal de confirmação */}
+              {showSkipConfirm && (
+                <div
+                  className="fixed inset-0 z-50 bg-black/70 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200"
+                  onClick={() => setShowSkipConfirm(false)}
+                >
+                  <div
+                    onClick={(e) => e.stopPropagation()}
+                    className="bg-gradient-to-br from-slate-900 via-blue-900 to-indigo-950 border border-white/20 rounded-3xl shadow-2xl max-w-sm w-full p-6 space-y-5 animate-in zoom-in-95 fade-in duration-300"
+                  >
+                    <div className="text-center space-y-3">
+                      <div className="text-6xl">😮</div>
+                      <h3 className="text-white font-black text-2xl">Tens a certeza?</h3>
+                      <p className="text-sky-200 text-sm leading-relaxed">
+                        Ganhaste <span className="text-yellow-400 font-black">{goldEarned} 🪙</span> e{' '}
+                        <span className="text-blue-300 font-black">{xpEarned} ⭐ XP</span> mas vais dispensar.
+                        <br />
+                        <span className="text-white/60 text-xs mt-2 block">
+                          Esses pontos vão simplesmente desaparecer e nenhum desbravador recebe.
+                        </span>
+                      </p>
+                    </div>
+
+                    <div className="flex flex-col gap-2">
+                      <button
+                        onClick={() => setShowSkipConfirm(false)}
+                        className="w-full bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-400 hover:to-emerald-400 text-white font-black py-3 rounded-2xl transition-all active:scale-[0.98] shadow-lg"
+                      >
+                        Voltar e escolher
+                      </button>
+                      <button
+                        onClick={() => {
+                          setShowSkipConfirm(false)
+                          setDonationSkipped(true)
+                        }}
+                        className="w-full bg-white/5 hover:bg-white/10 text-white/60 hover:text-white/80 text-sm py-2.5 rounded-2xl transition-colors border border-white/10"
+                      >
+                        Sim, dispensar mesmo assim
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           ) : (
             <div className="text-center text-sky-300 space-y-3">
