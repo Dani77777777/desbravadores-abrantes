@@ -1053,7 +1053,7 @@ function LeaderboardScreen({
   const maxStreak = Math.max(...participants.map((p) => p.current_streak), 0)
   const onFire = maxStreak >= 2 ? participants.filter((p) => p.current_streak === maxStreak) : []
 
-  const rowHeight = 130 // px entre rows
+  const rowHeight = 180 // px entre rows (espaço suficiente para os cards maiores)
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-950 via-indigo-900 to-blue-950 flex flex-col p-6 md:p-10 gap-6 overflow-hidden relative">
