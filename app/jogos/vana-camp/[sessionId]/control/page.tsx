@@ -7,6 +7,7 @@ import { HostRevealMonitor } from '@/components/vana-camp/HostRevealMonitor'
 import { HostNightMonitor } from '@/components/vana-camp/HostNightMonitor'
 import { DayAnnouncement } from '@/components/vana-camp/DayAnnouncement'
 import { HostDebugOverlay } from '@/components/vana-camp/HostDebugOverlay'
+import { OpenPresentButton } from '@/components/vana-camp/OpenPresentButton'
 
 export default async function VanaCampControlPage({
   params,
@@ -29,6 +30,7 @@ export default async function VanaCampControlPage({
 
   const wrap = (children: React.ReactNode) => (
     <div className="min-h-screen bg-gradient-to-br from-stone-900 via-amber-950 to-stone-900">
+      <OpenPresentButton sessionId={sessionId} />
       {children}
       {session.is_test_session && <HostDebugOverlay sessionId={sessionId} />}
     </div>
