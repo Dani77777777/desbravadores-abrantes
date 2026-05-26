@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Play, RotateCcw } from 'lucide-react'
 import { joinSession } from '@/lib/actions/vana-quest'
+import { shortDisplayName } from '@/utils/display-name'
 import { PlayerAvatar } from './PlayerAvatar'
 
 interface ActiveSession {
@@ -48,7 +49,7 @@ export function JoinForm({ user, profile, initialPin, activeSessions = [] }: Pro
 
     const result = await joinSession(
       pin.trim(),
-      user ? profile?.full_name || 'Jogador' : guestName.trim() || 'Convidado',
+      user ? shortDisplayName(profile?.full_name) : guestName.trim() || 'Convidado',
       user?.id || null,
       avatarUrl
     )
