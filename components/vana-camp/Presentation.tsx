@@ -215,8 +215,8 @@ const NIGHT_META: Record<string, { headline: string; flavor: string; icon: typeo
     accent: 'text-red-300',
   },
   night_seer: {
-    headline: 'O Profeta consulta os astros',
-    flavor: 'Procura desmascarar um suspeito…',
+    headline: 'O Profeta busca orientação a Deus',
+    flavor: 'Em oração, procura desmascarar um suspeito…',
     icon: Eye,
     accent: 'text-purple-300',
   },

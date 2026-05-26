@@ -158,7 +158,7 @@ export function NightScreen(props: Props) {
         <h1 className="text-2xl font-bold text-blue-100 mb-2">O acampamento dorme</h1>
         <p className="text-blue-200/70 text-sm max-w-md">
           {currentStatus === 'night_infiltrators' && 'Os infiltrados conspiram nas sombras…'}
-          {currentStatus === 'night_seer' && 'O Profeta consulta os astros…'}
+          {currentStatus === 'night_seer' && 'O Profeta busca orientação a Deus…'}
           {currentStatus === 'night_guardian' && 'O Conselheiro mantém vigia…'}
         </p>
         {remaining !== null && (

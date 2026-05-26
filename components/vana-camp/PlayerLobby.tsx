@@ -1,9 +1,10 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Flame, LogOut, Users, Bot } from 'lucide-react'
 import { leaveSession } from '@/lib/actions/vana-camp'
+import { createClient } from '@/utils/supabase/client'
 import { usePlayerList } from './usePlayerList'
 import { useVibrationSignal } from './useVibrationSignal'
 import { usePhaseReload } from './usePhaseReload'
@@ -20,7 +21,24 @@ export function PlayerLobby({ sessionId, code, myPlayerId, impersonatingBotName 
   const router = useRouter()
   const { players, loading } = usePlayerList(sessionId)
   const [leaving, setLeaving] = useState(false)
-  useVibrationSignal(sessionId, myPlayerId ?? null)
+  // Para jogadores reais (sem impersonação), descobrir o próprio player_id
+  // para receber sinais de vibração.
+  const [resolvedPlayerId, setResolvedPlayerId] = useState<string | null>(myPlayerId ?? null)
+  useEffect(() => {
+    if (myPlayerId) return
+    const supabase = createClient()
+    supabase.auth.getUser().then(async ({ data: { user } }) => {
+      if (!user) return
+      const { data } = await supabase
+        .from('vanacamp_players_public')
+        .select('id')
+        .eq('session_id', sessionId)
+        .eq('user_id', user.id)
+        .maybeSingle()
+      if (data) setResolvedPlayerId(data.id)
+    })
+  }, [sessionId, myPlayerId])
+  useVibrationSignal(sessionId, resolvedPlayerId)
   usePhaseReload(sessionId, 'lobby')
 
   async function handleLeave() {
