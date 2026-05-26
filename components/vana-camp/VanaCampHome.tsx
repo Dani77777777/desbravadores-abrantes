@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
-import { Plus, LogIn, ArrowRight } from 'lucide-react'
+import { Plus, LogIn, ArrowRight, Eye } from 'lucide-react'
 import {
   createSession,
   joinSessionByCode,
@@ -86,19 +86,33 @@ export function VanaCampHome({ canHost, initialCode, activeSessions, userId }: P
           <h2 className="text-amber-200 font-semibold text-sm uppercase tracking-wide">
             Voltar a uma partida
           </h2>
-          {activeSessions.map((s) => (
-            <Link
-              key={s.id}
-              href={s.host_id === userId ? `/jogos/vana-camp/${s.id}/control` : `/jogos/vana-camp/${s.id}`}
-              className="flex items-center justify-between bg-stone-900/60 hover:bg-stone-900 transition rounded p-3 group"
-            >
-              <div>
-                <div className="text-amber-100 font-mono font-bold">{s.code}</div>
-                <div className="text-xs text-stone-400">{s.status}</div>
-              </div>
-              <ArrowRight className="w-5 h-5 text-amber-400 group-hover:translate-x-1 transition" />
-            </Link>
-          ))}
+          {activeSessions.map((s) => {
+            const isHost = s.host_id === userId
+            return (
+              <Link
+                key={s.id}
+                href={isHost ? `/jogos/vana-camp/${s.id}/control` : `/jogos/vana-camp/${s.id}`}
+                className={`flex items-center justify-between rounded p-3 group transition ${
+                  isHost
+                    ? 'bg-amber-900/30 hover:bg-amber-900/50 border border-amber-700/50'
+                    : 'bg-stone-900/60 hover:bg-stone-900'
+                }`}
+              >
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-amber-100 font-mono font-bold">{s.code}</span>
+                    {isHost && (
+                      <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wider bg-amber-700/40 text-amber-200 border border-amber-600/50 px-1.5 py-0.5 rounded">
+                        <Eye className="w-3 h-3" /> Narrador
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-xs text-stone-400">{s.status}</div>
+                </div>
+                <ArrowRight className="w-5 h-5 text-amber-400 group-hover:translate-x-1 transition" />
+              </Link>
+            )
+          })}
         </section>
       )}
 
