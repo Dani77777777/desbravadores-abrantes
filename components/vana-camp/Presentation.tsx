@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import Image from 'next/image'
 import { QRCodeSVG } from 'qrcode.react'
 import { Moon, Sunrise, Sun, Sunset, Vote, Trophy, Skull, Eye, Shield, User, Crown, Users } from 'lucide-react'
-import { getDayResult, getDayVoteProgress } from '@/lib/actions/vana-camp'
+import { getDayResult, getDayVoteProgress, getMyMayorVoteContext } from '@/lib/actions/vana-camp'
 import { createClient } from '@/utils/supabase/client'
 import { useLiveSession } from './useLiveSession'
 import { usePhaseReload } from './usePhaseReload'
@@ -61,7 +61,13 @@ export function Presentation({
     return <PresentRoleReveal phaseEndsAt={live.phase_ends_at} phasePausedAt={live.phase_paused_at} />
   }
   if (status === 'mayor_election') {
-    return <PresentSimple title="Eleger o Diretor" subtitle="Cada desbravador vota em quem será o Diretor do Clube." icon="moon" />
+    return (
+      <PresentMayorElection
+        sessionId={sessionId}
+        phaseEndsAt={live.phase_ends_at}
+        phasePausedAt={live.phase_paused_at}
+      />
+    )
   }
   if (status === 'night_infiltrators' || status === 'night_seer' || status === 'night_guardian') {
     return (
@@ -470,6 +476,111 @@ function PresentDayAnnounce({
           A assembleia começa em <strong className="text-3xl">{remaining}s</strong>
         </p>
       )}
+    </main>
+  )
+}
+
+// ════════════════════════════════════════════════════════════════════
+// MAYOR ELECTION
+// ════════════════════════════════════════════════════════════════════
+
+function PresentMayorElection({
+  sessionId, phaseEndsAt, phasePausedAt,
+}: {
+  sessionId: string
+  phaseEndsAt: string | null
+  phasePausedAt: string | null
+}) {
+  const remaining = usePhaseCountdown(phaseEndsAt, phasePausedAt)
+  const [candidates, setCandidates] = useState<{ id: string; display_name: string }[]>([])
+  const [votes, setVotes] = useState<{ voter_id: string; target_id: string }[]>([])
+  const [voterCount, setVoterCount] = useState(0)
+
+  useEffect(() => {
+    async function refresh() {
+      const r = await getMyMayorVoteContext(sessionId)
+      if (r.players) {
+        setCandidates(r.players)
+        setVoterCount(r.players.length)
+      }
+      if (r.votes) setVotes(r.votes)
+    }
+    refresh()
+    const supabase = createClient()
+    const ch = supabase
+      .channel(`vc_pres_mayor_${sessionId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'vanacamp_votes', filter: `session_id=eq.${sessionId}` }, refresh)
+      .subscribe()
+    const i = setInterval(refresh, 1500)
+    return () => { supabase.removeChannel(ch); clearInterval(i) }
+  }, [sessionId])
+
+  const tally = new Map<string, number>()
+  for (const v of votes) tally.set(v.target_id, (tally.get(v.target_id) ?? 0) + 1)
+  const sorted = [...tally.entries()].sort(([, a], [, b]) => b - a)
+  const max = sorted[0]?.[1] ?? 0
+  const submittedSet = new Set(votes.map((v) => v.voter_id))
+
+  return (
+    <main className="min-h-screen p-10 flex flex-col text-amber-100 bg-gradient-to-br from-amber-800 via-amber-950 to-stone-950">
+      <header className="text-center mb-8">
+        <Crown className="w-24 h-24 text-amber-300 mx-auto mb-3 drop-shadow-[0_0_30px_rgba(252,211,77,0.6)]" />
+        <p className="uppercase tracking-[0.3em] text-amber-300/80 text-sm">Dia 1</p>
+        <h1 className="text-6xl md:text-7xl font-black mt-1">Eleger o Diretor</h1>
+        <p className="text-2xl text-amber-200/80 mt-3">
+          O voto do Diretor desempata as expulsões.
+        </p>
+        <p className="text-amber-200 mt-4">
+          {submittedSet.size} / {voterCount} já votaram
+          {remaining !== null && (
+            <> &middot; <span className="font-bold text-amber-100 text-2xl">{remaining}s</span></>
+          )}
+        </p>
+      </header>
+
+      <section className="flex-1 max-w-4xl mx-auto w-full">
+        {candidates.length === 0 ? (
+          <p className="text-center text-amber-200/70 italic text-xl">A carregar candidatos…</p>
+        ) : (
+          <ul className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {candidates.map((c) => {
+              const count = tally.get(c.id) ?? 0
+              const pct = max > 0 ? (count / max) * 100 : 0
+              const isLeader = count > 0 && count === max
+              return (
+                <li
+                  key={c.id}
+                  className={`bg-black/30 backdrop-blur rounded-xl p-4 border ${
+                    isLeader ? 'border-amber-300' : 'border-amber-700/40'
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-2xl font-bold flex items-center gap-2">
+                      {isLeader && <Crown className="w-5 h-5 text-amber-300" />}
+                      {c.display_name}
+                    </span>
+                    <span className="text-2xl font-black text-amber-200">
+                      {count}
+                    </span>
+                  </div>
+                  <div className="h-3 bg-black/40 rounded-full overflow-hidden">
+                    <div
+                      className={`h-full transition-all duration-500 ${isLeader ? 'bg-amber-300' : 'bg-amber-600'}`}
+                      style={{ width: `${pct}%` }}
+                    />
+                  </div>
+                </li>
+              )
+            })}
+          </ul>
+        )}
+
+        {sorted.length > 1 && sorted[0][1] === sorted[1][1] && sorted[0][1] > 0 && (
+          <p className="text-center text-amber-300 mt-6 text-lg">
+            ⚠ Empate &middot; sem desempate possível, ficará sem Diretor.
+          </p>
+        )}
+      </section>
     </main>
   )
 }

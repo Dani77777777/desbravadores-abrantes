@@ -1090,6 +1090,17 @@ export async function resolveMayorElection(sessionId: string): Promise<{ error?:
       },
     })
 
+    // Avança automaticamente para a primeira noite
+    const newDay = 1
+    await setPhase(sessionId, 'night_infiltrators', { day_number: newDay })
+    await service.from('vanacamp_events').insert({
+      session_id: sessionId,
+      day_number: newDay,
+      event_type: 'phase_change',
+      payload: { from: 'mayor_election', to: 'night_infiltrators', day: newDay },
+    })
+    await emitVibrationForRole(sessionId, 'infiltrator', 'night_call')
+
     revalidatePath(`/jogos/vana-camp/${sessionId}`)
     return {}
   } catch (e) { return { error: e instanceof Error ? e.message : 'Erro.' } }
@@ -1188,7 +1199,10 @@ export async function startNight(sessionId: string): Promise<{ error?: string }>
     }
 
     const service = createServiceClient()
-    const newDay = (session.day_number ?? 0) + 1
+    // No mayor_election já fizemos day_number=1 e avançámos; nos outros casos sobe.
+    const newDay = session.status === 'mayor_election'
+      ? session.day_number
+      : (session.day_number ?? 0) + 1
     await setPhase(sessionId, 'night_infiltrators', { day_number: newDay })
 
     await service.from('vanacamp_events').insert({
