@@ -1,26 +1,26 @@
 'use client'
 
-import Link from 'next/link'
-import { Tv } from 'lucide-react'
+import { MonitorPlay } from 'lucide-react'
 
 interface Props {
   sessionId: string
 }
 
 /**
- * Botão flutuante no canto superior esquerdo que abre a apresentação
- * (projetor / TV) num separador novo. Visível em todas as vistas do Narrador.
+ * Botão "Abrir apresentação" — só visível em desktop (sm+), igual ao padrão
+ * do VanaQuest. Em mobile o Narrador usa o painel sem a apresentação separada.
  */
 export function OpenPresentButton({ sessionId }: Props) {
   return (
-    <Link
+    <a
       href={`/jogos/vana-camp/${sessionId}/present`}
       target="_blank"
-      className="fixed top-4 right-4 z-40 bg-stone-800/80 hover:bg-stone-700 border border-amber-700/40 text-amber-100 rounded-full px-4 py-2 flex items-center gap-2 text-sm font-semibold shadow-lg backdrop-blur transition"
+      rel="noopener"
+      className="fixed top-4 right-4 z-40 hidden sm:flex items-center gap-1.5 bg-stone-800/80 hover:bg-stone-700 border border-amber-700/40 text-amber-100 rounded-xl px-3 py-2 text-xs font-bold shadow-lg backdrop-blur transition-colors"
       title="Abrir apresentação para projetor"
     >
-      <Tv className="w-4 h-4" />
-      Apresentação
-    </Link>
+      <MonitorPlay className="w-3.5 h-3.5" />
+      Abrir apresentação
+    </a>
   )
 }
