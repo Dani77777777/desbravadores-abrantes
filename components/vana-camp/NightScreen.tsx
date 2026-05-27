@@ -10,6 +10,7 @@ import {
 import { createClient } from '@/utils/supabase/client'
 import { useLiveSession } from './useLiveSession'
 import { useVibrationSignal } from './useVibrationSignal'
+import { VibrationFlash } from './VibrationFlash'
 import { usePhaseCountdown, usePhaseProgress } from './usePhaseCountdown'
 import { usePhaseReload } from './usePhaseReload'
 import type { VanaCampRole, VanaCampMessage } from '@/types/vana-camp'
@@ -61,7 +62,7 @@ export function NightScreen(props: Props) {
   const [pending, setPending] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  useVibrationSignal(sessionId, ctx?.my_player_id ?? null)
+  const { needsGesture, flash } = useVibrationSignal(sessionId, ctx?.my_player_id ?? null)
 
   async function refresh() {
     const r = await getMyNightContext(sessionId, impersonatingBotId)
@@ -173,6 +174,7 @@ export function NightScreen(props: Props) {
 
   return (
     <main className="min-h-screen p-4 md:p-8 text-stone-100" style={bgStyle}>
+      <VibrationFlash flash={flash} needsGesture={needsGesture} />
       {impersonatingBotName && <ImpersonateBanner name={impersonatingBotName} />}
       <div className="max-w-2xl mx-auto space-y-4">
         <header className="text-center space-y-2 py-2">

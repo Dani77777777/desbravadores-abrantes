@@ -6,6 +6,7 @@ import { getMyRoleInSession } from '@/lib/actions/vana-camp'
 import { createClient } from '@/utils/supabase/client'
 import { vibrate } from '@/utils/vibrate'
 import { useVibrationSignal } from './useVibrationSignal'
+import { VibrationFlash } from './VibrationFlash'
 import { usePhaseReload } from './usePhaseReload'
 import type { VanaCampRole } from '@/types/vana-camp'
 
@@ -66,7 +67,7 @@ export function RoleReveal({ sessionId, phaseEndsAt, impersonatingBot }: Props) 
   const [remaining, setRemaining] = useState<number | null>(null)
   const [myPlayerId, setMyPlayerId] = useState<string | null>(impersonatingBot?.id ?? null)
 
-  useVibrationSignal(sessionId, myPlayerId)
+  const { needsGesture, flash } = useVibrationSignal(sessionId, myPlayerId)
   usePhaseReload(sessionId, 'role_reveal')
 
   useEffect(() => {
@@ -129,6 +130,7 @@ export function RoleReveal({ sessionId, phaseEndsAt, impersonatingBot }: Props) 
 
   return (
     <main className={`min-h-screen flex flex-col items-center justify-center p-6 bg-gradient-to-br ${meta.bg}`}>
+      <VibrationFlash flash={flash} needsGesture={needsGesture} />
       {impersonatingBot && (
         <div className="fixed top-4 left-1/2 -translate-x-1/2 bg-purple-900/80 border border-purple-500 rounded-full px-4 py-1.5 flex items-center gap-2 text-purple-100 text-xs z-10">
           <Bot className="w-4 h-4" />

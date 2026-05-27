@@ -7,6 +7,7 @@ import { leaveSession } from '@/lib/actions/vana-camp'
 import { createClient } from '@/utils/supabase/client'
 import { usePlayerList } from './usePlayerList'
 import { useVibrationSignal } from './useVibrationSignal'
+import { VibrationFlash } from './VibrationFlash'
 import { usePhaseReload } from './usePhaseReload'
 
 interface Props {
@@ -38,7 +39,7 @@ export function PlayerLobby({ sessionId, code, myPlayerId, impersonatingBotName 
       if (data) setResolvedPlayerId(data.id)
     })
   }, [sessionId, myPlayerId])
-  useVibrationSignal(sessionId, resolvedPlayerId)
+  const { needsGesture, flash } = useVibrationSignal(sessionId, resolvedPlayerId)
   usePhaseReload(sessionId, 'lobby')
 
   async function handleLeave() {
@@ -55,6 +56,7 @@ export function PlayerLobby({ sessionId, code, myPlayerId, impersonatingBotName 
 
   return (
     <main className="max-w-2xl mx-auto p-4 md:p-8 space-y-6">
+      <VibrationFlash flash={flash} needsGesture={needsGesture} />
       {impersonatingBotName && (
         <div className="bg-purple-900/60 border border-purple-500 rounded-lg p-3 flex items-center gap-2 text-purple-100 text-sm">
           <Bot className="w-5 h-5" />
