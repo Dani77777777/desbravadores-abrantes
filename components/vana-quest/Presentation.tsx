@@ -992,22 +992,40 @@ function LeaderboardScreen({
   participants: Participant[]
   prevPointsRef: React.MutableRefObject<Record<string, number>>
 }) {
+  // If prevPointsRef is empty (page refresh / first mount), seed with current totals so we don't
+  // animate from 0 → total (which looks like they "lost" their points).
+  const seededRef = useRef<boolean>(false)
+  const isFirstMount = useRef<boolean>(false)
+  if (!seededRef.current) {
+    seededRef.current = true
+    isFirstMount.current = participants.every((p) => prevPointsRef.current[p.id] === undefined)
+    if (isFirstMount.current) {
+      participants.forEach((p) => { prevPointsRef.current[p.id] = p.total_points })
+    }
+  }
+
   // Live animated points per participant id
   const [animatedPoints, setAnimatedPoints] = useState<Record<string, number>>(() => {
     const init: Record<string, number> = {}
-    participants.forEach((p) => { init[p.id] = prevPointsRef.current[p.id] ?? 0 })
+    participants.forEach((p) => { init[p.id] = prevPointsRef.current[p.id] ?? p.total_points })
     return init
   })
 
   // Deltas captured at mount (how much each gained this round)
   const deltasRef = useRef<Record<string, number>>(
     Object.fromEntries(
-      participants.map((p) => [p.id, p.total_points - (prevPointsRef.current[p.id] ?? 0)])
+      participants.map((p) => [p.id, p.total_points - (prevPointsRef.current[p.id] ?? p.total_points)])
     )
   )
 
+  // Phase controls *position* ordering — we keep positions stable during the count,
+  // then trigger a single clean swap so rows visibly slide up AND down.
+  const [showFinalOrder, setShowFinalOrder] = useState(isFirstMount.current)
+
   // Animate from previous → current
   useEffect(() => {
+    if (isFirstMount.current) return // nothing to animate on refresh
+
     const startSnap: Record<string, number> = {}
     const endSnap: Record<string, number> = {}
     participants.forEach((p) => {
@@ -1041,14 +1059,33 @@ function LeaderboardScreen({
       }
     }
     rafId = requestAnimationFrame(tick)
-    return () => cancelAnimationFrame(rafId)
+
+    // Trigger position swap a bit before the count ends so the slide overlaps
+    // the last moments of counting — feels more dynamic.
+    const swapTimer = setTimeout(() => setShowFinalOrder(true), 1100)
+
+    return () => {
+      cancelAnimationFrame(rafId)
+      clearTimeout(swapTimer)
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // Sort by LIVE values so positions swap mid-animation as players overtake each other
-  const top = [...participants]
-    .sort((a, b) => (animatedPoints[b.id] ?? 0) - (animatedPoints[a.id] ?? 0))
-    .slice(0, 5)
+  // Compute both orderings once. Positions come from the current phase, but each row's
+  // identity is keyed by p.id so React reuses the DOM node and CSS transitions kick in.
+  const startOrder = [...participants]
+    .sort((a, b) => (prevPointsRef.current[b.id] ?? 0) - (prevPointsRef.current[a.id] ?? 0))
+  const endOrder = [...participants].sort((a, b) => b.total_points - a.total_points)
+  const orderedParticipants = showFinalOrder ? endOrder : startOrder
+
+  // Map participant id → display index in the current ordering
+  const indexById = new Map(orderedParticipants.map((p, idx) => [p.id, idx]))
+  // We still render only the top 5 (union of top-5 in either order so nobody pops in/out)
+  const visibleIds = new Set<string>([
+    ...startOrder.slice(0, 5).map((p) => p.id),
+    ...endOrder.slice(0, 5).map((p) => p.id),
+  ])
+  const top = participants.filter((p) => visibleIds.has(p.id))
 
   const maxStreak = Math.max(...participants.map((p) => p.current_streak), 0)
   const onFire = maxStreak >= 2 ? participants.filter((p) => p.current_streak === maxStreak) : []
@@ -1068,7 +1105,8 @@ function LeaderboardScreen({
         className="flex-1 max-w-6xl mx-auto w-full relative"
         style={{ minHeight: `${top.length * rowHeight}px` }}
       >
-        {top.map((p, i) => {
+        {top.map((p) => {
+          const i = indexById.get(p.id) ?? 0
           const value = animatedPoints[p.id] ?? 0
           const delta = deltasRef.current[p.id] ?? 0
           const showDelta = delta > 0.005
@@ -1079,7 +1117,7 @@ function LeaderboardScreen({
               className="absolute left-0 right-0 top-0 will-change-transform"
               style={{
                 transform: `translate3d(0, ${i * rowHeight}px, 0)`,
-                transition: 'transform 1100ms cubic-bezier(0.22, 1, 0.36, 1) 300ms',
+                transition: 'transform 1200ms cubic-bezier(0.22, 1, 0.36, 1)',
               }}
             >
               <div className={`flex items-center gap-5 rounded-3xl p-5 md:p-6 border-2 ${
