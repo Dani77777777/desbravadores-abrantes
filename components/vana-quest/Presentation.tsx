@@ -1076,8 +1076,11 @@ function LeaderboardScreen({
           return (
             <div
               key={p.id}
-              className="absolute left-0 right-0 transition-all duration-700 ease-out"
-              style={{ top: `${i * rowHeight}px` }}
+              className="absolute left-0 right-0 top-0 will-change-transform"
+              style={{
+                transform: `translate3d(0, ${i * rowHeight}px, 0)`,
+                transition: 'transform 1100ms cubic-bezier(0.22, 1, 0.36, 1) 300ms',
+              }}
             >
               <div className={`flex items-center gap-5 rounded-3xl p-5 md:p-6 border-2 ${
                 i === 0 ? 'bg-yellow-400/20 border-yellow-400/40' :
