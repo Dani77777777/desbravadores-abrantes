@@ -12,12 +12,15 @@ interface PhaseState {
 }
 
 /**
- * Subscreve UPDATEs em vanacamp_sessions e mantém o estado da fase em sync
- * sem depender do router.refresh() (que tem latência e às vezes não propaga
- * para componentes client a tempo).
+ * Mantém o estado da fase (status, timer, pausa) em sync sem depender de
+ * router.refresh() para o timer/pausa.
  *
- * Também chama router.refresh() quando o `status` muda (para re-renderizar
- * a fase nova), mas o timer/pausa são geridos via state local instantâneo.
+ * Estratégia tripla (defesa em profundidade):
+ *   1. Realtime: UPDATE em vanacamp_sessions → state local
+ *   2. Polling a 1s: query direta à BD (fallback se websocket falhar/throttle)
+ *   3. router.refresh() apenas quando o `status` muda (para re-render dos
+ *      componentes de fase). Para timer/pausa NÃO chama refresh — só atualiza
+ *      state — para não perder user-activation.
  */
 export function useLiveSession(
   sessionId: string,
@@ -26,13 +29,49 @@ export function useLiveSession(
   const router = useRouter()
   const [state, setState] = useState<PhaseState>(initial)
 
+  // Atualiza se os props iniciais mudarem (após router.refresh server-side)
   useEffect(() => {
-    setState(initial)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    setState((prev) => {
+      // Se valores são iguais, evita re-render
+      if (
+        prev.status === initial.status &&
+        prev.phase_ends_at === initial.phase_ends_at &&
+        prev.phase_paused_at === initial.phase_paused_at &&
+        prev.day_number === initial.day_number
+      ) return prev
+      return initial
+    })
   }, [initial.status, initial.phase_ends_at, initial.phase_paused_at, initial.day_number])
 
   useEffect(() => {
     const supabase = createClient()
+    let isMounted = true
+
+    function apply(next: PhaseState) {
+      if (!isMounted) return
+      setState((prev) => {
+        if (
+          prev.status === next.status &&
+          prev.phase_ends_at === next.phase_ends_at &&
+          prev.phase_paused_at === next.phase_paused_at &&
+          prev.day_number === next.day_number
+        ) return prev
+        // Status mudou → re-render do server p/ trocar de componente
+        if (next.status !== prev.status) router.refresh()
+        return next
+      })
+    }
+
+    async function fetchOnce() {
+      const { data } = await supabase
+        .from('vanacamp_sessions')
+        .select('status, phase_ends_at, phase_paused_at, day_number')
+        .eq('id', sessionId)
+        .maybeSingle()
+      if (data) apply(data as PhaseState)
+    }
+
+    // Realtime — caminho rápido
     const ch = supabase
       .channel(`vc_live_${sessionId}`)
       .on(
@@ -40,22 +79,24 @@ export function useLiveSession(
         { event: 'UPDATE', schema: 'public', table: 'vanacamp_sessions', filter: `id=eq.${sessionId}` },
         (payload) => {
           const next = payload.new as PhaseState
-          setState((prev) => {
-            // Se a fase mudou, força refresh do server para mostrar a nova UI
-            if (next.status !== prev.status) {
-              router.refresh()
-            }
-            return {
-              status: next.status,
-              phase_ends_at: next.phase_ends_at,
-              phase_paused_at: next.phase_paused_at,
-              day_number: next.day_number,
-            }
+          apply({
+            status: next.status,
+            phase_ends_at: next.phase_ends_at,
+            phase_paused_at: next.phase_paused_at,
+            day_number: next.day_number,
           })
         }
       )
       .subscribe()
-    return () => { supabase.removeChannel(ch) }
+
+    // Polling de 1s — fallback robusto
+    const i = setInterval(fetchOnce, 1000)
+
+    return () => {
+      isMounted = false
+      supabase.removeChannel(ch)
+      clearInterval(i)
+    }
   }, [sessionId, router])
 
   return state
