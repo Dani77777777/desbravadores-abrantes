@@ -5,6 +5,7 @@ import { HostLobby } from '@/components/vana-camp/HostLobby'
 import { HostRolePreview } from '@/components/vana-camp/HostRolePreview'
 import { HostRevealMonitor } from '@/components/vana-camp/HostRevealMonitor'
 import { HostNightMonitor } from '@/components/vana-camp/HostNightMonitor'
+import { HostDayMonitor } from '@/components/vana-camp/HostDayMonitor'
 import { DayAnnouncement } from '@/components/vana-camp/DayAnnouncement'
 import { HostDebugOverlay } from '@/components/vana-camp/HostDebugOverlay'
 import { OpenPresentButton } from '@/components/vana-camp/OpenPresentButton'
@@ -88,13 +89,27 @@ export default async function VanaCampControlPage({
     )
   }
 
-  if (session.status === 'day_announce') {
+  if (
+    session.status === 'day_announce' ||
+    session.status === 'day_discussion' ||
+    session.status === 'day_vote' ||
+    session.status === 'day_result'
+  ) {
+    const service = createServiceClient()
+    const { data: players } = await service
+      .from('vanacamp_players')
+      .select('id, display_name, is_alive')
+      .eq('session_id', sessionId)
+      .order('display_name', { ascending: true })
+
     return wrap(
-      <DayAnnouncement
+      <HostDayMonitor
         sessionId={sessionId}
+        status={session.status}
         dayNumber={session.day_number}
         phaseEndsAt={session.phase_ends_at}
         phasePausedAt={session.phase_paused_at}
+        allPlayers={players ?? []}
       />
     )
   }

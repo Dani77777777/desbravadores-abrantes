@@ -9,6 +9,7 @@ import {
   assignRoles,
   validateRoleConfig,
   resolveNight,
+  tallyVotes,
   checkWinCondition,
   type PlayerSnapshot,
 } from '@/utils/vana-camp'
@@ -1467,6 +1468,385 @@ export async function getNightProgress(sessionId: string): Promise<{
       expected: (actors ?? []).length,
       submitted: subbed.size,
       pending_names: pending,
+    }
+  } catch (e) { return { error: e instanceof Error ? e.message : 'Erro.' } }
+}
+
+// ────────────────────────────────────────────────────────────────────
+// CHAT (infiltrados / dead / lobby / day)
+// ────────────────────────────────────────────────────────────────────
+
+// ════════════════════════════════════════════════════════════════════
+// FASE 5 — O DIA (discussão → votação → resultado)
+// ════════════════════════════════════════════════════════════════════
+
+/**
+ * Avança de day_announce → day_discussion (host clica "Começar discussão").
+ */
+export async function startDayDiscussion(sessionId: string): Promise<{ error?: string }> {
+  try {
+    const { session } = await requireHostOfSession(sessionId)
+    if (session.status !== 'day_announce') {
+      return { error: 'Só podes começar a discussão depois do anúncio.' }
+    }
+    const service = createServiceClient()
+    await setPhase(sessionId, 'day_discussion')
+    await service.from('vanacamp_events').insert({
+      session_id: sessionId,
+      day_number: session.day_number,
+      event_type: 'phase_change',
+      payload: { from: 'day_announce', to: 'day_discussion' },
+    })
+    revalidatePath(`/jogos/vana-camp/${sessionId}`)
+    return {}
+  } catch (e) { return { error: e instanceof Error ? e.message : 'Erro.' } }
+}
+
+/**
+ * Avança de day_discussion → day_vote (host clica "Ir à votação").
+ */
+export async function startDayVote(sessionId: string): Promise<{ error?: string }> {
+  try {
+    const { session } = await requireHostOfSession(sessionId)
+    if (session.status !== 'day_discussion') {
+      return { error: 'Só podes começar a votação depois da discussão.' }
+    }
+    const service = createServiceClient()
+    await setPhase(sessionId, 'day_vote')
+    await service.from('vanacamp_events').insert({
+      session_id: sessionId,
+      day_number: session.day_number,
+      event_type: 'phase_change',
+      payload: { from: 'day_discussion', to: 'day_vote' },
+    })
+    // Vibra todos os vivos para chamarem atenção à votação
+    const { data: alive } = await service
+      .from('vanacamp_players')
+      .select('id')
+      .eq('session_id', sessionId)
+      .eq('is_alive', true)
+    const ids = (alive ?? []).map((p) => p.id)
+    if (ids.length > 0) {
+      await service.from('vanacamp_events').insert({
+        session_id: sessionId,
+        day_number: session.day_number,
+        event_type: 'vibrate',
+        payload: { target_player_ids: ids, pattern: 'alert' },
+      })
+    }
+    revalidatePath(`/jogos/vana-camp/${sessionId}`)
+    return {}
+  } catch (e) { return { error: e instanceof Error ? e.message : 'Erro.' } }
+}
+
+/**
+ * Submete (ou substitui) o voto de expulsão diária do actor.
+ */
+export async function submitDayVote(
+  sessionId: string,
+  targetPlayerId: string,
+  actAsPlayerId?: string,
+): Promise<{ error?: string }> {
+  try {
+    const { user } = await requireUser()
+    const actor = await resolveActorPlayerId(sessionId, user.id, actAsPlayerId)
+    if ('error' in actor) return { error: actor.error }
+    if (!actor.is_alive) return { error: 'Estás eliminado — não podes votar.' }
+
+    const service = createServiceClient()
+    const { data: session } = await service
+      .from('vanacamp_sessions')
+      .select('status, day_number')
+      .eq('id', sessionId)
+      .single()
+    if (!session) return { error: 'Sessão não encontrada.' }
+    if (session.status !== 'day_vote') {
+      return { error: 'Não é hora de votar.' }
+    }
+
+    const { data: target } = await service
+      .from('vanacamp_players')
+      .select('id, is_alive, session_id')
+      .eq('id', targetPlayerId)
+      .single()
+    if (!target || target.session_id !== sessionId) return { error: 'Alvo inválido.' }
+    if (!target.is_alive) return { error: 'Alvo já eliminado.' }
+    if (target.id === actor.player_id) return { error: 'Não podes votar em ti.' }
+
+    const { error } = await service
+      .from('vanacamp_votes')
+      .upsert(
+        {
+          session_id: sessionId,
+          day_number: session.day_number,
+          vote_type: 'day_expulsion',
+          voter_player_id: actor.player_id,
+          target_player_id: targetPlayerId,
+        },
+        { onConflict: 'session_id,day_number,vote_type,voter_player_id' },
+      )
+    if (error) return { error: error.message }
+    return {}
+  } catch (e) { return { error: e instanceof Error ? e.message : 'Erro.' } }
+}
+
+/**
+ * Devolve contexto da votação para um jogador (vivos, voto atual).
+ */
+export async function getMyDayVoteContext(
+  sessionId: string,
+  actAsPlayerId?: string,
+): Promise<{
+  my_player_id?: string
+  is_alive?: boolean
+  is_mayor?: boolean
+  current_target_id?: string | null
+  alive_players?: { id: string; display_name: string; is_mayor: boolean }[]
+  /** Votos públicos (todos veem em quem cada um votou). */
+  votes?: { voter_id: string; target_id: string }[]
+  error?: string
+}> {
+  try {
+    const { user } = await requireUser()
+    const actor = await resolveActorPlayerId(sessionId, user.id, actAsPlayerId)
+    if ('error' in actor) return { error: actor.error }
+
+    const service = createServiceClient()
+    const { data: session } = await service
+      .from('vanacamp_sessions')
+      .select('day_number')
+      .eq('id', sessionId)
+      .single()
+    if (!session) return { error: 'Sessão não encontrada.' }
+
+    const { data: me } = await service
+      .from('vanacamp_players')
+      .select('is_mayor')
+      .eq('id', actor.player_id)
+      .single()
+
+    const { data: alive } = await service
+      .from('vanacamp_players')
+      .select('id, display_name, is_mayor')
+      .eq('session_id', sessionId)
+      .eq('is_alive', true)
+      .order('display_name', { ascending: true })
+
+    const { data: myVote } = await service
+      .from('vanacamp_votes')
+      .select('target_player_id')
+      .eq('session_id', sessionId)
+      .eq('day_number', session.day_number)
+      .eq('vote_type', 'day_expulsion')
+      .eq('voter_player_id', actor.player_id)
+      .maybeSingle()
+
+    const { data: allVotes } = await service
+      .from('vanacamp_votes')
+      .select('voter_player_id, target_player_id')
+      .eq('session_id', sessionId)
+      .eq('day_number', session.day_number)
+      .eq('vote_type', 'day_expulsion')
+
+    return {
+      my_player_id: actor.player_id,
+      is_alive: actor.is_alive,
+      is_mayor: me?.is_mayor ?? false,
+      current_target_id: myVote?.target_player_id ?? null,
+      alive_players: alive ?? [],
+      votes: (allVotes ?? []).map((v) => ({
+        voter_id: v.voter_player_id,
+        target_id: v.target_player_id,
+      })),
+    }
+  } catch (e) { return { error: e instanceof Error ? e.message : 'Erro.' } }
+}
+
+/**
+ * Progresso da votação para o painel do Narrador.
+ */
+export async function getDayVoteProgress(sessionId: string): Promise<{
+  expected?: number
+  submitted?: number
+  pending_names?: string[]
+  tally?: Record<string, { count: number; name: string }>
+  error?: string
+}> {
+  try {
+    const { session } = await requireHostOfSession(sessionId)
+    const service = createServiceClient()
+
+    const { data: alive } = await service
+      .from('vanacamp_players')
+      .select('id, display_name')
+      .eq('session_id', sessionId)
+      .eq('is_alive', true)
+
+    const { data: votes } = await service
+      .from('vanacamp_votes')
+      .select('voter_player_id, target_player_id')
+      .eq('session_id', sessionId)
+      .eq('day_number', session.day_number)
+      .eq('vote_type', 'day_expulsion')
+
+    const nameById = new Map((alive ?? []).map((p) => [p.id, p.display_name]))
+    const voted = new Set((votes ?? []).map((v) => v.voter_player_id))
+    const pending = (alive ?? []).filter((p) => !voted.has(p.id)).map((p) => p.display_name)
+
+    const tally: Record<string, { count: number; name: string }> = {}
+    for (const v of votes ?? []) {
+      const name = nameById.get(v.target_player_id) ?? '?'
+      if (!tally[v.target_player_id]) tally[v.target_player_id] = { count: 0, name }
+      tally[v.target_player_id].count += 1
+    }
+
+    return {
+      expected: (alive ?? []).length,
+      submitted: voted.size,
+      pending_names: pending,
+      tally,
+    }
+  } catch (e) { return { error: e instanceof Error ? e.message : 'Erro.' } }
+}
+
+/**
+ * Resolve a votação: aplica desempate do Mayor, elimina, verifica vitória,
+ * avança para day_result (ou finished).
+ */
+export async function resolveDayVote(sessionId: string): Promise<{ error?: string }> {
+  try {
+    const { session } = await requireHostOfSession(sessionId)
+    if (session.status !== 'day_vote') return { error: 'Não estás na fase de votação.' }
+    const service = createServiceClient()
+
+    const { data: votes } = await service
+      .from('vanacamp_votes')
+      .select('*')
+      .eq('session_id', sessionId)
+      .eq('day_number', session.day_number)
+      .eq('vote_type', 'day_expulsion')
+
+    // Mayor vivo, se existir
+    const { data: mayor } = await service
+      .from('vanacamp_players')
+      .select('id')
+      .eq('session_id', sessionId)
+      .eq('is_mayor', true)
+      .eq('is_alive', true)
+      .maybeSingle()
+
+    const result = tallyVotes((votes ?? []) as never, mayor?.id ?? null)
+
+    const { data: allPlayers } = await service
+      .from('vanacamp_players')
+      .select('id, role, is_alive, display_name')
+      .eq('session_id', sessionId)
+
+    let eliminated: { id: string; role: VanaCampRole | null; name: string } | null = null
+    if (result.winner_id) {
+      const target = (allPlayers ?? []).find((p) => p.id === result.winner_id)
+      if (target) {
+        await service
+          .from('vanacamp_players')
+          .update({
+            is_alive: false,
+            eliminated_on_day: session.day_number,
+            eliminated_by: 'vote',
+          })
+          .eq('id', target.id)
+        eliminated = {
+          id: target.id,
+          role: target.role as VanaCampRole | null,
+          name: target.display_name,
+        }
+      }
+    }
+
+    await service.from('vanacamp_events').insert({
+      session_id: sessionId,
+      day_number: session.day_number,
+      event_type: 'vote_tally',
+      payload: {
+        counts: result.counts,
+        winner_id: result.winner_id,
+        mayor_tiebreak_used: result.mayor_tiebreak_used,
+        eliminated,
+      },
+    })
+
+    // Verifica vitória
+    const snapshots: PlayerSnapshot[] = (allPlayers ?? [])
+      .filter((p) => p.role)
+      .map((p) => ({
+        id: p.id,
+        role: p.role as VanaCampRole,
+        is_alive: p.id === eliminated?.id ? false : p.is_alive,
+      }))
+    const winner = checkWinCondition(snapshots)
+
+    if (winner) {
+      await service
+        .from('vanacamp_sessions')
+        .update({
+          status: 'finished',
+          winner_side: winner,
+          ended_at: new Date().toISOString(),
+        })
+        .eq('id', sessionId)
+      await service.from('vanacamp_events').insert({
+        session_id: sessionId,
+        day_number: session.day_number,
+        event_type: 'win',
+        payload: { side: winner },
+      })
+      revalidatePath(`/jogos/vana-camp/${sessionId}`)
+      return {}
+    }
+
+    await setPhase(sessionId, 'day_result')
+    await service.from('vanacamp_events').insert({
+      session_id: sessionId,
+      day_number: session.day_number,
+      event_type: 'phase_change',
+      payload: { from: 'day_vote', to: 'day_result' },
+    })
+
+    revalidatePath(`/jogos/vana-camp/${sessionId}`)
+    return {}
+  } catch (e) { return { error: e instanceof Error ? e.message : 'Erro.' } }
+}
+
+/**
+ * Devolve o resultado da votação (para o ecrã de day_result).
+ */
+export async function getDayResult(sessionId: string, dayNumber: number): Promise<{
+  eliminated?: { id: string; role: VanaCampRole | null; name: string } | null
+  mayor_tiebreak_used?: boolean
+  counts?: Record<string, number>
+  error?: string
+}> {
+  try {
+    const service = createServiceClient()
+    const { data: event } = await service
+      .from('vanacamp_events')
+      .select('payload')
+      .eq('session_id', sessionId)
+      .eq('day_number', dayNumber)
+      .eq('event_type', 'vote_tally')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    if (!event) return { eliminated: null, counts: {} }
+    const payload = event.payload as {
+      eliminated: { id: string; role: VanaCampRole | null; name: string } | null
+      counts: Record<string, number>
+      mayor_tiebreak_used: boolean
+    }
+    return {
+      eliminated: payload.eliminated,
+      mayor_tiebreak_used: payload.mayor_tiebreak_used,
+      counts: payload.counts,
     }
   } catch (e) { return { error: e instanceof Error ? e.message : 'Erro.' } }
 }

@@ -3,7 +3,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import Image from 'next/image'
 import { QRCodeSVG } from 'qrcode.react'
-import { Moon, Sunrise, Trophy, Skull, Eye, Shield, User, Crown, Users } from 'lucide-react'
+import { Moon, Sunrise, Sun, Sunset, Vote, Trophy, Skull, Eye, Shield, User, Crown, Users } from 'lucide-react'
+import { getDayResult, getDayVoteProgress } from '@/lib/actions/vana-camp'
 import { createClient } from '@/utils/supabase/client'
 import { useLiveSession } from './useLiveSession'
 import { usePhaseReload } from './usePhaseReload'
@@ -74,6 +75,37 @@ export function Presentation({
   if (status === 'day_announce') {
     return (
       <PresentDayAnnounce
+        sessionId={sessionId}
+        dayNumber={dayNumber}
+        phaseEndsAt={live.phase_ends_at}
+        phasePausedAt={live.phase_paused_at}
+      />
+    )
+  }
+  if (status === 'day_discussion') {
+    return (
+      <PresentDayDiscussion
+        sessionId={sessionId}
+        dayNumber={dayNumber}
+        phaseStartedAt={initialPhaseStartedAt}
+        phaseEndsAt={live.phase_ends_at}
+        phasePausedAt={live.phase_paused_at}
+      />
+    )
+  }
+  if (status === 'day_vote') {
+    return (
+      <PresentDayVote
+        sessionId={sessionId}
+        dayNumber={dayNumber}
+        phaseEndsAt={live.phase_ends_at}
+        phasePausedAt={live.phase_paused_at}
+      />
+    )
+  }
+  if (status === 'day_result') {
+    return (
+      <PresentDayResult
         sessionId={sessionId}
         dayNumber={dayNumber}
         phaseEndsAt={live.phase_ends_at}
@@ -434,6 +466,238 @@ function PresentDayAnnounce({
         <p className="text-amber-900 text-xl mt-8">
           A assembleia começa em <strong className="text-3xl">{remaining}s</strong>
         </p>
+      )}
+    </main>
+  )
+}
+
+// ════════════════════════════════════════════════════════════════════
+// DAY DISCUSSION
+// ════════════════════════════════════════════════════════════════════
+
+function PresentDayDiscussion({
+  sessionId, dayNumber, phaseStartedAt, phaseEndsAt, phasePausedAt,
+}: {
+  sessionId: string
+  dayNumber: number
+  phaseStartedAt: string | null
+  phaseEndsAt: string | null
+  phasePausedAt: string | null
+}) {
+  const remaining = usePhaseCountdown(phaseEndsAt, phasePausedAt)
+  const progress = usePhaseProgress(phaseStartedAt, phaseEndsAt, phasePausedAt)
+  const { players } = usePlayerList(sessionId)
+  const alive = players.filter((p) => p.is_alive)
+
+  // Gradiente sol → pôr-do-sol
+  const bgStyle = useMemo(() => {
+    const hue = 45 - progress * 25
+    const sat = 70 + progress * 15
+    const lightTop = 75 - progress * 30
+    const lightBottom = 60 - progress * 35
+    return {
+      background: `linear-gradient(180deg, hsl(${hue}, ${sat}%, ${lightTop}%) 0%, hsl(${hue - 5}, ${sat}%, ${lightBottom}%) 100%)`,
+    }
+  }, [progress])
+
+  return (
+    <main className="min-h-screen p-10 flex flex-col text-stone-900" style={bgStyle}>
+      <header className="flex items-center justify-between">
+        <div>
+          <p className="text-amber-900/80 uppercase tracking-[0.3em] text-sm">Dia {dayNumber}</p>
+          <h1 className="text-6xl md:text-7xl font-black mt-1">Assembleia</h1>
+          <p className="text-stone-900/70 text-xl mt-2">Quem suspeitam que é Infiltrado?</p>
+        </div>
+        <div className="text-right">
+          {progress < 0.7 ? (
+            <Sun className="w-24 h-24 text-amber-700 drop-shadow-lg ml-auto" />
+          ) : (
+            <Sunset className="w-24 h-24 text-orange-800 drop-shadow-lg ml-auto" />
+          )}
+          {remaining !== null && (
+            <p className="text-7xl font-black font-mono mt-2 text-stone-900 drop-shadow">
+              {remaining}<span className="text-3xl">s</span>
+            </p>
+          )}
+        </div>
+      </header>
+
+      <section className="flex-1 mt-10">
+        <h2 className="text-amber-900 uppercase tracking-widest text-sm font-bold mb-4">
+          No acampamento ({alive.length})
+        </h2>
+        <ul className="grid grid-cols-3 md:grid-cols-4 gap-3">
+          {alive.map((p) => (
+            <li
+              key={p.id}
+              className="bg-white/40 backdrop-blur border border-amber-700/30 rounded-lg px-4 py-3 text-stone-900 text-xl font-semibold flex items-center gap-2"
+            >
+              {p.is_mayor && <Crown className="w-5 h-5 text-amber-700" />}
+              <span className="truncate">{p.display_name}</span>
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      <footer className="text-center text-amber-900/70 text-lg mt-6">
+        Discutam entre vocês. A votação começa quando o Narrador decidir.
+      </footer>
+    </main>
+  )
+}
+
+// ════════════════════════════════════════════════════════════════════
+// DAY VOTE
+// ════════════════════════════════════════════════════════════════════
+
+function PresentDayVote({
+  sessionId, dayNumber, phaseEndsAt, phasePausedAt,
+}: {
+  sessionId: string
+  dayNumber: number
+  phaseEndsAt: string | null
+  phasePausedAt: string | null
+}) {
+  const remaining = usePhaseCountdown(phaseEndsAt, phasePausedAt)
+  const [tally, setTally] = useState<Record<string, { count: number; name: string }>>({})
+  const [submitted, setSubmitted] = useState(0)
+  const [expected, setExpected] = useState(0)
+
+  useEffect(() => {
+    async function refresh() {
+      const r = await getDayVoteProgress(sessionId)
+      if (r.tally) setTally(r.tally)
+      if (r.submitted !== undefined) setSubmitted(r.submitted)
+      if (r.expected !== undefined) setExpected(r.expected)
+    }
+    refresh()
+    const supabase = createClient()
+    const ch = supabase
+      .channel(`vc_pres_vote_${sessionId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'vanacamp_votes', filter: `session_id=eq.${sessionId}` }, refresh)
+      .subscribe()
+    const i = setInterval(refresh, 1500)
+    return () => { supabase.removeChannel(ch); clearInterval(i) }
+  }, [sessionId])
+
+  const sorted = Object.entries(tally).sort(([, a], [, b]) => b.count - a.count)
+  const maxCount = sorted[0]?.[1].count ?? 0
+
+  return (
+    <main className="min-h-screen p-10 flex flex-col text-stone-100 bg-gradient-to-br from-orange-700 via-red-800 to-stone-900">
+      <header className="text-center mb-6">
+        <Vote className="w-20 h-20 text-amber-200 mx-auto mb-3 drop-shadow-lg" />
+        <p className="uppercase tracking-[0.3em] text-orange-200 text-sm">Dia {dayNumber}</p>
+        <h1 className="text-5xl md:text-6xl font-black mt-1 mb-2">Quem expulsamos?</h1>
+        <p className="text-orange-200">
+          {submitted} / {expected} votaram
+          {remaining !== null && <> &middot; <span className="font-bold text-amber-100">{remaining}s</span></>}
+        </p>
+      </header>
+
+      <section className="flex-1 max-w-3xl mx-auto w-full space-y-3">
+        {sorted.length === 0 ? (
+          <p className="text-center text-orange-200/70 italic text-xl">Ninguém votou ainda…</p>
+        ) : (
+          sorted.map(([id, t]) => {
+            const pct = maxCount > 0 ? (t.count / maxCount) * 100 : 0
+            const isLeader = t.count === maxCount && maxCount > 0
+            return (
+              <div
+                key={id}
+                className={`bg-black/30 backdrop-blur rounded-xl p-4 border ${isLeader ? 'border-red-300' : 'border-white/10'}`}
+              >
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-2xl font-bold">{t.name}</span>
+                  <span className="text-2xl font-black text-amber-200">
+                    {t.count} {t.count === 1 ? 'voto' : 'votos'}
+                  </span>
+                </div>
+                <div className="h-3 bg-black/40 rounded-full overflow-hidden">
+                  <div
+                    className={`h-full transition-all duration-500 ${isLeader ? 'bg-red-400' : 'bg-amber-400'}`}
+                    style={{ width: `${pct}%` }}
+                  />
+                </div>
+              </div>
+            )
+          })
+        )}
+      </section>
+    </main>
+  )
+}
+
+// ════════════════════════════════════════════════════════════════════
+// DAY RESULT
+// ════════════════════════════════════════════════════════════════════
+
+function PresentDayResult({
+  sessionId, dayNumber, phaseEndsAt, phasePausedAt,
+}: {
+  sessionId: string
+  dayNumber: number
+  phaseEndsAt: string | null
+  phasePausedAt: string | null
+}) {
+  const remaining = usePhaseCountdown(phaseEndsAt, phasePausedAt)
+  const [result, setResult] = useState<Awaited<ReturnType<typeof getDayResult>> | null>(null)
+
+  useEffect(() => {
+    getDayResult(sessionId, dayNumber).then(setResult)
+  }, [sessionId, dayNumber])
+
+  if (!result) {
+    return <PresentSimple title="A apurar votos…" icon="moon" />
+  }
+
+  if (!result.eliminated) {
+    return (
+      <main className="min-h-screen flex flex-col items-center justify-center text-center p-12 bg-gradient-to-br from-stone-700 via-stone-900 to-stone-950 text-amber-100">
+        <Sunset className="w-32 h-32 text-orange-400 mb-6 drop-shadow-lg" />
+        <h1 className="text-6xl font-black mb-4">Sem expulsão hoje</h1>
+        <p className="text-2xl text-stone-300 max-w-3xl">
+          A assembleia não chegou a um veredito. Ninguém é expulso esta tarde.
+        </p>
+        {remaining !== null && <p className="text-stone-400 mt-8 text-xl">A noite cai em {remaining}s</p>}
+      </main>
+    )
+  }
+
+  const role = result.eliminated.role
+  const meta = role ? ROLE_META[role] : null
+  const Icon = meta?.icon ?? User
+
+  return (
+    <main className={`min-h-screen flex flex-col items-center justify-center text-center p-12 text-white bg-gradient-to-br ${
+      role === 'infiltrator' ? 'from-emerald-900 via-stone-900 to-stone-950' : 'from-stone-700 via-red-900 to-stone-950'
+    }`}>
+      <Sunset className="w-24 h-24 text-orange-400 mb-4 drop-shadow-lg" />
+      <p className="uppercase tracking-[0.3em] text-orange-300 text-sm mb-2">Veredito do Dia {dayNumber}</p>
+
+      <div className="space-y-4 animate-in fade-in zoom-in duration-700">
+        <h1 className="text-6xl md:text-7xl font-black">
+          {result.eliminated.name}
+        </h1>
+        <p className="text-3xl text-stone-200">foi expulso do acampamento</p>
+
+        {role && meta && (
+          <div className={`inline-flex flex-col items-center gap-4 mt-6 ${meta.color.split(' ')[0]}`}>
+            <Icon className="w-32 h-32 drop-shadow-[0_0_30px_currentColor]" strokeWidth={1.5} />
+            <p className="text-lg uppercase tracking-widest text-stone-300">era um</p>
+            <p className="text-5xl md:text-6xl font-black">{meta.label}</p>
+          </div>
+        )}
+      </div>
+
+      {result.mayor_tiebreak_used && (
+        <p className="text-amber-300 mt-8 flex items-center gap-2 text-xl">
+          <Crown className="w-6 h-6" /> O voto do Diretor desempatou
+        </p>
+      )}
+
+      {remaining !== null && (
+        <p className="text-stone-400 mt-10 text-xl">A noite cai em {remaining}s</p>
       )}
     </main>
   )

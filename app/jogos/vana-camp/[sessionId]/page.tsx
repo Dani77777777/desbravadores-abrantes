@@ -4,6 +4,8 @@ import { PlayerLobby } from '@/components/vana-camp/PlayerLobby'
 import { RoleReveal } from '@/components/vana-camp/RoleReveal'
 import { NightScreen } from '@/components/vana-camp/NightScreen'
 import { DayAnnouncement } from '@/components/vana-camp/DayAnnouncement'
+import { DayScreen } from '@/components/vana-camp/DayScreen'
+import { DayResultScreen } from '@/components/vana-camp/DayResultScreen'
 import { WaitingPhase } from '@/components/vana-camp/WaitingPhase'
 
 export default async function VanaCampSessionPage({
@@ -67,6 +69,31 @@ export default async function VanaCampSessionPage({
   if (session.status === 'day_announce') {
     return (
       <DayAnnouncement
+        sessionId={sessionId}
+        dayNumber={session.day_number}
+        phaseEndsAt={session.phase_ends_at}
+        phasePausedAt={session.phase_paused_at}
+      />
+    )
+  }
+
+  if (session.status === 'day_discussion' || session.status === 'day_vote') {
+    return (
+      <DayScreen
+        sessionId={sessionId}
+        status={session.status}
+        dayNumber={session.day_number}
+        phaseStartedAt={session.phase_started_at}
+        phaseEndsAt={session.phase_ends_at}
+        phasePausedAt={session.phase_paused_at}
+        chatMode={session.chat_mode}
+      />
+    )
+  }
+
+  if (session.status === 'day_result') {
+    return (
+      <DayResultScreen
         sessionId={sessionId}
         dayNumber={session.day_number}
         phaseEndsAt={session.phase_ends_at}
