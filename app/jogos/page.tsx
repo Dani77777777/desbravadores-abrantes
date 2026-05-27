@@ -44,6 +44,17 @@ export default async function GamesHubPage() {
       requiresAuth: false,
     },
     {
+      id: 'vana-camp',
+      title: 'VanaCamp: Infiltrados',
+      description: 'Jogo de dedução e aventura do clube. Descobre quem sabota o acampamento antes que seja tarde.',
+      icon: <img src="/images/VanaCamp.png" alt="VanaCamp" className="w-12 h-12 object-contain" />,
+      href: '/jogos/vana-camp',
+      loginHref: '/login?next=/jogos/vana-camp',
+      color: 'from-stone-900 via-amber-900 to-orange-600',
+      status: 'Disponível',
+      requiresAuth: true,
+    },
+    {
       id: 'em-breve',
       title: 'Em Breve...',
       description: 'Mais desafios estão a ser preparados pelos teus líderes!',
