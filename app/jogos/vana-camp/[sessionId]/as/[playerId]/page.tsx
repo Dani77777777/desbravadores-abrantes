@@ -7,6 +7,7 @@ import { NightScreen } from '@/components/vana-camp/NightScreen'
 import { DayAnnouncement } from '@/components/vana-camp/DayAnnouncement'
 import { DayScreen } from '@/components/vana-camp/DayScreen'
 import { DayResultScreen } from '@/components/vana-camp/DayResultScreen'
+import { MayorElectionScreen } from '@/components/vana-camp/MayorElectionScreen'
 import { WaitingPhase } from '@/components/vana-camp/WaitingPhase'
 
 export default async function ImpersonateBotPage({
@@ -66,6 +67,18 @@ export default async function ImpersonateBotPage({
         sessionId={sessionId}
         phaseEndsAt={session.phase_ends_at}
         impersonatingBot={bot}
+      />
+    )
+  }
+
+  if (session.status === 'mayor_election') {
+    return (
+      <MayorElectionScreen
+        sessionId={sessionId}
+        phaseEndsAt={session.phase_ends_at}
+        phasePausedAt={session.phase_paused_at}
+        impersonatingBotId={bot.id}
+        impersonatingBotName={bot.display_name}
       />
     )
   }

@@ -6,6 +6,7 @@ import { NightScreen } from '@/components/vana-camp/NightScreen'
 import { DayAnnouncement } from '@/components/vana-camp/DayAnnouncement'
 import { DayScreen } from '@/components/vana-camp/DayScreen'
 import { DayResultScreen } from '@/components/vana-camp/DayResultScreen'
+import { MayorElectionScreen } from '@/components/vana-camp/MayorElectionScreen'
 import { WaitingPhase } from '@/components/vana-camp/WaitingPhase'
 
 export default async function VanaCampSessionPage({
@@ -48,6 +49,16 @@ export default async function VanaCampSessionPage({
   if (session.status === 'lobby') return wrap(<PlayerLobby sessionId={sessionId} code={session.code} />)
   if (session.status === 'role_preview') return wrap(<WaitingPhase sessionId={sessionId} message="O Narrador está a preparar os papéis…" />)
   if (session.status === 'role_reveal') return <RoleReveal sessionId={sessionId} phaseEndsAt={session.phase_ends_at} />
+
+  if (session.status === 'mayor_election') {
+    return (
+      <MayorElectionScreen
+        sessionId={sessionId}
+        phaseEndsAt={session.phase_ends_at}
+        phasePausedAt={session.phase_paused_at}
+      />
+    )
+  }
 
   if (
     session.status === 'night_infiltrators' ||

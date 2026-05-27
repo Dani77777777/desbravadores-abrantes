@@ -6,6 +6,8 @@ import { HostRolePreview } from '@/components/vana-camp/HostRolePreview'
 import { HostRevealMonitor } from '@/components/vana-camp/HostRevealMonitor'
 import { HostNightMonitor } from '@/components/vana-camp/HostNightMonitor'
 import { HostDayMonitor } from '@/components/vana-camp/HostDayMonitor'
+import { HostMayorElectionMonitor } from '@/components/vana-camp/HostMayorElectionMonitor'
+import { HostFinishedPanel } from '@/components/vana-camp/HostFinishedPanel'
 import { DayAnnouncement } from '@/components/vana-camp/DayAnnouncement'
 import { HostDebugOverlay } from '@/components/vana-camp/HostDebugOverlay'
 import { OpenPresentButton } from '@/components/vana-camp/OpenPresentButton'
@@ -61,7 +63,24 @@ export default async function VanaCampControlPage({
   }
 
   if (session.status === 'role_reveal') {
-    return wrap(<HostRevealMonitor sessionId={sessionId} phaseEndsAt={session.phase_ends_at} />)
+    return wrap(<HostRevealMonitor sessionId={sessionId} phaseEndsAt={session.phase_ends_at} mayorMode={session.mayor_mode} />)
+  }
+
+  if (session.status === 'mayor_election') {
+    const service = createServiceClient()
+    const { data: players } = await service
+      .from('vanacamp_players')
+      .select('id, display_name, is_alive')
+      .eq('session_id', sessionId)
+      .order('display_name', { ascending: true })
+    return wrap(
+      <HostMayorElectionMonitor
+        sessionId={sessionId}
+        phaseEndsAt={session.phase_ends_at}
+        phasePausedAt={session.phase_paused_at}
+        allPlayers={players ?? []}
+      />
+    )
   }
 
   if (
@@ -115,15 +134,7 @@ export default async function VanaCampControlPage({
   }
 
   if (session.status === 'finished') {
-    return wrap(
-      <DayAnnouncement
-        sessionId={sessionId}
-        dayNumber={session.day_number}
-        phaseEndsAt={null}
-        phasePausedAt={null}
-        winnerSide={session.winner_side}
-      />
-    )
+    return wrap(<HostFinishedPanel sessionId={sessionId} winnerSide={session.winner_side} />)
   }
 
   return wrap(

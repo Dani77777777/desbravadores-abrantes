@@ -7,11 +7,14 @@ import { getAllRolesForHost } from '@/lib/actions/vana-camp'
 import { createClient } from '@/utils/supabase/client'
 import { HostAlertPanel } from './HostAlertPanel'
 import { StartNightButton } from './HostNightMonitor'
+import { StartMayorElectionButton } from './StartMayorElectionButton'
 import type { VanaCampRole } from '@/types/vana-camp'
 
 interface Props {
   sessionId: string
   phaseEndsAt: string | null
+  /** Quando 'vote_day1', mostra o botão de eleição em vez de "Começar Noite". */
+  mayorMode?: 'none' | 'auto' | 'vote_day1' | 'manual'
 }
 
 interface Row {
@@ -46,7 +49,7 @@ const ROLE_ICON: Record<VanaCampRole, typeof User> = {
  * Vista do NARRADOR durante o role_reveal.
  * Mostra todos os jogadores e os seus papéis, com countdown.
  */
-export function HostRevealMonitor({ sessionId, phaseEndsAt }: Props) {
+export function HostRevealMonitor({ sessionId, phaseEndsAt, mayorMode }: Props) {
   const router = useRouter()
   const [rows, setRows] = useState<Row[]>([])
   const [remaining, setRemaining] = useState<number | null>(null)
@@ -121,7 +124,11 @@ export function HostRevealMonitor({ sessionId, phaseEndsAt }: Props) {
       </section>
 
       <div className="text-center">
-        <StartNightButton sessionId={sessionId} />
+        {mayorMode === 'vote_day1' ? (
+          <StartMayorElectionButton sessionId={sessionId} />
+        ) : (
+          <StartNightButton sessionId={sessionId} />
+        )}
         <p className="text-stone-500 text-xs mt-2">
           Carrega quando achares que todos já leram o seu papel.
         </p>

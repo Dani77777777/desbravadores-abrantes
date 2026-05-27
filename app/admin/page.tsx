@@ -10,7 +10,7 @@ import { SuggestionPanel } from './components/SuggestionPanel'
 import { EventPanel } from './components/EventPanel'
 import { StorePanel } from './components/StorePanel'
 import { QrPanel } from './components/QrPanel'
-import { Users, ListChecks, Megaphone, MessageSquare, LayoutDashboard, CalendarDays, ShoppingBag, QrCode, Gamepad2, Swords } from 'lucide-react'
+import { Users, ListChecks, Megaphone, MessageSquare, LayoutDashboard, CalendarDays, ShoppingBag, QrCode, Gamepad2, Swords, Flame } from 'lucide-react'
 
 export default async function AdminPage({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
   const supabase = await createClient()
@@ -163,6 +163,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
             { id: 'qr', label: 'Questões / QR', icon: QrCode, coordOnly: true, count: 0, countColor: 'blue' },
             { id: 'vantur', label: 'Vantur', icon: Gamepad2, coordOnly: true, count: 0, countColor: 'blue', href: '/admin/vantur' },
             { id: 'vana-quest', label: 'VanaQuest', icon: Swords, coordOnly: true, count: 0, countColor: 'blue', href: '/admin/vana-quest' },
+            { id: 'vana-camp', label: 'VanaCamp', icon: Flame, coordOnly: true, count: 0, countColor: 'orange', href: '/admin/vana-camp' },
             { id: 'store', label: 'Loja', icon: ShoppingBag, coordOnly: true, count: purchases?.filter(p => p.status === 'pending').length || 0, countColor: 'orange' }
           ] as { id: string, label: string, icon: any, coordOnly: boolean, count: number, countColor: string, href?: string }[])
             .filter(tab => !tab.coordOnly || isCoordenador)

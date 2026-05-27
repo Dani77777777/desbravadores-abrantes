@@ -24,6 +24,7 @@ import {
   type VanaCampPreviewData,
   type VanaCampPreviewPlayer,
   type VanaCampRoleHistoryEntry,
+  type VanaCampSide,
 } from '@/types/vana-camp'
 
 // ────────────────────────────────────────────────────────────────────
@@ -412,6 +413,42 @@ export async function leaveSession(sessionId: string): Promise<{ error?: string 
 // ────────────────────────────────────────────────────────────────────
 // Cancelar sessão (host antes de começar)
 // ────────────────────────────────────────────────────────────────────
+
+/**
+ * Apaga permanentemente uma sessão (admin). Apenas coordenadores ou o host.
+ */
+export async function deleteVanaCampSession(sessionId: string): Promise<{ error?: string }> {
+  try {
+    const { supabase, user } = await requireUser()
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single()
+    const isCoord = profile?.role === 'coordenador'
+
+    const { data: session } = await supabase
+      .from('vanacamp_sessions')
+      .select('host_id')
+      .eq('id', sessionId)
+      .single()
+    if (!session) return { error: 'Sessão não encontrada.' }
+    if (!isCoord && session.host_id !== user.id) {
+      return { error: 'Apenas o host ou um coordenador podem apagar.' }
+    }
+
+    const service = createServiceClient()
+    const { error } = await service
+      .from('vanacamp_sessions')
+      .delete()
+      .eq('id', sessionId)
+    if (error) return { error: error.message }
+
+    revalidatePath('/admin/vana-camp')
+    revalidatePath('/jogos/vana-camp')
+    return {}
+  } catch (e) { return { error: e instanceof Error ? e.message : 'Erro.' } }
+}
 
 export async function cancelSession(sessionId: string): Promise<{ error?: string }> {
   const { supabase, user } = await requireUser()
@@ -875,6 +912,189 @@ async function requireHostOfSession(sessionId: string) {
   return { supabase, user, session }
 }
 
+// ────────────────────────────────────────────────────────────────────
+// MAYOR ELECTION (mayor_mode='vote_day1')
+// ────────────────────────────────────────────────────────────────────
+
+/**
+ * Avança de role_reveal para mayor_election (só se mayor_mode='vote_day1').
+ */
+export async function startMayorElection(sessionId: string): Promise<{ error?: string }> {
+  try {
+    const { session } = await requireHostOfSession(sessionId)
+    if (session.status !== 'role_reveal') {
+      return { error: 'Só podes começar a eleição depois do reveal.' }
+    }
+    if (session.mayor_mode !== 'vote_day1') {
+      return { error: 'O modo de Mayor desta sessão não é por eleição.' }
+    }
+    const service = createServiceClient()
+    await setPhase(sessionId, 'mayor_election')
+    await service.from('vanacamp_events').insert({
+      session_id: sessionId,
+      day_number: 0,
+      event_type: 'phase_change',
+      payload: { from: 'role_reveal', to: 'mayor_election' },
+    })
+    revalidatePath(`/jogos/vana-camp/${sessionId}`)
+    return {}
+  } catch (e) { return { error: e instanceof Error ? e.message : 'Erro.' } }
+}
+
+/** Submete (ou substitui) o voto da eleição do Mayor. */
+export async function submitMayorVote(
+  sessionId: string,
+  targetPlayerId: string,
+  actAsPlayerId?: string,
+): Promise<{ error?: string }> {
+  try {
+    const { user } = await requireUser()
+    const actor = await resolveActorPlayerId(sessionId, user.id, actAsPlayerId)
+    if ('error' in actor) return { error: actor.error }
+    if (!actor.is_alive) return { error: 'Estás eliminado.' }
+
+    const service = createServiceClient()
+    const { data: session } = await service
+      .from('vanacamp_sessions')
+      .select('status')
+      .eq('id', sessionId)
+      .single()
+    if (!session || session.status !== 'mayor_election') {
+      return { error: 'Não é hora de votar no Diretor.' }
+    }
+
+    const { data: target } = await service
+      .from('vanacamp_players')
+      .select('id, is_alive, session_id')
+      .eq('id', targetPlayerId)
+      .single()
+    if (!target || target.session_id !== sessionId) return { error: 'Alvo inválido.' }
+    if (!target.is_alive) return { error: 'Alvo inválido.' }
+
+    const { error } = await service
+      .from('vanacamp_votes')
+      .upsert(
+        {
+          session_id: sessionId,
+          day_number: 0,
+          vote_type: 'mayor_election',
+          voter_player_id: actor.player_id,
+          target_player_id: targetPlayerId,
+        },
+        { onConflict: 'session_id,day_number,vote_type,voter_player_id' },
+      )
+    if (error) return { error: error.message }
+    return {}
+  } catch (e) { return { error: e instanceof Error ? e.message : 'Erro.' } }
+}
+
+/** Contexto da eleição para o jogador. */
+export async function getMyMayorVoteContext(
+  sessionId: string,
+  actAsPlayerId?: string,
+): Promise<{
+  my_player_id?: string
+  current_target_id?: string | null
+  players?: { id: string; display_name: string }[]
+  votes?: { voter_id: string; target_id: string }[]
+  error?: string
+}> {
+  try {
+    const { user } = await requireUser()
+    const actor = await resolveActorPlayerId(sessionId, user.id, actAsPlayerId)
+    if ('error' in actor) return { error: actor.error }
+
+    const service = createServiceClient()
+    const { data: alive } = await service
+      .from('vanacamp_players')
+      .select('id, display_name')
+      .eq('session_id', sessionId)
+      .eq('is_alive', true)
+      .order('display_name', { ascending: true })
+
+    const { data: myVote } = await service
+      .from('vanacamp_votes')
+      .select('target_player_id')
+      .eq('session_id', sessionId)
+      .eq('day_number', 0)
+      .eq('vote_type', 'mayor_election')
+      .eq('voter_player_id', actor.player_id)
+      .maybeSingle()
+
+    const { data: allVotes } = await service
+      .from('vanacamp_votes')
+      .select('voter_player_id, target_player_id')
+      .eq('session_id', sessionId)
+      .eq('day_number', 0)
+      .eq('vote_type', 'mayor_election')
+
+    return {
+      my_player_id: actor.player_id,
+      current_target_id: myVote?.target_player_id ?? null,
+      players: alive ?? [],
+      votes: (allVotes ?? []).map((v) => ({
+        voter_id: v.voter_player_id,
+        target_id: v.target_player_id,
+      })),
+    }
+  } catch (e) { return { error: e instanceof Error ? e.message : 'Erro.' } }
+}
+
+/** Resolve a eleição: tally simples (sem desempate, vence o mais votado, em
+ *  empate fica sem Mayor) e avança para night_infiltrators. */
+export async function resolveMayorElection(sessionId: string): Promise<{ error?: string }> {
+  try {
+    const { session } = await requireHostOfSession(sessionId)
+    if (session.status !== 'mayor_election') return { error: 'Não estás na eleição.' }
+    const service = createServiceClient()
+
+    const { data: votes } = await service
+      .from('vanacamp_votes')
+      .select('target_player_id')
+      .eq('session_id', sessionId)
+      .eq('day_number', 0)
+      .eq('vote_type', 'mayor_election')
+
+    const tally = new Map<string, number>()
+    for (const v of votes ?? []) {
+      tally.set(v.target_player_id, (tally.get(v.target_player_id) ?? 0) + 1)
+    }
+
+    let mayorId: string | null = null
+    if (tally.size > 0) {
+      const sorted = [...tally.entries()].sort(([, a], [, b]) => b - a)
+      // Em caso de empate fica sem Mayor (decisão de design)
+      if (sorted.length === 1 || sorted[0][1] > sorted[1][1]) {
+        mayorId = sorted[0][0]
+      }
+    }
+
+    // Limpa qualquer is_mayor anterior e atribui
+    await service.from('vanacamp_players').update({ is_mayor: false }).eq('session_id', sessionId)
+    if (mayorId) {
+      await service.from('vanacamp_players').update({ is_mayor: true }).eq('id', mayorId)
+    }
+
+    const { data: mayorPlayer } = mayorId
+      ? await service.from('vanacamp_players').select('display_name').eq('id', mayorId).single()
+      : { data: null }
+
+    await service.from('vanacamp_events').insert({
+      session_id: sessionId,
+      day_number: 0,
+      event_type: 'mayor_elected',
+      payload: {
+        mayor_id: mayorId,
+        mayor_name: mayorPlayer?.display_name ?? null,
+        counts: Object.fromEntries(tally),
+      },
+    })
+
+    revalidatePath(`/jogos/vana-camp/${sessionId}`)
+    return {}
+  } catch (e) { return { error: e instanceof Error ? e.message : 'Erro.' } }
+}
+
 /**
  * Resolve a sub-fase noturna seguinte tendo em conta papéis vivos.
  * Devolve null quando já não há sub-fases (passa para day_announce).
@@ -953,12 +1173,17 @@ async function emitVibrationForRole(
 }
 
 /**
- * Avança de role_reveal (ou day_result) para a primeira sub-fase da noite.
+ * Avança de role_reveal (ou day_result, ou mayor_election) para a primeira
+ * sub-fase da noite.
  */
 export async function startNight(sessionId: string): Promise<{ error?: string }> {
   try {
     const { session } = await requireHostOfSession(sessionId)
-    if (session.status !== 'role_reveal' && session.status !== 'day_result') {
+    if (
+      session.status !== 'role_reveal' &&
+      session.status !== 'day_result' &&
+      session.status !== 'mayor_election'
+    ) {
       return { error: 'Não estás no momento de começar a noite.' }
     }
 
@@ -1848,6 +2073,197 @@ export async function getDayResult(sessionId: string, dayNumber: number): Promis
       mayor_tiebreak_used: payload.mayor_tiebreak_used,
       counts: payload.counts,
     }
+  } catch (e) { return { error: e instanceof Error ? e.message : 'Erro.' } }
+}
+
+// ════════════════════════════════════════════════════════════════════
+// PRÉMIOS XP / GOLD
+// ════════════════════════════════════════════════════════════════════
+
+const REWARDS = {
+  winning_side: { xp: 30, gold: 15 },
+  survived: { xp: 20, gold: 10 },
+  seer_correct: { xp: 10, gold: 5 },
+  guardian_save: { xp: 15, gold: 5 },
+  mayor_tiebreak: { xp: 10, gold: 5 },
+}
+
+export interface VanaCampPlayerReward {
+  player_id: string
+  user_id: string | null
+  display_name: string
+  is_bot: boolean
+  xp: number
+  gold: number
+  reasons: string[]
+}
+
+interface SessionRewardSummary {
+  rewards: VanaCampPlayerReward[]
+  already_awarded: boolean
+  winner_side: VanaCampSide | null
+}
+
+async function computeRewards(sessionId: string): Promise<SessionRewardSummary> {
+  const service = createServiceClient()
+
+  const { data: session } = await service
+    .from('vanacamp_sessions')
+    .select('winner_side, rewards_awarded')
+    .eq('id', sessionId)
+    .single()
+  if (!session) throw new Error('Sessão não encontrada.')
+
+  const { data: players } = await service
+    .from('vanacamp_players')
+    .select('id, user_id, display_name, role, is_alive, is_mayor, is_bot')
+    .eq('session_id', sessionId)
+
+  const { data: nightActions } = await service
+    .from('vanacamp_night_actions')
+    .select('*')
+    .eq('session_id', sessionId)
+
+  const { data: events } = await service
+    .from('vanacamp_events')
+    .select('*')
+    .eq('session_id', sessionId)
+    .in('event_type', ['save', 'vote_tally'])
+
+  const winnerSide = session.winner_side as VanaCampSide | null
+
+  const rewards: VanaCampPlayerReward[] = (players ?? []).map((p) => {
+    const reward: VanaCampPlayerReward = {
+      player_id: p.id,
+      user_id: p.user_id,
+      display_name: p.display_name,
+      is_bot: p.is_bot,
+      xp: 0,
+      gold: 0,
+      reasons: [],
+    }
+    if (!p.role) return reward
+
+    const playerSide: VanaCampSide = p.role === 'infiltrator' ? 'infiltrators' : 'desbravadores'
+    if (winnerSide && playerSide === winnerSide) {
+      reward.xp += REWARDS.winning_side.xp
+      reward.gold += REWARDS.winning_side.gold
+      reward.reasons.push(`Lado vencedor (+${REWARDS.winning_side.xp} XP, +${REWARDS.winning_side.gold} gold)`)
+    }
+    if (p.is_alive) {
+      reward.xp += REWARDS.survived.xp
+      reward.gold += REWARDS.survived.gold
+      reward.reasons.push(`Sobreviveu (+${REWARDS.survived.xp} XP, +${REWARDS.survived.gold} gold)`)
+    }
+    if (p.role === 'seer') {
+      const correctIds = (nightActions ?? []).filter(
+        (a) => a.phase === 'seer' && a.actor_player_id === p.id && a.result === 'infiltrado',
+      ).length
+      if (correctIds > 0) {
+        const xp = correctIds * REWARDS.seer_correct.xp
+        const gold = correctIds * REWARDS.seer_correct.gold
+        reward.xp += xp; reward.gold += gold
+        reward.reasons.push(`Identificou ${correctIds} infiltrado(s) (+${xp} XP, +${gold} gold)`)
+      }
+    }
+    if (p.role === 'guardian') {
+      const guardianActions = (nightActions ?? []).filter(
+        (a) => a.phase === 'guardian' && a.actor_player_id === p.id,
+      )
+      const saves = guardianActions.filter((ga) =>
+        (events ?? []).some((e) => e.event_type === 'save' && e.day_number === ga.day_number),
+      ).length
+      if (saves > 0) {
+        const xp = saves * REWARDS.guardian_save.xp
+        const gold = saves * REWARDS.guardian_save.gold
+        reward.xp += xp; reward.gold += gold
+        reward.reasons.push(`Salvou ${saves} desbravador(es) (+${xp} XP, +${gold} gold)`)
+      }
+    }
+    if (p.is_mayor) {
+      const tiebreaks = (events ?? []).filter(
+        (e) => e.event_type === 'vote_tally' && (e.payload as { mayor_tiebreak_used?: boolean })?.mayor_tiebreak_used,
+      ).length
+      if (tiebreaks > 0) {
+        const xp = tiebreaks * REWARDS.mayor_tiebreak.xp
+        const gold = tiebreaks * REWARDS.mayor_tiebreak.gold
+        reward.xp += xp; reward.gold += gold
+        reward.reasons.push(`Desempate do Diretor ${tiebreaks}× (+${xp} XP, +${gold} gold)`)
+      }
+    }
+    return reward
+  })
+
+  return { rewards, already_awarded: !!session.rewards_awarded, winner_side: winnerSide }
+}
+
+export async function previewRewards(sessionId: string): Promise<SessionRewardSummary & { error?: string }> {
+  try {
+    const { user } = await requireUser()
+    const supabase = await createClient()
+    const { data: session } = await supabase
+      .from('vanacamp_sessions')
+      .select('host_id')
+      .eq('id', sessionId)
+      .single()
+    if (!session) return { error: 'Sessão não encontrada.', rewards: [], already_awarded: false, winner_side: null }
+    if (session.host_id !== user.id) return { error: 'Apenas o Narrador.', rewards: [], already_awarded: false, winner_side: null }
+    return await computeRewards(sessionId)
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : 'Erro.', rewards: [], already_awarded: false, winner_side: null }
+  }
+}
+
+export async function awardRewards(sessionId: string): Promise<{
+  ok?: boolean
+  error?: string
+  awarded?: number
+  skipped_bots?: number
+}> {
+  try {
+    const { user } = await requireUser()
+    const supabase = await createClient()
+    const service = createServiceClient()
+
+    const { data: session } = await supabase
+      .from('vanacamp_sessions')
+      .select('host_id, rewards_awarded, status')
+      .eq('id', sessionId)
+      .single()
+    if (!session) return { error: 'Sessão não encontrada.' }
+    if (session.host_id !== user.id) return { error: 'Apenas o Narrador pode atribuir prémios.' }
+    if (session.status !== 'finished') return { error: 'O jogo ainda não terminou.' }
+    if (session.rewards_awarded) return { error: 'Os prémios já foram atribuídos a esta sessão.' }
+
+    const summary = await computeRewards(sessionId)
+    let awarded = 0
+    let skipped = 0
+
+    for (const r of summary.rewards) {
+      if (r.is_bot || !r.user_id) { skipped++; continue }
+      if (r.xp === 0 && r.gold === 0) continue
+      const description = `VanaCamp — ${r.reasons.join(' · ')}`
+      const { error } = await service.from('points_log').insert({
+        target_user_id: r.user_id,
+        awarded_by_user_id: user.id,
+        amount_xp: r.xp,
+        amount_gold: r.gold,
+        description,
+      })
+      if (error) {
+        console.error('[vana-camp] award error', error, r)
+        continue
+      }
+      awarded++
+    }
+
+    await service
+      .from('vanacamp_sessions')
+      .update({ rewards_awarded: true })
+      .eq('id', sessionId)
+
+    revalidatePath(`/jogos/vana-camp/${sessionId}`)
+    return { ok: true, awarded, skipped_bots: skipped }
   } catch (e) { return { error: e instanceof Error ? e.message : 'Erro.' } }
 }
 

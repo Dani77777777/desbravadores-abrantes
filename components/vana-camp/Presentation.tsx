@@ -60,6 +60,9 @@ export function Presentation({
   if (status === 'role_reveal') {
     return <PresentRoleReveal phaseEndsAt={live.phase_ends_at} phasePausedAt={live.phase_paused_at} />
   }
+  if (status === 'mayor_election') {
+    return <PresentSimple title="Eleger o Diretor" subtitle="Cada desbravador vota em quem será o Diretor do Clube." icon="moon" />
+  }
   if (status === 'night_infiltrators' || status === 'night_seer' || status === 'night_guardian') {
     return (
       <PresentNight
