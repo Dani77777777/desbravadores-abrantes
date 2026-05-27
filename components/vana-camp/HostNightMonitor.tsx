@@ -43,6 +43,10 @@ export function HostNightMonitor(props: Props) {
   })
   usePhaseReload(sessionId, status)
   const remaining = usePhaseCountdown(live.phase_ends_at, live.phase_paused_at)
+  // Usa o status "vivo" (atualizado por polling) em vez do prop server-rendered
+  // — assim o título/ícone respondem instantaneamente quando a fase muda na BD.
+  const currentStatus = (live.status in PHASE_META ? live.status : status) as keyof typeof PHASE_META
+  const liveDayNumber = live.day_number ?? dayNumber
 
   const [progress, setProgress] = useState<{ expected: number; submitted: number; pending_names: string[] }>({
     expected: 0, submitted: 0, pending_names: [],
@@ -63,11 +67,11 @@ export function HostNightMonitor(props: Props) {
       .channel(`vc_host_night_${sessionId}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'vanacamp_events', filter: `session_id=eq.${sessionId}` }, () => refresh())
       .subscribe()
-    const i = setInterval(refresh, 2000)
+    const i = setInterval(refresh, 1500)
     return () => { supabase.removeChannel(ch); clearInterval(i) }
-  }, [sessionId, status])
+  }, [sessionId, currentStatus])
 
-  const meta = PHASE_META[status]
+  const meta = PHASE_META[currentStatus] ?? PHASE_META[status]
   const Icon = meta.icon
   const allReady = progress.expected > 0 && progress.submitted >= progress.expected
   const isPaused = !!live.phase_paused_at
@@ -84,7 +88,7 @@ export function HostNightMonitor(props: Props) {
       <header className="text-center space-y-2 py-4">
         <Icon className={`w-12 h-12 mx-auto ${meta.color}`} />
         <h1 className="text-3xl font-black text-amber-100">{meta.label}</h1>
-        <p className="text-amber-300/60 text-sm">Dia {dayNumber}</p>
+        <p className="text-amber-300/60 text-sm">Dia {liveDayNumber}</p>
       </header>
 
       {/* Timer */}
