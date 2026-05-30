@@ -12,6 +12,9 @@ import { DayAnnouncement } from '@/components/vana-camp/DayAnnouncement'
 import { HostDebugOverlay } from '@/components/vana-camp/HostDebugOverlay'
 import { OpenPresentButton } from '@/components/vana-camp/OpenPresentButton'
 
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 export default async function VanaCampControlPage({
   params,
 }: {

@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import {
   Moon, Eye, Shield, Skull, Play, Pause, FastForward, Plus, Check, AlertCircle,
 } from 'lucide-react'
@@ -35,6 +36,7 @@ const PHASE_META: Record<string, { label: string; icon: typeof Moon; color: stri
 
 export function HostNightMonitor(props: Props) {
   const { sessionId, status, dayNumber, phaseEndsAt, phasePausedAt, allPlayers } = props
+  const router = useRouter()
   const live = useLiveSession(sessionId, {
     status,
     phase_ends_at: phaseEndsAt,
@@ -43,8 +45,18 @@ export function HostNightMonitor(props: Props) {
   })
   usePhaseReload(sessionId, status)
   const remaining = usePhaseCountdown(live.phase_ends_at, live.phase_paused_at)
-  // Usa o status "vivo" (atualizado por polling) em vez do prop server-rendered
-  // — assim o título/ícone respondem instantaneamente quando a fase muda na BD.
+
+  // Se o status "vivo" saiu da categoria noite, a fase mudou na BD mas o
+  // servidor ainda não devolveu o componente certo. Mostra ecrã de transição
+  // em vez do título obsoleto e força refresh.
+  const outOfPhase = !(live.status in PHASE_META)
+  useEffect(() => {
+    if (outOfPhase) {
+      const i = setInterval(() => router.refresh(), 500)
+      return () => clearInterval(i)
+    }
+  }, [outOfPhase, router])
+
   const currentStatus = (live.status in PHASE_META ? live.status : status) as keyof typeof PHASE_META
   const liveDayNumber = live.day_number ?? dayNumber
 
@@ -75,6 +87,16 @@ export function HostNightMonitor(props: Props) {
   const Icon = meta.icon
   const allReady = progress.expected > 0 && progress.submitted >= progress.expected
   const isPaused = !!live.phase_paused_at
+
+  if (outOfPhase) {
+    return (
+      <main className="min-h-screen flex flex-col items-center justify-center text-center p-8 text-amber-100">
+        <Moon className="w-16 h-16 text-amber-300/60 mb-4 animate-pulse" />
+        <p className="text-xl font-semibold">A noite acabou…</p>
+        <p className="text-stone-400 text-sm mt-2">A carregar a próxima fase.</p>
+      </main>
+    )
+  }
 
   async function wrap(fn: () => Promise<{ error?: string }>) {
     setBusy(true); setError(null)

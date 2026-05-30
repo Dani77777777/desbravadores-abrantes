@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import {
   Sun, Sunset, Vote, Play, Pause, FastForward, Plus, Check, AlertCircle, Crown, Moon,
 } from 'lucide-react'
@@ -38,6 +39,7 @@ const META = {
 
 export function HostDayMonitor(props: Props) {
   const { sessionId, status, dayNumber, phaseEndsAt, phasePausedAt, allPlayers } = props
+  const router = useRouter()
   const live = useLiveSession(sessionId, {
     status,
     phase_ends_at: phaseEndsAt,
@@ -46,6 +48,14 @@ export function HostDayMonitor(props: Props) {
   })
   usePhaseReload(sessionId, status)
   const remaining = usePhaseCountdown(live.phase_ends_at, live.phase_paused_at)
+
+  const outOfPhase = !(live.status in META)
+  useEffect(() => {
+    if (outOfPhase) {
+      const i = setInterval(() => router.refresh(), 500)
+      return () => clearInterval(i)
+    }
+  }, [outOfPhase, router])
 
   const currentStatus = (live.status in META ? live.status : status) as keyof typeof META
   const liveDay = live.day_number ?? dayNumber
@@ -84,6 +94,16 @@ export function HostDayMonitor(props: Props) {
   const Icon = meta.icon
   const isPaused = !!live.phase_paused_at
   const allVoted = progress.expected > 0 && progress.submitted >= progress.expected
+
+  if (outOfPhase) {
+    return (
+      <main className="min-h-screen flex flex-col items-center justify-center text-center p-8 text-amber-100">
+        <Sun className="w-16 h-16 text-amber-300/60 mb-4 animate-pulse" />
+        <p className="text-xl font-semibold">O dia acabou…</p>
+        <p className="text-stone-400 text-sm mt-2">A carregar a próxima fase.</p>
+      </main>
+    )
+  }
 
   async function wrap(fn: () => Promise<{ error?: string }>) {
     setBusy(true); setError(null)
