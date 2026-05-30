@@ -1,0 +1,169 @@
+import type { VanaWordsPlayer, WordTeam } from '@/types/vana-words'
+
+// ── Lista de palavras (banco com ≥ 100 entradas) ─────────────
+export const WORD_LIST = [
+  // Fé & Igreja
+  'Fé', 'Graça', 'Cruz', 'Paz', 'Luz', 'Amor', 'Bíblia', 'Oração', 'Igreja', 'Baptismo',
+  'Servo', 'Rei', 'Profeta', 'Anjo', 'Templo', 'Altar', 'Nuvem', 'Fogo', 'Arca', 'Maná',
+  'Sal', 'Pão', 'Vinho', 'Azeite', 'Cordeiro', 'Pomba', 'Graça', 'Milagre', 'Promessa', 'Aliança',
+  // Natureza
+  'Montanha', 'Rio', 'Floresta', 'Vento', 'Sol', 'Lua', 'Estrela', 'Céu', 'Mar', 'Deserto',
+  'Jardim', 'Árvore', 'Fruto', 'Vinha', 'Palma', 'Cedro', 'Trigo', 'Rosa', 'Lírio', 'Rocha',
+  'Lago', 'Fonte', 'Poço', 'Brisa', 'Pinheiro', 'Carvalho', 'Oliveira', 'Areia', 'Gelo', 'Chuva',
+  // Escutismo
+  'Mochila', 'Bússola', 'Corda', 'Nó', 'Tenda', 'Fogueira', 'Trilho', 'Mapa', 'Cantil',
+  'Apito', 'Distintivo', 'Lenço', 'Bastão', 'Patrulha', 'Lanterna', 'Faca', 'Bota', 'Sinal',
+  // Animais
+  'Águia', 'Leão', 'Cavalo', 'Serpente', 'Lobo', 'Raposa', 'Tartaruga', 'Golfinho', 'Pombo',
+  'Falcão', 'Abelha', 'Lebre', 'Urso', 'Cegonha', 'Borboleta', 'Corvo', 'Cervo', 'Baleia',
+  // Objetos & Conceitos
+  'Chave', 'Porta', 'Espada', 'Escudo', 'Coroa', 'Harpa', 'Trompa', 'Farol', 'Âncora',
+  'Barco', 'Vela', 'Cofre', 'Tesouro', 'Caminho', 'Ponte', 'Torre', 'Muro', 'Flecha', 'Arco',
+  // Valores
+  'Bondade', 'Coragem', 'Honra', 'Lealdade', 'Humildade', 'Verdade', 'Justiça', 'Esperança',
+  'Alegria', 'Força', 'Sabedoria', 'Misericórdia', 'Perdão', 'Gratidão', 'Silêncio',
+]
+
+// Remove duplicates that snuck in
+const UNIQUE_WORDS = [...new Set(WORD_LIST)]
+
+// ── Geração da grelha 5×5 ────────────────────────────────────
+export interface WordAssignment {
+  word: string
+  team: WordTeam
+  grid_pos: number
+}
+
+// wordPool: lista de palavras a usar; se omitida, usa WORD_LIST de fallback
+export function generateWordGrid(wordPool?: string[]): WordAssignment[] {
+  const pool = wordPool && wordPool.length >= 25 ? wordPool : UNIQUE_WORDS
+  const shuffledWords = [...pool].sort(() => Math.random() - 0.5).slice(0, 25)
+
+  const teams: WordTeam[] = [
+    'a', 'a', 'a', 'a', 'a',
+    'b', 'b', 'b', 'b', 'b',
+    'black',
+    ...Array<WordTeam>(14).fill('neutral'),
+  ]
+  const shuffledTeams = teams.sort(() => Math.random() - 0.5)
+
+  return shuffledWords.map((word, i) => ({
+    word,
+    team: shuffledTeams[i],
+    grid_pos: i,
+  }))
+}
+
+// ── Algoritmo de distribuição de equipas ─────────────────────
+export interface PlayerForTeam {
+  id: string
+  user_id: string | null
+  display_name: string
+  section: string | null
+}
+
+function sectionPenalty(players: PlayerForTeam[]): number {
+  const counts: Record<string, number> = {}
+  for (const p of players) {
+    if (p.section) counts[p.section] = (counts[p.section] ?? 0) + 1
+  }
+  return Object.values(counts).reduce((sum, c) => sum + Math.max(0, c - 1), 0)
+}
+
+function scoreTeamSplit(teamA: PlayerForTeam[], teamB: PlayerForTeam[]): number {
+  let score = 0
+  score -= sectionPenalty(teamA) * 2
+  score -= sectionPenalty(teamB) * 2
+  // Penalize unbalanced sizes
+  score -= Math.abs(teamA.length - teamB.length) * 3
+  return score
+}
+
+export function proposeTeams(
+  players: PlayerForTeam[],
+): { teamA: PlayerForTeam[]; teamB: PlayerForTeam[] } {
+  if (players.length < 2) {
+    return { teamA: players, teamB: [] }
+  }
+
+  const half = Math.ceil(players.length / 2)
+  let best: { teamA: PlayerForTeam[]; teamB: PlayerForTeam[] } | null = null
+  let bestScore = -Infinity
+
+  // Try 30 random splits, pick highest score
+  for (let attempt = 0; attempt < 30; attempt++) {
+    const shuffled = [...players].sort(() => Math.random() - 0.5)
+    const teamA = shuffled.slice(0, half)
+    const teamB = shuffled.slice(half)
+    const score = scoreTeamSplit(teamA, teamB)
+    if (score > bestScore) {
+      bestScore = score
+      best = { teamA, teamB }
+    }
+  }
+
+  return best!
+}
+
+// ── Algoritmo de seleção de Arauto ───────────────────────────
+interface RecentArautoRecord {
+  user_id: string
+  last_at: string // ISO date
+}
+
+export function selectArauto(
+  teamPlayers: PlayerForTeam[],
+  recentArautos: RecentArautoRecord[],
+): PlayerForTeam {
+  const recentMap = new Map(recentArautos.map((r) => [r.user_id, new Date(r.last_at).getTime()]))
+
+  const weights = teamPlayers.map((p) => {
+    if (!p.user_id) return 1 // bots: igual peso
+    const lastTs = recentMap.get(p.user_id)
+    if (!lastTs) return 200 // nunca foi Arauto: peso muito alto
+    const daysSince = (Date.now() - lastTs) / 86_400_000
+    return Math.max(1, daysSince)
+  })
+
+  const total = weights.reduce((a, b) => a + b, 0)
+  let rand = Math.random() * total
+  for (let i = 0; i < teamPlayers.length; i++) {
+    rand -= weights[i]
+    if (rand <= 0) return teamPlayers[i]
+  }
+  return teamPlayers[teamPlayers.length - 1]
+}
+
+// ── Helpers de cor para a grelha ────────────────────────────
+export function wordCardClass(
+  team: WordTeam | null | undefined,
+  isRevealed: boolean,
+  isSelected: boolean,
+  showColors: boolean,
+): string {
+  if (isRevealed) {
+    const base = 'opacity-80 cursor-default'
+    if (team === 'a')       return `${base} bg-amber-600 text-white border-amber-400`
+    if (team === 'b')       return `${base} bg-blue-600 text-white border-blue-400`
+    if (team === 'black')   return `${base} bg-stone-950 text-red-300 border-red-900`
+    return `${base} bg-stone-700 text-stone-300 border-stone-600`
+  }
+
+  if (showColors && team) {
+    // Vista do Arauto/Host: cartão inteiro pintado com a cor da equipa
+    const sel = isSelected ? 'ring-4 ring-white/70' : ''
+    if (team === 'a')     return `bg-amber-500 text-stone-900 border-amber-300 font-extrabold ${sel} cursor-pointer`
+    if (team === 'b')     return `bg-blue-600 text-white border-blue-300 font-extrabold ${sel} cursor-pointer`
+    if (team === 'black') return `bg-black text-red-400 border-4 border-red-500 font-extrabold ${sel} cursor-pointer`
+    // neutra
+    return `bg-stone-300 text-stone-700 border-stone-400 font-semibold ${sel} cursor-pointer`
+  }
+
+  const sel = isSelected ? 'ring-2 ring-indigo-400 bg-indigo-900/50' : 'bg-slate-800 hover:bg-slate-700'
+  return `${sel} text-white border-slate-600 cursor-pointer`
+}
+
+// Geração de código de sessão único (4 letras maiúsculas)
+export function generateCode(): string {
+  return Math.random().toString(36).slice(2, 6).toUpperCase()
+}

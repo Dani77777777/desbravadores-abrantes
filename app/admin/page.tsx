@@ -175,6 +175,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
             { id: 'surveys', label: 'Inquéritos', icon: ClipboardList, coordOnly: true, count: 0, countColor: 'blue' },
             { id: 'vantur', label: 'Vantur', icon: Gamepad2, coordOnly: true, count: 0, countColor: 'blue', href: '/admin/vantur' },
             { id: 'vana-quest', label: 'VanaQuest', icon: Swords, coordOnly: true, count: 0, countColor: 'blue', href: '/admin/vana-quest' },
+            { id: 'vana-words', label: 'VanaWords', icon: Gamepad2, coordOnly: false, count: 0, countColor: 'blue', href: '/admin/vana-words' },
             { id: 'store', label: 'Loja', icon: ShoppingBag, coordOnly: true, count: purchases?.filter(p => p.status === 'pending').length || 0, countColor: 'orange' }
           ] as { id: string, label: string, icon: any, coordOnly: boolean, count: number, countColor: string, href?: string }[])
             .filter(tab => !tab.coordOnly || isCoordenador)

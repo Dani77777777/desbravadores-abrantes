@@ -44,6 +44,17 @@ export default async function GamesHubPage() {
       requiresAuth: false,
     },
     {
+      id: 'vana-words',
+      title: 'VanaWords',
+      description: 'Jogo de palavras secretas ao estilo Codenames! Guia a tua equipa com dicas e descobre as palavras certas.',
+      icon: <img src="/images/VanaWords.png" alt="VanaWords" className="w-12 h-12 object-contain" />,
+      href: '/jogos/vana-words',
+      loginHref: '/login?redirect=/jogos/vana-words',
+      color: 'from-emerald-600 via-teal-700 to-indigo-800',
+      status: 'Disponível',
+      requiresAuth: true,
+    },
+    {
       id: 'em-breve',
       title: 'Em Breve...',
       description: 'Mais desafios estão a ser preparados pelos teus líderes!',
