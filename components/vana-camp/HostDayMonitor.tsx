@@ -52,8 +52,11 @@ export function HostDayMonitor(props: Props) {
   const outOfPhase = !(live.status in META)
   useEffect(() => {
     if (outOfPhase) {
-      const i = setInterval(() => router.refresh(), 500)
-      return () => clearInterval(i)
+      router.refresh()
+      const t = setTimeout(() => {
+        if (typeof window !== 'undefined') window.location.reload()
+      }, 800)
+      return () => clearTimeout(t)
     }
   }, [outOfPhase, router])
 

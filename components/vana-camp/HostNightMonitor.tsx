@@ -47,13 +47,17 @@ export function HostNightMonitor(props: Props) {
   const remaining = usePhaseCountdown(live.phase_ends_at, live.phase_paused_at)
 
   // Se o status "vivo" saiu da categoria noite, a fase mudou na BD mas o
-  // servidor ainda não devolveu o componente certo. Mostra ecrã de transição
-  // em vez do título obsoleto e força refresh.
+  // servidor renderizou esta página com a fase antiga. router.refresh() nem
+  // sempre invalida a route cache de forma fiável → hard reload (a página de
+  // controlo do host não tem dependências de user-activation como Vibration).
   const outOfPhase = !(live.status in PHASE_META)
   useEffect(() => {
     if (outOfPhase) {
-      const i = setInterval(() => router.refresh(), 500)
-      return () => clearInterval(i)
+      router.refresh()
+      const t = setTimeout(() => {
+        if (typeof window !== 'undefined') window.location.reload()
+      }, 800)
+      return () => clearTimeout(t)
     }
   }, [outOfPhase, router])
 
