@@ -9,13 +9,16 @@ import { Calendar as CalendarIcon, MapPin, Trophy, Coins, ChevronRight, Clock, I
 import Link from 'next/link'
 import { CalendarUI } from './CalendarUI'
 import { CodeEntryDialog } from '@/components/dashboard/CodeEntryDialog'
+import { SurveysSection } from '@/components/dashboard/SurveysSection'
 
 interface EventDashboardProps {
   events: any[]
   profile: any
+  surveys?: any[]
+  userId?: string
 }
 
-export function EventDashboard({ events, profile }: EventDashboardProps) {
+export function EventDashboard({ events, profile, surveys, userId }: EventDashboardProps) {
   const [selectedDate, setSelectedDate] = useState<Date | null>(null)
   const [viewingEvent, setViewingEvent] = useState<any>(null)
 
@@ -121,6 +124,11 @@ export function EventDashboard({ events, profile }: EventDashboardProps) {
               })
             )}
           </div>
+
+          {/* Surveys aparecem por baixo do "Brevemente" */}
+          {userId && surveys && surveys.length > 0 && (
+            <SurveysSection userId={userId} surveys={surveys} />
+          )}
         </div>
       </div>
 

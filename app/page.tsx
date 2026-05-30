@@ -88,6 +88,12 @@ export default async function Dashboard() {
     .select('task_id, points_awarded')
     .eq('user_id', user.id)
 
+  // Fetch visible surveys (RLS hides surveys older than deadline + 3 days for non-coords)
+  const { data: surveys } = await supabase
+    .from('surveys')
+    .select('*, survey_options(*), survey_responses(id, option_id, user_id)')
+    .order('created_at', { ascending: false })
+
   const completedTaskIds = new Set((myCompletions || []).map(c => c.task_id))
   const pendingAwardIds = new Set((myCompletions || []).filter(c => !c.points_awarded).map(c => c.task_id))
 
@@ -222,7 +228,7 @@ export default async function Dashboard() {
 
             {/* Events Agenda & Calendar Section */}
             <div>
-                <EventDashboard events={events || []} profile={profile} />
+                <EventDashboard events={events || []} profile={profile} surveys={surveys || []} userId={user.id} />
             </div>
         </div>
 

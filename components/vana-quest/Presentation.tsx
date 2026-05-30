@@ -69,8 +69,23 @@ export function Presentation({ sessionId, initialSession, questions, siteUrl }: 
   const [audioUnlocked, setAudioUnlocked] = useState(false)
   const [answerPulseKey, setAnswerPulseKey] = useState(0)
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const playersListRef = useRef<HTMLDivElement | null>(null)
   // Snapshot of points shown last time (per participant id) — used to animate from previous → new
+  // Persistido em localStorage para sobreviver a refresh
+  const prevPointsStorageKey = `vq-prevpts-${sessionId}`
   const prevPointsRef = useRef<Record<string, number>>({})
+  // Carrega prev points do localStorage no primeiro render (client only)
+  if (typeof window !== 'undefined' && Object.keys(prevPointsRef.current).length === 0) {
+    try {
+      const raw = window.localStorage.getItem(prevPointsStorageKey)
+      if (raw) prevPointsRef.current = JSON.parse(raw)
+    } catch {}
+  }
+  const savePrevPoints = () => {
+    try {
+      window.localStorage.setItem(prevPointsStorageKey, JSON.stringify(prevPointsRef.current))
+    } catch {}
+  }
   // Audio refs
   const musicRef = useRef<HTMLAudioElement | null>(null)
   const sfxAnsweredRef = useRef<HTMLAudioElement | null>(null)
@@ -84,6 +99,62 @@ export function Presentation({ sessionId, initialSession, questions, siteUrl }: 
     ? questions[session.current_question_index]
     : null
   const joinUrl = `${siteUrl}/jogos/vana-quest?pin=${session.pin}`
+
+  // Snapshot dos pontos quando a pergunta arranca → para o leaderboard mostrar delta + tocar SFX
+  const snapshotTakenForRef = useRef<string>('')
+  useEffect(() => {
+    if ((session.status === 'question_intro' || session.status === 'question_active') && currentQuestion) {
+      const key = `${currentQuestion.id}`
+      if (snapshotTakenForRef.current !== key) {
+        snapshotTakenForRef.current = key
+        const snap: Record<string, number> = {}
+        participants.forEach((p) => { snap[p.id] = Number(p.total_points) || 0 })
+        prevPointsRef.current = snap
+        savePrevPoints()
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session.status, currentQuestion?.id])
+
+  // Auto-scroll suave da lista de jogadores no lobby (quando transborda)
+  useEffect(() => {
+    if (session.status !== 'waiting') return
+    const el = playersListRef.current
+    if (!el) return
+
+    let rafId: number
+    let direction = 1 // 1 = baixo, -1 = cima
+    let pos = 0 // posição acumulada em sub-pixels
+    let lastTime = performance.now()
+    let pauseUntil = lastTime + 1500 // pausa inicial
+    const speedPxPerSec = 20 // ~20 px/s — bem devagar
+
+    const tick = (now: number) => {
+      const dt = now - lastTime
+      lastTime = now
+      const overflow = el.scrollHeight - el.clientHeight
+      if (overflow > 4) {
+        if (now >= pauseUntil) {
+          pos += (speedPxPerSec * dt / 1000) * direction
+          if (pos >= overflow) {
+            pos = overflow
+            direction = -1
+            pauseUntil = now + 1800
+          } else if (pos <= 0) {
+            pos = 0
+            direction = 1
+            pauseUntil = now + 1800
+          }
+          el.scrollTop = pos
+        }
+      } else {
+        pos = 0
+      }
+      rafId = requestAnimationFrame(tick)
+    }
+    rafId = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(rafId)
+  }, [session.status, participants.length])
 
   // Broadcast listener (commands from control panel)
   useEffect(() => {
@@ -395,7 +466,11 @@ export function Presentation({ sessionId, initialSession, questions, siteUrl }: 
             <p className="text-sky-300 text-xs font-black uppercase tracking-widest mb-4 flex items-center gap-2">
               <Users className="w-3.5 h-3.5" /> Jogadores na sala
             </p>
-            <div className="flex-1 space-y-2 overflow-y-auto max-h-[28rem]">
+            <div
+              ref={playersListRef}
+              className="flex-1 space-y-2 overflow-y-auto max-h-[28rem] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+              style={{ msOverflowStyle: 'none' }}
+            >
               {participants.length === 0 ? (
                 <div className="text-center py-12">
                   <div className="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center mx-auto mb-4">
@@ -760,7 +835,7 @@ function CinematicPodium({ participants }: { participants: Participant[] }) {
   const winnerRevealed = isRankRevealed(0) && !!podium[0]
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-blue-950 via-blue-900 to-indigo-950 flex flex-col items-center px-6 pt-8 pb-0 gap-4 relative overflow-hidden">
+    <div className="h-screen w-screen bg-gradient-to-b from-blue-950 via-blue-900 to-indigo-950 flex flex-col items-center px-6 pt-8 pb-0 gap-4 relative overflow-hidden [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
       {/* Confetti — only after winner revealed */}
       {winnerRevealed && <Confetti />}
 
@@ -884,23 +959,81 @@ function CinematicPodium({ participants }: { participants: Participant[] }) {
         })}
       </div>
 
-      {/* Rest of leaderboard — only after all revealed */}
+      {/* Rest of leaderboard — painel lateral direito, com auto-scroll se houver muitos */}
       {podium.length > 3 && revealed >= 4 && (
-        <div className="bg-white/10 backdrop-blur rounded-2xl border border-white/20 p-3 w-full max-w-2xl z-10 animate-in fade-in slide-in-from-bottom duration-700 mb-4">
-          {podium.slice(3, 10).map((p, i) => (
-            <div key={p.id} className="flex items-center gap-3 py-1.5 px-2 border-b border-white/10 last:border-0">
-              <span className="text-sm font-black w-7 text-center text-white/40">{i + 4}</span>
-              <span className="flex-1 text-white font-semibold text-sm truncate">{p.display_name}</span>
-              {p.max_streak >= 2 && (
-                <span className="flex items-center gap-1 text-orange-400 text-xs font-bold">
-                  <Flame className="w-3 h-3" /> {p.max_streak}
-                </span>
-              )}
-              <span className="text-white font-black text-sm tabular-nums">{p.total_points.toFixed(1)}</span>
-            </div>
-          ))}
-        </div>
+        <SidePodiumLeaderboard players={podium.slice(3)} />
       )}
+    </div>
+  )
+}
+
+// Painel lateral com restante leaderboard — auto-scroll quando transborda
+function SidePodiumLeaderboard({ players }: { players: Participant[] }) {
+  const ref = useRef<HTMLDivElement | null>(null)
+
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return
+    let rafId: number
+    let direction = 1
+    let pos = 0
+    let lastTime = performance.now()
+    let pauseUntil = lastTime + 1500
+    const speedPxPerSec = 20
+
+    const tick = (now: number) => {
+      const dt = now - lastTime
+      lastTime = now
+      const overflow = el.scrollHeight - el.clientHeight
+      if (overflow > 4) {
+        if (now >= pauseUntil) {
+          pos += (speedPxPerSec * dt / 1000) * direction
+          if (pos >= overflow) {
+            pos = overflow
+            direction = -1
+            pauseUntil = now + 1800
+          } else if (pos <= 0) {
+            pos = 0
+            direction = 1
+            pauseUntil = now + 1800
+          }
+          el.scrollTop = pos
+        }
+      } else {
+        pos = 0
+      }
+      rafId = requestAnimationFrame(tick)
+    }
+    rafId = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(rafId)
+  }, [players.length])
+
+  return (
+    <div
+      className="absolute right-4 md:right-6 top-1/2 -translate-y-1/2 bg-white/10 backdrop-blur rounded-2xl border border-white/20 p-2 md:p-3 z-20 animate-in fade-in slide-in-from-right duration-700 shadow-2xl flex flex-col overflow-hidden"
+      style={{ width: 'clamp(16rem, 22vw, 22rem)', maxHeight: '85vh' }}
+    >
+      <p className="text-sky-300 text-[10px] md:text-xs font-black uppercase tracking-widest text-center mb-2 flex-shrink-0">
+        Classificação
+      </p>
+      <div
+        ref={ref}
+        className="flex-1 min-h-0 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        style={{ msOverflowStyle: 'none' }}
+      >
+        {players.map((p, i) => (
+          <div key={p.id} className="flex items-center gap-2 py-1.5 px-1.5 border-b border-white/10 last:border-0 min-w-0">
+            <span className="text-xs md:text-sm font-black w-6 text-center text-white/40 flex-shrink-0">{i + 4}</span>
+            <span className="flex-1 text-white font-semibold text-xs md:text-sm truncate min-w-0">{p.display_name}</span>
+            {p.max_streak >= 2 && (
+              <span className="flex items-center gap-0.5 text-orange-400 text-[10px] md:text-xs font-bold flex-shrink-0">
+                <Flame className="w-3 h-3" /> {p.max_streak}
+              </span>
+            )}
+            <span className="text-white font-black text-xs md:text-sm tabular-nums flex-shrink-0">{p.total_points.toFixed(1)}</span>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }
@@ -992,22 +1125,40 @@ function LeaderboardScreen({
   participants: Participant[]
   prevPointsRef: React.MutableRefObject<Record<string, number>>
 }) {
+  // If prevPointsRef is empty (page refresh / first mount), seed with current totals so we don't
+  // animate from 0 → total (which looks like they "lost" their points).
+  const seededRef = useRef<boolean>(false)
+  const isFirstMount = useRef<boolean>(false)
+  if (!seededRef.current) {
+    seededRef.current = true
+    isFirstMount.current = participants.every((p) => prevPointsRef.current[p.id] === undefined)
+    if (isFirstMount.current) {
+      participants.forEach((p) => { prevPointsRef.current[p.id] = p.total_points })
+    }
+  }
+
   // Live animated points per participant id
   const [animatedPoints, setAnimatedPoints] = useState<Record<string, number>>(() => {
     const init: Record<string, number> = {}
-    participants.forEach((p) => { init[p.id] = prevPointsRef.current[p.id] ?? 0 })
+    participants.forEach((p) => { init[p.id] = prevPointsRef.current[p.id] ?? p.total_points })
     return init
   })
 
   // Deltas captured at mount (how much each gained this round)
   const deltasRef = useRef<Record<string, number>>(
     Object.fromEntries(
-      participants.map((p) => [p.id, p.total_points - (prevPointsRef.current[p.id] ?? 0)])
+      participants.map((p) => [p.id, p.total_points - (prevPointsRef.current[p.id] ?? p.total_points)])
     )
   )
 
+  // Phase controls *position* ordering — we keep positions stable during the count,
+  // then trigger a single clean swap so rows visibly slide up AND down.
+  const [showFinalOrder, setShowFinalOrder] = useState(isFirstMount.current)
+
   // Animate from previous → current
   useEffect(() => {
+    if (isFirstMount.current) return // nothing to animate on refresh
+
     const startSnap: Record<string, number> = {}
     const endSnap: Record<string, number> = {}
     participants.forEach((p) => {
@@ -1041,22 +1192,41 @@ function LeaderboardScreen({
       }
     }
     rafId = requestAnimationFrame(tick)
-    return () => cancelAnimationFrame(rafId)
+
+    // Trigger position swap a bit before the count ends so the slide overlaps
+    // the last moments of counting — feels more dynamic.
+    const swapTimer = setTimeout(() => setShowFinalOrder(true), 1100)
+
+    return () => {
+      cancelAnimationFrame(rafId)
+      clearTimeout(swapTimer)
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // Sort by LIVE values so positions swap mid-animation as players overtake each other
-  const top = [...participants]
-    .sort((a, b) => (animatedPoints[b.id] ?? 0) - (animatedPoints[a.id] ?? 0))
-    .slice(0, 5)
+  // Compute both orderings once. Positions come from the current phase, but each row's
+  // identity is keyed by p.id so React reuses the DOM node and CSS transitions kick in.
+  const startOrder = [...participants]
+    .sort((a, b) => (prevPointsRef.current[b.id] ?? 0) - (prevPointsRef.current[a.id] ?? 0))
+  const endOrder = [...participants].sort((a, b) => b.total_points - a.total_points)
+  const orderedParticipants = showFinalOrder ? endOrder : startOrder
+
+  // Map participant id → display index in the current ordering
+  const indexById = new Map(orderedParticipants.map((p, idx) => [p.id, idx]))
+  // We still render only the top 5 (union of top-5 in either order so nobody pops in/out)
+  const visibleIds = new Set<string>([
+    ...startOrder.slice(0, 5).map((p) => p.id),
+    ...endOrder.slice(0, 5).map((p) => p.id),
+  ])
+  const top = participants.filter((p) => visibleIds.has(p.id))
 
   const maxStreak = Math.max(...participants.map((p) => p.current_streak), 0)
   const onFire = maxStreak >= 2 ? participants.filter((p) => p.current_streak === maxStreak) : []
 
-  const rowHeight = 180 // px entre rows (espaço suficiente para os cards maiores)
+  const rowHeight = 140 // px entre rows (apertado para caber tudo num ecrã sem scroll)
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-950 via-indigo-900 to-blue-950 flex flex-col p-6 md:p-10 gap-6 overflow-hidden relative">
+    <div className="h-screen w-screen bg-gradient-to-br from-blue-950 via-indigo-900 to-blue-950 flex flex-col p-6 md:p-8 gap-4 overflow-hidden relative [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
       <div className="text-center space-y-1">
         <p className="text-sky-300 text-base font-black uppercase tracking-[0.3em]">Classificação</p>
         <h2 className="text-white font-black flex items-center justify-center gap-3" style={{ fontSize: 'clamp(2.5rem, 5vw, 4.5rem)' }}>
@@ -1068,7 +1238,8 @@ function LeaderboardScreen({
         className="flex-1 max-w-6xl mx-auto w-full relative"
         style={{ minHeight: `${top.length * rowHeight}px` }}
       >
-        {top.map((p, i) => {
+        {top.map((p) => {
+          const i = indexById.get(p.id) ?? 0
           const value = animatedPoints[p.id] ?? 0
           const delta = deltasRef.current[p.id] ?? 0
           const showDelta = delta > 0.005
@@ -1076,8 +1247,11 @@ function LeaderboardScreen({
           return (
             <div
               key={p.id}
-              className="absolute left-0 right-0 transition-all duration-700 ease-out"
-              style={{ top: `${i * rowHeight}px` }}
+              className="absolute left-0 right-0 top-0 will-change-transform"
+              style={{
+                transform: `translate3d(0, ${i * rowHeight}px, 0)`,
+                transition: 'transform 1200ms cubic-bezier(0.22, 1, 0.36, 1)',
+              }}
             >
               <div className={`flex items-center gap-5 rounded-3xl p-5 md:p-6 border-2 ${
                 i === 0 ? 'bg-yellow-400/20 border-yellow-400/40' :
@@ -1142,23 +1316,26 @@ function LeaderboardScreen({
       </div>
 
       {onFire.length > 0 && (
-        <div className="bg-white/5 rounded-3xl border-2 border-orange-400/30 p-5 md:p-6 max-w-6xl mx-auto w-full animate-in slide-in-from-bottom duration-500 shadow-2xl">
+        <div
+          className="absolute left-4 right-4 md:left-8 md:right-8 bottom-4 md:bottom-6 z-30 bg-gradient-to-r from-orange-950/95 via-orange-900/95 to-orange-950/95 backdrop-blur-md rounded-3xl border-2 border-orange-400/40 p-3 md:p-4 max-w-6xl mx-auto animate-in slide-in-from-bottom duration-500 shadow-2xl overflow-hidden [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          style={{ maxHeight: '22vh' }}
+        >
           <p
-            className="text-orange-300 font-black uppercase tracking-widest mb-3 flex items-center gap-2"
-            style={{ fontSize: 'clamp(1rem, 1.6vw, 1.5rem)' }}
+            className="text-orange-300 font-black uppercase tracking-widest mb-2 flex items-center gap-2"
+            style={{ fontSize: 'clamp(0.85rem, 1.3vw, 1.25rem)' }}
           >
-            <Flame className="w-6 h-6 md:w-8 md:h-8" /> Em chamas! ×{maxStreak} streak
+            <Flame className="w-5 h-5 md:w-6 md:h-6" /> Em chamas! ×{maxStreak} streak
           </p>
-          <div className="flex flex-wrap gap-3">
+          <div className="flex flex-wrap gap-2 overflow-hidden" style={{ maxHeight: '12vh' }}>
             {onFire.map((p) => (
               <div
                 key={p.id}
-                className="flex items-center gap-2.5 bg-orange-500/25 border-2 border-orange-400/40 rounded-full px-4 py-2 md:px-5 md:py-2.5"
+                className="flex items-center gap-2 bg-orange-500/25 border border-orange-400/40 rounded-full px-3 py-1.5 md:px-4 md:py-2"
               >
-                <Flame className="w-5 h-5 md:w-6 md:h-6 text-orange-400" />
+                <Flame className="w-4 h-4 md:w-5 md:h-5 text-orange-400 flex-shrink-0" />
                 <span
-                  className="text-white font-black"
-                  style={{ fontSize: 'clamp(1rem, 1.4vw, 1.5rem)' }}
+                  className="text-white font-black whitespace-nowrap"
+                  style={{ fontSize: 'clamp(0.85rem, 1.2vw, 1.25rem)' }}
                 >
                   {p.display_name}
                 </span>
