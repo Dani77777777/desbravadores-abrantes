@@ -71,7 +71,21 @@ export function Presentation({ sessionId, initialSession, questions, siteUrl }: 
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const playersListRef = useRef<HTMLDivElement | null>(null)
   // Snapshot of points shown last time (per participant id) — used to animate from previous → new
+  // Persistido em localStorage para sobreviver a refresh
+  const prevPointsStorageKey = `vq-prevpts-${sessionId}`
   const prevPointsRef = useRef<Record<string, number>>({})
+  // Carrega prev points do localStorage no primeiro render (client only)
+  if (typeof window !== 'undefined' && Object.keys(prevPointsRef.current).length === 0) {
+    try {
+      const raw = window.localStorage.getItem(prevPointsStorageKey)
+      if (raw) prevPointsRef.current = JSON.parse(raw)
+    } catch {}
+  }
+  const savePrevPoints = () => {
+    try {
+      window.localStorage.setItem(prevPointsStorageKey, JSON.stringify(prevPointsRef.current))
+    } catch {}
+  }
   // Audio refs
   const musicRef = useRef<HTMLAudioElement | null>(null)
   const sfxAnsweredRef = useRef<HTMLAudioElement | null>(null)
@@ -85,6 +99,22 @@ export function Presentation({ sessionId, initialSession, questions, siteUrl }: 
     ? questions[session.current_question_index]
     : null
   const joinUrl = `${siteUrl}/jogos/vana-quest?pin=${session.pin}`
+
+  // Snapshot dos pontos quando a pergunta arranca → para o leaderboard mostrar delta + tocar SFX
+  const snapshotTakenForRef = useRef<string>('')
+  useEffect(() => {
+    if ((session.status === 'question_intro' || session.status === 'question_active') && currentQuestion) {
+      const key = `${currentQuestion.id}`
+      if (snapshotTakenForRef.current !== key) {
+        snapshotTakenForRef.current = key
+        const snap: Record<string, number> = {}
+        participants.forEach((p) => { snap[p.id] = Number(p.total_points) || 0 })
+        prevPointsRef.current = snap
+        savePrevPoints()
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session.status, currentQuestion?.id])
 
   // Auto-scroll suave da lista de jogadores no lobby (quando transborda)
   useEffect(() => {
@@ -1135,10 +1165,10 @@ function LeaderboardScreen({
   const maxStreak = Math.max(...participants.map((p) => p.current_streak), 0)
   const onFire = maxStreak >= 2 ? participants.filter((p) => p.current_streak === maxStreak) : []
 
-  const rowHeight = 180 // px entre rows (espaço suficiente para os cards maiores)
+  const rowHeight = 140 // px entre rows (apertado para caber tudo num ecrã sem scroll)
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-950 via-indigo-900 to-blue-950 flex flex-col p-6 md:p-10 gap-6 overflow-hidden relative">
+    <div className="h-screen w-screen bg-gradient-to-br from-blue-950 via-indigo-900 to-blue-950 flex flex-col p-6 md:p-8 gap-4 overflow-hidden relative [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
       <div className="text-center space-y-1">
         <p className="text-sky-300 text-base font-black uppercase tracking-[0.3em]">Classificação</p>
         <h2 className="text-white font-black flex items-center justify-center gap-3" style={{ fontSize: 'clamp(2.5rem, 5vw, 4.5rem)' }}>
