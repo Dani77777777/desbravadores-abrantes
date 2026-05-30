@@ -1258,23 +1258,26 @@ function LeaderboardScreen({
       </div>
 
       {onFire.length > 0 && (
-        <div className="bg-white/5 rounded-3xl border-2 border-orange-400/30 p-5 md:p-6 max-w-6xl mx-auto w-full animate-in slide-in-from-bottom duration-500 shadow-2xl">
+        <div
+          className="absolute left-4 right-4 md:left-8 md:right-8 bottom-4 md:bottom-6 z-30 bg-gradient-to-r from-orange-950/95 via-orange-900/95 to-orange-950/95 backdrop-blur-md rounded-3xl border-2 border-orange-400/40 p-3 md:p-4 max-w-6xl mx-auto animate-in slide-in-from-bottom duration-500 shadow-2xl overflow-hidden [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          style={{ maxHeight: '22vh' }}
+        >
           <p
-            className="text-orange-300 font-black uppercase tracking-widest mb-3 flex items-center gap-2"
-            style={{ fontSize: 'clamp(1rem, 1.6vw, 1.5rem)' }}
+            className="text-orange-300 font-black uppercase tracking-widest mb-2 flex items-center gap-2"
+            style={{ fontSize: 'clamp(0.85rem, 1.3vw, 1.25rem)' }}
           >
-            <Flame className="w-6 h-6 md:w-8 md:h-8" /> Em chamas! ×{maxStreak} streak
+            <Flame className="w-5 h-5 md:w-6 md:h-6" /> Em chamas! ×{maxStreak} streak
           </p>
-          <div className="flex flex-wrap gap-3">
+          <div className="flex flex-wrap gap-2 overflow-hidden" style={{ maxHeight: '12vh' }}>
             {onFire.map((p) => (
               <div
                 key={p.id}
-                className="flex items-center gap-2.5 bg-orange-500/25 border-2 border-orange-400/40 rounded-full px-4 py-2 md:px-5 md:py-2.5"
+                className="flex items-center gap-2 bg-orange-500/25 border border-orange-400/40 rounded-full px-3 py-1.5 md:px-4 md:py-2"
               >
-                <Flame className="w-5 h-5 md:w-6 md:h-6 text-orange-400" />
+                <Flame className="w-4 h-4 md:w-5 md:h-5 text-orange-400 flex-shrink-0" />
                 <span
-                  className="text-white font-black"
-                  style={{ fontSize: 'clamp(1rem, 1.4vw, 1.5rem)' }}
+                  className="text-white font-black whitespace-nowrap"
+                  style={{ fontSize: 'clamp(0.85rem, 1.2vw, 1.25rem)' }}
                 >
                   {p.display_name}
                 </span>
