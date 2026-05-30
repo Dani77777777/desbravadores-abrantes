@@ -835,7 +835,7 @@ function CinematicPodium({ participants }: { participants: Participant[] }) {
   const winnerRevealed = isRankRevealed(0) && !!podium[0]
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-blue-950 via-blue-900 to-indigo-950 flex flex-col items-center px-6 pt-8 pb-0 gap-4 relative overflow-hidden">
+    <div className="h-screen w-screen bg-gradient-to-b from-blue-950 via-blue-900 to-indigo-950 flex flex-col items-center px-6 pt-8 pb-0 gap-4 relative overflow-hidden [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
       {/* Confetti — only after winner revealed */}
       {winnerRevealed && <Confetti />}
 
@@ -959,21 +959,29 @@ function CinematicPodium({ participants }: { participants: Participant[] }) {
         })}
       </div>
 
-      {/* Rest of leaderboard — only after all revealed */}
+      {/* Rest of leaderboard — painel lateral direito, sem scroll */}
       {podium.length > 3 && revealed >= 4 && (
-        <div className="bg-white/10 backdrop-blur rounded-2xl border border-white/20 p-3 w-full max-w-2xl z-10 animate-in fade-in slide-in-from-bottom duration-700 mb-4">
-          {podium.slice(3, 10).map((p, i) => (
-            <div key={p.id} className="flex items-center gap-3 py-1.5 px-2 border-b border-white/10 last:border-0">
-              <span className="text-sm font-black w-7 text-center text-white/40">{i + 4}</span>
-              <span className="flex-1 text-white font-semibold text-sm truncate">{p.display_name}</span>
-              {p.max_streak >= 2 && (
-                <span className="flex items-center gap-1 text-orange-400 text-xs font-bold">
-                  <Flame className="w-3 h-3" /> {p.max_streak}
-                </span>
-              )}
-              <span className="text-white font-black text-sm tabular-nums">{p.total_points.toFixed(1)}</span>
-            </div>
-          ))}
+        <div
+          className="absolute right-4 md:right-6 top-1/2 -translate-y-1/2 bg-white/10 backdrop-blur rounded-2xl border border-white/20 p-2 md:p-3 z-20 animate-in fade-in slide-in-from-right duration-700 shadow-2xl overflow-hidden flex flex-col [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          style={{ width: 'clamp(16rem, 22vw, 22rem)', maxHeight: '85vh' }}
+        >
+          <p className="text-sky-300 text-[10px] md:text-xs font-black uppercase tracking-widest text-center mb-2 flex-shrink-0">
+            Classificação
+          </p>
+          <div className="flex-1 min-h-0 overflow-hidden flex flex-col justify-around gap-0.5">
+            {podium.slice(3, 10).map((p, i) => (
+              <div key={p.id} className="flex items-center gap-2 py-1 px-1.5 border-b border-white/10 last:border-0 min-w-0">
+                <span className="text-xs md:text-sm font-black w-6 text-center text-white/40 flex-shrink-0">{i + 4}</span>
+                <span className="flex-1 text-white font-semibold text-xs md:text-sm truncate min-w-0">{p.display_name}</span>
+                {p.max_streak >= 2 && (
+                  <span className="flex items-center gap-0.5 text-orange-400 text-[10px] md:text-xs font-bold flex-shrink-0">
+                    <Flame className="w-3 h-3" /> {p.max_streak}
+                  </span>
+                )}
+                <span className="text-white font-black text-xs md:text-sm tabular-nums flex-shrink-0">{p.total_points.toFixed(1)}</span>
+              </div>
+            ))}
+          </div>
         </div>
       )}
     </div>
