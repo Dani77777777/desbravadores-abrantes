@@ -69,6 +69,7 @@ export function Presentation({ sessionId, initialSession, questions, siteUrl }: 
   const [audioUnlocked, setAudioUnlocked] = useState(false)
   const [answerPulseKey, setAnswerPulseKey] = useState(0)
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const playersListRef = useRef<HTMLDivElement | null>(null)
   // Snapshot of points shown last time (per participant id) — used to animate from previous → new
   const prevPointsRef = useRef<Record<string, number>>({})
   // Audio refs
@@ -84,6 +85,37 @@ export function Presentation({ sessionId, initialSession, questions, siteUrl }: 
     ? questions[session.current_question_index]
     : null
   const joinUrl = `${siteUrl}/jogos/vana-quest?pin=${session.pin}`
+
+  // Auto-scroll suave da lista de jogadores no lobby (quando transborda)
+  useEffect(() => {
+    if (session.status !== 'waiting') return
+    const el = playersListRef.current
+    if (!el) return
+
+    let rafId: number
+    let direction = 1 // 1 = baixo, -1 = cima
+    let pauseUntil = performance.now() + 1500 // pequena pausa no início
+    const speed = 0.25 // px por frame (~15 px/s — bem devagar)
+
+    const tick = (now: number) => {
+      const overflow = el.scrollHeight - el.clientHeight
+      if (overflow > 4) {
+        if (now >= pauseUntil) {
+          el.scrollTop += speed * direction
+          if (direction === 1 && el.scrollTop >= overflow - 0.5) {
+            direction = -1
+            pauseUntil = now + 1800
+          } else if (direction === -1 && el.scrollTop <= 0.5) {
+            direction = 1
+            pauseUntil = now + 1800
+          }
+        }
+      }
+      rafId = requestAnimationFrame(tick)
+    }
+    rafId = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(rafId)
+  }, [session.status, participants.length])
 
   // Broadcast listener (commands from control panel)
   useEffect(() => {
@@ -395,7 +427,11 @@ export function Presentation({ sessionId, initialSession, questions, siteUrl }: 
             <p className="text-sky-300 text-xs font-black uppercase tracking-widest mb-4 flex items-center gap-2">
               <Users className="w-3.5 h-3.5" /> Jogadores na sala
             </p>
-            <div className="flex-1 space-y-2 overflow-y-auto max-h-[28rem]">
+            <div
+              ref={playersListRef}
+              className="flex-1 space-y-2 overflow-y-auto max-h-[28rem] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+              style={{ msOverflowStyle: 'none' }}
+            >
               {participants.length === 0 ? (
                 <div className="text-center py-12">
                   <div className="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center mx-auto mb-4">
