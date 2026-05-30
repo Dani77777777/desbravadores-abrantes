@@ -94,22 +94,31 @@ export function Presentation({ sessionId, initialSession, questions, siteUrl }: 
 
     let rafId: number
     let direction = 1 // 1 = baixo, -1 = cima
-    let pauseUntil = performance.now() + 1500 // pequena pausa no início
-    const speed = 0.25 // px por frame (~15 px/s — bem devagar)
+    let pos = 0 // posição acumulada em sub-pixels
+    let lastTime = performance.now()
+    let pauseUntil = lastTime + 1500 // pausa inicial
+    const speedPxPerSec = 20 // ~20 px/s — bem devagar
 
     const tick = (now: number) => {
+      const dt = now - lastTime
+      lastTime = now
       const overflow = el.scrollHeight - el.clientHeight
       if (overflow > 4) {
         if (now >= pauseUntil) {
-          el.scrollTop += speed * direction
-          if (direction === 1 && el.scrollTop >= overflow - 0.5) {
+          pos += (speedPxPerSec * dt / 1000) * direction
+          if (pos >= overflow) {
+            pos = overflow
             direction = -1
             pauseUntil = now + 1800
-          } else if (direction === -1 && el.scrollTop <= 0.5) {
+          } else if (pos <= 0) {
+            pos = 0
             direction = 1
             pauseUntil = now + 1800
           }
+          el.scrollTop = pos
         }
+      } else {
+        pos = 0
       }
       rafId = requestAnimationFrame(tick)
     }
