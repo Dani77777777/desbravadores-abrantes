@@ -105,9 +105,9 @@ export function HostLobby({ sessionId, code, chatMode, mayorMode, assignMode, is
       </header>
 
       {/* Código grande */}
-      <section className="bg-stone-800/60 border border-amber-700/40 rounded-lg p-8 text-center">
+      <section className="bg-stone-800/60 border border-amber-700/40 rounded-lg p-6 md:p-8 text-center overflow-hidden">
         <div className="text-xs uppercase tracking-wider text-amber-300 mb-2">Código da sala</div>
-        <div className="text-6xl md:text-7xl font-mono font-black text-amber-100 tracking-widest">
+        <div className="text-4xl xs:text-5xl sm:text-6xl md:text-7xl font-mono font-black text-amber-100 tracking-wider sm:tracking-widest break-all">
           {code}
         </div>
       </section>
@@ -179,7 +179,7 @@ export function HostLobby({ sessionId, code, chatMode, mayorMode, assignMode, is
               type="text"
               value={botName}
               onChange={(e) => setBotName(e.target.value)}
-              placeholder="Nome (opcional — usa lista pré-definida se vazio)"
+              placeholder="Nome (opcional)"
               className="flex-1 bg-stone-950 border border-purple-700/40 rounded px-3 py-2 text-stone-100 placeholder:text-stone-500 text-sm focus:border-purple-500 focus:outline-none"
             />
             <button

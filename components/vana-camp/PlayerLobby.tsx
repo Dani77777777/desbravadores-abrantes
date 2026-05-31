@@ -69,9 +69,9 @@ export function PlayerLobby({ sessionId, code, myPlayerId, impersonatingBotName 
         <p className="text-amber-300/80">À espera que o jogo comece…</p>
       </header>
 
-      <section className="bg-stone-800/60 border border-amber-700/40 rounded-lg p-6 text-center">
+      <section className="bg-stone-800/60 border border-amber-700/40 rounded-lg p-6 text-center overflow-hidden">
         <div className="text-xs uppercase tracking-wider text-amber-300 mb-2">Código da sala</div>
-        <div className="text-5xl font-mono font-black text-amber-100 tracking-widest">
+        <div className="text-3xl xs:text-4xl sm:text-5xl font-mono font-black text-amber-100 tracking-wider sm:tracking-widest break-all">
           {code}
         </div>
       </section>

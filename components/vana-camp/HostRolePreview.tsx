@@ -122,16 +122,16 @@ export function HostRolePreview({ sessionId, mayorMode, isManualMode }: Props) {
 
       {/* Tabela de jogadores */}
       <section className="bg-stone-800/60 border border-amber-700/40 rounded-lg overflow-hidden">
-        <table className="w-full text-sm">
-          <thead className="bg-stone-900/60 text-amber-300 text-xs uppercase tracking-wide">
+        <table className="w-full text-xs sm:text-sm table-fixed sm:table-auto">
+          <thead className="bg-stone-900/60 text-amber-300 uppercase tracking-wide text-[10px] sm:text-xs">
             <tr>
-              <th className="text-left p-3">Jogador</th>
-              <th className="text-left p-3">Papel</th>
+              <th className="text-left p-2 sm:p-3 w-1/3 sm:w-auto">Jogador</th>
+              <th className="text-left p-2 sm:p-3 w-1/2 sm:w-auto">Papel</th>
               <th className="text-left p-3 hidden md:table-cell">
                 <span className="inline-flex items-center gap-1"><History className="w-3 h-3" /> Últimas partidas</span>
               </th>
               {(mayorMode === 'manual' || mayorMode === 'auto') && (
-                <th className="text-center p-3"><Crown className="w-4 h-4 inline" /></th>
+                <th className="text-center p-2 sm:p-3 w-12 sm:w-16"><Crown className="w-3.5 h-3.5 sm:w-4 sm:h-4 inline" /></th>
               )}
             </tr>
           </thead>
@@ -140,17 +140,19 @@ export function HostRolePreview({ sessionId, mayorMode, isManualMode }: Props) {
               const Icon = p.role ? ROLE_ICON[p.role] : User
               return (
                 <tr key={p.id} className="border-t border-stone-800">
-                  <td className="p-3 text-stone-100 font-medium">{p.display_name}</td>
-                  <td className="p-3">
-                    <div className="flex items-center gap-2">
-                      <Icon className={`w-4 h-4 ${p.role ? ROLE_COLOR[p.role] : 'text-stone-500'}`} />
+                  <td className="p-2 sm:p-3 text-stone-100 font-medium truncate" title={p.display_name}>
+                    {p.display_name}
+                  </td>
+                  <td className="p-2 sm:p-3">
+                    <div className="flex items-center gap-1 sm:gap-2">
+                      <Icon className={`w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0 ${p.role ? ROLE_COLOR[p.role] : 'text-stone-500'}`} />
                       <select
                         value={p.role ?? ''}
                         disabled={pending}
                         onChange={(e) =>
                           action(() => updatePlayerRole(sessionId, p.id, e.target.value as VanaCampRole))
                         }
-                        className={`bg-stone-950 border border-stone-700 rounded px-2 py-1 ${p.role ? ROLE_COLOR[p.role] : 'text-stone-500'}`}
+                        className={`w-full bg-stone-950 border border-stone-700 rounded px-1.5 sm:px-2 py-0.5 sm:py-1 text-[11px] sm:text-xs md:text-sm ${p.role ? ROLE_COLOR[p.role] : 'text-stone-500'} focus:outline-none`}
                       >
                         <option value="" disabled>—</option>
                         <option value="infiltrator">Infiltrado</option>
@@ -185,14 +187,14 @@ export function HostRolePreview({ sessionId, mayorMode, isManualMode }: Props) {
                     )}
                   </td>
                   {(mayorMode === 'manual' || mayorMode === 'auto') && (
-                    <td className="p-3 text-center">
+                    <td className="p-2 sm:p-3 text-center">
                       <input
                         type="radio"
                         name="mayor"
                         checked={p.is_mayor}
                         disabled={pending}
                         onChange={() => action(() => setMayor(sessionId, p.id))}
-                        className="w-4 h-4 accent-amber-500"
+                        className="w-3.5 h-3.5 sm:w-4 sm:h-4 accent-amber-500 align-middle"
                       />
                     </td>
                   )}
