@@ -125,14 +125,14 @@ const DownloadCard = ({ event, logoDataUrl, qrDataUrl }: CardProps) => {
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div style={{ display: 'flex', gap: 32 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, background: 'rgba(99,102,241,0.25)', border: '1px solid rgba(99,102,241,0.5)', borderRadius: 12, padding: '12px 28px' }}>
+        <div style={{ display: 'flex', gap: 32, flexShrink: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, background: 'rgba(99,102,241,0.25)', border: '1px solid rgba(99,102,241,0.5)', borderRadius: 12, padding: '12px 28px', whiteSpace: 'nowrap' }}>
             <span style={{ fontSize: 32 }}>🏆</span>
-            <span style={{ fontSize: 32, color: '#c7d2fe', fontWeight: 700 }}>{event.xp_reward} XP</span>
+            <span style={{ fontSize: 32, color: '#c7d2fe', fontWeight: 700, whiteSpace: 'nowrap' }}>{event.xp_reward} XP</span>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, background: 'rgba(234,179,8,0.2)', border: '1px solid rgba(234,179,8,0.4)', borderRadius: 12, padding: '12px 28px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, background: 'rgba(234,179,8,0.2)', border: '1px solid rgba(234,179,8,0.4)', borderRadius: 12, padding: '12px 28px', whiteSpace: 'nowrap' }}>
             <span style={{ fontSize: 32 }}>🪙</span>
-            <span style={{ fontSize: 32, color: '#fde047', fontWeight: 700 }}>{event.gold_reward} Gold</span>
+            <span style={{ fontSize: 32, color: '#fde047', fontWeight: 700, whiteSpace: 'nowrap' }}>{event.gold_reward} Gold</span>
           </div>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 16 }}>
@@ -229,19 +229,19 @@ const ShareCard = ({ event, logoDataUrl }: CardProps) => {
 
       {/* bottom: rewards + url */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'relative' }}>
-        <div style={{ display: 'flex', gap: 20 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, background: 'rgba(99,102,241,0.25)', border: '1px solid rgba(99,102,241,0.5)', borderRadius: 12, padding: '10px 22px' }}>
+        <div style={{ display: 'flex', gap: 20, flexShrink: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, background: 'rgba(99,102,241,0.25)', border: '1px solid rgba(99,102,241,0.5)', borderRadius: 12, padding: '10px 22px', whiteSpace: 'nowrap' }}>
             <span style={{ fontSize: 26 }}>🏆</span>
-            <span style={{ fontSize: 26, color: '#c7d2fe', fontWeight: 700 }}>{event.xp_reward} XP</span>
+            <span style={{ fontSize: 26, color: '#c7d2fe', fontWeight: 700, whiteSpace: 'nowrap' }}>{event.xp_reward} XP</span>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, background: 'rgba(234,179,8,0.2)', border: '1px solid rgba(234,179,8,0.4)', borderRadius: 12, padding: '10px 22px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, background: 'rgba(234,179,8,0.2)', border: '1px solid rgba(234,179,8,0.4)', borderRadius: 12, padding: '10px 22px', whiteSpace: 'nowrap' }}>
             <span style={{ fontSize: 26 }}>🪙</span>
-            <span style={{ fontSize: 26, color: '#fde047', fontWeight: 700 }}>{event.gold_reward} Gold</span>
+            <span style={{ fontSize: 26, color: '#fde047', fontWeight: 700, whiteSpace: 'nowrap' }}>{event.gold_reward} Gold</span>
           </div>
         </div>
-        <div style={{ textAlign: 'right' }}>
-          <p style={{ fontSize: 20, color: 'rgba(255,255,255,0.5)', margin: 0, marginBottom: 3 }}>Junta-te a nós em</p>
-          <p style={{ fontSize: 24, color: '#93c5fd', fontWeight: 700, margin: 0 }}>{SITE_URL}</p>
+        <div style={{ textAlign: 'right', flexShrink: 0 }}>
+          <p style={{ fontSize: 20, color: 'rgba(255,255,255,0.5)', margin: 0, marginBottom: 3, whiteSpace: 'nowrap' }}>Junta-te a nós em</p>
+          <p style={{ fontSize: 24, color: '#93c5fd', fontWeight: 700, margin: 0, whiteSpace: 'nowrap' }}>{SITE_URL}</p>
         </div>
       </div>
     </div>
