@@ -12,8 +12,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
-import { Plus, Trophy, Coins, Calendar, MapPin, Users, Trash2, CheckCircle2, ListChecks, History, Pencil } from 'lucide-react'
+import { Plus, Trophy, Coins, Calendar, MapPin, Users, Trash2, CheckCircle2, ListChecks, History, Pencil, Share2 } from 'lucide-react'
 import { EventAttendanceManager } from './EventAttendanceManager'
+import { EventShareDialog } from './EventShareDialog'
 
 interface EventPanelProps {
   profile: any
@@ -59,6 +60,10 @@ export function EventPanel({ profile, members, events }: EventPanelProps) {
   // Attendance Manager
   const [attendanceOpen, setAttendanceOpen] = useState(false)
   const [selectedEvent, setSelectedEvent] = useState<any>(null)
+
+  // Share event state
+  const [shareOpen, setShareOpen] = useState(false)
+  const [sharingEvent, setSharingEvent] = useState<any>(null)
 
   // Edit event state
   const [editOpen, setEditOpen] = useState(false)
@@ -363,10 +368,19 @@ export function EventPanel({ profile, members, events }: EventPanelProps) {
                     >
                       <Calendar className="w-3 h-3" /> Reagendar
                     </Button>
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      className="text-gray-400 hover:text-blue-600 shrink-0" 
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="text-gray-400 hover:text-blue-600 shrink-0"
+                      title="Partilhar Evento"
+                      onClick={() => { setSharingEvent(event); setShareOpen(true) }}
+                    >
+                      <Share2 className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="text-gray-400 hover:text-blue-600 shrink-0"
                       title="Editar Evento"
                       onClick={() => {
                         setEditingEvent(event)
@@ -517,6 +531,14 @@ export function EventPanel({ profile, members, events }: EventPanelProps) {
           </form>
         </DialogContent>
       </Dialog>
+
+      {sharingEvent && (
+        <EventShareDialog
+          event={sharingEvent}
+          open={shareOpen}
+          onOpenChange={(v) => { setShareOpen(v); if (!v) setSharingEvent(null) }}
+        />
+      )}
 
       {selectedEvent && (
         <Dialog open={attendanceOpen} onOpenChange={setAttendanceOpen}>
