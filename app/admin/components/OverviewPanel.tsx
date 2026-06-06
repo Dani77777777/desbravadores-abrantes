@@ -213,24 +213,35 @@ export function OverviewPanel({ profile, members, events, purchases }: OverviewP
                 {upcomingEvents.length === 0 ? (
                   <p className="text-sm text-gray-400 text-center py-4">Sem eventos agendados.</p>
                 ) : (
-                  <div className="space-y-4">
-                    {upcomingEvents.map(event => (
-                      <div key={event.id} className="relative pl-3 border-l-2 border-indigo-100 py-0.5">
-                        <div className="absolute -left-[5px] top-1.5 w-2 h-2 rounded-full bg-indigo-500" />
-                        <p className="text-xs font-bold text-gray-800 line-clamp-1">{event.title}</p>
-                        <div className="flex items-center gap-2 text-[10px] text-gray-500 mt-0.5">
-                          <CalendarDays className="w-3 h-3" />
-                          <span>
-                            {new Date(event.start_at).toLocaleDateString('pt-PT', { 
-                              day: '2-digit', 
-                              month: 'short',
-                              hour: '2-digit',
-                              minute: '2-digit'
-                            })}
-                          </span>
+                  <div className="relative border-l-2 border-indigo-200 ml-1 space-y-5 pb-1">
+                    {upcomingEvents.map(event => {
+                      const todayMidnight = new Date(); todayMidnight.setHours(0, 0, 0, 0)
+                      const daysLeft = Math.ceil((new Date(event.start_at).getTime() - todayMidnight.getTime()) / (1000 * 60 * 60 * 24))
+                      const daysLabel = daysLeft === 0 ? 'Hoje' : daysLeft === 1 ? 'Amanhã' : `Em ${daysLeft}d`
+                      const isUrgent = daysLeft <= 3
+                      return (
+                        <div key={event.id} className="relative pl-4 py-0.5">
+                          <div className={`absolute -left-[6px] top-1.5 w-2.5 h-2.5 rounded-full border-2 border-white ${isUrgent ? 'bg-rose-500' : 'bg-indigo-500'}`} />
+                          <div className="flex items-start justify-between gap-2">
+                            <p className="text-xs font-bold text-gray-800 line-clamp-1 flex-1">{event.title}</p>
+                            <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-full whitespace-nowrap ${isUrgent ? 'bg-rose-100 text-rose-600' : 'bg-indigo-100 text-indigo-600'}`}>
+                              {daysLabel}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2 text-[10px] text-gray-500 mt-0.5">
+                            <CalendarDays className="w-3 h-3" />
+                            <span>
+                              {new Date(event.start_at).toLocaleDateString('pt-PT', {
+                                day: '2-digit',
+                                month: 'short',
+                                hour: '2-digit',
+                                minute: '2-digit'
+                              })}
+                            </span>
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      )
+                    })}
                   </div>
                 )}
               </CardContent>
