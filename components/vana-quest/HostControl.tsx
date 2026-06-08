@@ -695,6 +695,11 @@ export function HostControl({ sessionId, initialSession, questions, siteUrl }: P
               <p className="text-orange-300 text-[10px] font-black uppercase tracking-widest mb-2 flex items-center gap-1.5">
                 <Flame className="w-3.5 h-3.5" /> Em chamas! ×{maxStreak} streak
               </p>
+              {onFire.length > 3 && (
+                <p className="text-orange-200/70 text-xs font-bold mb-2">
+                  {onFire.length} pessoas em chamas
+                </p>
+              )}
               <div className="flex flex-wrap gap-2">
                 {onFire.map((p) => (
                   <div key={p.id} className="flex items-center gap-2 bg-orange-500/20 border border-orange-400/30 rounded-full pl-1 pr-3 py-1">

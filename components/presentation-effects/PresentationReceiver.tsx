@@ -2,6 +2,7 @@
 
 import React, { useEffect, useRef, useState } from 'react'
 import { createClient } from '@/utils/supabase/client'
+import confetti from 'canvas-confetti'
 
 // --- WEB AUDIO API SYNTHESIZER FOR PRESENTATION SHORTCUTS ---
 class SoundSynth {
@@ -304,20 +305,6 @@ class SoundSynth {
   }
 }
 
-// --- PARTICLE / CONFETTI INTERFACE & CLASS ---
-interface ConfettiParticle {
-  x: number
-  y: number
-  size: number
-  color: string
-  shape: 'circle' | 'square' | 'triangle'
-  speedX: number
-  speedY: number
-  rotation: number
-  rotationSpeed: number
-  opacity: number
-}
-
 export default function PresentationReceiver() {
   const [supabase] = useState(() => createClient())
   const [activeEffects, setActiveEffects] = useState({
@@ -330,11 +317,6 @@ export default function PresentationReceiver() {
 
   // Audio synthesizer instance
   const synthRef = useRef<SoundSynth | null>(null)
-  
-  // HTML5 Canvas for confetti
-  const canvasRef = useRef<HTMLCanvasElement | null>(null)
-  const confettiParticles = useRef<ConfettiParticle[]>([])
-  const animationFrameId = useRef<number | null>(null)
 
   // Floating bubbles state (array of IDs and settings)
   const [bubblesList, setBubblesList] = useState<Array<{ id: number; left: number; size: number; delay: number; duration: number }>>([])
@@ -429,11 +411,7 @@ export default function PresentationReceiver() {
           micdrop: false,
         })
         setBubblesList([])
-        confettiParticles.current = []
-        if (canvasRef.current) {
-          const ctx = canvasRef.current.getContext('2d')
-          if (ctx) ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height)
-        }
+        confetti.reset()
         break
 
       default:
@@ -443,94 +421,9 @@ export default function PresentationReceiver() {
 
   // --- VISUAL: CONFETTI EXPLOSION ---
   const triggerConfettiVisual = () => {
-    const canvas = canvasRef.current
-    if (!canvas) return
-    const ctx = canvas.getContext('2d')
-    if (!ctx) return
-
-    // Set canvas dimensions to window size if not already set or changed
-    canvas.width = window.innerWidth
-    canvas.height = window.innerHeight
-
     const colors = ['#a78bfa', '#f472b6', '#38bdf8', '#34d399', '#fbbf24', '#fb7185', '#60a5fa']
-    const shapes: Array<'circle' | 'square' | 'triangle'> = ['circle', 'square', 'triangle']
-
-    // Spawn 150 particles from both left and right bottom corners
-    const count = 120
-    for (let i = 0; i < count; i++) {
-      const fromLeft = i % 2 === 0
-      confettiParticles.current.push({
-        x: fromLeft ? 0 : canvas.width,
-        y: canvas.height * 0.8,
-        size: Math.random() * 10 + 6,
-        color: colors[Math.floor(Math.random() * colors.length)],
-        shape: shapes[Math.floor(Math.random() * shapes.length)],
-        speedX: (fromLeft ? 1 : -1) * (Math.random() * 15 + 10),
-        speedY: -(Math.random() * 20 + 15),
-        rotation: Math.random() * 360,
-        rotationSpeed: (Math.random() - 0.5) * 10,
-        opacity: 1,
-      })
-    }
-
-    // Start animation loop if not running
-    if (!animationFrameId.current) {
-      animateConfetti()
-    }
-  }
-
-  const animateConfetti = () => {
-    const canvas = canvasRef.current
-    if (!canvas) return
-    const ctx = canvas.getContext('2d')
-    if (!ctx) return
-
-    ctx.clearRect(0, 0, canvas.width, canvas.height)
-
-    const particles = confettiParticles.current
-    for (let i = particles.length - 1; i >= 0; i--) {
-      const p = particles[i]
-
-      // Apply physics
-      p.x += p.speedX
-      p.y += p.speedY
-      p.speedY += 0.45; // Gravity
-      p.speedX *= 0.98; // Air resistance
-      p.rotation += p.rotationSpeed
-      p.opacity -= 0.008; // Smooth fade
-
-      if (p.opacity <= 0 || p.y > canvas.height) {
-        particles.splice(i, 1)
-        continue
-      }
-
-      ctx.save()
-      ctx.globalAlpha = p.opacity
-      ctx.translate(p.x, p.y)
-      ctx.rotate((p.rotation * Math.PI) / 180)
-      ctx.fillStyle = p.color
-
-      // Draw Shape
-      ctx.beginPath()
-      if (p.shape === 'circle') {
-        ctx.arc(0, 0, p.size / 2, 0, Math.PI * 2)
-      } else if (p.shape === 'triangle') {
-        ctx.moveTo(0, -p.size / 2)
-        ctx.lineTo(p.size / 2, p.size / 2)
-        ctx.lineTo(-p.size / 2, p.size / 2)
-        ctx.closePath()
-      } else {
-        ctx.rect(-p.size / 2, -p.size / 2, p.size, p.size)
-      }
-      ctx.fill()
-      ctx.restore()
-    }
-
-    if (particles.length > 0) {
-      animationFrameId.current = requestAnimationFrame(animateConfetti)
-    } else {
-      animationFrameId.current = null
-    }
+    confetti({ particleCount: 60, angle: 60, spread: 55, origin: { x: 0, y: 0.8 }, colors })
+    confetti({ particleCount: 60, angle: 120, spread: 55, origin: { x: 1, y: 0.8 }, colors })
   }
 
   // --- VISUAL: BUBBLES ---
@@ -559,17 +452,6 @@ export default function PresentationReceiver() {
     }, 5500)
   }
 
-  // Handle window resizing for Canvas
-  useEffect(() => {
-    const handleResize = () => {
-      if (canvasRef.current) {
-        canvasRef.current.width = window.innerWidth
-        canvasRef.current.height = window.innerHeight
-      }
-    }
-    window.addEventListener('resize', handleResize)
-    return () => window.removeEventListener('resize', handleResize)
-  }, [])
 
   return (
     <>
@@ -588,9 +470,6 @@ export default function PresentationReceiver() {
         id="presentation-receiver-root" 
         className="fixed inset-0 w-screen h-screen pointer-events-none z-[99999] overflow-hidden select-none"
       >
-        {/* Fullscreen Canvas for Confetti */}
-        <canvas ref={canvasRef} className="absolute inset-0 w-full h-full pointer-events-none" />
-
         {/* 2. Theatre Curtains Overlay */}
         <div className="absolute inset-0 flex pointer-events-none">
           {/* Left Curtain */}
