@@ -147,6 +147,24 @@ export function SurveyPanel({ profile, surveys }: SurveyPanelProps) {
     }
   }
 
+  const handleCloseVoting = async (id: string) => {
+    if (!confirm('Fechar a votação? O inquérito volta a ficar escondido dos membros (os votos já feitos não se perdem). Podes reabri-lo quando quiseres.')) return
+    setOpening(id)
+    try {
+      const { error } = await supabase
+        .from('surveys')
+        .update({ opened_at: null })
+        .eq('id', id)
+      if (error) throw error
+      toast.success('Votação fechada — inquérito escondido.')
+      router.refresh()
+    } catch (e: any) {
+      toast.error(e.message || 'Erro ao fechar a votação.')
+    } finally {
+      setOpening(null)
+    }
+  }
+
   const copyEmbedLink = (id: string) => {
     const url = `${window.location.origin}/embed/inquerito/${id}`
     navigator.clipboard.writeText(url)
@@ -412,6 +430,24 @@ export function SurveyPanel({ profile, surveys }: SurveyPanelProps) {
                     </div>
                   )
                 })}
+
+                {isOpen && (
+                  <div className="pt-3 mt-3 border-t flex items-center justify-between gap-3">
+                    <p className="text-xs text-gray-600">
+                      A votação está aberta. Podes fechá-la para esconder o inquérito (reabres quando quiseres).
+                    </p>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleCloseVoting(s.id)}
+                      disabled={opening === s.id}
+                      className="gap-1 shrink-0 text-amber-700 border-amber-300 hover:bg-amber-50"
+                    >
+                      <Lock className="w-3 h-3" />
+                      {opening === s.id ? 'A fechar...' : 'Fechar votação'}
+                    </Button>
+                  </div>
+                )}
 
                 {notOpened && deadlineDate > now && (
                   <div className="pt-3 mt-3 border-t flex items-center justify-between gap-3">
