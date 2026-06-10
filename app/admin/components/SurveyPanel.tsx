@@ -13,7 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Switch } from '@/components/ui/switch'
 import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
-import { Plus, Trophy, Coins, Trash2, CalendarClock, BarChart3, ClipboardList, X, Users, Award, Lock, RefreshCw } from 'lucide-react'
+import { Plus, Trophy, Coins, Trash2, CalendarClock, BarChart3, ClipboardList, X, Users, Award, Lock, RefreshCw, EyeOff, Play, Link2, MonitorPlay } from 'lucide-react'
 
 interface SurveyPanelProps {
   profile: any
@@ -32,7 +32,10 @@ export function SurveyPanel({ profile, surveys }: SurveyPanelProps) {
   const [deadline, setDeadline] = useState('')
   const [showResultsLive, setShowResultsLive] = useState(false)
   const [isDefinitive, setIsDefinitive] = useState(true)
+  const [hideRewards, setHideRewards] = useState(false)
+  const [startClosed, setStartClosed] = useState(false)
   const [finalizing, setFinalizing] = useState<string | null>(null)
+  const [opening, setOpening] = useState<string | null>(null)
   const [options, setOptions] = useState<DraftOption[]>([
     { label: '', xp_reward: 0, gold_reward: 0 },
     { label: '', xp_reward: 0, gold_reward: 0 },
@@ -71,6 +74,8 @@ export function SurveyPanel({ profile, surveys }: SurveyPanelProps) {
           deadline,
           show_results_live: showResultsLive,
           is_definitive: isDefinitive,
+          hide_rewards: hideRewards,
+          opened_at: startClosed ? null : new Date().toISOString(),
           created_by_user_id: profile.id,
         })
         .select()
@@ -95,6 +100,8 @@ export function SurveyPanel({ profile, surveys }: SurveyPanelProps) {
       setDeadline('')
       setShowResultsLive(false)
       setIsDefinitive(true)
+      setHideRewards(false)
+      setStartClosed(false)
       setOptions([
         { label: '', xp_reward: 0, gold_reward: 0 },
         { label: '', xp_reward: 0, gold_reward: 0 },
@@ -120,6 +127,30 @@ export function SurveyPanel({ profile, surveys }: SurveyPanelProps) {
     } finally {
       setFinalizing(null)
     }
+  }
+
+  const handleOpenVoting = async (id: string) => {
+    if (!confirm('Abrir a votação agora? Os membros passam a ver o inquérito e podem votar.')) return
+    setOpening(id)
+    try {
+      const { error } = await supabase
+        .from('surveys')
+        .update({ opened_at: new Date().toISOString() })
+        .eq('id', id)
+      if (error) throw error
+      toast.success('Votação aberta!')
+      router.refresh()
+    } catch (e: any) {
+      toast.error(e.message || 'Erro ao abrir a votação.')
+    } finally {
+      setOpening(null)
+    }
+  }
+
+  const copyEmbedLink = (id: string) => {
+    const url = `${window.location.origin}/embed/inquerito/${id}`
+    navigator.clipboard.writeText(url)
+    toast.success('Link de embed copiado! Adiciona ?qr=1 para mostrar um QR de voto.')
   }
 
   const handleDelete = async (id: string) => {
@@ -193,6 +224,32 @@ export function SurveyPanel({ profile, surveys }: SurveyPanelProps) {
                 <Switch id="s-def" checked={isDefinitive} onCheckedChange={setIsDefinitive} />
               </div>
 
+              <div className="flex items-start justify-between gap-4 p-3 border rounded-lg bg-slate-50/50">
+                <div className="flex-1 min-w-0">
+                  <Label htmlFor="s-hide" className="cursor-pointer flex items-center gap-1">
+                    <EyeOff className="w-3 h-3" /> Esconder recompensas
+                  </Label>
+                  <p className="text-[10px] text-gray-500 mt-1">
+                    Se ligado, os membros não veem que as opções dão XP/Ouro — mas os pontos
+                    continuam a ser atribuídos normalmente. Útil para não influenciar o voto.
+                  </p>
+                </div>
+                <Switch id="s-hide" checked={hideRewards} onCheckedChange={setHideRewards} />
+              </div>
+
+              <div className="flex items-start justify-between gap-4 p-3 border rounded-lg bg-slate-50/50">
+                <div className="flex-1 min-w-0">
+                  <Label htmlFor="s-closed" className="cursor-pointer flex items-center gap-1">
+                    <Play className="w-3 h-3" /> Abrir manualmente
+                  </Label>
+                  <p className="text-[10px] text-gray-500 mt-1">
+                    Se ligado, o inquérito fica escondido e sem aceitar votos até carregares em
+                    "Abrir votação". Ideal para abrir ao vivo durante uma apresentação/embed.
+                  </p>
+                </div>
+                <Switch id="s-closed" checked={startClosed} onCheckedChange={setStartClosed} />
+              </div>
+
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <Label>Opções</Label>
@@ -252,7 +309,8 @@ export function SurveyPanel({ profile, surveys }: SurveyPanelProps) {
       <div className="space-y-4">
         {surveys.map(s => {
           const deadlineDate = new Date(s.deadline)
-          const isOpen = deadlineDate > now
+          const notOpened = !s.opened_at || new Date(s.opened_at) > now
+          const isOpen = deadlineDate > now && !notOpened
           const hiddenFromMembers = new Date(deadlineDate.getTime() + 3 * 24 * 60 * 60 * 1000) <= now
           const opts: any[] = (s.survey_options || []).slice().sort((a: any, b: any) => a.position - b.position)
           const responses: any[] = s.survey_responses || []
@@ -272,7 +330,9 @@ export function SurveyPanel({ profile, surveys }: SurveyPanelProps) {
                       <CardDescription className="mt-1">{s.description}</CardDescription>
                     )}
                     <div className="flex flex-wrap gap-2 mt-2">
-                      {isOpen ? (
+                      {notOpened && deadlineDate > now ? (
+                        <Badge className="bg-slate-200 text-slate-700 border-none">Por abrir (escondido)</Badge>
+                      ) : isOpen ? (
                         <Badge className="bg-green-100 text-green-700 border-none">Aberto</Badge>
                       ) : hiddenFromMembers ? (
                         <Badge className="bg-gray-200 text-gray-700 border-none">Arquivado (só coordenadores)</Badge>
@@ -303,11 +363,27 @@ export function SurveyPanel({ profile, surveys }: SurveyPanelProps) {
                           <Award className="w-3 h-3 mr-1" /> Pontos atribuídos
                         </Badge>
                       )}
+                      {s.hide_rewards && (
+                        <Badge className="bg-slate-100 text-slate-600 border-none text-[10px]">
+                          <EyeOff className="w-3 h-3 mr-1" /> Recompensas escondidas
+                        </Badge>
+                      )}
                     </div>
                   </div>
-                  <Button variant="ghost" size="icon" className="h-8 w-8 text-gray-400 hover:text-red-600 hover:bg-red-50" onClick={() => handleDelete(s.id)}>
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      title="Copiar link de embed (ecrã de resultados)"
+                      className="h-8 w-8 text-gray-400 hover:text-blue-700 hover:bg-blue-50"
+                      onClick={() => copyEmbedLink(s.id)}
+                    >
+                      <MonitorPlay className="w-4 h-4" />
+                    </Button>
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-gray-400 hover:text-red-600 hover:bg-red-50" onClick={() => handleDelete(s.id)}>
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </div>
                 </div>
               </CardHeader>
               <CardContent className="space-y-2">
@@ -337,7 +413,24 @@ export function SurveyPanel({ profile, surveys }: SurveyPanelProps) {
                   )
                 })}
 
-                {!s.is_definitive && !isOpen && !s.finalized_at && (
+                {notOpened && deadlineDate > now && (
+                  <div className="pt-3 mt-3 border-t flex items-center justify-between gap-3">
+                    <p className="text-xs text-gray-600">
+                      O inquérito está escondido dos membros. Abre a votação quando quiseres.
+                    </p>
+                    <Button
+                      size="sm"
+                      onClick={() => handleOpenVoting(s.id)}
+                      disabled={opening === s.id}
+                      className="bg-green-700 hover:bg-green-800 gap-1 shrink-0"
+                    >
+                      <Play className="w-3 h-3" />
+                      {opening === s.id ? 'A abrir...' : 'Abrir votação'}
+                    </Button>
+                  </div>
+                )}
+
+                {!s.is_definitive && !isOpen && !notOpened && !s.finalized_at && (
                   <div className="pt-3 mt-3 border-t flex items-center justify-between gap-3">
                     <p className="text-xs text-gray-600">
                       Inquérito fechado. Atribui os pontos aos respondentes para finalizar.

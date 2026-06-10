@@ -44,6 +44,9 @@ export function SurveysSection({ userId, surveys }: SurveysSectionProps) {
   const visible = useMemo(() => {
     return (surveys || []).filter(s => {
       const dl = new Date(s.deadline)
+      // hidden until manually opened (RLS already hides these for members,
+      // but coordinators receive them too — filter here as well)
+      if (!s.opened_at || new Date(s.opened_at) > now) return false
       // visible to members: open OR within 3 days of deadline
       return new Date(dl.getTime() + 3 * 24 * 60 * 60 * 1000) > now
     })
@@ -156,7 +159,7 @@ export function SurveysSection({ userId, surveys }: SurveysSectionProps) {
                   const c = counts.get(o.id) || 0
                   const pct = total > 0 ? Math.round((c / total) * 100) : 0
                   const isMine = myResponse?.option_id === o.id
-                  const hasReward = o.xp_reward > 0 || o.gold_reward > 0
+                  const hasReward = !s.hide_rewards && (o.xp_reward > 0 || o.gold_reward > 0)
 
                   const labelEl = (
                     <span className="flex items-center gap-2 min-w-0 flex-1">
@@ -234,7 +237,7 @@ export function SurveysSection({ userId, surveys }: SurveysSectionProps) {
               <div className="p-3 rounded-lg border bg-blue-50 border-blue-200">
                 <p className="text-xs text-gray-500 mb-1">A tua escolha</p>
                 <p className="font-medium text-blue-900">{pending.option.label}</p>
-                {(pending.option.xp_reward > 0 || pending.option.gold_reward > 0) && (
+                {!pending.survey.hide_rewards && (pending.option.xp_reward > 0 || pending.option.gold_reward > 0) && (
                   <div className="flex items-center gap-3 mt-2 text-xs">
                     {pending.option.xp_reward > 0 && (
                       <span className="text-indigo-600 font-bold flex items-center gap-1"><Trophy className="w-3 h-3" /> +{pending.option.xp_reward} XP</span>
