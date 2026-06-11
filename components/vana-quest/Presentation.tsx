@@ -20,6 +20,7 @@ interface Question {
   option_c: string
   option_d: string
   correct_option: string
+  explanation: string | null
   time_seconds: number
   points_multiplier: number
 }

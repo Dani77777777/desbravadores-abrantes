@@ -23,6 +23,7 @@ CREATE TABLE IF NOT EXISTS public.vana_quest_questions (
   option_c text NOT NULL,
   option_d text NOT NULL,
   correct_option text NOT NULL CHECK (correct_option IN ('A', 'B', 'C', 'D')),
+  explanation text,
   time_seconds integer NOT NULL DEFAULT 20,
   points_multiplier integer NOT NULL DEFAULT 1 CHECK (points_multiplier IN (1, 2, 3)),
   question_order integer NOT NULL DEFAULT 0,

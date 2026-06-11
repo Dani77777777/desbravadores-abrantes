@@ -49,6 +49,7 @@ export default async function QuestEditorPage({
       option_c: formData.get('option_c') as string,
       option_d: formData.get('option_d') as string,
       correct_option: formData.get('correct_option') as string,
+      explanation: ((formData.get('explanation') as string) || '').trim() || null,
       time_seconds: parseInt(formData.get('time_seconds') as string) || 20,
       points_multiplier: parseInt(formData.get('points_multiplier') as string) || 1,
       question_order: (existing?.question_order ?? -1) + 1,
@@ -101,6 +102,17 @@ export default async function QuestEditorPage({
                   />
                 </div>
               ))}
+            </div>
+            <div>
+              <label className="text-xs font-bold text-gray-500 uppercase tracking-wide block mb-1.5">
+                Nota / Explicação <span className="text-gray-400 normal-case font-medium">(opcional)</span>
+              </label>
+              <textarea
+                name="explanation"
+                placeholder="Explica porque é esta a resposta correcta. Aparece no ecrã ao apresentador depois de todos responderem."
+                rows={2}
+                className="w-full border rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+              />
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div>

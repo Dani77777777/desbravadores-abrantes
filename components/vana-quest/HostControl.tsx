@@ -7,7 +7,7 @@ import { getIntroSeconds } from '@/utils/vana-quest'
 import { QRCodeSVG } from 'qrcode.react'
 import {
   Users, ChevronRight, Trophy, Zap, Clock, Maximize2,
-  CheckCircle2, Flame, Play, MonitorPlay, Copy, Check, Volume2, VolumeX, Share2, Download
+  CheckCircle2, Flame, Play, MonitorPlay, Copy, Check, Volume2, VolumeX, Share2, Download, Lightbulb
 } from 'lucide-react'
 import { PodiumShareCard } from './PodiumShareCard'
 import { detectGender, articleFor, winnerWord } from '@/utils/name-gender'
@@ -24,6 +24,7 @@ interface Question {
   option_c: string
   option_d: string
   correct_option: string
+  explanation: string | null
   time_seconds: number
   points_multiplier: number
 }
@@ -586,6 +587,17 @@ export function HostControl({ sessionId, initialSession, questions, siteUrl }: P
                   <span className="text-white/40"> · {participants.length - currentAnswers.length} sem resposta</span>
                 )}
               </p>
+
+              {/* Nota / explicação — para o apresentador ler em voz alta */}
+              {currentQuestion.explanation && (
+                <div className="flex items-start gap-2.5 bg-amber-400/10 border border-amber-400/30 rounded-2xl px-3.5 py-3 mt-1">
+                  <Lightbulb className="w-4 h-4 text-amber-300 flex-shrink-0 mt-0.5" fill="currentColor" />
+                  <div className="min-w-0">
+                    <p className="text-amber-300 text-[10px] font-black uppercase tracking-widest mb-0.5">Porquê?</p>
+                    <p className="text-white text-sm font-medium leading-snug">{currentQuestion.explanation}</p>
+                  </div>
+                </div>
+              )}
             </div>
           )
         })()}

@@ -69,6 +69,7 @@ export async function addQuestion(vanaQuestId: string, formData: FormData) {
     option_c: formData.get('option_c') as string,
     option_d: formData.get('option_d') as string,
     correct_option: formData.get('correct_option') as string,
+    explanation: ((formData.get('explanation') as string) || '').trim() || null,
     time_seconds: parseInt(formData.get('time_seconds') as string) || 20,
     points_multiplier: parseInt(formData.get('points_multiplier') as string) || 1,
     question_order: nextOrder,
@@ -88,6 +89,7 @@ export async function updateQuestion(questionId: string, vanaQuestId: string, fo
     option_c: formData.get('option_c') as string,
     option_d: formData.get('option_d') as string,
     correct_option: formData.get('correct_option') as string,
+    explanation: ((formData.get('explanation') as string) || '').trim() || null,
     time_seconds: parseInt(formData.get('time_seconds') as string) || 20,
     points_multiplier: parseInt(formData.get('points_multiplier') as string) || 1,
   }).eq('id', questionId)
