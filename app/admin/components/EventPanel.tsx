@@ -14,7 +14,7 @@ import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
 import { Plus, Trophy, Coins, Calendar, MapPin, Users, Trash2, CheckCircle2, ListChecks, History, Pencil, Share2, AlertTriangle } from 'lucide-react'
 import { EventAttendanceManager } from './EventAttendanceManager'
-import { EventShareDialog } from './EventShareDialog'
+import { EventShareDialog } from '@/components/events/EventShareDialog'
 
 interface EventPanelProps {
   profile: any

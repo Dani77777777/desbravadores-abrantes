@@ -5,11 +5,12 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
-import { Calendar as CalendarIcon, MapPin, Trophy, Coins, ChevronRight, Clock, Info, User } from 'lucide-react'
+import { Calendar as CalendarIcon, MapPin, Trophy, Coins, ChevronRight, Clock, Info, User, Share2 } from 'lucide-react'
 import Link from 'next/link'
 import { CalendarUI } from './CalendarUI'
 import { CodeEntryDialog } from '@/components/dashboard/CodeEntryDialog'
 import { SurveysSection } from '@/components/dashboard/SurveysSection'
+import { EventShareDialog } from './EventShareDialog'
 
 interface EventDashboardProps {
   events: any[]
@@ -21,8 +22,9 @@ interface EventDashboardProps {
 export function EventDashboard({ events, profile, surveys, userId }: EventDashboardProps) {
   const [selectedDate, setSelectedDate] = useState<Date | null>(null)
   const [viewingEvent, setViewingEvent] = useState<any>(null)
+  const [sharingEvent, setSharingEvent] = useState<any>(null)
 
-  const filteredEvents = selectedDate 
+  const filteredEvents = selectedDate
     ? events.filter(e => new Date(e.start_at).toDateString() === selectedDate.toDateString())
     : events.filter(e => !e.is_finished && new Date(e.start_at) >= new Date()).slice(0, 3)
 
@@ -38,10 +40,10 @@ export function EventDashboard({ events, profile, surveys, userId }: EventDashbo
               <CalendarIcon className="w-5 h-5 text-blue-700" /> Calendário de Atividades
             </h2>
           </div>
-          <CalendarUI 
-            events={events} 
-            selectedDate={selectedDate} 
-            onSelectDate={setSelectedDate} 
+          <CalendarUI
+            events={events}
+            selectedDate={selectedDate}
+            onSelectDate={setSelectedDate}
           />
           <CodeEntryDialog />
         </div>
@@ -52,7 +54,7 @@ export function EventDashboard({ events, profile, surveys, userId }: EventDashbo
             <h2 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
               {selectedDate ? (
                 <>
-                  <Info className="w-5 h-5 text-blue-700" /> 
+                  <Info className="w-5 h-5 text-blue-700" />
                   Eventos em {selectedDate.toLocaleDateString('pt-PT', { day: '2-digit', month: 'long' })}
                 </>
               ) : (
@@ -60,14 +62,14 @@ export function EventDashboard({ events, profile, surveys, userId }: EventDashbo
               )}
             </h2>
             {selectedDate && (
-               <Button 
-                variant="ghost" 
-                size="sm" 
+              <Button
+                variant="ghost"
+                size="sm"
                 className="text-xs text-blue-600 hover:text-blue-700 h-7"
                 onClick={() => setSelectedDate(null)}
-               >
-                 Limpar filtro
-               </Button>
+              >
+                Limpar filtro
+              </Button>
             )}
           </div>
 
@@ -76,8 +78,8 @@ export function EventDashboard({ events, profile, surveys, userId }: EventDashbo
               <Card className="border-dashed border-2 bg-transparent shadow-none">
                 <CardContent className="py-10 text-center">
                   <p className="text-gray-500 text-sm">
-                    {selectedDate 
-                      ? 'Não há eventos planeados para este dia.' 
+                    {selectedDate
+                      ? 'Não há eventos planeados para este dia.'
                       : 'Sem eventos marcados para breve.'}
                   </p>
                 </CardContent>
@@ -86,38 +88,47 @@ export function EventDashboard({ events, profile, surveys, userId }: EventDashbo
               filteredEvents.map((event) => {
                 const startDate = new Date(event.start_at)
                 const isToday = startDate.toDateString() === today.toDateString()
-                
+
                 return (
-                  <Card 
-                    key={event.id} 
+                  <Card
+                    key={event.id}
                     className={`group hover:shadow-md transition-all border shadow-sm cursor-pointer overflow-hidden ${isToday ? 'ring-1 ring-blue-500 border-blue-200' : ''}`}
                     onClick={() => setViewingEvent(event)}
                   >
                     <CardContent className="p-4 flex items-center justify-between gap-4">
-                       <div className="flex items-center gap-4">
-                          <div className={`w-12 h-12 rounded-xl flex flex-col items-center justify-center shrink-0 ${isToday ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-500'}`}>
-                             <span className="text-xs font-bold uppercase">{startDate.toLocaleDateString('pt-PT', { month: 'short' }).replace('.', '')}</span>
-                             <span className="text-lg font-black leading-none">{startDate.getDate()}</span>
+                      <div className="flex items-center gap-4">
+                        <div className={`w-12 h-12 rounded-xl flex flex-col items-center justify-center shrink-0 ${isToday ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-500'}`}>
+                          <span className="text-xs font-bold uppercase">{startDate.toLocaleDateString('pt-PT', { month: 'short' }).replace('.', '')}</span>
+                          <span className="text-lg font-black leading-none">{startDate.getDate()}</span>
+                        </div>
+                        <div className="space-y-0.5">
+                          <h3 className="font-bold text-gray-900 group-hover:text-blue-700 transition-colors text-sm">
+                            {event.title}
+                          </h3>
+                          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-gray-500">
+                            <span className="flex items-center gap-1 font-medium text-blue-600">
+                              <Clock className="w-3 h-3" />
+                              {startDate.toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                            {event.location && (
+                              <span className="flex items-center gap-1">
+                                <MapPin className="w-3 h-3" />
+                                {event.location}
+                              </span>
+                            )}
                           </div>
-                          <div className="space-y-0.5">
-                             <h3 className="font-bold text-gray-900 group-hover:text-blue-700 transition-colors text-sm">
-                               {event.title}
-                             </h3>
-                             <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-gray-500">
-                                <span className="flex items-center gap-1 font-medium text-blue-600">
-                                   <Clock className="w-3 h-3" />
-                                   {startDate.toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })}
-                                </span>
-                                {event.location && (
-                                   <span className="flex items-center gap-1">
-                                      <MapPin className="w-3 h-3" />
-                                      {event.location}
-                                   </span>
-                                )}
-                             </div>
-                          </div>
-                       </div>
-                       <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-blue-500 transform group-hover:translate-x-1 transition-all" />
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1 shrink-0">
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setSharingEvent(event) }}
+                          title="Partilhar evento"
+                          className="p-2 rounded-lg text-slate-300 hover:text-blue-600 hover:bg-blue-50 transition-colors"
+                        >
+                          <Share2 className="w-4 h-4" />
+                        </button>
+                        <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-blue-500 transform group-hover:translate-x-1 transition-all" />
+                      </div>
                     </CardContent>
                   </Card>
                 )
@@ -142,14 +153,14 @@ export function EventDashboard({ events, profile, surveys, userId }: EventDashbo
                 {viewingEvent.title}
               </DialogTitle>
               <DialogDescription className="flex items-center gap-2 pt-1 font-medium text-blue-600">
-                 <Clock className="w-4 h-4" />
-                 {new Date(viewingEvent.start_at).toLocaleString('pt-PT', { 
-                   weekday: 'long', 
-                   day: '2-digit', 
-                   month: 'long', 
-                   hour: '2-digit', 
-                   minute: '2-digit' 
-                 })}
+                <Clock className="w-4 h-4" />
+                {new Date(viewingEvent.start_at).toLocaleString('pt-PT', {
+                  weekday: 'long',
+                  day: '2-digit',
+                  month: 'long',
+                  hour: '2-digit',
+                  minute: '2-digit'
+                })}
               </DialogDescription>
             </DialogHeader>
 
@@ -182,42 +193,60 @@ export function EventDashboard({ events, profile, surveys, userId }: EventDashbo
               </div>
 
               <div className="bg-blue-50 p-4 rounded-xl space-y-3">
-                 <h4 className="text-xs font-bold text-blue-900 uppercase tracking-wider">Recompensas e Regras</h4>
-                 <div className="grid grid-cols-2 gap-4">
-                    <div className="flex items-center gap-2 bg-white p-2.5 rounded-lg border border-blue-100 shadow-sm">
-                       <div className="p-1.5 bg-indigo-100 text-indigo-700 rounded-lg">
-                          <Trophy className="w-4 h-4" />
-                       </div>
-                       <div>
-                          <p className="text-[10px] text-gray-500 font-bold uppercase">XP</p>
-                          <p className="text-lg font-black text-indigo-900 leading-none">+{viewingEvent.xp_reward}</p>
-                       </div>
+                <h4 className="text-xs font-bold text-blue-900 uppercase tracking-wider">Recompensas e Regras</h4>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="flex items-center gap-2 bg-white p-2.5 rounded-lg border border-blue-100 shadow-sm">
+                    <div className="p-1.5 bg-indigo-100 text-indigo-700 rounded-lg">
+                      <Trophy className="w-4 h-4" />
                     </div>
-                    <div className="flex items-center gap-2 bg-white p-2.5 rounded-lg border border-yellow-100 shadow-sm">
-                       <div className="p-1.5 bg-yellow-100 text-yellow-700 rounded-lg">
-                          <Coins className="w-4 h-4" />
-                       </div>
-                       <div>
-                          <p className="text-[10px] text-gray-500 font-bold uppercase">GOLD</p>
-                          <p className="text-lg font-black text-yellow-900 leading-none">+{viewingEvent.gold_reward}</p>
-                       </div>
+                    <div>
+                      <p className="text-[10px] text-gray-500 font-bold uppercase">XP</p>
+                      <p className="text-lg font-black text-indigo-900 leading-none">+{viewingEvent.xp_reward}</p>
                     </div>
-                 </div>
-                 
-                 <div className="flex items-center justify-between text-xs text-blue-700 px-1 pt-1 opacity-75">
-                    <span className="flex items-center gap-1"><Info className="w-3.5 h-3.5" /> Atraso: -{viewingEvent.late_discount_percent * 100}%</span>
-                    <span className="flex items-center gap-1"><Info className="w-3.5 h-3.5" /> Falta: -{viewingEvent.absent_penalty_percent * 100}%</span>
-                 </div>
+                  </div>
+                  <div className="flex items-center gap-2 bg-white p-2.5 rounded-lg border border-yellow-100 shadow-sm">
+                    <div className="p-1.5 bg-yellow-100 text-yellow-700 rounded-lg">
+                      <Coins className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <p className="text-[10px] text-gray-500 font-bold uppercase">GOLD</p>
+                      <p className="text-lg font-black text-yellow-900 leading-none">+{viewingEvent.gold_reward}</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between text-xs text-blue-700 px-1 pt-1 opacity-75">
+                  <span className="flex items-center gap-1"><Info className="w-3.5 h-3.5" /> Atraso: -{viewingEvent.late_discount_percent * 100}%</span>
+                  <span className="flex items-center gap-1"><Info className="w-3.5 h-3.5" /> Falta: -{viewingEvent.absent_penalty_percent * 100}%</span>
+                </div>
               </div>
             </div>
 
-            <DialogFooter className="sm:justify-start">
-               <p className="text-[10px] text-gray-400 italic">
-                 * Pontos atribuídos após finalização pelo instrutor.
-               </p>
+            <DialogFooter className="sm:justify-between gap-2">
+              <p className="text-[10px] text-gray-400 italic self-center">
+                * Pontos atribuídos após finalização pelo dirigente/coordenador.
+              </p>
+              <Button
+                variant="outline"
+                size="sm"
+                className="border-blue-200 text-blue-700 hover:bg-blue-50"
+                onClick={() => setSharingEvent(viewingEvent)}
+              >
+                <Share2 className="w-4 h-4 mr-1.5" />
+                Partilhar
+              </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
+      )}
+
+      {/* Share Dialog */}
+      {sharingEvent && (
+        <EventShareDialog
+          event={sharingEvent}
+          open={!!sharingEvent}
+          onOpenChange={(open) => !open && setSharingEvent(null)}
+        />
       )}
     </div>
   )
