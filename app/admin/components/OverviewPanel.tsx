@@ -68,20 +68,21 @@ export function OverviewPanel({ profile, members, events, purchases }: OverviewP
 
   // 3. Upcoming Birthdays (Next 30 days)
   const today = new Date()
+  const todayMidnight = new Date(today); todayMidnight.setHours(0, 0, 0, 0)
   const next30DaysBirthdays = members
     .filter(m => m.birth_date)
     .map(m => {
       const bDate = new Date(m.birth_date)
       const bMonth = bDate.getUTCMonth()
       const bDay = bDate.getUTCDate()
-      
-      let nextBday = new Date(today.getFullYear(), bMonth, bDay)
-      if (nextBday < today && (nextBday.toDateString() !== today.toDateString())) {
-        nextBday.setFullYear(today.getFullYear() + 1)
+
+      let nextBday = new Date(todayMidnight.getFullYear(), bMonth, bDay)
+      if (nextBday < todayMidnight) {
+        nextBday.setFullYear(todayMidnight.getFullYear() + 1)
       }
-      
-      const diffTime = nextBday.getTime() - today.getTime()
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+
+      const diffTime = nextBday.getTime() - todayMidnight.getTime()
+      const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24))
       
       return { ...m, daysUntil: diffDays, nextBday }
     })
@@ -216,7 +217,8 @@ export function OverviewPanel({ profile, members, events, purchases }: OverviewP
                   <div className="relative border-l-2 border-indigo-200 ml-1 space-y-5 pb-1">
                     {upcomingEvents.map(event => {
                       const todayMidnight = new Date(); todayMidnight.setHours(0, 0, 0, 0)
-                      const daysLeft = Math.ceil((new Date(event.start_at).getTime() - todayMidnight.getTime()) / (1000 * 60 * 60 * 24))
+                      const eventDay = new Date(event.start_at); eventDay.setHours(0, 0, 0, 0)
+                      const daysLeft = Math.round((eventDay.getTime() - todayMidnight.getTime()) / (1000 * 60 * 60 * 24))
                       const daysLabel = daysLeft === 0 ? 'Hoje' : daysLeft === 1 ? 'Amanhã' : `Em ${daysLeft}d`
                       const isUrgent = daysLeft <= 3
                       return (
