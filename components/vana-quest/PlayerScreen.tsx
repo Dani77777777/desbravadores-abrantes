@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef } from 'react'
 import { createClient } from '@/utils/supabase/client'
-import { submitAnswer, setRewardsRecipient } from '@/lib/actions/vana-quest'
+import { submitAnswer, setRewardsRecipient, skipRewards } from '@/lib/actions/vana-quest'
 import { CheckCircle2, XCircle, Trophy, Zap, Flame, Users } from 'lucide-react'
 import { PlayerAvatar } from './PlayerAvatar'
 
@@ -76,6 +76,10 @@ export function PlayerScreen({ sessionId, userId, userProfile, initialSession, q
   const [donationSuccess, setDonationSuccess] = useState(false)
   const [donationSkipped, setDonationSkipped] = useState(false)
   const [showSkipConfirm, setShowSkipConfirm] = useState(false)
+  // Membro selecionado à espera de confirmação (para não doar sem querer)
+  const [pendingRecipient, setPendingRecipient] = useState<{ id: string; full_name: string; section: string; avatar_url?: string | null } | null>(null)
+  // Foi expulso pelo host
+  const [kicked, setKicked] = useState(false)
 
   const isGuest = !userId
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -125,7 +129,7 @@ export function PlayerScreen({ sessionId, userId, userProfile, initialSession, q
   // enquanto o jogo ainda está a decorrer (não em 'finished'). Só na vista do jogador.
   useEffect(() => {
     const gameInProgress = session.status !== 'finished'
-    if (!gameInProgress) return
+    if (!gameInProgress || kicked) return
 
     // Aviso nativo ao fechar ou recarregar o separador
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
@@ -156,7 +160,7 @@ export function PlayerScreen({ sessionId, userId, userProfile, initialSession, q
       window.removeEventListener('beforeunload', handleBeforeUnload)
       window.removeEventListener('popstate', handlePopState)
     }
-  }, [session.status])
+  }, [session.status, kicked])
 
   // Sincronizar stats com a BD ao montar (após termos o participantId) e
   // sempre que entrarmos em question_results ou question_leaderboard.
@@ -213,9 +217,19 @@ export function PlayerScreen({ sessionId, userId, userProfile, initialSession, q
         })
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'vana_quest_participants', filter: `session_id=eq.${sessionId}` },
         () => setTotalPlayers((c) => c + 1))
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'vana_quest_participants', filter: `session_id=eq.${sessionId}` },
+        (p) => {
+          const removedId = (p.old as any)?.id
+          setTotalPlayers((c) => Math.max(0, c - 1))
+          // Se fui eu que fui removido → ecrã de expulsão
+          if (removedId && participantId && removedId === participantId) {
+            localStorage.removeItem(`vana_participant_${sessionId}`)
+            setKicked(true)
+          }
+        })
       .subscribe()
     return () => { supabase.removeChannel(channel) }
-  }, [sessionId, userId, currentQuestion?.id])
+  }, [sessionId, userId, currentQuestion?.id, participantId])
 
   // Load total player count
   useEffect(() => {
@@ -298,7 +312,14 @@ export function PlayerScreen({ sessionId, userId, userProfile, initialSession, q
     setDonating(true)
     await setRewardsRecipient(participantId, recipientId)
     setDonating(false)
+    setPendingRecipient(null)
     setDonationSuccess(true)
+  }
+
+  async function handleSkip() {
+    setShowSkipConfirm(false)
+    if (participantId) await skipRewards(participantId)
+    setDonationSkipped(true)
   }
 
   const filteredMembers = allMembers.filter((m) =>
@@ -308,6 +329,22 @@ export function PlayerScreen({ sessionId, userId, userProfile, initialSession, q
   // Calculated rewards (rounded half-up)
   const goldEarned = Math.round(totalPoints)
   const xpEarned = goldEarned * 2
+
+  // ── EXPULSO PELO HOST ──────────────────────────────────────────
+  if (kicked) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-950 to-indigo-950 flex flex-col items-center justify-center p-6 gap-5 text-center">
+        <div className="w-20 h-20 rounded-full bg-red-500/20 border border-red-400/30 flex items-center justify-center">
+          <XCircle className="w-10 h-10 text-red-400" />
+        </div>
+        <h2 className="text-2xl font-black text-white">Foste removido do jogo</h2>
+        <p className="text-sky-200 text-sm max-w-xs">
+          O anfitrião removeu-te desta sessão. Se achas que foi um engano, fala com o anfitrião e volta a entrar.
+        </p>
+        <a href="/jogos/vana-quest" className="text-sky-300 underline mt-2">Voltar a entrar</a>
+      </div>
+    )
+  }
 
   // ── WAITING ────────────────────────────────────────────────────
   if (session.status === 'waiting') {
@@ -600,7 +637,7 @@ export function PlayerScreen({ sessionId, userId, userProfile, initialSession, q
                 {filteredMembers.map((m) => (
                   <button
                     key={m.id}
-                    onClick={() => handleDonate(m.id)}
+                    onClick={() => setPendingRecipient(m)}
                     disabled={donating}
                     className="w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-white/10 hover:bg-white/20 transition-colors text-left disabled:opacity-60"
                   >
@@ -656,13 +693,57 @@ export function PlayerScreen({ sessionId, userId, userProfile, initialSession, q
                         Voltar e escolher
                       </button>
                       <button
-                        onClick={() => {
-                          setShowSkipConfirm(false)
-                          setDonationSkipped(true)
-                        }}
-                        className="w-full bg-white/5 hover:bg-white/10 text-white/60 hover:text-white/80 text-sm py-2.5 rounded-2xl transition-colors border border-white/10"
+                        onClick={handleSkip}
+                        disabled={donating}
+                        className="w-full bg-white/5 hover:bg-white/10 text-white/60 hover:text-white/80 text-sm py-2.5 rounded-2xl transition-colors border border-white/10 disabled:opacity-60"
                       >
                         Sim, dispensar mesmo assim
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Modal de confirmação de escolha (para não doar sem querer) */}
+              {pendingRecipient && (
+                <div
+                  className="fixed inset-0 z-50 bg-black/70 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200"
+                  onClick={() => !donating && setPendingRecipient(null)}
+                >
+                  <div
+                    onClick={(e) => e.stopPropagation()}
+                    className="bg-gradient-to-br from-slate-900 via-blue-900 to-indigo-950 border border-white/20 rounded-3xl shadow-2xl max-w-sm w-full p-6 space-y-5 animate-in zoom-in-95 fade-in duration-300"
+                  >
+                    <div className="text-center space-y-3">
+                      <PlayerAvatar
+                        name={pendingRecipient.full_name}
+                        avatarUrl={pendingRecipient.avatar_url}
+                        className="w-16 h-16 mx-auto"
+                        textClassName="text-xl"
+                        fallbackBg="bg-blue-500"
+                      />
+                      <h3 className="text-white font-black text-2xl">Confirmar?</h3>
+                      <p className="text-sky-200 text-sm leading-relaxed">
+                        Vais dar <span className="text-yellow-400 font-black">{goldEarned} 🪙</span> e{' '}
+                        <span className="text-blue-300 font-black">{xpEarned} ⭐ XP</span> a{' '}
+                        <span className="text-white font-black">{pendingRecipient.full_name}</span>.
+                      </p>
+                    </div>
+
+                    <div className="flex flex-col gap-2">
+                      <button
+                        onClick={() => handleDonate(pendingRecipient.id)}
+                        disabled={donating}
+                        className="w-full bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-400 hover:to-emerald-400 text-white font-black py-3 rounded-2xl transition-all active:scale-[0.98] shadow-lg disabled:opacity-60"
+                      >
+                        {donating ? 'A enviar...' : 'Sim, é este!'}
+                      </button>
+                      <button
+                        onClick={() => setPendingRecipient(null)}
+                        disabled={donating}
+                        className="w-full bg-white/5 hover:bg-white/10 text-white/60 hover:text-white/80 text-sm py-2.5 rounded-2xl transition-colors border border-white/10 disabled:opacity-60"
+                      >
+                        Voltar
                       </button>
                     </div>
                   </div>

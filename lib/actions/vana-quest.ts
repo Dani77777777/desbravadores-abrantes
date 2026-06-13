@@ -496,9 +496,56 @@ export async function setRewardsRecipient(
   const supabase = createServiceClient()
   await supabase
     .from('vana_quest_participants')
-    .update({ rewards_recipient_id: recipientId })
+    .update({ rewards_recipient_id: recipientId, rewards_skipped: false })
     .eq('id', participantId)
     .eq('is_guest', true)
+}
+
+/**
+ * Convidado decide NÃO dar os prémios a ninguém — fica registado na BD
+ * para que o host saiba (realtime) que este convidado já decidiu.
+ */
+export async function skipRewards(participantId: string): Promise<void> {
+  const supabase = createServiceClient()
+  await supabase
+    .from('vana_quest_participants')
+    .update({ rewards_recipient_id: null, rewards_skipped: true })
+    .eq('id', participantId)
+    .eq('is_guest', true)
+}
+
+/**
+ * Expulsar um participante da sessão (host only). Apaga o participante e,
+ * por CASCADE, as respostas associadas. Usado para remover convidados a
+ * fazer lixo (nomes inapropriados, etc.).
+ */
+export async function kickParticipant(
+  participantId: string,
+  sessionId: string
+): Promise<{ ok: boolean; error?: string }> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { ok: false, error: 'Não autorizado' }
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', user.id)
+    .single()
+
+  if (!profile || (profile.role !== 'coordenador' && profile.role !== 'dirigente')) {
+    return { ok: false, error: 'Sem permissões' }
+  }
+
+  const service = createServiceClient()
+  const { error } = await service
+    .from('vana_quest_participants')
+    .delete()
+    .eq('id', participantId)
+    .eq('session_id', sessionId)
+
+  if (error) return { ok: false, error: error.message }
+  return { ok: true }
 }
 
 /**
