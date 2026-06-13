@@ -2,10 +2,68 @@
 
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { AlertCircle, ArrowLeft, RefreshCcw } from 'lucide-react'
+import { AlertCircle, ArrowLeft, RefreshCcw, MailCheck } from 'lucide-react'
 import Link from 'next/link'
+import { useEffect, useState } from 'react'
 
 export default function AuthCodeErrorPage() {
+  // Supabase passa mensagens no fragmento (#) do URL — só legível no cliente.
+  const [hashMessage, setHashMessage] = useState('')
+
+  useEffect(() => {
+    const hash = window.location.hash.substring(1)
+    const params = new URLSearchParams(hash)
+    const msg = params.get('message') || ''
+    setHashMessage(msg)
+  }, [])
+
+  // Caso "Secure email change": um dos dois links foi aceite, falta confirmar o outro.
+  const isHalfConfirmed = /confirm link sent to the other email/i.test(hashMessage)
+
+  if (isHalfConfirmed) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-900 via-blue-800 to-blue-950 p-4">
+        <div className="absolute inset-0 z-0 opacity-10" style={{
+          backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.4'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`
+        }} />
+
+        <Card className="w-full max-w-md z-10 bg-white/95 backdrop-blur-sm shadow-2xl border-none overflow-hidden">
+          <div className="h-2 bg-emerald-500" />
+          <CardHeader className="text-center pt-8">
+            <div className="mx-auto w-16 h-16 bg-emerald-50 rounded-full flex items-center justify-center mb-4">
+              <MailCheck className="w-10 h-10 text-emerald-500" />
+            </div>
+            <CardTitle className="text-2xl font-bold text-blue-900">Quase lá!</CardTitle>
+            <CardDescription className="text-blue-800 text-base">
+              Este link foi confirmado com sucesso.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6 pb-8">
+            <div className="bg-emerald-50/60 rounded-lg p-4 space-y-2 border border-emerald-100">
+              <h3 className="font-semibold text-emerald-900 text-sm">Falta só um passo:</h3>
+              <p className="text-sm text-emerald-800">
+                Por segurança, enviámos um link para <strong>os dois endereços</strong> de email
+                (o antigo e o novo). Vai à caixa de entrada do <strong>outro</strong> email e clica
+                também no link de confirmação. Só depois disso o teu email será alterado.
+              </p>
+            </div>
+
+            <Button asChild variant="ghost" className="w-full text-blue-700 hover:text-blue-900 hover:bg-blue-50">
+              <Link href="/" className="flex items-center justify-center gap-2">
+                <ArrowLeft className="w-4 h-4" />
+                Voltar à Página Inicial
+              </Link>
+            </Button>
+
+            <p className="text-[10px] text-center text-gray-400 italic">
+              Clube de Desbravadores - Abrantes
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-900 via-blue-800 to-blue-950 p-4">
       {/* Decorative overlay pattern */}
@@ -41,7 +99,7 @@ export default function AuthCodeErrorPage() {
                 Tentar Novamente
               </Link>
             </Button>
-            
+
             <Button asChild variant="ghost" className="w-full text-blue-700 hover:text-blue-900 hover:bg-blue-50">
               <Link href="/" className="flex items-center justify-center gap-2">
                 <ArrowLeft className="w-4 h-4" />
