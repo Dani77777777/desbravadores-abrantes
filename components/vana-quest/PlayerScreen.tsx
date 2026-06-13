@@ -121,6 +121,43 @@ export function PlayerScreen({ sessionId, userId, userProfile, initialSession, q
     setShowMultiplierWarning(false)
   }, [session.status, currentQuestion?.id])
 
+  // Avisar o jogador antes de fechar/recarregar o separador ou carregar em "voltar"
+  // enquanto o jogo ainda está a decorrer (não em 'finished'). Só na vista do jogador.
+  useEffect(() => {
+    const gameInProgress = session.status !== 'finished'
+    if (!gameInProgress) return
+
+    // Aviso nativo ao fechar ou recarregar o separador
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault()
+      e.returnValue = ''
+      return ''
+    }
+    window.addEventListener('beforeunload', handleBeforeUnload)
+
+    // Intercetar o botão "voltar" do browser
+    const pushGuard = () => window.history.pushState(null, '', window.location.href)
+    pushGuard()
+    const handlePopState = () => {
+      const leave = window.confirm(
+        'Tens a certeza que queres sair do VanaQuest? Vais perder o teu lugar no jogo.'
+      )
+      if (leave) {
+        window.removeEventListener('beforeunload', handleBeforeUnload)
+        window.history.back()
+      } else {
+        // Cancelou: voltamos a empurrar o estado para manter o jogador no jogo
+        pushGuard()
+      }
+    }
+    window.addEventListener('popstate', handlePopState)
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload)
+      window.removeEventListener('popstate', handlePopState)
+    }
+  }, [session.status])
+
   // Sincronizar stats com a BD ao montar (após termos o participantId) e
   // sempre que entrarmos em question_results ou question_leaderboard.
   // Isto garante que mesmo após refresh ou se entrarmos a meio do jogo,
