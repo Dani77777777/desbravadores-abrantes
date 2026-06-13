@@ -1191,7 +1191,7 @@ function LeaderboardScreen({
   const maxStreak = Math.max(...participants.map((p) => p.current_streak), 0)
   const onFire = maxStreak >= 2 ? participants.filter((p) => p.current_streak === maxStreak) : []
 
-  const rowHeight = 140 // px entre rows (apertado para caber tudo num ecrã sem scroll)
+  const rowHeight = 158 // px entre rows (com respiro entre cards, mas a caber sem scroll)
 
   return (
     <div className="h-screen w-screen bg-gradient-to-br from-blue-950 via-indigo-900 to-blue-950 flex flex-col p-6 md:p-8 gap-4 overflow-hidden relative [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
