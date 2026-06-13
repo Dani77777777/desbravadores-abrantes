@@ -179,6 +179,8 @@ export function Presentation({ sessionId, initialSession, questions, siteUrl }: 
         (p) => setParticipants((prev) => prev.find((x) => x.id === (p.new as Participant).id) ? prev : [...prev, p.new as Participant]))
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'vana_quest_participants', filter: `session_id=eq.${sessionId}` },
         (p) => setParticipants((prev) => prev.map((x) => x.id === (p.new as Participant).id ? (p.new as Participant) : x)))
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'vana_quest_participants' },
+        (p) => setParticipants((prev) => prev.filter((x) => x.id !== (p.old as any)?.id)))
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'vana_quest_answers', filter: `session_id=eq.${sessionId}` },
         (p) => {
           const ans = p.new as Answer & { id?: string }

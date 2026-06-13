@@ -217,12 +217,13 @@ export function PlayerScreen({ sessionId, userId, userProfile, initialSession, q
         })
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'vana_quest_participants', filter: `session_id=eq.${sessionId}` },
         () => setTotalPlayers((c) => c + 1))
-      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'vana_quest_participants', filter: `session_id=eq.${sessionId}` },
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'vana_quest_participants' },
         (p) => {
           const removedId = (p.old as any)?.id
+          if (!removedId) return
           setTotalPlayers((c) => Math.max(0, c - 1))
           // Se fui eu que fui removido → ecrã de expulsão
-          if (removedId && participantId && removedId === participantId) {
+          if (participantId && removedId === participantId) {
             localStorage.removeItem(`vana_participant_${sessionId}`)
             setKicked(true)
           }

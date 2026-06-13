@@ -207,7 +207,7 @@ export function HostControl({ sessionId, initialSession, questions, siteUrl }: P
         (p) => setParticipants((prev) => prev.find((x) => x.id === (p.new as Participant).id) ? prev : [...prev, p.new as Participant]))
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'vana_quest_participants', filter: `session_id=eq.${sessionId}` },
         (p) => setParticipants((prev) => prev.map((x) => x.id === (p.new as Participant).id ? (p.new as Participant) : x)))
-      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'vana_quest_participants', filter: `session_id=eq.${sessionId}` },
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'vana_quest_participants' },
         (p) => setParticipants((prev) => prev.filter((x) => x.id !== (p.old as any)?.id)))
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'vana_quest_answers', filter: `session_id=eq.${sessionId}` },
         (p) => setAnswers((prev) => [...prev, p.new as Answer]))
@@ -1048,7 +1048,7 @@ export function HostControl({ sessionId, initialSession, questions, siteUrl }: P
               <button
                 onClick={handleKick}
                 disabled={kicking}
-                className="w-full bg-gradient-to-r from-red-500 to-rose-500 hover:from-red-400 hover:to-rose-400 text-white font-black py-3 rounded-2xl transition-all active:scale-[0.98] shadow-lg disabled:opacity-60"
+                className="w-full bg-red-600 hover:bg-red-500 text-white font-black py-3.5 rounded-2xl transition-all active:scale-[0.98] shadow-lg shadow-red-900/40 disabled:opacity-60"
               >
                 {kicking ? 'A remover...' : 'Sim, expulsar'}
               </button>
