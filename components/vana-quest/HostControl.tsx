@@ -8,7 +8,7 @@ import { QRCodeSVG } from 'qrcode.react'
 import {
   Users, ChevronRight, Trophy, Zap, Clock, Maximize2,
   CheckCircle2, Flame, Play, MonitorPlay, Copy, Check, Volume2, VolumeX, Share2, Download, Lightbulb,
-  UserX, Gift, AlertTriangle, XCircle
+  UserX, Gift, AlertTriangle, XCircle, ArrowUp, ArrowDown
 } from 'lucide-react'
 import { PodiumShareCard } from './PodiumShareCard'
 import { detectGender, articleFor, winnerWord } from '@/utils/name-gender'
@@ -158,6 +158,8 @@ export function HostControl({ sessionId, initialSession, questions, siteUrl }: P
   const prevPointsRef = useRef<Record<string, number>>({})
   // Capturar os deltas ao entrar no leaderboard (e congelar até sair)
   const [deltas, setDeltas] = useState<Record<string, number>>({})
+  // Variação de posição face à ronda anterior (+ subiu, - desceu)
+  const [rankDeltas, setRankDeltas] = useState<Record<string, number>>({})
 
   async function copyLink() {
     try {
@@ -268,11 +270,30 @@ export function HostControl({ sessionId, initialSession, questions, siteUrl }: P
   // Capturar deltas (pontos ganhos nesta ronda) quando entramos no leaderboard
   useEffect(() => {
     if (session.status === 'question_leaderboard') {
+      const prevSnap = { ...prevPointsRef.current }
+      const hadPrev = Object.keys(prevSnap).length > 0
+
       const d: Record<string, number> = {}
       participants.forEach((p) => {
-        d[p.id] = Number(p.total_points) - (prevPointsRef.current[p.id] ?? 0)
+        d[p.id] = Number(p.total_points) - (prevSnap[p.id] ?? 0)
       })
       setDeltas(d)
+
+      // Variação de posição: ranking anterior vs atual
+      if (hadPrev) {
+        const prevOrder = [...participants].sort((a, b) => (prevSnap[b.id] ?? 0) - (prevSnap[a.id] ?? 0))
+        const curOrder = [...participants].sort((a, b) => Number(b.total_points) - Number(a.total_points))
+        const prevRank = new Map(prevOrder.map((p, i) => [p.id, i]))
+        const curRank = new Map(curOrder.map((p, i) => [p.id, i]))
+        const rd: Record<string, number> = {}
+        participants.forEach((p) => {
+          rd[p.id] = (prevRank.get(p.id) ?? 0) - (curRank.get(p.id) ?? 0) // + subiu, - desceu
+        })
+        setRankDeltas(rd)
+      } else {
+        setRankDeltas({})
+      }
+
       // Atualiza o snapshot para a próxima ronda
       const snap: Record<string, number> = {}
       participants.forEach((p) => { snap[p.id] = Number(p.total_points) })
@@ -666,6 +687,7 @@ export function HostControl({ sessionId, initialSession, questions, siteUrl }: P
                 {sorted.map((p, i) => {
                   const delta = deltas[p.id] || 0
                   const showDelta = delta > 0.005
+                  const rankChange = rankDeltas[p.id] || 0
 
                   return (
                     <div
@@ -677,12 +699,22 @@ export function HostControl({ sessionId, initialSession, questions, siteUrl }: P
                         'bg-white/5 border-white/10'
                       }`}
                     >
-                      {/* Posição */}
-                      <div className="flex-shrink-0 w-7 text-center">
+                      {/* Posição + variação */}
+                      <div className="flex-shrink-0 w-8 flex flex-col items-center">
                         {i < 3 ? (
                           <span className="text-xl leading-none">{medals[i]}</span>
                         ) : (
                           <span className="text-sm font-black text-white/40 tabular-nums">{i + 1}</span>
+                        )}
+                        {rankChange !== 0 ? (
+                          <span className={`flex items-center text-[9px] font-black leading-none mt-0.5 ${
+                            rankChange > 0 ? 'text-green-400' : 'text-red-400'
+                          }`}>
+                            {rankChange > 0 ? <ArrowUp className="w-2.5 h-2.5" /> : <ArrowDown className="w-2.5 h-2.5" />}
+                            {Math.abs(rankChange)}
+                          </span>
+                        ) : (
+                          <span className="text-white/20 text-[9px] leading-none mt-0.5">—</span>
                         )}
                       </div>
 
