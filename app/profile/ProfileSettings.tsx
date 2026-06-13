@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { useState } from 'react'
 import { toast } from 'sonner'
-import { updateUserProfile, changeUserEmail } from './actions'
+import { updateUserProfile } from './actions'
 import { User, Image, Mail, Calendar, Award, History } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { Navbar } from '@/components/layout/Navbar'
@@ -110,15 +110,21 @@ export default function ProfileSettings({ profile, user, userEmail, purchases }:
 
   const handleEmailChange = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (newEmail === userEmail) {
+      toast.error('O novo email é igual ao atual')
+      return
+    }
     setEmailLoading(true)
     try {
-      const result = await changeUserEmail(newEmail)
-      if (result.error) {
-        toast.error(result.error)
+      const { error } = await supabase.auth.updateUser(
+        { email: newEmail },
+        { emailRedirectTo: `${window.location.origin}/auth/callback` }
+      )
+      if (error) {
+        toast.error('Erro ao alterar email: ' + error.message)
       } else {
         setEmailSent(true)
         setNewEmail('')
-        toast.success('Email de confirmação enviado para ' + newEmail)
       }
     } catch {
       toast.error('Erro ao alterar email. Tenta novamente.')
