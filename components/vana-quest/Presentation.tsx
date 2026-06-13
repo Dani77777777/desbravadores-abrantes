@@ -1183,10 +1183,10 @@ function LeaderboardScreen({
 
   // Map participant id → display index in the current ordering
   const indexById = new Map(orderedParticipants.map((p, idx) => [p.id, idx]))
-  // We still render only the top 5 (union of top-5 in either order so nobody pops in/out)
+  // Renderiza o top 6 (união do top-6 em qualquer das ordens para ninguém aparecer/desaparecer)
   const visibleIds = new Set<string>([
-    ...startOrder.slice(0, 5).map((p) => p.id),
-    ...endOrder.slice(0, 5).map((p) => p.id),
+    ...startOrder.slice(0, 6).map((p) => p.id),
+    ...endOrder.slice(0, 6).map((p) => p.id),
   ])
   const top = participants.filter((p) => visibleIds.has(p.id))
 
