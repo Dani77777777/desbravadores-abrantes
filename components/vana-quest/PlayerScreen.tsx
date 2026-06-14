@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef } from 'react'
 import { createClient } from '@/utils/supabase/client'
 import { submitAnswer, setRewardsRecipient, skipRewards } from '@/lib/actions/vana-quest'
-import { CheckCircle2, XCircle, Trophy, Zap, Flame, Users } from 'lucide-react'
+import { CheckCircle2, XCircle, Trophy, Zap, Flame, Users, ArrowUp, Crown } from 'lucide-react'
 import { PlayerAvatar } from './PlayerAvatar'
 
 const OPTION_COLORS = [
@@ -80,6 +80,8 @@ export function PlayerScreen({ sessionId, userId, userProfile, initialSession, q
   const [pendingRecipient, setPendingRecipient] = useState<{ id: string; full_name: string; section: string; avatar_url?: string | null } | null>(null)
   // Foi expulso pelo host
   const [kicked, setKicked] = useState(false)
+  // Posição na classificação (rank) + pontos para subir
+  const [rankInfo, setRankInfo] = useState<{ rank: number; total: number; pointsToNext: number | null }>({ rank: 0, total: 0, pointsToNext: null })
 
   const isGuest = !userId
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -184,6 +186,30 @@ export function PlayerScreen({ sessionId, userId, userProfile, initialSession, q
         setTotalPoints(Number(data.total_points) || 0)
         setCorrectCount(data.correct_answers || 0)
         setStreak(data.current_streak || 0)
+      })
+  }, [participantId, session.status])
+
+  // Posição na classificação + quantos pontos faltam para subir
+  useEffect(() => {
+    if (!participantId) return
+    if (session.status !== 'question_leaderboard' && session.status !== 'finished') return
+
+    supabase
+      .from('vana_quest_participants')
+      .select('id, total_points')
+      .eq('session_id', sessionId)
+      .order('total_points', { ascending: false })
+      .then(({ data }) => {
+        if (!data) return
+        const idx = data.findIndex((p) => p.id === participantId)
+        if (idx === -1) return
+        const me = Number(data[idx].total_points) || 0
+        const above = idx > 0 ? Number(data[idx - 1].total_points) || 0 : null
+        setRankInfo({
+          rank: idx + 1,
+          total: data.length,
+          pointsToNext: above === null ? null : Math.max(0, above - me),
+        })
       })
   }, [participantId, session.status])
 
@@ -587,11 +613,40 @@ export function PlayerScreen({ sessionId, userId, userProfile, initialSession, q
 
   // ── LEADERBOARD (player view) ─────────────────────────────────
   if (session.status === 'question_leaderboard') {
+    const isLeader = rankInfo.rank === 1
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-900 to-indigo-950 flex flex-col items-center justify-center p-6 gap-5 text-center">
-        <Trophy className="w-16 h-16 text-yellow-400" />
-        <p className="text-sky-300 text-xs font-black uppercase tracking-widest">A tua pontuação</p>
-        <p className="text-white text-6xl font-black tabular-nums">{totalPoints.toFixed(1)}</p>
+      <div className="min-h-screen bg-gradient-to-br from-blue-900 to-indigo-950 flex flex-col items-center justify-center p-6 gap-4 text-center">
+        {isLeader ? <Crown className="w-16 h-16 text-yellow-400" /> : <Trophy className="w-14 h-14 text-yellow-400" />}
+
+        {/* Posição em destaque */}
+        {rankInfo.rank > 0 && (
+          <div className="flex flex-col items-center">
+            <p className="text-sky-300 text-xs font-black uppercase tracking-widest mb-1">
+              {isLeader ? '👑 Estás em 1º!' : 'A tua posição'}
+            </p>
+            <div className="flex items-baseline gap-2">
+              <span className="text-white text-7xl font-black tabular-nums leading-none">{rankInfo.rank}º</span>
+              <span className="text-white/40 text-2xl font-bold">/ {rankInfo.total}</span>
+            </div>
+          </div>
+        )}
+
+        {/* Pontuação */}
+        <div className="bg-white/10 rounded-2xl px-6 py-3 mt-1">
+          <p className="text-sky-300 text-[10px] font-bold uppercase tracking-widest">A tua pontuação</p>
+          <p className="text-white text-4xl font-black tabular-nums">{totalPoints.toFixed(1)}</p>
+        </div>
+
+        {/* Quanto falta para subir */}
+        {rankInfo.pointsToNext !== null && rankInfo.pointsToNext > 0 && (
+          <div className="flex items-center gap-2 bg-green-500/15 border border-green-400/30 rounded-2xl px-4 py-2.5">
+            <ArrowUp className="w-4 h-4 text-green-400 flex-shrink-0" />
+            <p className="text-green-200 text-sm font-semibold">
+              Faltam <span className="text-green-400 font-black">{rankInfo.pointsToNext.toFixed(1)}</span> pts para o {rankInfo.rank - 1}º
+            </p>
+          </div>
+        )}
+
         <div className="flex gap-4 text-sm">
           <div className="bg-white/10 rounded-xl px-4 py-2">
             <p className="text-white/60 text-xs">Certas</p>
@@ -604,7 +659,7 @@ export function PlayerScreen({ sessionId, userId, userProfile, initialSession, q
             </div>
           )}
         </div>
-        <p className="text-white/40 text-xs animate-pulse mt-4">Olha para o ecrã principal...</p>
+        <p className="text-white/40 text-xs animate-pulse mt-2">Olha para o ecrã principal...</p>
       </div>
     )
   }
