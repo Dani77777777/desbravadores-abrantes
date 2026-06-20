@@ -21,6 +21,11 @@ function LoginContent() {
   const [isSignUp, setIsSignUp] = useState(mode === 'signup')
   const supabase = createClient()
 
+  // Para onde redirecionar após entrar. Só aceita caminhos internos (começados por "/")
+  // para evitar open-redirects. Por defeito vai para a home.
+  const nextParam = searchParams.get('next')
+  const next = nextParam && nextParam.startsWith('/') ? nextParam : '/'
+
   useEffect(() => {
     // If mode changes in URL, update state
     if (mode === 'signup') setIsSignUp(true)
@@ -58,7 +63,7 @@ function LoginContent() {
           if (!error && data.session) {
             // Clear the hash from URL and redirect
             window.location.hash = ''
-            router.push('/')
+            router.push(next)
             router.refresh()
           }
         })
@@ -71,7 +76,7 @@ function LoginContent() {
       if (event === 'PASSWORD_RECOVERY') {
         router.replace('/login/reset-password' + window.location.hash)
       } else if (event === 'SIGNED_IN' && session) {
-        router.push('/')
+        router.push(next)
         router.refresh()
       }
     })
@@ -102,7 +107,7 @@ function LoginContent() {
           password,
         })
         if (error) throw error
-        router.push('/')
+        router.push(next)
         router.refresh()
       }
     } catch (error: any) {

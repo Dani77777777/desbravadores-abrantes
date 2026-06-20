@@ -5,6 +5,7 @@ import { createClient } from '@/utils/supabase/client'
 import { QRCodeSVG } from 'qrcode.react'
 import { Users, Trophy, Zap, Flame, CheckCircle2 } from 'lucide-react'
 import { PlayerAvatar } from './PlayerAvatar'
+import { useLiveSession } from './useLiveSession'
 import { getIntroSeconds, questionFontSize, optionFontSize } from '@/utils/vana-quest'
 import confetti from 'canvas-confetti'
 
@@ -169,12 +170,18 @@ export function Presentation({ sessionId, initialSession, questions, siteUrl }: 
     return () => { supabase.removeChannel(ch) }
   }, [sessionId])
 
-  // Realtime
+  // Sessão sincronizada de forma resiliente (realtime + polling + refetch ao reconectar).
+  // O projetor é um cliente só, mas também não pode ficar preso por um evento perdido.
+  useLiveSession(
+    sessionId,
+    (row) => setSession((prev) => ({ ...prev, ...(row as Session) })),
+    { pollMs: 3000 }
+  )
+
+  // Realtime (participantes + respostas). A sessão é tratada pela useLiveSession acima.
   useEffect(() => {
     const channel = supabase
       .channel(`present-${sessionId}`)
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'vana_quest_sessions', filter: `id=eq.${sessionId}` },
-        (p) => setSession((prev) => ({ ...prev, ...(p.new as Session) })))
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'vana_quest_participants', filter: `session_id=eq.${sessionId}` },
         (p) => setParticipants((prev) => prev.find((x) => x.id === (p.new as Participant).id) ? prev : [...prev, p.new as Participant]))
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'vana_quest_participants', filter: `session_id=eq.${sessionId}` },

@@ -5,6 +5,7 @@ import { createClient } from '@/utils/supabase/client'
 import { submitAnswer, setRewardsRecipient, skipRewards } from '@/lib/actions/vana-quest'
 import { CheckCircle2, XCircle, Trophy, Zap, Flame, Users, ArrowUp, Crown } from 'lucide-react'
 import { PlayerAvatar } from './PlayerAvatar'
+import { useLiveSession } from './useLiveSession'
 
 const OPTION_COLORS = [
   'bg-red-500 active:bg-red-700',
@@ -61,6 +62,7 @@ export function PlayerScreen({ sessionId, userId, userProfile, initialSession, q
   const [participantId, setParticipantId] = useState<string | null>(null)
   const [answerResult, setAnswerResult] = useState<AnswerResult | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  const [submitError, setSubmitError] = useState(false)
   const [timeLeft, setTimeLeft] = useState(0)
   const [totalPoints, setTotalPoints] = useState(0)
   const [streak, setStreak] = useState(0)
@@ -128,9 +130,10 @@ export function PlayerScreen({ sessionId, userId, userProfile, initialSession, q
   }, [session.status, currentQuestion?.id])
 
   // Avisar o jogador antes de fechar/recarregar o separador ou carregar em "voltar"
-  // enquanto o jogo ainda está a decorrer (não em 'finished'). Só na vista do jogador.
+  // enquanto o jogo está EM JOGO (nem 'waiting' nem 'finished'). Na sala de espera sair
+  // é normal — não avisamos e deixamos a presença tratar da limpeza automática.
   useEffect(() => {
-    const gameInProgress = session.status !== 'finished'
+    const gameInProgress = session.status !== 'finished' && session.status !== 'waiting'
     if (!gameInProgress || kicked) return
 
     // Aviso nativo ao fechar ou recarregar o separador
@@ -213,34 +216,34 @@ export function PlayerScreen({ sessionId, userId, userProfile, initialSession, q
       })
   }, [participantId, session.status])
 
-  // Realtime: session + counters (without revealing distribution)
+  // Sessão sincronizada de forma resiliente: realtime (rápido) + polling (rede de
+  // segurança) + refetch ao reconectar/voltar ao separador. Garante que o ecrã nunca
+  // fica preso por um evento realtime perdido. Pausa o polling no fim do jogo.
+  useLiveSession(
+    sessionId,
+    (row) => setSession((prev) => ({ ...prev, ...(row as Session) })),
+    { paused: session.status === 'finished', pollMs: 2000 }
+  )
+
+  // Reset ao mudar de pergunta — corre venha o estado do realtime ou do polling.
+  // currentQuestion.id só muda quando uma NOVA pergunta começa (mantém-se igual em
+  // active → results → leaderboard), por isso o reveal da resposta é preservado.
+  useEffect(() => {
+    setAnswerResult(null)
+    setSubmitting(false)
+    setSubmitError(false)
+    setTotalAnswered(0)
+  }, [currentQuestion?.id])
+
+  // Realtime leve só para participantes: contagem na sala + deteção de expulsão.
+  // Canal estável (deps sem currentQuestion) → nunca é recriado a meio do jogo, por
+  // isso não há janela de re-subscrição onde se perdem eventos.
+  // NÃO subscrevemos os INSERT de respostas: com N jogadores isso gera N×N mensagens
+  // por pergunta e satura o canal, derrubando o UPDATE crítico da sessão. A contagem
+  // "responderam X/Y" passa a vir de polling leve (efeito abaixo).
   useEffect(() => {
     const channel = supabase
       .channel(`player-${sessionId}-${userId || 'g'}`)
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'vana_quest_sessions', filter: `id=eq.${sessionId}` },
-        (p) => {
-          const ns = p.new as Session
-          setSession(ns)
-          if (ns.status === 'question_active') {
-            const k = `${ns.current_question_index}`
-            if (questionKey.current !== k) {
-              questionKey.current = k
-              setAnswerResult(null)
-              setSubmitting(false)
-              setTotalAnswered(0)
-              startTimeRef.current = ns.question_started_at
-                ? new Date(ns.question_started_at).getTime()
-                : Date.now()
-            }
-          }
-        })
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'vana_quest_answers', filter: `session_id=eq.${sessionId}` },
-        (p) => {
-          const ans = p.new as any
-          if (currentQuestion && ans.question_id === currentQuestion.id) {
-            setTotalAnswered((c) => c + 1)
-          }
-        })
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'vana_quest_participants', filter: `session_id=eq.${sessionId}` },
         () => setTotalPlayers((c) => c + 1))
       .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'vana_quest_participants' },
@@ -256,7 +259,23 @@ export function PlayerScreen({ sessionId, userId, userProfile, initialSession, q
         })
       .subscribe()
     return () => { supabase.removeChannel(channel) }
-  }, [sessionId, userId, currentQuestion?.id, participantId])
+  }, [sessionId, userId, participantId])
+
+  // Presença na sala de espera — marca este jogador como "online". Quando a ligação cai
+  // (fechou o separador / saiu), o host deteta a ausência e remove-o da lista antes de o
+  // jogo começar, evitando "jogadores mortos". Como a chave de presença é o participantId
+  // (estável entre refreshes via localStorage), um simples refresh sai e volta a entrar,
+  // por isso o host não o remove (há um período de tolerância). Só durante 'waiting'.
+  useEffect(() => {
+    if (session.status !== 'waiting' || !participantId) return
+    const channel = supabase.channel(`vq-presence-${sessionId}`, {
+      config: { presence: { key: participantId } },
+    })
+    channel.subscribe((status) => {
+      if (status === 'SUBSCRIBED') channel.track({ participantId })
+    })
+    return () => { supabase.removeChannel(channel) }
+  }, [session.status, participantId, sessionId])
 
   // Load total player count
   useEffect(() => {
@@ -264,10 +283,26 @@ export function PlayerScreen({ sessionId, userId, userProfile, initialSession, q
       .then(({ count }) => { if (count !== null) setTotalPlayers(count) })
   }, [sessionId])
 
-  // Reset answered count when question changes
+  // Contagem "responderam X/Y" via polling leve (substitui a subscrição realtime de
+  // respostas no lado do jogador). Só corre durante a pergunta activa.
   useEffect(() => {
-    if (currentQuestion) setTotalAnswered(0)
-  }, [currentQuestion?.id])
+    if (session.status !== 'question_active' || !currentQuestion) return
+    let cancelled = false
+    const fetchCounts = async () => {
+      const [answered, players] = await Promise.all([
+        supabase.from('vana_quest_answers').select('id', { count: 'exact', head: true })
+          .eq('session_id', sessionId).eq('question_id', currentQuestion.id),
+        supabase.from('vana_quest_participants').select('id', { count: 'exact', head: true })
+          .eq('session_id', sessionId),
+      ])
+      if (cancelled) return
+      if (answered.count !== null) setTotalAnswered(answered.count)
+      if (players.count !== null) setTotalPlayers(players.count)
+    }
+    fetchCounts()
+    const t = setInterval(fetchCounts, 2500)
+    return () => { cancelled = true; clearInterval(t) }
+  }, [session.status, currentQuestion?.id, sessionId])
 
   useEffect(() => {
     if (session.status === 'question_active' && session.question_started_at) {
@@ -293,20 +328,44 @@ export function PlayerScreen({ sessionId, userId, userProfile, initialSession, q
   async function handleAnswer(optionLetter: string) {
     if (!participantId || !currentQuestion || submitting || answerResult) return
     setSubmitting(true)
+    setSubmitError(false)
 
     const elapsedMs = Math.max(0, Date.now() - startTimeRef.current)
-    const result = await submitAnswer(participantId, sessionId, currentQuestion.id, optionLetter, elapsedMs)
 
-    if (result.ok) {
-      // Don't reveal correctness yet — only store the chosen option
-      // Correctness, points and streak are revealed when session.status hits 'question_results'
-      setAnswerResult({
-        isCorrect: result.isCorrect!,
-        finalPoints: result.finalPoints!,
-        chosen: optionLetter,
-      })
+    // Redes móveis falham pedidos isolados; uma falha pontual não deve custar a
+    // resposta ao jogador. Tentamos até 3 vezes. O servidor é idempotente, por isso
+    // se a 1ª tentativa chegou a registar (mas a resposta perdeu-se), a 2ª devolve
+    // a resposta já existente em vez de duplicar.
+    try {
+      for (let attempt = 0; attempt < 3; attempt++) {
+        try {
+          const result = await submitAnswer(participantId, sessionId, currentQuestion.id, optionLetter, elapsedMs)
+
+          // Sucesso, ou já tinha respondido (cliques duplos / retry idempotente):
+          // em ambos guardamos a escolha. A correção/pontos só são revelados em
+          // 'question_results'.
+          if (result.ok || result.alreadyAnswered) {
+            setAnswerResult({
+              isCorrect: result.isCorrect ?? false,
+              finalPoints: result.finalPoints ?? 0,
+              chosen: optionLetter,
+            })
+            return
+          }
+
+          // Rejeição lógica (pergunta já fechada, etc.) — repetir não ajuda.
+          setSubmitError(true)
+          return
+        } catch {
+          // Erro de rede — espera curta e tenta de novo.
+          if (attempt < 2) await new Promise((r) => setTimeout(r, 400))
+        }
+      }
+      // Esgotou as tentativas — deixa o jogador tocar outra vez.
+      setSubmitError(true)
+    } finally {
+      setSubmitting(false)
     }
-    setSubmitting(false)
   }
 
   // Reveal points/streak/correctCount only when entering question_results
@@ -527,6 +586,14 @@ export function PlayerScreen({ sessionId, userId, userProfile, initialSession, q
           />
         </div>
         <p className="text-center text-2xl font-black text-white tabular-nums">{Math.ceil(timeLeft)}</p>
+
+        {/* Falha de envio — botões reativam, jogador pode tocar outra vez */}
+        {submitError && !answerResult && (
+          <div className="bg-red-500/20 border border-red-400/40 rounded-2xl px-4 py-2.5 flex items-center gap-2 animate-in fade-in slide-in-from-top-2 duration-300">
+            <XCircle className="w-4 h-4 text-red-300 flex-shrink-0" />
+            <p className="text-red-100 text-sm font-semibold">Falha ao enviar. Toca outra vez na tua resposta.</p>
+          </div>
+        )}
 
         {/* If already answered — neutral state, no hint of which option was chosen */}
         {answerResult ? (

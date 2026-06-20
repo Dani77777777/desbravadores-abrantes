@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef } from 'react'
 import { createClient } from '@/utils/supabase/client'
-import { nextStage, awardSessionPoints, kickParticipant } from '@/lib/actions/vana-quest'
+import { nextStage, awardSessionPoints, kickParticipant, leaveSession } from '@/lib/actions/vana-quest'
 import { getIntroSeconds } from '@/utils/vana-quest'
 import { QRCodeSVG } from 'qrcode.react'
 import {
@@ -13,6 +13,8 @@ import {
 import { PodiumShareCard } from './PodiumShareCard'
 import { detectGender, articleFor, winnerWord } from '@/utils/name-gender'
 import { PlayerAvatar } from './PlayerAvatar'
+import { useLiveSession } from './useLiveSession'
+import { toast } from 'sonner'
 
 const OPTION_COLORS = ['bg-red-500', 'bg-blue-500', 'bg-yellow-400', 'bg-green-500']
 const OPTION_LABELS = ['▲ A', '● B', '◆ C', '■ D']
@@ -70,6 +72,10 @@ export function HostControl({ sessionId, initialSession, questions, siteUrl }: P
   const supabase = createClient()
   const [session, setSession] = useState<Session>(initialSession)
   const [participants, setParticipants] = useState<Participant[]>([])
+  // Espelho dos participantes para ler nomes dentro de closures (ex.: timers de presença)
+  // sem os capturar de forma obsoleta.
+  const participantsRef = useRef<Participant[]>([])
+  participantsRef.current = participants
   const [answers, setAnswers] = useState<Answer[]>([])
   const [timeLeft, setTimeLeft] = useState(0)
   const [qrZoomed, setQrZoomed] = useState(false)
@@ -199,12 +205,19 @@ export function HostControl({ sessionId, initialSession, questions, siteUrl }: P
     broadcast({ musicEnabled })
   }, [musicEnabled])
 
-  // Realtime
+  // Sessão sincronizada de forma resiliente. O host CONDUZ o jogo (nextStage), mas a
+  // sua própria UI também só avança quando recebe o eco do UPDATE — se esse evento se
+  // perder, o painel ficava preso. O polling garante que apanha sempre o estado real.
+  useLiveSession(
+    sessionId,
+    (row) => setSession((prev) => ({ ...prev, ...(row as Session) })),
+    { pollMs: 3000 }
+  )
+
+  // Realtime (participantes + respostas). A sessão é tratada pela useLiveSession acima.
   useEffect(() => {
     const channel = supabase
       .channel(`control-${sessionId}`)
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'vana_quest_sessions', filter: `id=eq.${sessionId}` },
-        (p) => setSession((prev) => ({ ...prev, ...(p.new as Session) })))
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'vana_quest_participants', filter: `session_id=eq.${sessionId}` },
         (p) => setParticipants((prev) => prev.find((x) => x.id === (p.new as Participant).id) ? prev : [...prev, p.new as Participant]))
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'vana_quest_participants', filter: `session_id=eq.${sessionId}` },
@@ -216,6 +229,67 @@ export function HostControl({ sessionId, initialSession, questions, siteUrl }: P
       .subscribe()
     return () => { supabase.removeChannel(channel) }
   }, [sessionId])
+
+  // Sala de espera: remove automaticamente quem sai antes do jogo começar, para não
+  // ficarem "jogadores mortos" na lista (e depois na classificação) quando o jogo
+  // arranca. Usa Realtime Presence — cada jogador marca presença; quando a presença cai
+  // e NÃO regressa dentro de ~15s (tolerância para refresh / quebras curtas de rede), o
+  // participante é removido. Só corre durante 'waiting'; ao iniciar o jogo os timers são
+  // limpos e a `leaveSession` recusa apagar (está protegida por status === 'waiting').
+  useEffect(() => {
+    if (session.status !== 'waiting') return
+    const channel = supabase.channel(`vq-presence-${sessionId}`, {
+      config: { presence: { key: 'host' } },
+    })
+    const removalTimers = new Map<string, ReturnType<typeof setTimeout>>()
+
+    const stillPresent = (participantId: string) => {
+      const state = channel.presenceState() as Record<string, any[]>
+      return Object.values(state).some((entries) =>
+        entries.some((e: any) => e.participantId === participantId)
+      )
+    }
+
+    const cancelRemoval = (participantId: string) => {
+      const t = removalTimers.get(participantId)
+      if (t) { clearTimeout(t); removalTimers.delete(participantId) }
+    }
+
+    const scheduleRemoval = (participantId: string) => {
+      if (removalTimers.has(participantId)) return
+      const t = setTimeout(async () => {
+        removalTimers.delete(participantId)
+        if (stillPresent(participantId)) return // voltou entretanto (ex.: refresh)
+        const removed = participantsRef.current.find((p) => p.id === participantId)
+        const res = await leaveSession(participantId, sessionId)
+        if (res.ok) {
+          setParticipants((prev) => prev.filter((p) => p.id !== participantId))
+          toast(`${removed?.display_name || 'Um jogador'} saiu da sala`, {
+            icon: '👋',
+            description: 'Removido da lista automaticamente.',
+          })
+        }
+      }, 15000)
+      removalTimers.set(participantId, t)
+    }
+
+    channel
+      .on('presence', { event: 'leave' }, ({ leftPresences }) => {
+        ;(leftPresences as any[]).forEach((e) => { if (e?.participantId) scheduleRemoval(e.participantId) })
+      })
+      .on('presence', { event: 'join' }, ({ newPresences }) => {
+        ;(newPresences as any[]).forEach((e) => { if (e?.participantId) cancelRemoval(e.participantId) })
+      })
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') channel.track({ host: true })
+      })
+
+    return () => {
+      removalTimers.forEach((t) => clearTimeout(t))
+      removalTimers.clear()
+      supabase.removeChannel(channel)
+    }
+  }, [session.status, sessionId])
 
   // Load initial
   useEffect(() => {
