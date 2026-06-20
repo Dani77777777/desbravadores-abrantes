@@ -16,6 +16,7 @@ import { Menu, X, LogOut, User, Shield, Tent, MessageSquare, Trophy, Phone, Shop
 import { PushNotificationButton } from '@/components/notifications/PushNotificationButton'
 import { createClient } from '@/utils/supabase/client'
 import { useRouter } from 'next/navigation'
+import { isAdminRole, isHelper, helperLabel } from '@/utils/permissions'
 
 interface NavbarProps {
   user: any
@@ -32,7 +33,8 @@ export function Navbar({ user, profile }: NavbarProps) {
     router.refresh()
   }
 
-  const isAdmin = profile?.role === 'coordenador' || profile?.role === 'dirigente'
+  const isAdmin = isAdminRole(profile)
+  const roleLabel = isHelper(profile) ? helperLabel(profile) : `${profile?.role} • ${profile?.section}`
 
   return (
     <nav className="bg-blue-900 border-b border-blue-800 text-white shadow-md sticky top-0 z-50">
@@ -143,7 +145,7 @@ export function Navbar({ user, profile }: NavbarProps) {
                       <div className="flex flex-col space-y-1">
                         <p className="text-sm font-medium leading-none">{profile?.full_name}</p>
                         <p className="text-xs leading-none text-muted-foreground capitalize">
-                          {profile?.role} • {profile?.section}
+                          {roleLabel}
                         </p>
                       </div>
                     </DropdownMenuLabel>
@@ -332,7 +334,7 @@ export function Navbar({ user, profile }: NavbarProps) {
                       <div className="text-xl font-bold text-white tracking-tight leading-none mb-1">{profile?.full_name}</div>
                       <div className="text-sm text-blue-300 font-medium capitalize flex items-center gap-2">
                          <span className="w-2 h-2 rounded-full bg-blue-400" />
-                         {profile?.role} • {profile?.section}
+                         {roleLabel}
                       </div>
                     </div>
                   </div>

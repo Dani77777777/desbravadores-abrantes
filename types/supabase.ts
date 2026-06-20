@@ -77,6 +77,9 @@ export interface Database {
           avatar_url: string | null
           section: 'rebentos' | 'ticoes' | 'exploradores' | 'companheiros' | 'embaixadores'
           role: 'coordenador' | 'dirigente' | 'desbravador'
+          leadership_section: 'rebentos' | 'ticoes' | 'exploradores' | 'companheiros' | 'embaixadores' | null
+          helper_role: 'coordenador' | 'dirigente' | null
+          helper_section: 'rebentos' | 'ticoes' | 'exploradores' | 'companheiros' | 'embaixadores' | null
           total_xp: number
           current_gold: number
           created_at: string
@@ -89,6 +92,9 @@ export interface Database {
           avatar_url?: string | null
           section?: 'rebentos' | 'ticoes' | 'exploradores' | 'companheiros' | 'embaixadores'
           role?: 'coordenador' | 'dirigente' | 'desbravador'
+          leadership_section?: 'rebentos' | 'ticoes' | 'exploradores' | 'companheiros' | 'embaixadores' | null
+          helper_role?: 'coordenador' | 'dirigente' | null
+          helper_section?: 'rebentos' | 'ticoes' | 'exploradores' | 'companheiros' | 'embaixadores' | null
           total_xp?: number
           current_gold?: number
           created_at?: string
@@ -101,6 +107,9 @@ export interface Database {
           avatar_url?: string | null
           section?: 'rebentos' | 'ticoes' | 'exploradores' | 'companheiros' | 'embaixadores'
           role?: 'coordenador' | 'dirigente' | 'desbravador'
+          leadership_section?: 'rebentos' | 'ticoes' | 'exploradores' | 'companheiros' | 'embaixadores' | null
+          helper_role?: 'coordenador' | 'dirigente' | null
+          helper_section?: 'rebentos' | 'ticoes' | 'exploradores' | 'companheiros' | 'embaixadores' | null
           total_xp?: number
           current_gold?: number
           created_at?: string

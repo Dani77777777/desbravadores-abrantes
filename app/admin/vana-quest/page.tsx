@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { ChevronLeft, Plus, Trash2, Pencil, ListChecks, BookOpen, History, Users, Trophy, ChevronRight } from 'lucide-react'
 import { startSession } from '@/lib/actions/vana-quest'
 import { DeleteSessionButton } from '@/components/vana-quest/DeleteSessionButton'
+import { isAdminRole } from '@/utils/permissions'
 
 export default async function VanaQuestAdminPage() {
   const supabase = await createClient()
@@ -13,7 +14,7 @@ export default async function VanaQuestAdminPage() {
   if (!user) redirect('/login')
 
   const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single()
-  const isAdmin = profile?.role === 'coordenador' || profile?.role === 'dirigente'
+  const isAdmin = isAdminRole(profile)
   if (!isAdmin) redirect('/')
 
   const { data: quests } = await supabase

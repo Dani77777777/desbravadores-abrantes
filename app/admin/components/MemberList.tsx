@@ -29,11 +29,14 @@ import {
 } from "@/components/ui/select"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { triggerResetPassword } from '../actions'
+import { HelperManager } from './HelperManager'
+import { helperLabel } from '@/utils/permissions'
 
 interface MemberListProps {
   members: any[]
   currentUserRole: string
   adminProfile: any
+  clubMembers?: any[]
 }
 
 const SECTION_LABELS: Record<string, string> = {
@@ -44,7 +47,8 @@ const SECTION_LABELS: Record<string, string> = {
   embaixadores: 'Embaixadores',
 }
 
-export function MemberList({ members, currentUserRole, adminProfile }: MemberListProps) {
+export function MemberList({ members, currentUserRole, adminProfile, clubMembers = [] }: MemberListProps) {
+  const canAssignHelpers = currentUserRole === 'coordenador' || currentUserRole === 'dirigente'
   const [selectedMember, setSelectedMember] = useState<any>(null)
   const [pointsOpen, setPointsOpen] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -142,6 +146,9 @@ export function MemberList({ members, currentUserRole, adminProfile }: MemberLis
 
   return (
     <div className="space-y-4">
+      {canAssignHelpers && (
+        <HelperManager adminProfile={adminProfile} clubMembers={clubMembers} />
+      )}
       {members.map((member) => (
         <div key={member.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-white border rounded-xl shadow-sm hover:shadow-md transition-all gap-4">
            <div className="flex items-center gap-4 flex-1">
@@ -159,6 +166,11 @@ export function MemberList({ members, currentUserRole, adminProfile }: MemberLis
                         {member.role === 'dirigente' && member.leadership_section && (
                           <Badge variant="outline" className="text-[10px] h-4 border-blue-200 text-blue-700 bg-blue-50 font-bold leading-none">
                             Líder {SECTION_LABELS[member.leadership_section] || member.leadership_section}
+                          </Badge>
+                        )}
+                        {member.helper_role && (
+                          <Badge variant="outline" className="text-[10px] h-4 border-amber-300 text-amber-700 bg-amber-50 font-bold leading-none">
+                            {helperLabel(member)}
                           </Badge>
                         )}
                       </div>

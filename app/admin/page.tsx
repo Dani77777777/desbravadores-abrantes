@@ -12,6 +12,7 @@ import { StorePanel } from './components/StorePanel'
 import { QrPanel } from './components/QrPanel'
 import { SurveyPanel } from './components/SurveyPanel'
 import { Users, ListChecks, Megaphone, MessageSquare, LayoutDashboard, CalendarDays, ShoppingBag, QrCode, Gamepad2, Swords, ClipboardList } from 'lucide-react'
+import { effectiveRole, effectiveLeadershipSection, isHelper, helperLabel } from '@/utils/permissions'
 
 export default async function AdminPage({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
   const supabase = await createClient()
@@ -28,22 +29,35 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
     .eq('id', user.id)
     .single()
 
-  if (!profile || (profile.role !== 'coordenador' && profile.role !== 'dirigente')) {
+  // Cargo EFETIVO (considera ajudantes). As RLS na BD já usam o cargo efetivo;
+  // aqui usamos o mesmo no scoping/gating para o ajudante ver o que o cargo vê.
+  const effRole = effectiveRole(profile)
+  const effLeadership = effectiveLeadershipSection(profile)
+
+  if (!profile || (effRole !== 'coordenador' && effRole !== 'dirigente')) {
     redirect('/')
   }
 
   // Fetch members (coordenador sees all, dirigente sees their LEADERSHIP section)
   let membersQuery = supabase.from('profiles').select('*').order('full_name')
-  if (profile.role === 'dirigente') {
-    const targetSection = profile.leadership_section || profile.section
+  if (effRole === 'dirigente') {
+    const targetSection = effLeadership || profile.section
     membersQuery = membersQuery.eq('section', targetSection)
   }
   const { data: members } = await membersQuery
 
+  // Lista de TODOS os membros do clube — para o seletor de nomeação de ajudantes.
+  // Só carregada para coordenador/dirigente REAIS (ajudantes não nomeiam ninguém).
+  let clubMembers: any[] = []
+  if (profile.role === 'coordenador' || profile.role === 'dirigente') {
+    const { data: cm } = await supabase.rpc('list_club_members_for_assignment')
+    clubMembers = cm || []
+  }
+
   // Fetch tasks visible to this user
   let tasksQuery = supabase.from('tasks').select('*').order('created_at', { ascending: false })
-  if (profile.role === 'dirigente') {
-    const targetSection = profile.leadership_section || profile.section
+  if (effRole === 'dirigente') {
+    const targetSection = effLeadership || profile.section
     tasksQuery = tasksQuery.or(`target_section.is.null,target_section.eq.${targetSection}`)
   }
   const { data: tasks } = await tasksQuery
@@ -58,8 +72,8 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
     `)
     .order('completed_at', { ascending: false })
 
-  if (profile.role === 'dirigente') {
-    const targetSection = profile.leadership_section || profile.section
+  if (effRole === 'dirigente') {
+    const targetSection = effLeadership || profile.section
     completionsQuery = completionsQuery.eq('profiles.section', targetSection)
   }
 
@@ -82,8 +96,8 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
     `)
     .order('created_at', { ascending: false })
 
-  if (profile.role === 'dirigente') {
-    const targetSection = profile.leadership_section || profile.section
+  if (effRole === 'dirigente') {
+    const targetSection = effLeadership || profile.section
     suggestionsQuery = suggestionsQuery
       .eq('target', 'dirigente')
       .eq('profiles.section', targetSection)
@@ -93,8 +107,8 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
 
   // Fetch Events
   let eventsQuery = supabase.from('events').select('*').order('start_at', { ascending: false })
-  if (profile.role === 'dirigente') {
-    const targetSection = profile.leadership_section || profile.section
+  if (effRole === 'dirigente') {
+    const targetSection = effLeadership || profile.section
     eventsQuery = eventsQuery.or(`target_section.is.null,target_section.eq.${targetSection}`)
   }
   const { data: events } = await eventsQuery
@@ -102,8 +116,8 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
   // Fetch Store Data
   let products = []
   let purchases = []
-  
-  if (profile.role === 'coordenador') {
+
+  if (effRole === 'coordenador') {
     const { data: storeProducts } = await supabase.from('store_products').select('*').order('created_at', { ascending: false })
     products = storeProducts || []
 
@@ -120,7 +134,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
 
   // Fetch Surveys (coord-only tab; load all surveys with options + responses)
   let surveys: any[] = []
-  if (profile.role === 'coordenador') {
+  if (effRole === 'coordenador') {
     const { data: surveysData } = await supabase
       .from('surveys')
       .select('*, survey_options(*), survey_responses(id, option_id, user_id)')
@@ -128,10 +142,15 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
     surveys = surveysData || []
   }
 
+  // Perfil EFETIVO passado aos painéis — para um ajudante agir como o cargo que ajuda.
+  const effProfile = isHelper(profile)
+    ? { ...profile, role: effRole, leadership_section: effLeadership }
+    : profile
+
   const resolvedParams = await searchParams
-  const isCoordenador = profile.role === 'coordenador'
-  const isDirigente = profile.role === 'dirigente'
-  
+  const isCoordenador = effRole === 'coordenador'
+  const isDirigente = effRole === 'dirigente'
+
   const defaultTab = isCoordenador ? 'overview' : 'members'
   let activeTab = resolvedParams?.tab || defaultTab
 
@@ -155,9 +174,10 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Painel de Gestão</h1>
             <p className="text-gray-600">
-              {profile.role === 'coordenador'
-                ? `Coordenador • Todos os membros (${members?.length || 0})`
-                : `Dirigente das classes: ${SECTION_LABELS[profile.leadership_section || profile.section] || profile.section} • (${members?.length || 0} membros)`}
+              {isHelper(profile) && <span className="font-bold text-blue-700">{helperLabel(profile)} • </span>}
+              {isCoordenador
+                ? `Coordenação • Todos os membros (${members?.length || 0})`
+                : `Classes: ${SECTION_LABELS[effLeadership || profile.section] || profile.section} • (${members?.length || 0} membros)`}
             </p>
           </div>
         </div>
@@ -204,9 +224,9 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
         </div>
 
         {/* Overview tab */}
-        {activeTab === 'overview' && profile.role === 'coordenador' && (
+        {activeTab === 'overview' && isCoordenador && (
           <OverviewPanel
-            profile={profile}
+            profile={effProfile}
             members={members || []}
             events={events || []}
             purchases={purchases || []}
@@ -221,10 +241,11 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
               <CardDescription>Gerencie os pontos, XP e investiduras dos desbravadores.</CardDescription>
             </CardHeader>
             <CardContent>
-              <MemberList 
-                members={members || []} 
-                currentUserRole={profile.role} 
+              <MemberList
+                members={members || []}
+                currentUserRole={profile.role}
                 adminProfile={profile}
+                clubMembers={clubMembers}
               />
             </CardContent>
           </Card>
@@ -233,7 +254,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
         {/* Tasks tab */}
         {activeTab === 'tasks' && (
           <TaskPanel
-            profile={profile}
+            profile={effProfile}
             tasks={tasks || []}
             completions={completions || []}
           />
@@ -241,8 +262,8 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
 
         {/* Announcements tab */}
         {activeTab === 'events' && (
-          <EventPanel 
-            profile={profile}
+          <EventPanel
+            profile={effProfile}
             members={members || []}
             events={events || []}
           />
@@ -251,7 +272,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
         {/* Announcements tab */}
         {activeTab === 'announcements' && (
           <AnnouncementPanel
-            profile={profile}
+            profile={effProfile}
             members={members || []}
             sentAnnouncements={sentAnnouncements || []}
           />
@@ -259,25 +280,25 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
 
         {activeTab === 'suggestions' && (
           <SuggestionPanel
-            profile={profile}
+            profile={effProfile}
             initialSuggestions={suggestions || []}
           />
         )}
 
         {/* QR tab */}
-        {activeTab === 'qr' && profile.role === 'coordenador' && (
-          <QrPanel profile={profile} />
+        {activeTab === 'qr' && isCoordenador && (
+          <QrPanel profile={effProfile} />
         )}
 
         {/* Surveys tab */}
-        {activeTab === 'surveys' && profile.role === 'coordenador' && (
-          <SurveyPanel profile={profile} surveys={surveys} />
+        {activeTab === 'surveys' && isCoordenador && (
+          <SurveyPanel profile={effProfile} surveys={surveys} />
         )}
 
         {/* Store tab */}
-        {activeTab === 'store' && profile.role === 'coordenador' && (
+        {activeTab === 'store' && isCoordenador && (
           <StorePanel
-            profile={profile}
+            profile={effProfile}
             products={products}
             initialPurchases={purchases}
           />

@@ -5,6 +5,7 @@ import { Navbar } from '@/components/layout/Navbar'
 import Link from 'next/link'
 import { ChevronLeft, Plus, Clock, Zap } from 'lucide-react'
 import { QuestEditorClient } from '@/components/vana-quest/QuestEditorClient'
+import { isAdminRole } from '@/utils/permissions'
 
 export default async function QuestEditorPage({
   params,
@@ -18,7 +19,7 @@ export default async function QuestEditorPage({
   if (!user) redirect('/login')
 
   const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single()
-  const isAdmin = profile?.role === 'coordenador' || profile?.role === 'dirigente'
+  const isAdmin = isAdminRole(profile)
   if (!isAdmin) redirect('/')
 
   const { data: quest } = await supabase.from('vana_quests').select('*').eq('id', questId).single()
