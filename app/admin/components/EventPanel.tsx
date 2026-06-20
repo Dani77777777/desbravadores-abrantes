@@ -12,7 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
-import { Plus, Trophy, Coins, Calendar, MapPin, Users, Trash2, CheckCircle2, ListChecks, History, Pencil, Share2, AlertTriangle } from 'lucide-react'
+import { Plus, Trophy, Coins, Calendar, MapPin, Users, Trash2, CheckCircle2, ListChecks, History, Pencil, Share2, AlertTriangle, RotateCcw, Loader2 } from 'lucide-react'
 import { EventAttendanceManager } from './EventAttendanceManager'
 import { EventShareDialog } from '@/components/events/EventShareDialog'
 
@@ -216,6 +216,24 @@ export function EventPanel({ profile, members, events }: EventPanelProps) {
     setGoldReward(10)
     setLateDiscount(25)
     setAbsentPenalty(0)
+  }
+
+  // Revert a finished event: remove awarded points and reopen for correction
+  const [revertingId, setRevertingId] = useState<string | null>(null)
+
+  const handleRevertEvent = async (event: any) => {
+    if (!confirm(`Reverter o evento "${event.title}"?\n\nOs pontos (XP/Ouro) atribuídos a todos os membros serão removidos e o evento voltará ao estado "por finalizar" para corrigires a atribuição. As presenças marcadas são mantidas.`)) return
+    setRevertingId(event.id)
+    try {
+      const { error } = await supabase.rpc('revert_event_points', { p_event_id: event.id })
+      if (error) throw error
+      toast.success('Evento revertido. Os pontos foram removidos — podes corrigir a atribuição.')
+      router.refresh()
+    } catch (e: any) {
+      toast.error(e.message || 'Erro ao reverter evento.')
+    } finally {
+      setRevertingId(null)
+    }
   }
 
   const handleDeleteEvent = async (eventId: string) => {
@@ -452,13 +470,26 @@ export function EventPanel({ profile, members, events }: EventPanelProps) {
                     <p className="text-[10px] text-gray-500">{new Date(event.start_at).toLocaleDateString('pt-PT')}</p>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
+                    <Button
+                      variant="ghost"
+                      size="sm"
                       className="text-gray-600 hover:text-blue-600 gap-1 text-[10px] h-8"
                       onClick={() => { setSelectedEvent(event); setAttendanceOpen(true) }}
                     >
                       <ListChecks className="w-3 h-3" /> Ver Histórico
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-gray-600 hover:text-orange-600 gap-1 text-[10px] h-8"
+                      title="Reverter atribuição de pontos"
+                      onClick={() => handleRevertEvent(event)}
+                      disabled={revertingId === event.id}
+                    >
+                      {revertingId === event.id
+                        ? <Loader2 className="w-3 h-3 animate-spin" />
+                        : <RotateCcw className="w-3 h-3" />}
+                      Reverter
                     </Button>
                     <Badge className="bg-green-100 text-green-700 border-green-200">Concluído</Badge>
                   </div>

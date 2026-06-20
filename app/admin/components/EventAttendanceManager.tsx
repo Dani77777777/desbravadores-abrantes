@@ -134,7 +134,8 @@ export function EventAttendanceManager({ event, members, profile, onComplete }: 
           awarded_by_user_id: profile.id,
           amount_xp: xp,
           amount_gold: gold,
-          description: description
+          description: description,
+          event_id: event.id
         })
       }
 

@@ -50,6 +50,10 @@ CREATE TABLE IF NOT EXISTS public.points_log (
 -- Garantir que o default existe caso a tabela já exista
 ALTER TABLE public.points_log ALTER COLUMN awarded_by_user_id SET DEFAULT auth.uid();
 
+-- Ligar cada registo de pontos ao evento que o originou (permite reverter eventos)
+ALTER TABLE public.points_log ADD COLUMN IF NOT EXISTS event_id uuid;
+CREATE INDEX IF NOT EXISTS idx_points_log_event_id ON public.points_log(event_id);
+
 CREATE TABLE IF NOT EXISTS public.announcements (
   id uuid DEFAULT uuid_generate_v4() PRIMARY KEY,
   author_id uuid REFERENCES public.profiles(id) ON DELETE SET NULL,
@@ -539,6 +543,52 @@ CREATE POLICY "Leaders can manage attendance" ON public.event_attendance FOR ALL
     AND (SELECT section::text FROM public.profiles WHERE id = user_id) = public.get_my_leadership_section()
   )
 );
+
+-- Chave estrangeira points_log -> events (criada agora que a tabela events existe)
+DO $$ BEGIN
+  ALTER TABLE public.points_log
+    ADD CONSTRAINT points_log_event_id_fkey
+    FOREIGN KEY (event_id) REFERENCES public.events(id) ON DELETE SET NULL;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+-- Reverter a atribuição de pontos de um evento finalizado.
+-- Remove os pontos atribuídos, marca as presenças como não atribuídas e reabre o evento.
+CREATE OR REPLACE FUNCTION public.revert_event_points(p_event_id uuid)
+RETURNS void LANGUAGE plpgsql SECURITY DEFINER AS $$
+DECLARE
+  v_event public.events%ROWTYPE;
+  v_role text := public.get_my_role();
+BEGIN
+  SELECT * INTO v_event FROM public.events WHERE id = p_event_id;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Evento não encontrado.';
+  END IF;
+
+  -- Apenas coordenador, ou dirigente da secção-alvo do evento (mesma regra da gestão de eventos)
+  IF NOT (
+    v_role = 'coordenador'
+    OR (v_role = 'dirigente' AND v_event.target_section = public.get_my_leadership_section())
+  ) THEN
+    RAISE EXCEPTION 'Sem permissão para reverter este evento.';
+  END IF;
+
+  -- 1. Remover os pontos atribuídos por este evento.
+  --    O gatilho on_points_log_change recalcula automaticamente os totais dos perfis.
+  DELETE FROM public.points_log WHERE event_id = p_event_id;
+
+  -- 2. Marcar presenças como não atribuídas (mantém o estado presente/atrasado/faltou para correção)
+  UPDATE public.event_attendance
+  SET points_awarded = false, awarded_at = NULL, updated_at = now()
+  WHERE event_id = p_event_id;
+
+  -- 3. Reabrir o evento
+  UPDATE public.events
+  SET is_finished = false, updated_at = now()
+  WHERE id = p_event_id;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.revert_event_points(uuid) TO authenticated;
 
 -- ============================================
 -- 9. SETUP DE STORAGE (Imagens de Perfil)
