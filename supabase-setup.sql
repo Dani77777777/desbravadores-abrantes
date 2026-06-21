@@ -775,3 +775,35 @@ CREATE POLICY "Users can delete their own avatars"
 ON storage.objects FOR DELETE
 TO authenticated
 USING ( bucket_id = 'imagens' AND owner = auth.uid() );
+
+-- Imagens de produtos da loja (pasta products/) — só coordenadores escrevem.
+-- A leitura já é pública pela política "Public Access" acima.
+DROP POLICY IF EXISTS "Coordinators can upload product images" ON storage.objects;
+CREATE POLICY "Coordinators can upload product images"
+ON storage.objects FOR INSERT
+TO authenticated
+WITH CHECK (
+  bucket_id = 'imagens'
+  AND (storage.foldername(name))[1] = 'products'
+  AND public.get_my_role() = 'coordenador'
+);
+
+DROP POLICY IF EXISTS "Coordinators can update product images" ON storage.objects;
+CREATE POLICY "Coordinators can update product images"
+ON storage.objects FOR UPDATE
+TO authenticated
+USING (
+  bucket_id = 'imagens'
+  AND (storage.foldername(name))[1] = 'products'
+  AND public.get_my_role() = 'coordenador'
+);
+
+DROP POLICY IF EXISTS "Coordinators can delete product images" ON storage.objects;
+CREATE POLICY "Coordinators can delete product images"
+ON storage.objects FOR DELETE
+TO authenticated
+USING (
+  bucket_id = 'imagens'
+  AND (storage.foldername(name))[1] = 'products'
+  AND public.get_my_role() = 'coordenador'
+);

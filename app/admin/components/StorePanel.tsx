@@ -13,9 +13,11 @@ interface StorePanelProps {
   profile: any
   products: any[]
   initialPurchases: any[]
+  members: any[]
+  events: any[]
 }
 
-export function StorePanel({ profile, products, initialPurchases }: StorePanelProps) {
+export function StorePanel({ profile, products, initialPurchases, members, events }: StorePanelProps) {
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -51,7 +53,7 @@ export function StorePanel({ profile, products, initialPurchases }: StorePanelPr
         </TabsList>
 
         <TabsContent value="products" className="mt-6">
-          <ProductManagement products={products} profile={profile} />
+          <ProductManagement products={products} profile={profile} members={members} events={events} />
         </TabsContent>
 
         <TabsContent value="orders" className="mt-6">

@@ -7,6 +7,7 @@ import { createClient } from '@/utils/supabase/client'
 import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
+import { computeStoreEconomy } from '@/lib/store-economy'
 import {
   Users,
   ShieldCheck,
@@ -112,50 +113,12 @@ export function OverviewPanel({ profile, members, events, purchases }: OverviewP
     .slice(0, 5)
 
   // 7. Shop pricing & level guide ──────────────────────────────────────────────
-  // Gold distribution (current balances) → suggests fair price points.
-  const sortedGold = members.map(m => m.current_gold || 0).sort((a, b) => a - b)
-  const goldN = sortedGold.length
-  const percentileGold = (p: number) => {
-    if (goldN === 0) return 0
-    const idx = Math.min(goldN - 1, Math.max(0, Math.round((p / 100) * (goldN - 1))))
-    return sortedGold[idx]
-  }
-  const avgGold = goldN > 0 ? Math.round(totalGold / goldN) : 0
-  const medianGold = percentileGold(50)
-  const richestGold = goldN > 0 ? sortedGold[goldN - 1] : 0
-  const affordCount = (price: number) => sortedGold.filter(g => g >= price).length
-
-  // Earning rate → how long it takes to save up for an item.
-  const finishedEvents = events.filter(e => e.is_finished)
-  const avgGoldPerEvent = finishedEvents.length > 0
-    ? Math.round(finishedEvents.reduce((acc, e) => acc + (e.gold_reward || 0), 0) / finishedEvents.length)
-    : 0
-  const last30 = new Date(today); last30.setDate(last30.getDate() - 30)
-  const monthlyIncome = finishedEvents
-    .filter(e => new Date(e.start_at) >= last30)
-    .reduce((acc, e) => acc + (e.gold_reward || 0), 0)
-  const weeklyIncome = monthlyIncome / 4
-  const weeksToSave = (price: number) => (weeklyIncome > 0 ? Math.max(1, Math.ceil(price / weeklyIncome)) : null)
-
-  // Suggested price tiers (priced at a percentile → that % roughly can't afford it).
-  const priceTiers = [
-    { key: 'acessivel', label: 'Acessível', value: percentileGold(25), dot: 'bg-emerald-500', text: 'text-emerald-600' },
-    { key: 'equilibrado', label: 'Equilibrado', value: percentileGold(50), dot: 'bg-blue-500', text: 'text-blue-600' },
-    { key: 'premium', label: 'Premium', value: percentileGold(75), dot: 'bg-amber-500', text: 'text-amber-600' },
-    { key: 'exclusivo', label: 'Exclusivo', value: percentileGold(90), dot: 'bg-rose-500', text: 'text-rose-600' },
-  ]
-
-  // Level distribution → informs the "nível mínimo" of an item (Nível = XP/1000 + 1).
-  const levelOf = (xp: number) => Math.floor((xp || 0) / 1000) + 1
-  const memberLevels = members.map(m => levelOf(m.total_xp))
-  const LEVEL_CAP = 5
-  const levelBuckets = Array.from({ length: LEVEL_CAP }, (_, i) => {
-    const lvl = i + 1
-    const isLast = lvl === LEVEL_CAP
-    const count = memberLevels.filter(l => (isLast ? l >= lvl : l === lvl)).length
-    return { lvl, label: isLast ? `${lvl}+` : `${lvl}`, count, atOrAbove: memberLevels.filter(l => l >= lvl).length }
-  })
-  const maxBucket = Math.max(1, ...levelBuckets.map(b => b.count))
+  const {
+    goldN, avgGold, medianGold, richestGold,
+    avgGoldPerEvent, monthlyIncome,
+    affordCount, weeksToSave, priceTiers,
+    levelBuckets, maxBucket,
+  } = computeStoreEconomy(members, events)
 
   // Demand so far (gold already spent in the store).
   const validPurchases = purchases.filter(p => p.status !== 'cancelled' && p.status !== 'rejected')

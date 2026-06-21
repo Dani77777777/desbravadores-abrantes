@@ -301,6 +301,8 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
             profile={effProfile}
             products={products}
             initialPurchases={purchases}
+            members={members || []}
+            events={events || []}
           />
         )}
       </main>
