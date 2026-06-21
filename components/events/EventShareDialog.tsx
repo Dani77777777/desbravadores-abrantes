@@ -12,7 +12,7 @@ interface Event {
   description?: string
   location?: string
   start_at: string
-  end_at: string
+  end_at?: string | null
   target_section?: string
   xp_reward: number
   gold_reward: number
@@ -87,7 +87,7 @@ const DownloadCard = ({ event, logoDataUrl, qrDataUrl }: CardProps) => {
   const section = event.target_section ? SECTION_LABELS[event.target_section] : null
   const { day, month, weekday } = dateParts(event.start_at)
   const startTime = formatTime(event.start_at)
-  const endTime = formatTime(event.end_at)
+  const endTime = event.end_at ? formatTime(event.end_at) : null
 
   return (
     <div style={{
@@ -157,7 +157,7 @@ const DownloadCard = ({ event, logoDataUrl, qrDataUrl }: CardProps) => {
           <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap', marginTop: 6 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.14)', borderRadius: 16, padding: '14px 28px' }}>
               <span style={{ fontSize: 30 }}>🕐</span>
-              <span style={{ fontSize: 30, color: '#fff', fontWeight: 700 }}>{startTime} – {endTime}</span>
+              <span style={{ fontSize: 30, color: '#fff', fontWeight: 700 }}>{startTime}{endTime ? ` – ${endTime}` : ''}</span>
             </div>
             {event.location && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 12, background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.14)', borderRadius: 16, padding: '14px 28px' }}>
@@ -204,7 +204,7 @@ const ShareCard = ({ event, logoDataUrl }: CardProps) => {
   const section = event.target_section ? SECTION_LABELS[event.target_section] : null
   const { day, month, weekday } = dateParts(event.start_at)
   const startTime = formatTime(event.start_at)
-  const endTime = formatTime(event.end_at)
+  const endTime = event.end_at ? formatTime(event.end_at) : null
 
   return (
     <div style={{
@@ -272,7 +272,7 @@ const ShareCard = ({ event, logoDataUrl }: CardProps) => {
             <span style={{ fontSize: 28, color: '#fff', fontWeight: 700, textTransform: 'capitalize' }}>{weekday}</span>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <span style={{ fontSize: 25 }}>🕐</span>
-              <span style={{ fontSize: 27, color: 'rgba(255,255,255,0.85)', fontWeight: 600 }}>{startTime} – {endTime}</span>
+              <span style={{ fontSize: 27, color: 'rgba(255,255,255,0.85)', fontWeight: 600 }}>{startTime}{endTime ? ` – ${endTime}` : ''}</span>
             </div>
             {event.location && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>

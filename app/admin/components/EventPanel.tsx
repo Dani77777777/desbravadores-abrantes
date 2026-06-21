@@ -91,7 +91,7 @@ export function EventPanel({ profile, members, events }: EventPanelProps) {
         description: description || null,
         location: location || null,
         start_at: new_date_with_time(startAt),
-        end_at: new_date_with_time(endAt),
+        end_at: endAt ? new_date_with_time(endAt) : null,
         target_section: targetSection === '__all__' ? null : targetSection,
         xp_reward: xpReward,
         gold_reward: goldReward,
@@ -128,7 +128,7 @@ export function EventPanel({ profile, members, events }: EventPanelProps) {
     try {
       const { error } = await supabase.from('events').update({
         start_at: new_date_with_time(newStartAt),
-        end_at: new_date_with_time(newEndAt),
+        end_at: newEndAt ? new_date_with_time(newEndAt) : null,
         updated_at: new Date().toISOString()
       }).eq('id', reschedulingEvent.id)
 
@@ -288,8 +288,9 @@ export function EventPanel({ profile, members, events }: EventPanelProps) {
                   <Input id="event-start" type="datetime-local" value={startAt} onChange={e => setStartAt(e.target.value)} required />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="event-end">Fim *</Label>
-                  <Input id="event-end" type="datetime-local" value={endAt} onChange={e => setEndAt(e.target.value)} required />
+                  <Label htmlFor="event-end">Fim <span className="text-gray-400 font-normal">(opcional)</span></Label>
+                  <Input id="event-end" type="datetime-local" value={endAt} onChange={e => setEndAt(e.target.value)} />
+                  <p className="text-[10px] text-slate-400">Deixa em branco se o evento não tiver hora de fim definida.</p>
                 </div>
               </div>
 
@@ -357,9 +358,9 @@ export function EventPanel({ profile, members, events }: EventPanelProps) {
               )}
               {upcomingEvents.map(event => {
                 const startMs = new Date(event.start_at).getTime()
-                const endMs = new Date(event.end_at).getTime()
+                const endMs = event.end_at ? new Date(event.end_at).getTime() : null
                 const showAttendance = now > 0 && now >= startMs - 60 * 60 * 1000
-                const isOverdue = now > 0 && now >= endMs
+                const isOverdue = now > 0 && endMs !== null && now >= endMs
 
                 return (
                   <div key={event.id} className="p-4 border rounded-xl hover:shadow-md transition-shadow bg-white flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -404,7 +405,7 @@ export function EventPanel({ profile, members, events }: EventPanelProps) {
                           onClick={() => {
                             setReschedulingEvent(event)
                             setNewStartAt(new Date(event.start_at).toISOString().slice(0, 16))
-                            setNewEndAt(new Date(event.end_at).toISOString().slice(0, 16))
+                            setNewEndAt(event.end_at ? new Date(event.end_at).toISOString().slice(0, 16) : '')
                             setRescheduleOpen(true)
                           }}
                         >
@@ -534,8 +535,8 @@ export function EventPanel({ profile, members, events }: EventPanelProps) {
               <Input type="datetime-local" value={newStartAt} onChange={e => setNewStartAt(e.target.value)} required />
             </div>
             <div className="space-y-2">
-              <Label>Novo Horário de Fim</Label>
-              <Input type="datetime-local" value={newEndAt} onChange={e => setNewEndAt(e.target.value)} required />
+              <Label>Novo Horário de Fim <span className="text-gray-400 font-normal">(opcional)</span></Label>
+              <Input type="datetime-local" value={newEndAt} onChange={e => setNewEndAt(e.target.value)} />
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setRescheduleOpen(false)}>Cancelar</Button>

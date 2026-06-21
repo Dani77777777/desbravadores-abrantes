@@ -625,7 +625,7 @@ CREATE TABLE IF NOT EXISTS public.events (
   description text,
   location text,
   start_at timestamptz NOT NULL,
-  end_at timestamptz NOT NULL,
+  end_at timestamptz,
   target_section text,
   xp_reward integer NOT NULL DEFAULT 0,
   gold_reward integer NOT NULL DEFAULT 0,

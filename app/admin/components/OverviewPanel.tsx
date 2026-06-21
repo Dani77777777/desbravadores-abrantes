@@ -7,19 +7,24 @@ import { createClient } from '@/utils/supabase/client'
 import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
-import { 
-  Users, 
-  ShieldCheck, 
-  Trophy, 
-  Coins, 
-  Cake, 
-  BarChart3, 
+import {
+  Users,
+  ShieldCheck,
+  Trophy,
+  Coins,
+  Cake,
+  BarChart3,
   ChevronRight,
   TrendingUp,
   CalendarDays,
   MapPin,
   Package,
-  Check
+  Check,
+  Tag,
+  Wallet,
+  Gauge,
+  Layers,
+  Clock
 } from 'lucide-react'
 
 interface OverviewPanelProps {
@@ -106,6 +111,57 @@ export function OverviewPanel({ profile, members, events, purchases }: OverviewP
     .filter(p => p.store_products?.type === 'physical' && p.status === 'pending')
     .slice(0, 5)
 
+  // 7. Shop pricing & level guide ──────────────────────────────────────────────
+  // Gold distribution (current balances) → suggests fair price points.
+  const sortedGold = members.map(m => m.current_gold || 0).sort((a, b) => a - b)
+  const goldN = sortedGold.length
+  const percentileGold = (p: number) => {
+    if (goldN === 0) return 0
+    const idx = Math.min(goldN - 1, Math.max(0, Math.round((p / 100) * (goldN - 1))))
+    return sortedGold[idx]
+  }
+  const avgGold = goldN > 0 ? Math.round(totalGold / goldN) : 0
+  const medianGold = percentileGold(50)
+  const richestGold = goldN > 0 ? sortedGold[goldN - 1] : 0
+  const affordCount = (price: number) => sortedGold.filter(g => g >= price).length
+
+  // Earning rate → how long it takes to save up for an item.
+  const finishedEvents = events.filter(e => e.is_finished)
+  const avgGoldPerEvent = finishedEvents.length > 0
+    ? Math.round(finishedEvents.reduce((acc, e) => acc + (e.gold_reward || 0), 0) / finishedEvents.length)
+    : 0
+  const last30 = new Date(today); last30.setDate(last30.getDate() - 30)
+  const monthlyIncome = finishedEvents
+    .filter(e => new Date(e.start_at) >= last30)
+    .reduce((acc, e) => acc + (e.gold_reward || 0), 0)
+  const weeklyIncome = monthlyIncome / 4
+  const weeksToSave = (price: number) => (weeklyIncome > 0 ? Math.max(1, Math.ceil(price / weeklyIncome)) : null)
+
+  // Suggested price tiers (priced at a percentile → that % roughly can't afford it).
+  const priceTiers = [
+    { key: 'acessivel', label: 'Acessível', value: percentileGold(25), dot: 'bg-emerald-500', text: 'text-emerald-600' },
+    { key: 'equilibrado', label: 'Equilibrado', value: percentileGold(50), dot: 'bg-blue-500', text: 'text-blue-600' },
+    { key: 'premium', label: 'Premium', value: percentileGold(75), dot: 'bg-amber-500', text: 'text-amber-600' },
+    { key: 'exclusivo', label: 'Exclusivo', value: percentileGold(90), dot: 'bg-rose-500', text: 'text-rose-600' },
+  ]
+
+  // Level distribution → informs the "nível mínimo" of an item (Nível = XP/1000 + 1).
+  const levelOf = (xp: number) => Math.floor((xp || 0) / 1000) + 1
+  const memberLevels = members.map(m => levelOf(m.total_xp))
+  const LEVEL_CAP = 5
+  const levelBuckets = Array.from({ length: LEVEL_CAP }, (_, i) => {
+    const lvl = i + 1
+    const isLast = lvl === LEVEL_CAP
+    const count = memberLevels.filter(l => (isLast ? l >= lvl : l === lvl)).length
+    return { lvl, label: isLast ? `${lvl}+` : `${lvl}`, count, atOrAbove: memberLevels.filter(l => l >= lvl).length }
+  })
+  const maxBucket = Math.max(1, ...levelBuckets.map(b => b.count))
+
+  // Demand so far (gold already spent in the store).
+  const validPurchases = purchases.filter(p => p.status !== 'cancelled' && p.status !== 'rejected')
+  const goldSpent = validPurchases.reduce((acc, p) => acc + (p.store_products?.price || 0), 0)
+  const itemsSold = validPurchases.length
+
   const handleDeliver = async (purchaseId: string) => {
     setLoading(purchaseId)
     try {
@@ -147,13 +203,125 @@ export function OverviewPanel({ profile, members, events, purchases }: OverviewP
           value={totalXP.toLocaleString()} 
           color="purple"
         />
-        <StatCard 
-          icon={<Coins className="w-5 h-5" />} 
-          label="Total Ouro" 
-          value={totalGold.toLocaleString()} 
+        <StatCard
+          icon={<Coins className="w-5 h-5" />}
+          label="Total Ouro"
+          value={totalGold.toLocaleString()}
           color="amber"
         />
       </div>
+
+      {/* Shop pricing & level guide */}
+      <Card className="border-blue-100">
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between gap-2">
+            <CardTitle className="text-base sm:text-lg flex items-center gap-2">
+              <Tag className="w-5 h-5 text-blue-600" />
+              Loja · Guia de Preços &amp; Níveis
+            </CardTitle>
+            <a href="/admin?tab=store" className="text-[10px] font-bold text-blue-600 hover:underline shrink-0 flex items-center gap-0.5">
+              Gerir loja <ChevronRight className="w-3 h-3" />
+            </a>
+          </div>
+          <CardDescription className="text-xs">
+            Valores reais do clube para definires preços e níveis mínimos justos para cada artigo.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-5">
+          {/* Mini stats */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <EconomyStat icon={<Wallet className="w-4 h-4" />} label="Ouro médio" value={avgGold} sub="por membro" color="amber" />
+            <EconomyStat icon={<BarChart3 className="w-4 h-4" />} label="Mediana" value={medianGold} sub="metade tem menos" color="blue" />
+            <EconomyStat icon={<TrendingUp className="w-4 h-4" />} label="Mais rico" value={richestGold} sub="saldo máximo" color="rose" />
+            <EconomyStat
+              icon={<Gauge className="w-4 h-4" />}
+              label="Ganho / mês"
+              value={monthlyIncome || avgGoldPerEvent}
+              sub={monthlyIncome > 0 ? 'se presente em tudo' : '≈ por evento'}
+              color="emerald"
+            />
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+            {/* Price tiers */}
+            <div className="space-y-2.5">
+              <div className="flex items-center gap-2">
+                <Coins className="w-4 h-4 text-amber-500" />
+                <h4 className="text-xs font-bold text-gray-700 uppercase tracking-wide">Faixas de preço sugeridas</h4>
+              </div>
+              <div className="space-y-2">
+                {priceTiers.map(tier => {
+                  const reach = goldN > 0 ? Math.round((affordCount(tier.value) / goldN) * 100) : 0
+                  const weeks = weeksToSave(tier.value)
+                  return (
+                    <div key={tier.key} className="flex items-center gap-3 p-2.5 rounded-lg border border-gray-100 bg-white">
+                      <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${tier.dot}`} />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs font-bold text-gray-800">{tier.label}</p>
+                        <p className="text-[10px] text-gray-400">
+                          {reach}% conseguem comprar{weeks ? ` · ≈ ${weeks} sem. a poupar` : ''}
+                        </p>
+                      </div>
+                      <span className={`text-sm font-black shrink-0 ${tier.text} flex items-center gap-1`}>
+                        {tier.value.toLocaleString()} 🪙
+                      </span>
+                    </div>
+                  )
+                })}
+              </div>
+              <p className="text-[10px] text-gray-400 leading-relaxed pt-0.5">
+                Um artigo ao preço de cada faixa fica ao alcance da percentagem indicada de membros, ao saldo atual.
+              </p>
+            </div>
+
+            {/* Level distribution */}
+            <div className="space-y-2.5">
+              <div className="flex items-center gap-2">
+                <Layers className="w-4 h-4 text-indigo-500" />
+                <h4 className="text-xs font-bold text-gray-700 uppercase tracking-wide">Membros por nível</h4>
+              </div>
+              <div className="space-y-2.5">
+                {levelBuckets.map(b => (
+                  <div key={b.lvl} className="space-y-1">
+                    <div className="flex justify-between items-center text-xs">
+                      <span className="font-medium text-gray-600">Nível {b.label}</span>
+                      <span className="font-bold text-gray-800">{b.count}</span>
+                    </div>
+                    <div className="w-full bg-gray-100 h-2 rounded-full overflow-hidden">
+                      <div
+                        className="h-full rounded-full bg-indigo-500 transition-all duration-500"
+                        style={{ width: `${(b.count / maxBucket) * 100}%` }}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="flex items-start gap-1.5 text-[10px] text-gray-400 leading-relaxed pt-0.5">
+                <ShieldCheck className="w-3 h-3 mt-0.5 shrink-0 text-indigo-400" />
+                <span>
+                  Cada nível = 1000 XP. Pôr um artigo a <span className="font-bold text-indigo-500">Nível 3+</span> deixa-o disponível para {levelBuckets[2]?.atOrAbove ?? 0} membro(s).
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Demand footer */}
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-1 pt-3 border-t border-gray-100 text-[11px] text-gray-500">
+            <span className="flex items-center gap-1.5">
+              <Coins className="w-3.5 h-3.5 text-amber-500" />
+              <span className="font-bold text-gray-700">{goldSpent.toLocaleString()}</span> ouro já gasto na loja
+            </span>
+            <span className="flex items-center gap-1.5">
+              <Package className="w-3.5 h-3.5 text-blue-500" />
+              <span className="font-bold text-gray-700">{itemsSold}</span> artigos vendidos
+            </span>
+            <span className="flex items-center gap-1.5">
+              <Clock className="w-3.5 h-3.5 text-emerald-500" />
+              <span className="font-bold text-gray-700">{avgGoldPerEvent}</span> ouro / evento (média)
+            </span>
+          </div>
+        </CardContent>
+      </Card>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left Column (2/3) */}
@@ -431,6 +599,27 @@ export function OverviewPanel({ profile, members, events, purchases }: OverviewP
           </Card>
         </div>
       </div>
+    </div>
+  )
+}
+
+function EconomyStat({ icon, label, value, sub, color }: { icon: React.ReactNode, label: string, value: number, sub?: string, color: 'blue' | 'emerald' | 'rose' | 'amber' }) {
+  const colors = {
+    blue: 'bg-blue-50 text-blue-600 border-blue-100',
+    emerald: 'bg-emerald-50 text-emerald-600 border-emerald-100',
+    rose: 'bg-rose-50 text-rose-600 border-rose-100',
+    amber: 'bg-amber-50 text-amber-600 border-amber-100',
+  }
+  return (
+    <div className="rounded-xl border border-gray-100 p-3 bg-white">
+      <div className="flex items-center gap-2 mb-1.5">
+        <div className={`p-1.5 rounded-lg border ${colors[color]} shrink-0`}>{icon}</div>
+        <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wide leading-tight">{label}</span>
+      </div>
+      <p className="text-lg sm:text-xl font-black text-gray-900 flex items-center gap-1">
+        {value.toLocaleString()} <span className="text-xs">🪙</span>
+      </p>
+      {sub && <p className="text-[10px] text-gray-400 truncate">{sub}</p>}
     </div>
   )
 }
