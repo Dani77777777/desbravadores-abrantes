@@ -1,7 +1,8 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Sunrise, Home, Shield, Trophy } from 'lucide-react'
+import Link from 'next/link'
+import { Sunrise, Home, Shield, Trophy, VenetianMask } from 'lucide-react'
 import { createClient } from '@/utils/supabase/client'
 import { usePhaseCountdown } from './usePhaseCountdown'
 import { usePhaseReload } from './usePhaseReload'
@@ -40,17 +41,34 @@ export function DayAnnouncement({ sessionId, dayNumber, phaseEndsAt, phasePaused
   }, [sessionId, dayNumber])
 
   if (winnerSide) {
+    const infWin = winnerSide === 'infiltrators'
     return (
-      <main className="min-h-screen flex flex-col items-center justify-center text-center p-8 bg-gradient-to-br from-amber-700 via-orange-600 to-yellow-500 text-white">
-        <Trophy className="w-24 h-24 mb-4 drop-shadow-lg" />
-        <h1 className="text-5xl font-black mb-2">
-          {winnerSide === 'infiltrators' ? 'Vitória dos Infiltrados!' : 'Vitória dos Desbravadores!'}
-        </h1>
-        <p className="text-xl text-amber-100">
-          {winnerSide === 'infiltrators'
-            ? 'Os Infiltrados ficaram com o acampamento.'
-            : 'Todos os Infiltrados foram descobertos.'}
-        </p>
+      <main className={`min-h-screen flex flex-col items-center justify-center text-center px-6 py-12 text-white bg-gradient-to-br ${
+        infWin ? 'from-red-950 via-stone-900 to-red-950' : 'from-amber-600 via-orange-500 to-yellow-400'
+      }`}>
+        <div className="flex flex-col items-center gap-5 sm:gap-6 max-w-sm w-full animate-in fade-in zoom-in duration-700">
+          <div className={`rounded-full p-5 sm:p-6 ring-4 ${
+            infWin ? 'bg-red-500/15 ring-red-400/30' : 'bg-white/15 ring-white/25'
+          }`}>
+            {infWin
+              ? <VenetianMask className="w-16 h-16 sm:w-20 sm:h-20 text-red-200 drop-shadow-lg" />
+              : <Trophy className="w-16 h-16 sm:w-20 sm:h-20 text-amber-50 drop-shadow-lg" />}
+          </div>
+          <h1 className="text-4xl sm:text-5xl font-black leading-tight text-balance">
+            {infWin ? 'Vitória dos Infiltrados!' : 'Vitória dos Desbravadores!'}
+          </h1>
+          <p className={`text-base sm:text-xl text-balance ${infWin ? 'text-red-100/90' : 'text-amber-50/95'}`}>
+            {infWin
+              ? 'Os Infiltrados ficaram com o acampamento.'
+              : 'Todos os Infiltrados foram descobertos. O acampamento está a salvo!'}
+          </p>
+          <Link
+            href="/jogos/vana-camp"
+            className="mt-3 inline-flex items-center justify-center gap-2 bg-white/15 hover:bg-white/25 active:bg-white/30 border border-white/30 rounded-full px-6 py-2.5 font-semibold backdrop-blur transition"
+          >
+            Voltar ao início
+          </Link>
+        </div>
       </main>
     )
   }

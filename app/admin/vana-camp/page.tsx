@@ -46,6 +46,7 @@ export default async function VanaCampAdminPage() {
     lobby: { label: 'No lobby', color: 'bg-stone-700/60 text-stone-200' },
     role_preview: { label: 'A preparar papéis', color: 'bg-amber-900/60 text-amber-200' },
     role_reveal: { label: 'A revelar papéis', color: 'bg-amber-900/60 text-amber-200' },
+    mayor_election: { label: 'Eleição do Diretor', color: 'bg-amber-900/60 text-amber-200' },
     night_infiltrators: { label: 'Noite — Infiltrados', color: 'bg-indigo-900/60 text-indigo-200' },
     night_seer: { label: 'Noite — Profeta', color: 'bg-purple-900/60 text-purple-200' },
     night_guardian: { label: 'Noite — Conselheiro', color: 'bg-sky-900/60 text-sky-200' },
@@ -110,43 +111,47 @@ export default async function VanaCampAdminPage() {
                   : `/admin/vana-camp/${s.id}`
                 return (
                   <li key={s.id} className="hover:bg-stone-900/40 transition">
-                    <div className="p-4 flex items-center gap-3 flex-wrap">
-                      <Link href={targetHref} className="flex-1 min-w-0 flex items-center gap-3 group">
-                        <span className="font-mono font-bold text-amber-100 text-lg">{s.code}</span>
-                        <span className={`text-[10px] uppercase tracking-wider px-2 py-0.5 rounded ${statusMeta.color}`}>
-                          {statusMeta.label}
+                    <div className="p-4 flex flex-col gap-3 sm:flex-row sm:items-center">
+                      <Link href={targetHref} className="flex-1 min-w-0 group">
+                        <div className="flex items-center flex-wrap gap-2">
+                          <span className="font-mono font-bold text-amber-100 text-lg">{s.code}</span>
+                          <span className={`text-[10px] uppercase tracking-wider px-2 py-0.5 rounded ${statusMeta.color}`}>
+                            {statusMeta.label}
+                          </span>
+                          {s.is_test_session && (
+                            <span className="text-[10px] uppercase tracking-wider bg-purple-900/60 text-purple-200 px-1.5 py-0.5 rounded inline-flex items-center gap-1">
+                              <Bot className="w-3 h-3" /> teste
+                            </span>
+                          )}
+                          {s.winner_side && (
+                            <span className={`text-[10px] uppercase tracking-wider px-2 py-0.5 rounded inline-flex items-center gap-1 ${
+                              s.winner_side === 'infiltrators' ? 'bg-red-900/60 text-red-200' : 'bg-amber-800/60 text-amber-100'
+                            }`}>
+                              <Trophy className="w-3 h-3" />
+                              {s.winner_side === 'infiltrators' ? 'Infiltrados' : 'Desbravadores'}
+                            </span>
+                          )}
+                          {s.rewards_awarded && (
+                            <span className="text-[10px] uppercase tracking-wider bg-emerald-900/60 text-emerald-200 px-1.5 py-0.5 rounded inline-flex items-center gap-1">
+                              <Sparkles className="w-3 h-3" /> prémios
+                            </span>
+                          )}
+                        </div>
+                      </Link>
+                      <div className="flex items-center flex-wrap gap-x-4 gap-y-1 text-xs">
+                        <span className="flex items-center gap-1 text-stone-400">
+                          <Users className="w-3 h-3" /> {playerCount}
                         </span>
-                        {s.is_test_session && (
-                          <span className="text-[10px] uppercase tracking-wider bg-purple-900/60 text-purple-200 px-1.5 py-0.5 rounded inline-flex items-center gap-1">
-                            <Bot className="w-3 h-3" /> teste
-                          </span>
-                        )}
-                        {s.winner_side && (
-                          <span className={`text-[10px] uppercase tracking-wider px-2 py-0.5 rounded inline-flex items-center gap-1 ${
-                            s.winner_side === 'infiltrators' ? 'bg-red-900/60 text-red-200' : 'bg-amber-800/60 text-amber-100'
-                          }`}>
-                            <Trophy className="w-3 h-3" />
-                            {s.winner_side === 'infiltrators' ? 'Infiltrados' : 'Desbravadores'}
-                          </span>
-                        )}
-                        {s.rewards_awarded && (
-                          <span className="text-[10px] uppercase tracking-wider bg-emerald-900/60 text-emerald-200 px-1.5 py-0.5 rounded inline-flex items-center gap-1">
-                            <Sparkles className="w-3 h-3" /> prémios
-                          </span>
-                        )}
-                      </Link>
-                      <span className="flex items-center gap-1 text-stone-400 text-xs">
-                        <Users className="w-3 h-3" /> {playerCount}
-                      </span>
-                      <span className="text-stone-500 text-xs">Dia {s.day_number}</span>
-                      <span className="text-stone-500 text-xs">{fmtDate(s.created_at)}</span>
-                      <Link
-                        href={`/admin/vana-camp/${s.id}`}
-                        className="text-amber-300 hover:text-amber-100 text-xs flex items-center gap-1"
-                      >
-                        <Eye className="w-3.5 h-3.5" /> Detalhes
-                      </Link>
-                      <DeleteVanaCampSessionButton sessionId={s.id} code={s.code} />
+                        <span className="text-stone-500">Dia {s.day_number}</span>
+                        <span className="text-stone-500">{fmtDate(s.created_at)}</span>
+                        <Link
+                          href={`/admin/vana-camp/${s.id}`}
+                          className="text-amber-300 hover:text-amber-100 flex items-center gap-1"
+                        >
+                          <Eye className="w-3.5 h-3.5" /> Detalhes
+                        </Link>
+                        <DeleteVanaCampSessionButton sessionId={s.id} code={s.code} />
+                      </div>
                     </div>
                   </li>
                 )

@@ -15,6 +15,7 @@ import type {
   VanaCampMayorMode,
   VanaCampRoleAssignmentMode,
 } from '@/types/vana-camp'
+import { statusLabel } from '@/utils/vana-camp-labels'
 
 interface Props {
   canHost: boolean
@@ -107,7 +108,7 @@ export function VanaCampHome({ canHost, initialCode, activeSessions, userId }: P
                       </span>
                     )}
                   </div>
-                  <div className="text-xs text-stone-400">{s.status}</div>
+                  <div className="text-xs text-stone-400">{statusLabel(s.status)}</div>
                 </div>
                 <ArrowRight className="w-5 h-5 text-amber-400 group-hover:translate-x-1 transition" />
               </Link>

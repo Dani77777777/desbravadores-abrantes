@@ -6,7 +6,19 @@ import { Navbar } from '@/components/layout/Navbar'
 import {
   ChevronLeft, Flame, VenetianMask, Eye, Shield, User, Crown, Bot, Trophy, Clock, Sparkles,
 } from 'lucide-react'
-import type { VanaCampRole } from '@/types/vana-camp'
+import type {
+  VanaCampRole,
+  VanaCampChatMode,
+  VanaCampMayorMode,
+  VanaCampRoleAssignmentMode,
+} from '@/types/vana-camp'
+import {
+  statusLabel,
+  causeLabel,
+  CHAT_MODE_LABEL,
+  MAYOR_MODE_LABEL,
+  ASSIGN_MODE_LABEL,
+} from '@/utils/vana-camp-labels'
 
 const ROLE_META: Record<VanaCampRole, { label: string; icon: typeof User; color: string }> = {
   infiltrator: { label: 'Infiltrado', icon: VenetianMask, color: 'text-red-300' },
@@ -75,11 +87,11 @@ export default async function VanaCampSessionDetailPage({
     const payload = e.payload as Record<string, unknown> | null
     switch (e.event_type) {
       case 'phase_change':
-        return { label: `Fase: ${payload?.from} → ${payload?.to}`, tone: 'text-stone-300' }
+        return { label: `Fase: ${statusLabel(payload?.from as string)} → ${statusLabel(payload?.to as string)}`, tone: 'text-stone-300' }
       case 'death': {
         const name = (payload?.target_name as string) ?? '?'
         const cause = (payload?.cause as string) ?? '?'
-        return { label: `${name} foi para casa (${cause})`, tone: 'text-red-300' }
+        return { label: `${name} foi para casa (${causeLabel(cause)})`, tone: 'text-red-300' }
       }
       case 'save':
         return { label: 'Conselheiro protegeu um desbravador', tone: 'text-sky-300' }
@@ -128,13 +140,13 @@ export default async function VanaCampSessionDetailPage({
 
         {/* Meta */}
         <section className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm">
-          <Card label="Estado" value={session.status} />
+          <Card label="Estado" value={statusLabel(session.status)} />
           <Card label="Dia" value={`${session.day_number}`} />
           <Card label="Narrador" value={hostProfile?.full_name ?? '?'} />
           <Card label="Criada" value={fmt(session.created_at)} />
-          <Card label="Modo chat" value={session.chat_mode} />
-          <Card label="Diretor" value={session.mayor_mode} />
-          <Card label="Atribuição" value={session.role_assignment_mode} />
+          <Card label="Modo chat" value={CHAT_MODE_LABEL[session.chat_mode as VanaCampChatMode] ?? session.chat_mode} />
+          <Card label="Diretor" value={MAYOR_MODE_LABEL[session.mayor_mode as VanaCampMayorMode] ?? session.mayor_mode} />
+          <Card label="Atribuição" value={ASSIGN_MODE_LABEL[session.role_assignment_mode as VanaCampRoleAssignmentMode] ?? session.role_assignment_mode} />
           <Card label="Prémios" value={session.rewards_awarded ? '✓ atribuídos' : '—'} accent={session.rewards_awarded ? 'text-emerald-300' : 'text-stone-300'} />
         </section>
 
@@ -162,7 +174,7 @@ export default async function VanaCampSessionDetailPage({
                   )}
                   {!p.is_alive && (
                     <span className="text-stone-500 text-xs">
-                      ✗ dia {p.eliminated_on_day} ({p.eliminated_by})
+                      ✗ dia {p.eliminated_on_day} ({causeLabel(p.eliminated_by)})
                     </span>
                   )}
                 </li>

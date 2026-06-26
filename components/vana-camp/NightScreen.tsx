@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Moon, VenetianMask, Home, Eye, Shield, User, Bot, Check, MessageSquare } from 'lucide-react'
 import {
   getMyNightContext,
@@ -8,6 +8,7 @@ import {
   sendChatMessage,
 } from '@/lib/actions/vana-camp'
 import { createClient } from '@/utils/supabase/client'
+import { vibrate } from '@/utils/vibrate'
 import { useLiveSession } from './useLiveSession'
 import { useVibrationSignal } from './useVibrationSignal'
 import { VibrationFlash } from './VibrationFlash'
@@ -65,6 +66,19 @@ export function NightScreen(props: Props) {
   const [resting, setResting] = useState(false)
   // Sempre que a fase muda (nova role chamada), o ecrã de descanso reinicia.
   useEffect(() => { setResting(false) }, [live.status])
+
+  // Vibra o telemóvel quando chega a vez deste jogador (à prova do sinal do
+  // servidor se perder durante a transição RoleReveal → NightScreen). Dispara
+  // uma só vez por turno graças à key fase+dia.
+  const vibratedTurnRef = useRef<string | null>(null)
+  useEffect(() => {
+    if (!ctx || ctx.error || !ctx.is_alive || !ctx.my_role) return
+    if (PHASE_FOR_ROLE[ctx.my_role] !== live.status) return // não é o meu turno
+    const key = `${live.status}:${live.day_number}`
+    if (vibratedTurnRef.current === key) return
+    vibratedTurnRef.current = key
+    vibrate('night_call')
+  }, [ctx, live.status, live.day_number])
 
   const { needsGesture, flash } = useVibrationSignal(sessionId, ctx?.my_player_id ?? null)
 
