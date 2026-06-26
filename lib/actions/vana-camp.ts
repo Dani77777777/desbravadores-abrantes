@@ -2319,21 +2319,86 @@ async function computeRewards(sessionId: string): Promise<SessionRewardSummary> 
   return { rewards, already_awarded: !!session.rewards_awarded, winner_side: winnerSide }
 }
 
+/** True se o utilizador é coordenador/dirigente (admin do clube). */
+async function userIsClubAdmin(userId: string): Promise<boolean> {
+  const service = createServiceClient()
+  const { data } = await service.from('profiles').select('role').eq('id', userId).maybeSingle()
+  return data?.role === 'coordenador' || data?.role === 'dirigente'
+}
+
 export async function previewRewards(sessionId: string): Promise<SessionRewardSummary & { error?: string }> {
   try {
     const { user } = await requireUser()
-    const supabase = await createClient()
-    const { data: session } = await supabase
+    const service = createServiceClient()
+    const { data: session } = await service
       .from('vanacamp_sessions')
       .select('host_id')
       .eq('id', sessionId)
-      .single()
+      .maybeSingle()
     if (!session) return { error: 'Sessão não encontrada.', rewards: [], already_awarded: false, winner_side: null }
-    if (session.host_id !== user.id) return { error: 'Apenas o Narrador.', rewards: [], already_awarded: false, winner_side: null }
+    const allowed = session.host_id === user.id || (await userIsClubAdmin(user.id))
+    if (!allowed) return { error: 'Sem permissão.', rewards: [], already_awarded: false, winner_side: null }
     return await computeRewards(sessionId)
   } catch (e) {
     return { error: e instanceof Error ? e.message : 'Erro.', rewards: [], already_awarded: false, winner_side: null }
   }
+}
+
+/**
+ * Dados para o cartão de vitória partilhável (logo + equipa vencedora).
+ * Devolve os jogadores do lado que ganhou, com avatar e quem foi Diretor.
+ */
+export async function getVictoryCardData(sessionId: string): Promise<{
+  winner_side?: VanaCampSide | null
+  winners?: { id: string; display_name: string; avatar_url: string | null; is_mayor: boolean }[]
+  error?: string
+}> {
+  try {
+    const { user } = await requireUser()
+    const service = createServiceClient()
+    const { data: session } = await service
+      .from('vanacamp_sessions')
+      .select('host_id, winner_side, status')
+      .eq('id', sessionId)
+      .maybeSingle()
+    if (!session) return { error: 'Sessão não encontrada.' }
+    const allowed = session.host_id === user.id || (await userIsClubAdmin(user.id))
+    if (!allowed) return { error: 'Sem permissão.' }
+    if (session.status !== 'finished' || !session.winner_side) return { winner_side: null, winners: [] }
+
+    const winSide = session.winner_side as VanaCampSide
+    const { data: players } = await service
+      .from('vanacamp_players')
+      .select('id, user_id, display_name, role, is_mayor')
+      .eq('session_id', sessionId)
+
+    const winners = (players ?? []).filter((p) => {
+      if (!p.role) return false
+      return winSide === 'infiltrators' ? p.role === 'infiltrator' : p.role !== 'infiltrator'
+    })
+
+    // Avatares dos perfis (bots não têm user_id → sem avatar)
+    const userIds = winners.map((w) => w.user_id).filter((x): x is string => !!x)
+    let avatarByUser = new Map<string, string | null>()
+    if (userIds.length > 0) {
+      const { data: profiles } = await service
+        .from('profiles')
+        .select('id, avatar_url')
+        .in('id', userIds)
+      avatarByUser = new Map((profiles ?? []).map((p) => [p.id, p.avatar_url ?? null]))
+    }
+
+    const result = winners
+      .map((w) => ({
+        id: w.id,
+        display_name: w.display_name,
+        avatar_url: w.user_id ? (avatarByUser.get(w.user_id) ?? null) : null,
+        is_mayor: w.is_mayor,
+      }))
+      .sort((a, b) => (b.is_mayor ? 1 : 0) - (a.is_mayor ? 1 : 0) || a.display_name.localeCompare(b.display_name))
+
+    return { winner_side: winSide, winners: result }
+  } catch (e) { return { error: e instanceof Error ? e.message : 'Erro.' } }
 }
 
 export async function awardRewards(sessionId: string): Promise<{
@@ -2344,16 +2409,16 @@ export async function awardRewards(sessionId: string): Promise<{
 }> {
   try {
     const { user } = await requireUser()
-    const supabase = await createClient()
     const service = createServiceClient()
 
-    const { data: session } = await supabase
+    const { data: session } = await service
       .from('vanacamp_sessions')
       .select('host_id, rewards_awarded, status')
       .eq('id', sessionId)
-      .single()
+      .maybeSingle()
     if (!session) return { error: 'Sessão não encontrada.' }
-    if (session.host_id !== user.id) return { error: 'Apenas o Narrador pode atribuir prémios.' }
+    const allowed = session.host_id === user.id || (await userIsClubAdmin(user.id))
+    if (!allowed) return { error: 'Apenas o Narrador ou um administrador podem atribuir prémios.' }
     if (session.status !== 'finished') return { error: 'O jogo ainda não terminou.' }
     if (session.rewards_awarded) return { error: 'Os prémios já foram atribuídos a esta sessão.' }
 

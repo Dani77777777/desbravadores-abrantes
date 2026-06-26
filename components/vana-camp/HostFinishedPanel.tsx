@@ -1,13 +1,15 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { Trophy, Bot, Coins, Sparkles, Check, AlertCircle, User } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { Trophy, Bot, Coins, Sparkles, Check, AlertCircle, User, Share2, Download } from 'lucide-react'
 import {
   previewRewards,
   awardRewards,
+  getVictoryCardData,
   type VanaCampPlayerReward,
 } from '@/lib/actions/vana-camp'
 import type { VanaCampSide } from '@/types/vana-camp'
+import { VanaCampVictoryCard } from './VanaCampVictoryCard'
 
 interface Props {
   sessionId: string
@@ -21,6 +23,47 @@ export function HostFinishedPanel({ sessionId, winnerSide }: Props) {
   const [awarding, setAwarding] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
+
+  const [card, setCard] = useState<Awaited<ReturnType<typeof getVictoryCardData>> | null>(null)
+  const [sharing, setSharing] = useState(false)
+  const [shareToast, setShareToast] = useState<string | null>(null)
+  const cardRef = useRef<HTMLDivElement | null>(null)
+
+  useEffect(() => { getVictoryCardData(sessionId).then(setCard) }, [sessionId])
+
+  async function handleShare() {
+    if (sharing || !cardRef.current) return
+    setSharing(true); setShareToast(null)
+    try {
+      const { toPng } = await import('html-to-image')
+      const dataUrl = await toPng(cardRef.current, { pixelRatio: 2, cacheBust: true })
+      const fileName = `vanacamp-${winnerSide ?? 'fim'}-${Date.now()}.png`
+      const date = new Date().toLocaleDateString('pt-PT', { day: 'numeric', month: 'long', year: 'numeric' })
+      const text = isInfWin
+        ? `🕵️ VanaCamp — ${date}\n\nOs INFILTRADOS venceram! Enganaram o acampamento e não foram descobertos a tempo.\n\nSerás tu a descobri-los no próximo jogo? 🔦`
+        : `🏕️ VanaCamp — ${date}\n\nOs DESBRAVADORES venceram! Descobriram todos os Infiltrados e salvaram o acampamento. 🎉\n\nJunta-te ao próximo jogo!`
+      try {
+        const res = await fetch(dataUrl)
+        const blob = await res.blob()
+        const file = new File([blob], fileName, { type: 'image/png' })
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+          await navigator.share({ files: [file], title: 'Resultado VanaCamp', text })
+          setShareToast('Partilhado!')
+          return
+        }
+      } catch { /* sem Web Share — faz download */ }
+      const link = document.createElement('a')
+      link.href = dataUrl
+      link.download = fileName
+      link.click()
+      setShareToast('Imagem transferida!')
+    } catch {
+      setShareToast('Erro ao gerar imagem')
+    } finally {
+      setSharing(false)
+      setTimeout(() => setShareToast(null), 3000)
+    }
+  }
 
   async function load() {
     setLoading(true)
@@ -55,7 +98,7 @@ export function HostFinishedPanel({ sessionId, winnerSide }: Props) {
   const totalGold = rewards.reduce((s, r) => s + (r.is_bot ? 0 : r.gold), 0)
 
   return (
-    <main className="max-w-3xl mx-auto p-4 md:p-8 space-y-5">
+    <div className="max-w-3xl mx-auto p-4 md:p-8 space-y-5">
       <header className="text-center space-y-3 py-6">
         <Trophy className={`w-20 h-20 mx-auto drop-shadow-lg ${isInfWin ? 'text-red-300' : 'text-amber-300'}`} />
         <h1 className="text-4xl font-black text-amber-100">
@@ -150,6 +193,28 @@ export function HostFinishedPanel({ sessionId, winnerSide }: Props) {
           </button>
         )}
       </section>
-    </main>
+
+      {/* Partilhar imagem de vitória */}
+      {card?.winner_side && (card.winners?.length ?? 0) > 0 && (
+        <section className="space-y-2">
+          <button
+            onClick={handleShare}
+            disabled={sharing}
+            className="w-full bg-stone-800 hover:bg-stone-700 disabled:opacity-50 border border-amber-700/40 text-amber-100 font-bold py-3 rounded transition flex items-center justify-center gap-2"
+          >
+            {sharing ? 'A gerar imagem…' : (<><Share2 className="w-5 h-5" /> Partilhar resultado</>)}
+          </button>
+          {shareToast && (
+            <div className="bg-amber-950/40 border border-amber-700/40 text-amber-200 rounded p-3 text-sm text-center flex items-center justify-center gap-2">
+              <Download className="w-4 h-4" /> {shareToast}
+            </div>
+          )}
+          {/* Card escondido (off-screen) para captura */}
+          <div style={{ position: 'fixed', left: '-99999px', top: 0, pointerEvents: 'none' }} aria-hidden="true">
+            <VanaCampVictoryCard ref={cardRef} winnerSide={card.winner_side} winners={card.winners ?? []} />
+          </div>
+        </section>
+      )}
+    </div>
   )
 }

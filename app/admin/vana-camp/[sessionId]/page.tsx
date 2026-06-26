@@ -6,11 +6,13 @@ import { Navbar } from '@/components/layout/Navbar'
 import {
   ChevronLeft, Flame, VenetianMask, Eye, Shield, User, Crown, Bot, Trophy, Clock, Sparkles,
 } from 'lucide-react'
+import { HostFinishedPanel } from '@/components/vana-camp/HostFinishedPanel'
 import type {
   VanaCampRole,
   VanaCampChatMode,
   VanaCampMayorMode,
   VanaCampRoleAssignmentMode,
+  VanaCampSide,
 } from '@/types/vana-camp'
 import {
   statusLabel,
@@ -155,6 +157,13 @@ export default async function VanaCampSessionDetailPage({
           <Card label="Atribuição" value={ASSIGN_MODE_LABEL[session.role_assignment_mode as VanaCampRoleAssignmentMode] ?? session.role_assignment_mode} />
           <Card label="Prémios" value={session.rewards_awarded ? '✓ atribuídos' : '—'} accent={session.rewards_awarded ? 'text-emerald-300' : 'text-stone-300'} />
         </section>
+
+        {/* Atribuir XP e Gold (também depois do jogo, a partir do admin) */}
+        {session.status === 'finished' && (
+          <section className="bg-stone-800/40 border border-amber-700/30 rounded-lg overflow-hidden">
+            <HostFinishedPanel sessionId={sessionId} winnerSide={session.winner_side as VanaCampSide | null} />
+          </section>
+        )}
 
         {/* Jogadores com papéis revelados */}
         <section className="bg-stone-800/60 border border-amber-700/40 rounded-lg overflow-hidden">
