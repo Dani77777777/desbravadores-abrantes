@@ -11,7 +11,7 @@ import { createClient } from '@/utils/supabase/client'
 import { useLiveSession } from './useLiveSession'
 import { useVibrationSignal } from './useVibrationSignal'
 import { VibrationFlash } from './VibrationFlash'
-import { usePhaseCountdown, usePhaseProgress } from './usePhaseCountdown'
+import { usePhaseCountdown, usePhaseProgress, formatClock } from './usePhaseCountdown'
 import { usePhaseReload } from './usePhaseReload'
 import type { VanaCampRole, VanaCampMessage } from '@/types/vana-camp'
 
@@ -61,6 +61,10 @@ export function NightScreen(props: Props) {
   const [ctx, setCtx] = useState<Awaited<ReturnType<typeof getMyNightContext>> | null>(null)
   const [pending, setPending] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // Quando o jogador já agiu e carrega em "Fechar os olhos", entra em modo de descanso.
+  const [resting, setResting] = useState(false)
+  // Sempre que a fase muda (nova role chamada), o ecrã de descanso reinicia.
+  useEffect(() => { setResting(false) }, [live.status])
 
   const { needsGesture, flash } = useVibrationSignal(sessionId, ctx?.my_player_id ?? null)
 
@@ -172,6 +176,34 @@ export function NightScreen(props: Props) {
   // ── A vez do jogador ────────────────────────────────────────────
   const targets = (ctx.alive_players ?? []).filter((p) => p.id !== ctx.my_player_id)
 
+  // Já agiu? (Profeta tem resultado; Conselheiro/Infiltrado já escolheram alvo.)
+  const hasActed =
+    ctx.my_role === 'seer' ? !!ctx.current_result : !!ctx.current_target_id
+
+  // ── Descanso: o jogador concluiu e fechou os olhos ──────────────
+  if (resting) {
+    return (
+      <main className="min-h-screen flex flex-col items-center justify-center text-center p-8 text-stone-200" style={bgStyle}>
+        {impersonatingBotName && <ImpersonateBanner name={impersonatingBotName} />}
+        <Moon className="w-20 h-20 text-blue-200/60 mb-5 animate-pulse" />
+        <h1 className="text-3xl font-black text-blue-100 mb-2">Fecha os olhos e dorme 😴</h1>
+        <p className="text-blue-200/70 text-sm max-w-md">
+          A tua parte já está feita. Fecha os olhos até de manhã — não espreites, para a próxima
+          pessoa poder jogar à vontade!
+        </p>
+        {remaining !== null && (
+          <p className="text-blue-300/50 text-xs mt-6">a noite continua… {formatClock(remaining)}</p>
+        )}
+        <button
+          onClick={() => setResting(false)}
+          className="mt-8 text-blue-300/60 hover:text-blue-100 text-xs underline underline-offset-4"
+        >
+          Rever a minha jogada
+        </button>
+      </main>
+    )
+  }
+
   return (
     <main className="min-h-screen p-4 md:p-8 text-stone-100" style={bgStyle}>
       <VibrationFlash flash={flash} needsGesture={needsGesture} />
@@ -228,6 +260,15 @@ export function NightScreen(props: Props) {
           <div className="bg-red-900/60 border border-red-700 text-red-100 rounded p-3 text-sm">
             {error}
           </div>
+        )}
+
+        {hasActed && (
+          <button
+            onClick={() => setResting(true)}
+            className="w-full flex items-center justify-center gap-2 bg-indigo-900/60 hover:bg-indigo-800/70 border border-indigo-600/50 text-blue-100 font-semibold py-3 rounded-lg transition"
+          >
+            <Moon className="w-5 h-5" /> Já está — fechar os olhos e dormir
+          </button>
         )}
       </div>
     </main>

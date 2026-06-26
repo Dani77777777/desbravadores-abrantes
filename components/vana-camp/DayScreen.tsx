@@ -12,7 +12,7 @@ import { useLiveSession } from './useLiveSession'
 import { useVibrationSignal } from './useVibrationSignal'
 import { VibrationFlash } from './VibrationFlash'
 import { usePhaseReload } from './usePhaseReload'
-import { usePhaseCountdown, usePhaseProgress } from './usePhaseCountdown'
+import { usePhaseCountdown, usePhaseProgress, formatClock } from './usePhaseCountdown'
 import type { VanaCampMessage, VanaCampChatMode } from '@/types/vana-camp'
 
 interface Props {
@@ -113,7 +113,7 @@ export function DayScreen(props: Props) {
               Discutam entre vocês. A votação começa quando o Narrador decidir.
             </p>
             {remaining !== null && (
-              <p className="text-amber-900 text-2xl font-black mt-2">{remaining}s</p>
+              <p className="text-amber-900 text-2xl font-black mt-2">{formatClock(remaining)}</p>
             )}
           </header>
 
@@ -183,7 +183,7 @@ export function DayScreen(props: Props) {
               </p>
             )}
             {remaining !== null && (
-              <p className="text-amber-100 text-2xl font-black">{remaining}s</p>
+              <p className="text-amber-100 text-2xl font-black">{formatClock(remaining)}</p>
             )}
           </header>
 

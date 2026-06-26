@@ -8,7 +8,7 @@ import { getDayResult, getDayVoteProgress, getMyMayorVoteContext } from '@/lib/a
 import { createClient } from '@/utils/supabase/client'
 import { useLiveSession } from './useLiveSession'
 import { usePhaseReload } from './usePhaseReload'
-import { usePhaseCountdown, usePhaseProgress } from './usePhaseCountdown'
+import { usePhaseCountdown, usePhaseProgress, formatClock } from './usePhaseCountdown'
 import { usePlayerList } from './usePlayerList'
 import type {
   VanaCampPlayerPublic,
@@ -630,7 +630,7 @@ function PresentDayDiscussion({
           )}
           {remaining !== null && (
             <p className="text-7xl font-black font-mono mt-2 text-stone-900 drop-shadow">
-              {remaining}<span className="text-3xl">s</span>
+              {formatClock(remaining)}
             </p>
           )}
         </div>

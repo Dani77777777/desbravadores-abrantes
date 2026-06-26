@@ -3,6 +3,16 @@
 import { useEffect, useState } from 'react'
 
 /**
+ * Formata segundos como relógio: "4:35" a partir de 1 minuto, "45s" abaixo disso.
+ */
+export function formatClock(totalSeconds: number): string {
+  if (totalSeconds < 60) return `${totalSeconds}s`
+  const m = Math.floor(totalSeconds / 60)
+  const s = totalSeconds % 60
+  return `${m}:${String(s).padStart(2, '0')}`
+}
+
+/**
  * Devolve segundos restantes de uma fase, atualizando a cada ~250ms.
  * Respeita pausa: se `pausedAt` estiver definido, o tempo fica congelado.
  */
