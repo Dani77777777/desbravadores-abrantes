@@ -2,9 +2,10 @@
 
 import { useEffect, useState, useRef } from 'react'
 import { createClient } from '@/utils/supabase/client'
-import { submitAnswer, setRewardsRecipient } from '@/lib/actions/vana-quest'
-import { CheckCircle2, XCircle, Trophy, Zap, Flame, Users } from 'lucide-react'
+import { submitAnswer, setRewardsRecipient, skipRewards } from '@/lib/actions/vana-quest'
+import { CheckCircle2, XCircle, Trophy, Zap, Flame, Users, ArrowUp, Crown } from 'lucide-react'
 import { PlayerAvatar } from './PlayerAvatar'
+import { useLiveSession } from './useLiveSession'
 
 const OPTION_COLORS = [
   'bg-red-500 active:bg-red-700',
@@ -61,6 +62,7 @@ export function PlayerScreen({ sessionId, userId, userProfile, initialSession, q
   const [participantId, setParticipantId] = useState<string | null>(null)
   const [answerResult, setAnswerResult] = useState<AnswerResult | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  const [submitError, setSubmitError] = useState(false)
   const [timeLeft, setTimeLeft] = useState(0)
   const [totalPoints, setTotalPoints] = useState(0)
   const [streak, setStreak] = useState(0)
@@ -76,6 +78,12 @@ export function PlayerScreen({ sessionId, userId, userProfile, initialSession, q
   const [donationSuccess, setDonationSuccess] = useState(false)
   const [donationSkipped, setDonationSkipped] = useState(false)
   const [showSkipConfirm, setShowSkipConfirm] = useState(false)
+  // Membro selecionado à espera de confirmação (para não doar sem querer)
+  const [pendingRecipient, setPendingRecipient] = useState<{ id: string; full_name: string; section: string; avatar_url?: string | null } | null>(null)
+  // Foi expulso pelo host
+  const [kicked, setKicked] = useState(false)
+  // Posição na classificação (rank) + pontos para subir
+  const [rankInfo, setRankInfo] = useState<{ rank: number; total: number; pointsToNext: number | null }>({ rank: 0, total: 0, pointsToNext: null })
 
   const isGuest = !userId
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -121,6 +129,44 @@ export function PlayerScreen({ sessionId, userId, userProfile, initialSession, q
     setShowMultiplierWarning(false)
   }, [session.status, currentQuestion?.id])
 
+  // Avisar o jogador antes de fechar/recarregar o separador ou carregar em "voltar"
+  // enquanto o jogo está EM JOGO (nem 'waiting' nem 'finished'). Na sala de espera sair
+  // é normal — não avisamos e deixamos a presença tratar da limpeza automática.
+  useEffect(() => {
+    const gameInProgress = session.status !== 'finished' && session.status !== 'waiting'
+    if (!gameInProgress || kicked) return
+
+    // Aviso nativo ao fechar ou recarregar o separador
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault()
+      e.returnValue = ''
+      return ''
+    }
+    window.addEventListener('beforeunload', handleBeforeUnload)
+
+    // Intercetar o botão "voltar" do browser
+    const pushGuard = () => window.history.pushState(null, '', window.location.href)
+    pushGuard()
+    const handlePopState = () => {
+      const leave = window.confirm(
+        'Tens a certeza que queres sair do VanaQuest? Vais perder o teu lugar no jogo.'
+      )
+      if (leave) {
+        window.removeEventListener('beforeunload', handleBeforeUnload)
+        window.history.back()
+      } else {
+        // Cancelou: voltamos a empurrar o estado para manter o jogador no jogo
+        pushGuard()
+      }
+    }
+    window.addEventListener('popstate', handlePopState)
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload)
+      window.removeEventListener('popstate', handlePopState)
+    }
+  }, [session.status, kicked])
+
   // Sincronizar stats com a BD ao montar (após termos o participantId) e
   // sempre que entrarmos em question_results ou question_leaderboard.
   // Isto garante que mesmo após refresh ou se entrarmos a meio do jogo,
@@ -146,39 +192,90 @@ export function PlayerScreen({ sessionId, userId, userProfile, initialSession, q
       })
   }, [participantId, session.status])
 
-  // Realtime: session + counters (without revealing distribution)
+  // Posição na classificação + quantos pontos faltam para subir
+  useEffect(() => {
+    if (!participantId) return
+    if (session.status !== 'question_leaderboard' && session.status !== 'finished') return
+
+    supabase
+      .from('vana_quest_participants')
+      .select('id, total_points')
+      .eq('session_id', sessionId)
+      .order('total_points', { ascending: false })
+      .then(({ data }) => {
+        if (!data) return
+        const idx = data.findIndex((p) => p.id === participantId)
+        if (idx === -1) return
+        const me = Number(data[idx].total_points) || 0
+        const above = idx > 0 ? Number(data[idx - 1].total_points) || 0 : null
+        setRankInfo({
+          rank: idx + 1,
+          total: data.length,
+          pointsToNext: above === null ? null : Math.max(0, above - me),
+        })
+      })
+  }, [participantId, session.status])
+
+  // Sessão sincronizada de forma resiliente: realtime (rápido) + polling (rede de
+  // segurança) + refetch ao reconectar/voltar ao separador. Garante que o ecrã nunca
+  // fica preso por um evento realtime perdido. Pausa o polling no fim do jogo.
+  useLiveSession(
+    sessionId,
+    (row) => setSession((prev) => ({ ...prev, ...(row as Session) })),
+    { paused: session.status === 'finished', pollMs: 2000 }
+  )
+
+  // Reset ao mudar de pergunta — corre venha o estado do realtime ou do polling.
+  // currentQuestion.id só muda quando uma NOVA pergunta começa (mantém-se igual em
+  // active → results → leaderboard), por isso o reveal da resposta é preservado.
+  useEffect(() => {
+    setAnswerResult(null)
+    setSubmitting(false)
+    setSubmitError(false)
+    setTotalAnswered(0)
+  }, [currentQuestion?.id])
+
+  // Realtime leve só para participantes: contagem na sala + deteção de expulsão.
+  // Canal estável (deps sem currentQuestion) → nunca é recriado a meio do jogo, por
+  // isso não há janela de re-subscrição onde se perdem eventos.
+  // NÃO subscrevemos os INSERT de respostas: com N jogadores isso gera N×N mensagens
+  // por pergunta e satura o canal, derrubando o UPDATE crítico da sessão. A contagem
+  // "responderam X/Y" passa a vir de polling leve (efeito abaixo).
   useEffect(() => {
     const channel = supabase
       .channel(`player-${sessionId}-${userId || 'g'}`)
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'vana_quest_sessions', filter: `id=eq.${sessionId}` },
-        (p) => {
-          const ns = p.new as Session
-          setSession(ns)
-          if (ns.status === 'question_active') {
-            const k = `${ns.current_question_index}`
-            if (questionKey.current !== k) {
-              questionKey.current = k
-              setAnswerResult(null)
-              setSubmitting(false)
-              setTotalAnswered(0)
-              startTimeRef.current = ns.question_started_at
-                ? new Date(ns.question_started_at).getTime()
-                : Date.now()
-            }
-          }
-        })
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'vana_quest_answers', filter: `session_id=eq.${sessionId}` },
-        (p) => {
-          const ans = p.new as any
-          if (currentQuestion && ans.question_id === currentQuestion.id) {
-            setTotalAnswered((c) => c + 1)
-          }
-        })
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'vana_quest_participants', filter: `session_id=eq.${sessionId}` },
         () => setTotalPlayers((c) => c + 1))
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'vana_quest_participants' },
+        (p) => {
+          const removedId = (p.old as any)?.id
+          if (!removedId) return
+          setTotalPlayers((c) => Math.max(0, c - 1))
+          // Se fui eu que fui removido → ecrã de expulsão
+          if (participantId && removedId === participantId) {
+            localStorage.removeItem(`vana_participant_${sessionId}`)
+            setKicked(true)
+          }
+        })
       .subscribe()
     return () => { supabase.removeChannel(channel) }
-  }, [sessionId, userId, currentQuestion?.id])
+  }, [sessionId, userId, participantId])
+
+  // Presença na sala de espera — marca este jogador como "online". Quando a ligação cai
+  // (fechou o separador / saiu), o host deteta a ausência e remove-o da lista antes de o
+  // jogo começar, evitando "jogadores mortos". Como a chave de presença é o participantId
+  // (estável entre refreshes via localStorage), um simples refresh sai e volta a entrar,
+  // por isso o host não o remove (há um período de tolerância). Só durante 'waiting'.
+  useEffect(() => {
+    if (session.status !== 'waiting' || !participantId) return
+    const channel = supabase.channel(`vq-presence-${sessionId}`, {
+      config: { presence: { key: participantId } },
+    })
+    channel.subscribe((status) => {
+      if (status === 'SUBSCRIBED') channel.track({ participantId })
+    })
+    return () => { supabase.removeChannel(channel) }
+  }, [session.status, participantId, sessionId])
 
   // Load total player count
   useEffect(() => {
@@ -186,10 +283,26 @@ export function PlayerScreen({ sessionId, userId, userProfile, initialSession, q
       .then(({ count }) => { if (count !== null) setTotalPlayers(count) })
   }, [sessionId])
 
-  // Reset answered count when question changes
+  // Contagem "responderam X/Y" via polling leve (substitui a subscrição realtime de
+  // respostas no lado do jogador). Só corre durante a pergunta activa.
   useEffect(() => {
-    if (currentQuestion) setTotalAnswered(0)
-  }, [currentQuestion?.id])
+    if (session.status !== 'question_active' || !currentQuestion) return
+    let cancelled = false
+    const fetchCounts = async () => {
+      const [answered, players] = await Promise.all([
+        supabase.from('vana_quest_answers').select('id', { count: 'exact', head: true })
+          .eq('session_id', sessionId).eq('question_id', currentQuestion.id),
+        supabase.from('vana_quest_participants').select('id', { count: 'exact', head: true })
+          .eq('session_id', sessionId),
+      ])
+      if (cancelled) return
+      if (answered.count !== null) setTotalAnswered(answered.count)
+      if (players.count !== null) setTotalPlayers(players.count)
+    }
+    fetchCounts()
+    const t = setInterval(fetchCounts, 2500)
+    return () => { cancelled = true; clearInterval(t) }
+  }, [session.status, currentQuestion?.id, sessionId])
 
   useEffect(() => {
     if (session.status === 'question_active' && session.question_started_at) {
@@ -215,20 +328,44 @@ export function PlayerScreen({ sessionId, userId, userProfile, initialSession, q
   async function handleAnswer(optionLetter: string) {
     if (!participantId || !currentQuestion || submitting || answerResult) return
     setSubmitting(true)
+    setSubmitError(false)
 
     const elapsedMs = Math.max(0, Date.now() - startTimeRef.current)
-    const result = await submitAnswer(participantId, sessionId, currentQuestion.id, optionLetter, elapsedMs)
 
-    if (result.ok) {
-      // Don't reveal correctness yet — only store the chosen option
-      // Correctness, points and streak are revealed when session.status hits 'question_results'
-      setAnswerResult({
-        isCorrect: result.isCorrect!,
-        finalPoints: result.finalPoints!,
-        chosen: optionLetter,
-      })
+    // Redes móveis falham pedidos isolados; uma falha pontual não deve custar a
+    // resposta ao jogador. Tentamos até 3 vezes. O servidor é idempotente, por isso
+    // se a 1ª tentativa chegou a registar (mas a resposta perdeu-se), a 2ª devolve
+    // a resposta já existente em vez de duplicar.
+    try {
+      for (let attempt = 0; attempt < 3; attempt++) {
+        try {
+          const result = await submitAnswer(participantId, sessionId, currentQuestion.id, optionLetter, elapsedMs)
+
+          // Sucesso, ou já tinha respondido (cliques duplos / retry idempotente):
+          // em ambos guardamos a escolha. A correção/pontos só são revelados em
+          // 'question_results'.
+          if (result.ok || result.alreadyAnswered) {
+            setAnswerResult({
+              isCorrect: result.isCorrect ?? false,
+              finalPoints: result.finalPoints ?? 0,
+              chosen: optionLetter,
+            })
+            return
+          }
+
+          // Rejeição lógica (pergunta já fechada, etc.) — repetir não ajuda.
+          setSubmitError(true)
+          return
+        } catch {
+          // Erro de rede — espera curta e tenta de novo.
+          if (attempt < 2) await new Promise((r) => setTimeout(r, 400))
+        }
+      }
+      // Esgotou as tentativas — deixa o jogador tocar outra vez.
+      setSubmitError(true)
+    } finally {
+      setSubmitting(false)
     }
-    setSubmitting(false)
   }
 
   // Reveal points/streak/correctCount only when entering question_results
@@ -261,7 +398,14 @@ export function PlayerScreen({ sessionId, userId, userProfile, initialSession, q
     setDonating(true)
     await setRewardsRecipient(participantId, recipientId)
     setDonating(false)
+    setPendingRecipient(null)
     setDonationSuccess(true)
+  }
+
+  async function handleSkip() {
+    setShowSkipConfirm(false)
+    if (participantId) await skipRewards(participantId)
+    setDonationSkipped(true)
   }
 
   const filteredMembers = allMembers.filter((m) =>
@@ -271,6 +415,22 @@ export function PlayerScreen({ sessionId, userId, userProfile, initialSession, q
   // Calculated rewards (rounded half-up)
   const goldEarned = Math.round(totalPoints)
   const xpEarned = goldEarned * 2
+
+  // ── EXPULSO PELO HOST ──────────────────────────────────────────
+  if (kicked) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-950 to-indigo-950 flex flex-col items-center justify-center p-6 gap-5 text-center">
+        <div className="w-20 h-20 rounded-full bg-red-500/20 border border-red-400/30 flex items-center justify-center">
+          <XCircle className="w-10 h-10 text-red-400" />
+        </div>
+        <h2 className="text-2xl font-black text-white">Foste removido do jogo</h2>
+        <p className="text-sky-200 text-sm max-w-xs">
+          O anfitrião removeu-te desta sessão. Se achas que foi um engano, fala com o anfitrião e volta a entrar.
+        </p>
+        <a href="/jogos/vana-quest" className="text-sky-300 underline mt-2">Voltar a entrar</a>
+      </div>
+    )
+  }
 
   // ── WAITING ────────────────────────────────────────────────────
   if (session.status === 'waiting') {
@@ -427,6 +587,14 @@ export function PlayerScreen({ sessionId, userId, userProfile, initialSession, q
         </div>
         <p className="text-center text-2xl font-black text-white tabular-nums">{Math.ceil(timeLeft)}</p>
 
+        {/* Falha de envio — botões reativam, jogador pode tocar outra vez */}
+        {submitError && !answerResult && (
+          <div className="bg-red-500/20 border border-red-400/40 rounded-2xl px-4 py-2.5 flex items-center gap-2 animate-in fade-in slide-in-from-top-2 duration-300">
+            <XCircle className="w-4 h-4 text-red-300 flex-shrink-0" />
+            <p className="text-red-100 text-sm font-semibold">Falha ao enviar. Toca outra vez na tua resposta.</p>
+          </div>
+        )}
+
         {/* If already answered — neutral state, no hint of which option was chosen */}
         {answerResult ? (
           <div className="flex-1 flex flex-col items-center justify-center gap-5">
@@ -512,11 +680,40 @@ export function PlayerScreen({ sessionId, userId, userProfile, initialSession, q
 
   // ── LEADERBOARD (player view) ─────────────────────────────────
   if (session.status === 'question_leaderboard') {
+    const isLeader = rankInfo.rank === 1
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-900 to-indigo-950 flex flex-col items-center justify-center p-6 gap-5 text-center">
-        <Trophy className="w-16 h-16 text-yellow-400" />
-        <p className="text-sky-300 text-xs font-black uppercase tracking-widest">A tua pontuação</p>
-        <p className="text-white text-6xl font-black tabular-nums">{totalPoints.toFixed(1)}</p>
+      <div className="min-h-screen bg-gradient-to-br from-blue-900 to-indigo-950 flex flex-col items-center justify-center p-6 gap-4 text-center">
+        {isLeader ? <Crown className="w-16 h-16 text-yellow-400" /> : <Trophy className="w-14 h-14 text-yellow-400" />}
+
+        {/* Posição em destaque */}
+        {rankInfo.rank > 0 && (
+          <div className="flex flex-col items-center">
+            <p className="text-sky-300 text-xs font-black uppercase tracking-widest mb-1">
+              {isLeader ? '👑 Estás em 1º!' : 'A tua posição'}
+            </p>
+            <div className="flex items-baseline gap-2">
+              <span className="text-white text-7xl font-black tabular-nums leading-none">{rankInfo.rank}º</span>
+              <span className="text-white/40 text-2xl font-bold">/ {rankInfo.total}</span>
+            </div>
+          </div>
+        )}
+
+        {/* Pontuação */}
+        <div className="bg-white/10 rounded-2xl px-6 py-3 mt-1">
+          <p className="text-sky-300 text-[10px] font-bold uppercase tracking-widest">A tua pontuação</p>
+          <p className="text-white text-4xl font-black tabular-nums">{totalPoints.toFixed(1)}</p>
+        </div>
+
+        {/* Quanto falta para subir */}
+        {rankInfo.pointsToNext !== null && rankInfo.pointsToNext > 0 && (
+          <div className="flex items-center gap-2 bg-green-500/15 border border-green-400/30 rounded-2xl px-4 py-2.5">
+            <ArrowUp className="w-4 h-4 text-green-400 flex-shrink-0" />
+            <p className="text-green-200 text-sm font-semibold">
+              Faltam <span className="text-green-400 font-black">{rankInfo.pointsToNext.toFixed(1)}</span> pts para o {rankInfo.rank - 1}º
+            </p>
+          </div>
+        )}
+
         <div className="flex gap-4 text-sm">
           <div className="bg-white/10 rounded-xl px-4 py-2">
             <p className="text-white/60 text-xs">Certas</p>
@@ -529,7 +726,7 @@ export function PlayerScreen({ sessionId, userId, userProfile, initialSession, q
             </div>
           )}
         </div>
-        <p className="text-white/40 text-xs animate-pulse mt-4">Olha para o ecrã principal...</p>
+        <p className="text-white/40 text-xs animate-pulse mt-2">Olha para o ecrã principal...</p>
       </div>
     )
   }
@@ -563,7 +760,7 @@ export function PlayerScreen({ sessionId, userId, userProfile, initialSession, q
                 {filteredMembers.map((m) => (
                   <button
                     key={m.id}
-                    onClick={() => handleDonate(m.id)}
+                    onClick={() => setPendingRecipient(m)}
                     disabled={donating}
                     className="w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-white/10 hover:bg-white/20 transition-colors text-left disabled:opacity-60"
                   >
@@ -619,13 +816,57 @@ export function PlayerScreen({ sessionId, userId, userProfile, initialSession, q
                         Voltar e escolher
                       </button>
                       <button
-                        onClick={() => {
-                          setShowSkipConfirm(false)
-                          setDonationSkipped(true)
-                        }}
-                        className="w-full bg-white/5 hover:bg-white/10 text-white/60 hover:text-white/80 text-sm py-2.5 rounded-2xl transition-colors border border-white/10"
+                        onClick={handleSkip}
+                        disabled={donating}
+                        className="w-full bg-white/5 hover:bg-white/10 text-white/60 hover:text-white/80 text-sm py-2.5 rounded-2xl transition-colors border border-white/10 disabled:opacity-60"
                       >
                         Sim, dispensar mesmo assim
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Modal de confirmação de escolha (para não doar sem querer) */}
+              {pendingRecipient && (
+                <div
+                  className="fixed inset-0 z-50 bg-black/70 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200"
+                  onClick={() => !donating && setPendingRecipient(null)}
+                >
+                  <div
+                    onClick={(e) => e.stopPropagation()}
+                    className="bg-gradient-to-br from-slate-900 via-blue-900 to-indigo-950 border border-white/20 rounded-3xl shadow-2xl max-w-sm w-full p-6 space-y-5 animate-in zoom-in-95 fade-in duration-300"
+                  >
+                    <div className="text-center space-y-3">
+                      <PlayerAvatar
+                        name={pendingRecipient.full_name}
+                        avatarUrl={pendingRecipient.avatar_url}
+                        className="w-16 h-16 mx-auto"
+                        textClassName="text-xl"
+                        fallbackBg="bg-blue-500"
+                      />
+                      <h3 className="text-white font-black text-2xl">Confirmar?</h3>
+                      <p className="text-sky-200 text-sm leading-relaxed">
+                        Vais dar <span className="text-yellow-400 font-black">{goldEarned} 🪙</span> e{' '}
+                        <span className="text-blue-300 font-black">{xpEarned} ⭐ XP</span> a{' '}
+                        <span className="text-white font-black">{pendingRecipient.full_name}</span>.
+                      </p>
+                    </div>
+
+                    <div className="flex flex-col gap-2">
+                      <button
+                        onClick={() => handleDonate(pendingRecipient.id)}
+                        disabled={donating}
+                        className="w-full bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-400 hover:to-emerald-400 text-white font-black py-3 rounded-2xl transition-all active:scale-[0.98] shadow-lg disabled:opacity-60"
+                      >
+                        {donating ? 'A enviar...' : 'Sim, é este!'}
+                      </button>
+                      <button
+                        onClick={() => setPendingRecipient(null)}
+                        disabled={donating}
+                        className="w-full bg-white/5 hover:bg-white/10 text-white/60 hover:text-white/80 text-sm py-2.5 rounded-2xl transition-colors border border-white/10 disabled:opacity-60"
+                      >
+                        Voltar
                       </button>
                     </div>
                   </div>

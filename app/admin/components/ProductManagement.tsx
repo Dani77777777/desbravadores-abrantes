@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { createClient } from '@/utils/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -12,12 +12,15 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Badge } from '@/components/ui/badge'
 import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
-import { Plus, Edit, Trash2, Key, Image as ImageIcon, Package, Check, ShoppingBag } from 'lucide-react'
+import { Plus, Edit, Trash2, Key, Image as ImageIcon, Package, Check, ShoppingBag, Upload, Loader2, X, Coins, Layers } from 'lucide-react'
 import { DigitalKeyManager } from './DigitalKeyManager'
+import { computeStoreEconomy } from '@/lib/store-economy'
 
 interface ProductManagementProps {
   products: any[]
   profile: any
+  members: any[]
+  events: any[]
 }
 
 const SECTION_OPTIONS = [
@@ -28,12 +31,13 @@ const SECTION_OPTIONS = [
   { value: 'embaixadores', label: 'Embaixadores' },
 ]
 
-export function ProductManagement({ products, profile }: ProductManagementProps) {
+export function ProductManagement({ products, profile, members, events }: ProductManagementProps) {
   const supabase = createClient()
   const router = useRouter()
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingProduct, setEditingProduct] = useState<any>(null)
-  
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
   // Form State
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
@@ -44,6 +48,40 @@ export function ProductManagement({ products, profile }: ProductManagementProps)
   const [restrictions, setRestrictions] = useState<string[]>([])
   const [minLevel, setMinLevel] = useState(0)
   const [loading, setLoading] = useState(false)
+  const [uploadingImage, setUploadingImage] = useState(false)
+
+  // Real club data → fair price/level guidance shown live in the dialog.
+  const econ = computeStoreEconomy(members, events)
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (!file.type.startsWith('image/')) {
+      toast.error('Escolhe um ficheiro de imagem.')
+      return
+    }
+    setUploadingImage(true)
+    try {
+      const bucket = process.env.NEXT_PUBLIC_SUPABASE_STORAGE_BUCKET || 'imagens'
+      const fileExt = file.name.split('.').pop()
+      const fileName = `${Date.now()}-${Math.random().toString(36).slice(2)}.${fileExt}`
+      const filePath = `products/${fileName}`
+
+      const { error: uploadError } = await supabase.storage
+        .from(bucket)
+        .upload(filePath, file, { cacheControl: '3600', upsert: false })
+      if (uploadError) throw uploadError
+
+      const { data: { publicUrl } } = supabase.storage.from(bucket).getPublicUrl(filePath)
+      setImageUrl(publicUrl)
+      toast.success('Imagem carregada!')
+    } catch (error: any) {
+      toast.error('Erro ao carregar imagem: ' + (error.message || 'Erro desconhecido'))
+    } finally {
+      setUploadingImage(false)
+      if (fileInputRef.current) fileInputRef.current.value = ''
+    }
+  }
 
   const resetForm = () => {
     setName('')
@@ -176,13 +214,90 @@ export function ProductManagement({ products, profile }: ProductManagementProps)
                     <Input type="number" min={0} value={stock} onChange={e => setStock(Number(e.target.value))} />
                   </div>
                 )}
-                <div className="space-y-2 col-span-2">
-                  <Label>URL da Imagem (Opcional)</Label>
-                  <Input value={imageUrl} onChange={e => setImageUrl(e.target.value)} placeholder="https://exemplo.com/imagem.jpg" />
+                {/* Reactive pricing guide — built from real club data */}
+                <div className="col-span-2 rounded-xl border border-blue-100 bg-blue-50/40 p-3 space-y-2.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-xs font-bold text-gray-700 flex items-center gap-1.5">
+                      <Coins className="w-3.5 h-3.5 text-amber-500" /> Guia de preço justo
+                    </span>
+                    <span className="text-[10px] text-gray-400">{econ.goldN} membros · saldo atual</span>
+                  </div>
+                  {price > 0 ? (
+                    <p className="text-[11px] text-gray-600 leading-relaxed">
+                      A <span className="font-black text-amber-600">{price.toLocaleString()} 🪙</span>:{' '}
+                      <span className="font-bold text-gray-800">{econ.affordCount(price)} de {econ.goldN}</span> membros
+                      {' '}({econ.goldN > 0 ? Math.round((econ.affordCount(price) / econ.goldN) * 100) : 0}%) conseguem comprar agora
+                      {econ.weeksToSave(price) ? <> · ≈ <span className="font-bold text-gray-800">{econ.weeksToSave(price)} sem.</span> a poupar</> : null}
+                    </p>
+                  ) : (
+                    <p className="text-[11px] text-gray-400">Define um preço — ou escolhe uma faixa sugerida abaixo.</p>
+                  )}
+                  <div className="flex flex-wrap gap-1.5">
+                    {econ.priceTiers.map(tier => (
+                      <button
+                        key={tier.key}
+                        type="button"
+                        onClick={() => setPrice(tier.value)}
+                        className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-[11px] font-bold transition-colors ${price === tier.value ? 'border-blue-400 bg-blue-100 text-blue-800' : 'border-gray-200 bg-white text-gray-600 hover:border-blue-300'}`}
+                      >
+                        <span className={`w-2 h-2 rounded-full ${tier.dot}`} />
+                        {tier.label}
+                        <span className="text-gray-300">·</span>
+                        <span className={tier.text}>{tier.value.toLocaleString()} 🪙</span>
+                      </button>
+                    ))}
+                  </div>
                 </div>
+
+                {/* Image: upload to Supabase Storage or paste a URL */}
+                <div className="space-y-2 col-span-2">
+                  <Label className="flex items-center gap-1.5"><ImageIcon className="w-3.5 h-3.5" /> Imagem do Produto (Opcional)</Label>
+                  <div className="flex items-center gap-3">
+                    <div className="w-16 h-16 rounded-lg border bg-gray-50 flex items-center justify-center overflow-hidden shrink-0 relative">
+                      {imageUrl ? (
+                        <>
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={imageUrl} alt="Pré-visualização" className="w-full h-full object-cover" />
+                          <button
+                            type="button"
+                            onClick={() => setImageUrl('')}
+                            title="Remover imagem"
+                            className="absolute top-0.5 right-0.5 bg-black/60 hover:bg-red-600 text-white rounded-full p-0.5"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </>
+                      ) : (
+                        <ImageIcon className="w-6 h-6 text-gray-300" />
+                      )}
+                    </div>
+                    <div className="flex-1 space-y-2 min-w-0">
+                      <input ref={fileInputRef} type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="gap-1.5"
+                        disabled={uploadingImage}
+                        onClick={() => fileInputRef.current?.click()}
+                      >
+                        {uploadingImage
+                          ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> A carregar…</>
+                          : <><Upload className="w-3.5 h-3.5" /> Carregar imagem</>}
+                      </Button>
+                      <Input value={imageUrl} onChange={e => setImageUrl(e.target.value)} placeholder="… ou cola um URL" className="h-8 text-xs" />
+                    </div>
+                  </div>
+                </div>
+
                 <div className="space-y-2">
-                  <Label>Nível Mínimo (0 = Livre)</Label>
+                  <Label className="flex items-center gap-1.5"><Layers className="w-3.5 h-3.5 text-indigo-500" /> Nível Mínimo (0 = Livre)</Label>
                   <Input type="number" min={0} value={minLevel} onChange={e => setMinLevel(Number(e.target.value))} />
+                  <p className="text-[10px] text-indigo-500/90">
+                    {minLevel > 1
+                      ? `${econ.atOrAboveLevel(minLevel)} de ${econ.goldN} membros já têm o nível ${minLevel}+`
+                      : 'Disponível para todos os níveis'}
+                  </p>
                 </div>
                 <div className="space-y-2 col-span-2">
                   <Label>Restrições de Secção (Vazio = Todos)</Label>

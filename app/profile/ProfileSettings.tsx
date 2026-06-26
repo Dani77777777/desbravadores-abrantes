@@ -37,6 +37,9 @@ export default function ProfileSettings({ profile, user, userEmail, purchases }:
   const [avatarUrl, setAvatarUrl] = useState(profile.avatar_url || '')
   const [loading, setLoading] = useState(false)
   const [uploading, setUploading] = useState(false)
+  const [newEmail, setNewEmail] = useState('')
+  const [emailLoading, setEmailLoading] = useState(false)
+  const [emailSent, setEmailSent] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const router = useRouter()
   const supabase = createClient()
@@ -102,6 +105,31 @@ export default function ProfileSettings({ profile, user, userEmail, purchases }:
       toast.error('Erro ao salvar. Tente novamente.')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleEmailChange = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (newEmail === userEmail) {
+      toast.error('O novo email é igual ao atual')
+      return
+    }
+    setEmailLoading(true)
+    try {
+      const { error } = await supabase.auth.updateUser(
+        { email: newEmail },
+        { emailRedirectTo: `${window.location.origin}/auth/callback` }
+      )
+      if (error) {
+        toast.error('Erro ao alterar email: ' + error.message)
+      } else {
+        setEmailSent(true)
+        setNewEmail('')
+      }
+    } catch {
+      toast.error('Erro ao alterar email. Tenta novamente.')
+    } finally {
+      setEmailLoading(false)
     }
   }
 
@@ -290,14 +318,76 @@ export default function ProfileSettings({ profile, user, userEmail, purchases }:
                 </div>
               </div>
 
-              <Button 
-                type="submit" 
+              <Button
+                type="submit"
                 className="w-full bg-blue-800 hover:bg-blue-900"
                 disabled={loading}
               >
                 {loading ? 'A guardar...' : 'Guardar Alterações'}
               </Button>
             </form>
+          </CardContent>
+        </Card>
+
+        {/* Change Email */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Mail className="w-5 h-5" />
+              Alterar Email
+            </CardTitle>
+            <CardDescription>
+              Será enviado um email de confirmação para o novo endereço
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {emailSent ? (
+              <div className="rounded-lg bg-green-50 border border-green-200 p-4 text-center space-y-2">
+                <p className="text-green-800 font-medium">Email de confirmação enviado!</p>
+                <p className="text-green-700 text-sm">
+                  Verifica a tua caixa de entrada e clica no link para confirmar o novo email.
+                </p>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-green-700 mt-2"
+                  onClick={() => setEmailSent(false)}
+                >
+                  Alterar para outro email
+                </Button>
+              </div>
+            ) : (
+              <form onSubmit={handleEmailChange} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="current_email">Email atual</Label>
+                  <Input
+                    id="current_email"
+                    type="email"
+                    value={userEmail}
+                    disabled
+                    className="bg-gray-50 text-gray-500"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="new_email">Novo email</Label>
+                  <Input
+                    id="new_email"
+                    type="email"
+                    placeholder="novo@email.com"
+                    value={newEmail}
+                    onChange={(e) => setNewEmail(e.target.value)}
+                    required
+                  />
+                </div>
+                <Button
+                  type="submit"
+                  className="w-full bg-blue-800 hover:bg-blue-900"
+                  disabled={emailLoading || !newEmail}
+                >
+                  {emailLoading ? 'A enviar...' : 'Confirmar Alteração de Email'}
+                </Button>
+              </form>
+            )}
           </CardContent>
         </Card>
       </div>

@@ -5,6 +5,7 @@ import { Navbar } from '@/components/layout/Navbar';
 import Link from 'next/link';
 import { ChevronLeft, BookOpen, ScrollText, Plus, Trash2, Search, X, AlertCircle } from 'lucide-react';
 import { normalizeText } from '@/utils/text-normalization';
+import { isAdminRole } from '@/utils/permissions';
 
 export default async function VanturAdminPage({ searchParams }: { searchParams: Promise<{ qBib?: string, qDict?: string, error?: string }> }) {
   const supabase = await createClient();
@@ -25,7 +26,7 @@ export default async function VanturAdminPage({ searchParams }: { searchParams: 
     .eq('id', user.id)
     .single();
 
-  const isAdmin = profile?.role === 'coordenador' || profile?.role === 'dirigente';
+  const isAdmin = isAdminRole(profile);
   if (!isAdmin) redirect('/');
 
   // Fetch words with filtering
