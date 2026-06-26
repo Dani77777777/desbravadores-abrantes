@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { Crown, Play, Pause, Plus, FastForward, AlertCircle } from 'lucide-react'
 import {
-  pausePhase, resumePhase, extendPhase, resolveMayorElection, getMyMayorVoteContext,
+  pausePhase, resumePhase, extendPhase, resolveMayorElection, getMayorElectionProgress,
 } from '@/lib/actions/vana-camp'
 import { createClient } from '@/utils/supabase/client'
 import { useLiveSession } from './useLiveSession'
@@ -36,8 +36,8 @@ export function HostMayorElectionMonitor({ sessionId, phaseEndsAt, phasePausedAt
 
   useEffect(() => {
     async function refresh() {
-      // Reusa getMyMayorVoteContext só para ler os votos (host vê tudo)
-      const r = await getMyMayorVoteContext(sessionId)
+      // Host não é jogador — usa a função host-only para ler os votos.
+      const r = await getMayorElectionProgress(sessionId)
       if (r.votes) {
         const counts: Record<string, number> = {}
         for (const v of r.votes) counts[v.target_id] = (counts[v.target_id] ?? 0) + 1
@@ -110,7 +110,7 @@ export function HostMayorElectionMonitor({ sessionId, phaseEndsAt, phasePausedAt
         </div>
       )}
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+      <div className="grid grid-cols-3 gap-2">
         {isPaused ? (
           <button onClick={() => wrap(() => resumePhase(sessionId))} disabled={busy} className="bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-white font-semibold py-3 rounded flex items-center justify-center gap-2">
             <Play className="w-4 h-4" /> Retomar
@@ -123,10 +123,13 @@ export function HostMayorElectionMonitor({ sessionId, phaseEndsAt, phasePausedAt
         <button onClick={() => wrap(() => extendPhase(sessionId, 30))} disabled={busy} className="bg-stone-700 hover:bg-stone-600 disabled:opacity-50 text-white font-semibold py-3 rounded flex items-center justify-center gap-2">
           <Plus className="w-4 h-4" /> 30s
         </button>
-        <button onClick={() => wrap(() => resolveMayorElection(sessionId))} disabled={busy} className="col-span-2 bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white font-bold py-3 rounded flex items-center justify-center gap-2">
-          <FastForward className="w-5 h-5" /> Apurar e seguir para noite
+        <button onClick={() => wrap(() => extendPhase(sessionId, 60))} disabled={busy} className="bg-stone-700 hover:bg-stone-600 disabled:opacity-50 text-white font-semibold py-3 rounded flex items-center justify-center gap-2">
+          <Plus className="w-4 h-4" /> 1min
         </button>
       </div>
+      <button onClick={() => wrap(() => resolveMayorElection(sessionId))} disabled={busy} className="w-full bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white font-bold py-3 rounded flex items-center justify-center gap-2">
+        <FastForward className="w-5 h-5" /> Apurar e seguir para noite
+      </button>
 
       <HostAlertPanel sessionId={sessionId} players={allPlayers} />
     </main>

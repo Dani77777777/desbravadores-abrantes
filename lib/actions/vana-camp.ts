@@ -1397,7 +1397,13 @@ export async function extendPhase(sessionId: string, seconds: number): Promise<{
   try {
     const { session } = await requireHostOfSession(sessionId)
     if (!session.phase_ends_at) return { error: 'Sem timer ativo.' }
-    const newEnds = new Date(new Date(session.phase_ends_at).getTime() + seconds * 1000).toISOString()
+    // Referência: se estiver em pausa, o "agora" efetivo é o momento da pausa
+    // (o relógio está congelado). Senão, é agora mesmo.
+    const ref = session.phase_paused_at ? new Date(session.phase_paused_at).getTime() : Date.now()
+    // Se o timer já expirou, soma a partir da referência (não do fim no passado),
+    // para que +30s passe mesmo a haver 30s no relógio.
+    const base = Math.max(new Date(session.phase_ends_at).getTime(), ref)
+    const newEnds = new Date(base + seconds * 1000).toISOString()
     const service = createServiceClient()
     await service.from('vanacamp_sessions').update({ phase_ends_at: newEnds }).eq('id', sessionId)
     return {}
@@ -1944,6 +1950,46 @@ export async function getDayVoteProgress(sessionId: string): Promise<{
       submitted: voted.size,
       pending_names: pending,
       tally,
+    }
+  } catch (e) { return { error: e instanceof Error ? e.message : 'Erro.' } }
+}
+
+/**
+ * Progresso da eleição do Diretor para o ecrã de projeção (corre como host).
+ * O host não é jogador, por isso não pode usar getMyMayorVoteContext — esta
+ * função é host-only e não exige uma linha em vanacamp_players.
+ */
+export async function getMayorElectionProgress(sessionId: string): Promise<{
+  players?: { id: string; display_name: string }[]
+  votes?: { voter_id: string; target_id: string }[]
+  expected?: number
+  error?: string
+}> {
+  try {
+    await requireHostOfSession(sessionId)
+    const service = createServiceClient()
+
+    const { data: alive } = await service
+      .from('vanacamp_players')
+      .select('id, display_name')
+      .eq('session_id', sessionId)
+      .eq('is_alive', true)
+      .order('display_name', { ascending: true })
+
+    const { data: votes } = await service
+      .from('vanacamp_votes')
+      .select('voter_player_id, target_player_id')
+      .eq('session_id', sessionId)
+      .eq('day_number', 0)
+      .eq('vote_type', 'mayor_election')
+
+    return {
+      players: alive ?? [],
+      votes: (votes ?? []).map((v) => ({
+        voter_id: v.voter_player_id,
+        target_id: v.target_player_id,
+      })),
+      expected: (alive ?? []).length,
     }
   } catch (e) { return { error: e instanceof Error ? e.message : 'Erro.' } }
 }

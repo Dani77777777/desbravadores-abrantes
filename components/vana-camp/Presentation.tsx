@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import Image from 'next/image'
 import { QRCodeSVG } from 'qrcode.react'
 import { Moon, Sunrise, Sun, Sunset, Vote, Trophy, VenetianMask, Home, Eye, Shield, User, Crown, Users } from 'lucide-react'
-import { getDayResult, getDayVoteProgress, getMyMayorVoteContext } from '@/lib/actions/vana-camp'
+import { getDayResult, getDayVoteProgress, getMayorElectionProgress } from '@/lib/actions/vana-camp'
 import { createClient } from '@/utils/supabase/client'
 import { useLiveSession } from './useLiveSession'
 import { usePhaseReload } from './usePhaseReload'
@@ -498,10 +498,10 @@ function PresentMayorElection({
 
   useEffect(() => {
     async function refresh() {
-      const r = await getMyMayorVoteContext(sessionId)
+      const r = await getMayorElectionProgress(sessionId)
       if (r.players) {
         setCandidates(r.players)
-        setVoterCount(r.players.length)
+        setVoterCount(r.expected ?? r.players.length)
       }
       if (r.votes) setVotes(r.votes)
     }
@@ -528,7 +528,7 @@ function PresentMayorElection({
         <p className="uppercase tracking-[0.3em] text-amber-300/80 text-sm">Dia 1</p>
         <h1 className="text-6xl md:text-7xl font-black mt-1">Eleger o Diretor</h1>
         <p className="text-2xl text-amber-200/80 mt-3">
-          O voto do Diretor desempata as expulsões.
+          O voto do Diretor desempata quando há igualdade.
         </p>
         <p className="text-amber-200 mt-4">
           {submittedSet.size} / {voterCount} já votaram
