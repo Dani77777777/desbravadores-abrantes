@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { Bug, EyeOff, Skull, Shield, User, Crown, Bot, UserCog, Eye } from 'lucide-react'
+import { Bug, EyeOff, VenetianMask, Shield, User, Crown, Bot, UserCog, Eye } from 'lucide-react'
 import { getAllRolesForHost } from '@/lib/actions/vana-camp'
 import { createClient } from '@/utils/supabase/client'
 import type { VanaCampRole } from '@/types/vana-camp'
@@ -35,7 +35,7 @@ const ROLE_COLOR: Record<VanaCampRole, string> = {
 }
 
 const ROLE_ICON: Record<VanaCampRole, typeof User> = {
-  infiltrator: Skull,
+  infiltrator: VenetianMask,
   seer: Eye,
   guardian: Shield,
   villager: User,

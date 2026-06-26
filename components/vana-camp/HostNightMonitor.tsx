@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import {
-  Moon, Eye, Shield, Skull, Play, Pause, FastForward, Plus, Check, AlertCircle,
+  Moon, Eye, Shield, VenetianMask, Play, Pause, FastForward, Plus, Check, AlertCircle,
 } from 'lucide-react'
 import {
   getNightProgress,
@@ -29,7 +29,7 @@ interface Props {
 }
 
 const PHASE_META: Record<string, { label: string; icon: typeof Moon; color: string }> = {
-  night_infiltrators: { label: 'Turno dos Infiltrados', icon: Skull, color: 'text-red-300' },
+  night_infiltrators: { label: 'Turno dos Infiltrados', icon: VenetianMask, color: 'text-red-300' },
   night_seer: { label: 'Turno do Profeta', icon: Eye, color: 'text-purple-300' },
   night_guardian: { label: 'Turno do Conselheiro', icon: Shield, color: 'text-sky-300' },
 }

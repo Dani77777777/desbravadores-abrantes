@@ -63,8 +63,8 @@ export function HostFinishedPanel({ sessionId, winnerSide }: Props) {
         </h1>
         <p className="text-amber-300/70">
           {isInfWin
-            ? 'O acampamento foi sabotado.'
-            : 'Os Infiltrados foram desmascarados.'}
+            ? 'Os Infiltrados não foram descobertos a tempo.'
+            : 'Os Infiltrados foram todos descobertos.'}
         </p>
       </header>
 

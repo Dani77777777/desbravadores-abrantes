@@ -204,7 +204,7 @@ export function HostLobby({ sessionId, code, chatMode, mayorMode, assignMode, is
             <div><span className="text-red-400 font-bold">{dist.infiltrators}</span> Infiltrado(s)</div>
             <div><span className="text-purple-300 font-bold">{dist.seer}</span> Profeta</div>
             <div><span className="text-sky-300 font-bold">{dist.guardian}</span> Conselheiro</div>
-            <div><span className="text-amber-200 font-bold">{dist.villagers}</span> Fiéis</div>
+            <div><span className="text-amber-200 font-bold">{dist.villagers}</span> Desbravadores</div>
           </div>
           <p className="text-stone-400 text-xs mt-2">
             Poderás ajustar antes de revelar aos jogadores.

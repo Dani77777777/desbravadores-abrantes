@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Skull, Eye, Shield, User, Crown, Bot } from 'lucide-react'
+import { VenetianMask, Eye, Shield, User, Crown, Bot } from 'lucide-react'
 import { getMyRoleInSession } from '@/lib/actions/vana-camp'
 import { createClient } from '@/utils/supabase/client'
 import { vibrate } from '@/utils/vibrate'
@@ -31,28 +31,28 @@ const ROLE_META: Record<VanaCampRole, {
 }> = {
   infiltrator: {
     label: 'Infiltrado',
-    flavor: 'Sabota o acampamento à noite. Não deixes que te descubram.',
-    icon: Skull,
+    flavor: 'À noite, assustas um desbravador e ele vai para casa. Não deixes que te descubram!',
+    icon: VenetianMask,
     color: 'text-red-300',
     bg: 'from-red-950 via-stone-950 to-stone-900',
   },
   seer: {
     label: 'Profeta',
-    flavor: 'À noite, escolhe alguém e descobre se é Fiel ou Infiltrado.',
+    flavor: 'À noite, escolhes alguém e descobres se é Desbravador ou Infiltrado.',
     icon: Eye,
     color: 'text-purple-300',
     bg: 'from-purple-950 via-stone-950 to-stone-900',
   },
   guardian: {
     label: 'Conselheiro',
-    flavor: 'À noite, protege um desbravador da sabotagem.',
+    flavor: 'À noite, proteges um desbravador para que ninguém o mande para casa.',
     icon: Shield,
     color: 'text-sky-300',
     bg: 'from-sky-950 via-stone-950 to-stone-900',
   },
   villager: {
-    label: 'Desbravador Fiel',
-    flavor: 'Sem poder noturno, mas tens voz e voto durante o dia.',
+    label: 'Desbravador',
+    flavor: 'Não tens poder à noite, mas tens voz e voto na assembleia de dia.',
     icon: User,
     color: 'text-amber-200',
     bg: 'from-amber-950 via-stone-950 to-stone-900',
@@ -160,7 +160,7 @@ export function RoleReveal({ sessionId, phaseEndsAt, impersonatingBot }: Props) 
             <ul className="space-y-1 text-red-100">
               {fellow.map((f) => (
                 <li key={f.id} className="flex items-center gap-2">
-                  <Skull className="w-4 h-4 text-red-400" />
+                  <VenetianMask className="w-4 h-4 text-red-400" />
                   {f.display_name}
                 </li>
               ))}

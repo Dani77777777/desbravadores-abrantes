@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { Moon, Skull, Eye, Shield, User, Bot, Check, MessageSquare } from 'lucide-react'
+import { Moon, VenetianMask, Home, Eye, Shield, User, Bot, Check, MessageSquare } from 'lucide-react'
 import {
   getMyNightContext,
   submitNightAction,
@@ -35,7 +35,7 @@ const PHASE_FOR_ROLE: Record<VanaCampRole, 'night_infiltrators' | 'night_seer' |
 }
 
 const ROLE_ICON: Record<VanaCampRole, typeof User> = {
-  infiltrator: Skull,
+  infiltrator: VenetianMask,
   seer: Eye,
   guardian: Shield,
   villager: User,
@@ -180,7 +180,7 @@ export function NightScreen(props: Props) {
         <header className="text-center space-y-2 py-2">
           <Icon className="w-12 h-12 text-amber-300 mx-auto drop-shadow-[0_0_15px_rgba(252,211,77,0.5)]" />
           <h1 className="text-2xl md:text-3xl font-black text-amber-100">
-            {ctx.my_role === 'infiltrator' && 'Quem sabotar esta noite?'}
+            {ctx.my_role === 'infiltrator' && 'Quem vais assustar esta noite?'}
             {ctx.my_role === 'seer' && 'Que jogador queres revelar?'}
             {ctx.my_role === 'guardian' && 'Quem queres proteger?'}
           </h1>
@@ -290,7 +290,7 @@ function SeerResult({ target, result }: { target: string; result: 'fiel' | 'infi
     }`}>
       <p className="text-sm text-stone-300 mb-1">A tua profecia revela:</p>
       <p className="text-2xl font-black">
-        <strong>{target}</strong> é {isInf ? 'INFILTRADO' : 'um FIEL DESBRAVADOR'}
+        <strong>{target}</strong> é {isInf ? 'INFILTRADO' : 'um DESBRAVADOR'}
       </p>
     </div>
   )
@@ -430,10 +430,10 @@ function DeadView({
   return (
     <main className="min-h-screen flex flex-col items-center justify-center text-center p-8 text-stone-300" style={bgStyle}>
       {impersonatingBotName && <ImpersonateBanner name={impersonatingBotName} />}
-      <Skull className="w-16 h-16 text-stone-400 mb-3" />
-      <h1 className="text-2xl font-bold mb-2">Estás na cozinha</h1>
+      <Home className="w-16 h-16 text-stone-400 mb-3" />
+      <h1 className="text-2xl font-bold mb-2">Já estás em casa</h1>
       <p className="text-stone-400 text-sm max-w-md">
-        Foste eliminado. Já não influencias o jogo, mas podes assistir até ao fim.
+        Foste para casa. Já não influencias o jogo, mas podes acompanhar até ao fim.
       </p>
       {remaining !== null && (
         <p className="text-stone-500 text-xs mt-6">resta: {remaining}s</p>

@@ -4,15 +4,15 @@ import { notFound, redirect } from 'next/navigation'
 import Link from 'next/link'
 import { Navbar } from '@/components/layout/Navbar'
 import {
-  ChevronLeft, Flame, Skull, Eye, Shield, User, Crown, Bot, Trophy, Clock, Sparkles,
+  ChevronLeft, Flame, VenetianMask, Eye, Shield, User, Crown, Bot, Trophy, Clock, Sparkles,
 } from 'lucide-react'
 import type { VanaCampRole } from '@/types/vana-camp'
 
 const ROLE_META: Record<VanaCampRole, { label: string; icon: typeof User; color: string }> = {
-  infiltrator: { label: 'Infiltrado', icon: Skull, color: 'text-red-300' },
+  infiltrator: { label: 'Infiltrado', icon: VenetianMask, color: 'text-red-300' },
   seer: { label: 'Profeta', icon: Eye, color: 'text-purple-300' },
   guardian: { label: 'Conselheiro', icon: Shield, color: 'text-sky-300' },
-  villager: { label: 'Fiel', icon: User, color: 'text-amber-200' },
+  villager: { label: 'Desbravador', icon: User, color: 'text-amber-200' },
 }
 
 export default async function VanaCampSessionDetailPage({
@@ -79,17 +79,17 @@ export default async function VanaCampSessionDetailPage({
       case 'death': {
         const name = (payload?.target_name as string) ?? '?'
         const cause = (payload?.cause as string) ?? '?'
-        return { label: `${name} foi eliminado (${cause})`, tone: 'text-red-300' }
+        return { label: `${name} foi para casa (${cause})`, tone: 'text-red-300' }
       }
       case 'save':
-        return { label: 'Conselheiro salvou um desbravador', tone: 'text-sky-300' }
+        return { label: 'Conselheiro protegeu um desbravador', tone: 'text-sky-300' }
       case 'night_resolved':
-        return { label: 'Noite resolveu (sem mortes)', tone: 'text-stone-400' }
+        return { label: 'Noite resolveu (ninguém foi para casa)', tone: 'text-stone-400' }
       case 'vote_tally': {
         const elim = payload?.eliminated as { name?: string } | null
         const tie = payload?.mayor_tiebreak_used
-        if (elim?.name) return { label: `Votação: ${elim.name} expulso${tie ? ' (desempate do Diretor)' : ''}`, tone: 'text-orange-300' }
-        return { label: 'Votação: sem expulsão (empate)', tone: 'text-stone-400' }
+        if (elim?.name) return { label: `Votação: ${elim.name} foi para casa${tie ? ' (desempate do Diretor)' : ''}`, tone: 'text-orange-300' }
+        return { label: 'Votação: ninguém foi para casa (empate)', tone: 'text-stone-400' }
       }
       case 'win':
         return { label: `Vitória dos ${payload?.side === 'infiltrators' ? 'Infiltrados' : 'Desbravadores'}`, tone: 'text-amber-300' }
@@ -133,7 +133,7 @@ export default async function VanaCampSessionDetailPage({
           <Card label="Narrador" value={hostProfile?.full_name ?? '?'} />
           <Card label="Criada" value={fmt(session.created_at)} />
           <Card label="Modo chat" value={session.chat_mode} />
-          <Card label="Mayor" value={session.mayor_mode} />
+          <Card label="Diretor" value={session.mayor_mode} />
           <Card label="Atribuição" value={session.role_assignment_mode} />
           <Card label="Prémios" value={session.rewards_awarded ? '✓ atribuídos' : '—'} accent={session.rewards_awarded ? 'text-emerald-300' : 'text-stone-300'} />
         </section>

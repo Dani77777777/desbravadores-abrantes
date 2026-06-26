@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { Shuffle, Check, AlertTriangle, History, Crown, Skull, Eye, Shield, User } from 'lucide-react'
+import { Shuffle, Check, AlertTriangle, History, Crown, VenetianMask, Eye, Shield, User } from 'lucide-react'
 import {
   getRolePreviewData,
   regenerateRoles,
@@ -26,7 +26,7 @@ const ROLE_LABEL: Record<VanaCampRole, string> = {
   infiltrator: 'Infiltrado',
   seer: 'Profeta',
   guardian: 'Conselheiro',
-  villager: 'Fiel',
+  villager: 'Desbravador',
 }
 
 const ROLE_COLOR: Record<VanaCampRole, string> = {
@@ -37,7 +37,7 @@ const ROLE_COLOR: Record<VanaCampRole, string> = {
 }
 
 const ROLE_ICON: Record<VanaCampRole, typeof User> = {
-  infiltrator: Skull,
+  infiltrator: VenetianMask,
   seer: Eye,
   guardian: Shield,
   villager: User,
@@ -110,7 +110,7 @@ export function HostRolePreview({ sessionId, mayorMode, isManualMode }: Props) {
         <Card label="Infiltrados" value={counts.infiltrators} expected={data.suggested_counts.infiltrators} color="text-red-400" />
         <Card label="Profetas" value={counts.seer} expected={data.suggested_counts.seer} color="text-purple-300" />
         <Card label="Conselheiros" value={counts.guardian} expected={data.suggested_counts.guardian} color="text-sky-300" />
-        <Card label="Fiéis" value={counts.villagers} expected={data.suggested_counts.villagers} color="text-amber-200" />
+        <Card label="Desbravadores" value={counts.villagers} expected={data.suggested_counts.villagers} color="text-amber-200" />
       </section>
 
       {mismatch && (
@@ -158,7 +158,7 @@ export function HostRolePreview({ sessionId, mayorMode, isManualMode }: Props) {
                         <option value="infiltrator">Infiltrado</option>
                         <option value="seer">Profeta</option>
                         <option value="guardian">Conselheiro</option>
-                        <option value="villager">Fiel</option>
+                        <option value="villager">Desbravador</option>
                       </select>
                     </div>
                   </td>

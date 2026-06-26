@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { Sun, Sunset, Vote, Crown, Skull, Bot, MessageSquare, Check } from 'lucide-react'
+import { Sun, Sunset, Vote, Crown, Home, Bot, MessageSquare, Check } from 'lucide-react'
 import {
   getMyDayVoteContext,
   submitDayVote,
@@ -143,8 +143,8 @@ export function DayScreen(props: Props) {
     if (ctx?.is_alive === false) {
       return (
         <main className="min-h-screen flex flex-col items-center justify-center p-8 text-center text-orange-100" style={bgStyle}>
-          <Skull className="w-16 h-16 mb-4" />
-          <p className="text-2xl font-bold">Estás na cozinha</p>
+          <Home className="w-16 h-16 mb-4" />
+          <p className="text-2xl font-bold">Já estás em casa</p>
           <p className="text-orange-200/70 text-sm mt-2">Não podes votar. Aguarda o resultado.</p>
           {remaining !== null && <p className="text-sm mt-4">{remaining}s</p>}
         </main>
@@ -175,7 +175,7 @@ export function DayScreen(props: Props) {
           <header className="text-center space-y-2 py-2">
             <Vote className="w-14 h-14 text-amber-200 mx-auto drop-shadow-lg" />
             <h1 className="text-3xl md:text-4xl font-black">
-              Vota em quem expulsar
+              Vota em quem vai para casa
             </h1>
             {ctx?.is_mayor && (
               <p className="text-amber-200 text-xs flex items-center justify-center gap-1">
@@ -251,7 +251,7 @@ function ImpersonateBanner({ name }: { name: string }) {
 function DeadBanner() {
   return (
     <div className="bg-stone-900/60 border border-stone-700 rounded p-3 text-center text-stone-300 text-sm">
-      Estás na cozinha — não podes votar, mas podes observar.
+      Já estás em casa — não podes votar, mas podes acompanhar.
     </div>
   )
 }

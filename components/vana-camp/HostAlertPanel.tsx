@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Vibrate, Users, Skull, Eye, Shield, ChevronUp, ChevronDown, Smartphone } from 'lucide-react'
+import { Vibrate, Users, VenetianMask, Eye, Shield, ChevronUp, ChevronDown, Smartphone } from 'lucide-react'
 import { triggerVibration } from '@/lib/actions/vana-camp'
 import { isVibrationSupported } from '@/utils/vibrate'
 import type { VanaCampRole } from '@/types/vana-camp'
@@ -84,7 +84,7 @@ export function HostAlertPanel({ sessionId, players }: Props) {
                 className="bg-stone-800 hover:bg-red-900 disabled:opacity-50 text-red-300 text-xs px-2 py-2 rounded flex items-center justify-center gap-1"
                 title="Vibrar infiltrados"
               >
-                <Skull className="w-3.5 h-3.5" /> Inf
+                <VenetianMask className="w-3.5 h-3.5" /> Inf
               </button>
               <button
                 onClick={() => fire('Profeta', () => triggerVibration(sessionId, { kind: 'role', role: 'seer' }, 'night_call'))}

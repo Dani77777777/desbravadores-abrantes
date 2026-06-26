@@ -951,7 +951,7 @@ export async function submitMayorVote(
     const { user } = await requireUser()
     const actor = await resolveActorPlayerId(sessionId, user.id, actAsPlayerId)
     if ('error' in actor) return { error: actor.error }
-    if (!actor.is_alive) return { error: 'Estás eliminado.' }
+    if (!actor.is_alive) return { error: 'Já estás em casa.' }
 
     const service = createServiceClient()
     const { data: session } = await service
@@ -1465,7 +1465,7 @@ export async function submitNightAction(
     const { user } = await requireUser()
     const actor = await resolveActorPlayerId(sessionId, user.id, actAsPlayerId)
     if ('error' in actor) return { error: actor.error }
-    if (!actor.is_alive) return { error: 'Estás eliminado.' }
+    if (!actor.is_alive) return { error: 'Já estás em casa.' }
 
     const service = createServiceClient()
     const { data: session } = await service
@@ -1494,7 +1494,7 @@ export async function submitNightAction(
       .eq('id', targetPlayerId)
       .single()
     if (!target || target.session_id !== sessionId) return { error: 'Alvo inválido.' }
-    if (!target.is_alive) return { error: 'Alvo já está eliminado.' }
+    if (!target.is_alive) return { error: 'Essa pessoa já foi para casa.' }
 
     // Guardian: não pode repetir alvo da noite anterior
     if (phase === 'guardian' && session.day_number > 1) {
@@ -1790,7 +1790,7 @@ export async function submitDayVote(
     const { user } = await requireUser()
     const actor = await resolveActorPlayerId(sessionId, user.id, actAsPlayerId)
     if ('error' in actor) return { error: actor.error }
-    if (!actor.is_alive) return { error: 'Estás eliminado — não podes votar.' }
+    if (!actor.is_alive) return { error: 'Já estás em casa — não podes votar.' }
 
     const service = createServiceClient()
     const { data: session } = await service
@@ -1809,7 +1809,7 @@ export async function submitDayVote(
       .eq('id', targetPlayerId)
       .single()
     if (!target || target.session_id !== sessionId) return { error: 'Alvo inválido.' }
-    if (!target.is_alive) return { error: 'Alvo já eliminado.' }
+    if (!target.is_alive) return { error: 'Essa pessoa já foi para casa.' }
     if (target.id === actor.player_id) return { error: 'Não podes votar em ti.' }
 
     const { error } = await service
@@ -2304,7 +2304,7 @@ export async function sendChatMessage(
       return { error: 'Canal restrito a infiltrados vivos.' }
     }
     if (channel === 'dead' && actor.is_alive) {
-      return { error: 'Canal restrito a eliminados.' }
+      return { error: 'Canal restrito a quem já foi para casa.' }
     }
 
     const service = createServiceClient()

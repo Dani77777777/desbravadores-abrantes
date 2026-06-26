@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Sunset, Skull, Eye, Shield, User, Crown, Smile, Frown } from 'lucide-react'
+import { Sunset, VenetianMask, Eye, Shield, User, Crown, Smile, Frown } from 'lucide-react'
 import { getDayResult } from '@/lib/actions/vana-camp'
 import { useLiveSession } from './useLiveSession'
 import { usePhaseReload } from './usePhaseReload'
@@ -16,15 +16,15 @@ interface Props {
 }
 
 const ROLE_META: Record<VanaCampRole, { label: string; icon: typeof User; bg: string; tone: string }> = {
-  infiltrator: { label: 'INFILTRADO', icon: Skull, bg: 'from-red-900 via-stone-950 to-stone-900', tone: 'text-red-300' },
+  infiltrator: { label: 'INFILTRADO', icon: VenetianMask, bg: 'from-red-900 via-stone-950 to-stone-900', tone: 'text-red-300' },
   seer: { label: 'PROFETA', icon: Eye, bg: 'from-purple-900 via-stone-950 to-stone-900', tone: 'text-purple-300' },
   guardian: { label: 'CONSELHEIRO', icon: Shield, bg: 'from-sky-900 via-stone-950 to-stone-900', tone: 'text-sky-300' },
-  villager: { label: 'DESBRAVADOR FIEL', icon: User, bg: 'from-amber-900 via-stone-950 to-stone-900', tone: 'text-amber-200' },
+  villager: { label: 'DESBRAVADOR', icon: User, bg: 'from-amber-900 via-stone-950 to-stone-900', tone: 'text-amber-200' },
 }
 
 /**
- * Ecrã dramático: revela quem foi expulso e qual era o seu papel.
- * Mostrado a TODOS (vivos e mortos) — é a catarse do dia.
+ * Ecrã dramático: revela quem foi para casa e qual era o seu papel.
+ * Mostrado a TODOS (no acampamento e em casa) — é a catarse do dia.
  */
 export function DayResultScreen({ sessionId, dayNumber, phaseEndsAt, phasePausedAt }: Props) {
   const live = useLiveSession(sessionId, {
@@ -51,13 +51,13 @@ export function DayResultScreen({ sessionId, dayNumber, phaseEndsAt, phasePaused
   }
 
   if (!result.eliminated) {
-    // Empate sem desempate do Mayor → ninguém expulso
+    // Empate sem desempate do Diretor → ninguém vai para casa
     return (
       <main className="min-h-screen flex flex-col items-center justify-center p-8 text-center bg-gradient-to-br from-stone-700 via-stone-900 to-stone-950 text-amber-100">
         <Sunset className="w-20 h-20 text-orange-400 mb-4 drop-shadow-lg" />
-        <h1 className="text-4xl font-black mb-3">Sem expulsão hoje</h1>
+        <h1 className="text-4xl font-black mb-3">Hoje ninguém vai para casa</h1>
         <p className="text-stone-300 text-lg max-w-md">
-          A assembleia não chegou a um veredito. Ninguém é expulso esta tarde — o acampamento continua.
+          A assembleia não chegou a um acordo. Ninguém vai para casa esta tarde — o acampamento continua.
         </p>
         {remaining !== null && <p className="text-stone-400 text-sm mt-6">{remaining}s</p>}
       </main>
@@ -74,7 +74,7 @@ export function DayResultScreen({ sessionId, dayNumber, phaseEndsAt, phasePaused
 
       <div className="space-y-3 animate-in fade-in zoom-in duration-700">
         <h1 className="text-4xl md:text-5xl font-black">
-          {result.eliminated.name} foi expulso
+          {result.eliminated.name} vai para casa
         </h1>
         {result.eliminated.role && meta && (
           <div className={`inline-flex flex-col items-center gap-3 mt-4 ${meta.tone}`}>
@@ -97,7 +97,7 @@ export function DayResultScreen({ sessionId, dayNumber, phaseEndsAt, phasePaused
         </p>
       ) : (
         <p className="text-red-300 mt-4 flex items-center gap-2">
-          <Frown className="w-5 h-5" /> Um Fiel a menos…
+          <Frown className="w-5 h-5" /> Um Desbravador a menos…
         </p>
       )}
 

@@ -87,7 +87,7 @@ export function MayorElectionScreen({
           <Crown className="w-16 h-16 text-amber-300 mx-auto drop-shadow-[0_0_20px_rgba(252,211,77,0.6)]" />
           <h1 className="text-3xl md:text-4xl font-black">Eleger o Diretor do Clube</h1>
           <p className="text-amber-200/70 text-sm">
-            O Diretor desempata em caso de igualdade nas votações de expulsão.
+            O Diretor desempata quando há igualdade na votação de quem vai para casa.
           </p>
           {remaining !== null && (
             <p className="text-amber-200 text-2xl font-black mt-1">{remaining}s</p>

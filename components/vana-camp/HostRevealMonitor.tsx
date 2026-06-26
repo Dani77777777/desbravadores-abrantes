@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Eye, Skull, Shield, User, Crown, Bot } from 'lucide-react'
+import { Eye, VenetianMask, Shield, User, Crown, Bot } from 'lucide-react'
 import { getAllRolesForHost } from '@/lib/actions/vana-camp'
 import { createClient } from '@/utils/supabase/client'
 import { HostAlertPanel } from './HostAlertPanel'
@@ -30,7 +30,7 @@ const ROLE_LABEL: Record<VanaCampRole, string> = {
   infiltrator: 'Infiltrado',
   seer: 'Profeta',
   guardian: 'Conselheiro',
-  villager: 'Fiel',
+  villager: 'Desbravador',
 }
 const ROLE_COLOR: Record<VanaCampRole, string> = {
   infiltrator: 'text-red-300 bg-red-950/40 border-red-800/50',
@@ -39,7 +39,7 @@ const ROLE_COLOR: Record<VanaCampRole, string> = {
   villager: 'text-amber-200 bg-amber-950/40 border-amber-800/50',
 }
 const ROLE_ICON: Record<VanaCampRole, typeof User> = {
-  infiltrator: Skull,
+  infiltrator: VenetianMask,
   seer: Eye,
   guardian: Shield,
   villager: User,

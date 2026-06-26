@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import Image from 'next/image'
 import { QRCodeSVG } from 'qrcode.react'
-import { Moon, Sunrise, Sun, Sunset, Vote, Trophy, Skull, Eye, Shield, User, Crown, Users } from 'lucide-react'
+import { Moon, Sunrise, Sun, Sunset, Vote, Trophy, VenetianMask, Home, Eye, Shield, User, Crown, Users } from 'lucide-react'
 import { getDayResult, getDayVoteProgress, getMyMayorVoteContext } from '@/lib/actions/vana-camp'
 import { createClient } from '@/utils/supabase/client'
 import { useLiveSession } from './useLiveSession'
@@ -251,13 +251,13 @@ function PresentRoleReveal({ phaseEndsAt, phasePausedAt }: { phaseEndsAt: string
 const NIGHT_META: Record<string, { headline: string; flavor: string; icon: typeof Moon; accent: string }> = {
   night_infiltrators: {
     headline: 'Os infiltrados conspiram nas sombras',
-    flavor: 'Estão a escolher quem sabotar esta noite…',
-    icon: Skull,
+    flavor: 'Estão a escolher quem assustar esta noite…',
+    icon: VenetianMask,
     accent: 'text-red-300',
   },
   night_seer: {
     headline: 'O Profeta busca orientação a Deus',
-    flavor: 'Em oração, procura desmascarar um suspeito…',
+    flavor: 'Em oração, procura descobrir um suspeito…',
     icon: Eye,
     accent: 'text-purple-300',
   },
@@ -447,11 +447,11 @@ function PresentDayAnnounce({
       <div className="bg-white/50 backdrop-blur rounded-2xl p-8 max-w-3xl border border-amber-700/30 shadow-xl">
         {death && (
           <div className="flex items-center gap-4 justify-center">
-            <Skull className="w-16 h-16 text-stone-800 shrink-0" />
+            <Home className="w-16 h-16 text-stone-800 shrink-0" />
             <p className="text-3xl text-stone-900 text-left">
               <strong className="text-red-700">{(death.payload as { target_name?: string }).target_name ?? 'Alguém'}</strong>{' '}
-              foi <strong>sabotado</strong> esta noite.
-              <span className="block text-xl text-stone-700 mt-2">Foi levado para a cozinha lavar a loiça.</span>
+              ficou com medo esta noite.
+              <span className="block text-xl text-stone-700 mt-2">Foi para casa mais cedo.</span>
             </p>
           </div>
         )}
@@ -459,8 +459,8 @@ function PresentDayAnnounce({
           <div className="flex items-center gap-4 justify-center">
             <Shield className="w-16 h-16 text-sky-700 shrink-0" />
             <p className="text-3xl text-stone-900">
-              O <strong className="text-sky-800">Conselheiro</strong> salvou um desbravador!
-              <span className="block text-xl text-stone-700 mt-2">Ninguém morreu esta noite.</span>
+              O <strong className="text-sky-800">Conselheiro</strong> protegeu um desbravador!
+              <span className="block text-xl text-stone-700 mt-2">Ninguém foi para casa esta noite.</span>
             </p>
           </div>
         )}
@@ -702,7 +702,7 @@ function PresentDayVote({
       <header className="text-center mb-6">
         <Vote className="w-20 h-20 text-amber-200 mx-auto mb-3 drop-shadow-lg" />
         <p className="uppercase tracking-[0.3em] text-orange-200 text-sm">Dia {dayNumber}</p>
-        <h1 className="text-5xl md:text-6xl font-black mt-1 mb-2">Quem expulsamos?</h1>
+        <h1 className="text-5xl md:text-6xl font-black mt-1 mb-2">Quem vai para casa?</h1>
         <p className="text-orange-200">
           {submitted} / {expected} votaram
           {remaining !== null && <> &middot; <span className="font-bold text-amber-100">{remaining}s</span></>}
@@ -769,9 +769,9 @@ function PresentDayResult({
     return (
       <main className="min-h-screen flex flex-col items-center justify-center text-center p-12 bg-gradient-to-br from-stone-700 via-stone-900 to-stone-950 text-amber-100">
         <Sunset className="w-32 h-32 text-orange-400 mb-6 drop-shadow-lg" />
-        <h1 className="text-6xl font-black mb-4">Sem expulsão hoje</h1>
+        <h1 className="text-6xl font-black mb-4">Hoje ninguém vai para casa</h1>
         <p className="text-2xl text-stone-300 max-w-3xl">
-          A assembleia não chegou a um veredito. Ninguém é expulso esta tarde.
+          A assembleia não chegou a um acordo. Ninguém vai para casa esta tarde.
         </p>
         {remaining !== null && <p className="text-stone-400 mt-8 text-xl">A noite cai em {remaining}s</p>}
       </main>
@@ -793,7 +793,7 @@ function PresentDayResult({
         <h1 className="text-6xl md:text-7xl font-black">
           {result.eliminated.name}
         </h1>
-        <p className="text-3xl text-stone-200">foi expulso do acampamento</p>
+        <p className="text-3xl text-stone-200">foi para casa</p>
 
         {role && meta && (
           <div className={`inline-flex flex-col items-center gap-4 mt-6 ${meta.color.split(' ')[0]}`}>
@@ -822,10 +822,10 @@ function PresentDayResult({
 // ════════════════════════════════════════════════════════════════════
 
 const ROLE_META: Record<VanaCampRole, { label: string; color: string; icon: typeof User }> = {
-  infiltrator: { label: 'Infiltrado', color: 'text-red-300 bg-red-950/40 border-red-700/50', icon: Skull },
+  infiltrator: { label: 'Infiltrado', color: 'text-red-300 bg-red-950/40 border-red-700/50', icon: VenetianMask },
   seer: { label: 'Profeta', color: 'text-purple-300 bg-purple-950/40 border-purple-700/50', icon: Eye },
   guardian: { label: 'Conselheiro', color: 'text-sky-300 bg-sky-950/40 border-sky-700/50', icon: Shield },
-  villager: { label: 'Fiel', color: 'text-amber-200 bg-amber-950/40 border-amber-700/50', icon: User },
+  villager: { label: 'Desbravador', color: 'text-amber-200 bg-amber-950/40 border-amber-700/50', icon: User },
 }
 
 function PresentFinished({ sessionId, winnerSide }: { sessionId: string; winnerSide: VanaCampSide | null }) {
@@ -859,8 +859,8 @@ function PresentFinished({ sessionId, winnerSide }: { sessionId: string; winnerS
       </h1>
       <p className={`text-2xl mb-10 ${isInfWin ? 'text-red-200' : 'text-amber-100'}`}>
         {isInfWin
-          ? 'O acampamento foi sabotado. Os fiéis não conseguiram desmascará-los a tempo.'
-          : 'Os Infiltrados foram todos desmascarados. O acampamento está a salvo!'}
+          ? 'Os desbravadores não conseguiram descobrir os Infiltrados a tempo.'
+          : 'Os Infiltrados foram todos descobertos. O acampamento está a salvo!'}
       </p>
 
       <section className="bg-black/30 backdrop-blur rounded-2xl p-6 max-w-5xl w-full border border-white/10">

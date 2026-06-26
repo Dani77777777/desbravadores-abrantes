@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Sunrise, Skull, Shield, Trophy } from 'lucide-react'
+import { Sunrise, Home, Shield, Trophy } from 'lucide-react'
 import { createClient } from '@/utils/supabase/client'
 import { usePhaseCountdown } from './usePhaseCountdown'
 import { usePhaseReload } from './usePhaseReload'
@@ -48,8 +48,8 @@ export function DayAnnouncement({ sessionId, dayNumber, phaseEndsAt, phasePaused
         </h1>
         <p className="text-xl text-amber-100">
           {winnerSide === 'infiltrators'
-            ? 'O acampamento foi sabotado.'
-            : 'Todos os infiltrados foram desmascarados.'}
+            ? 'Os Infiltrados ficaram com o acampamento.'
+            : 'Todos os Infiltrados foram descobertos.'}
         </p>
       </main>
     )
@@ -70,10 +70,10 @@ export function DayAnnouncement({ sessionId, dayNumber, phaseEndsAt, phasePaused
       <div className="max-w-md bg-white/40 backdrop-blur rounded-lg p-5 border border-amber-700/30 shadow-lg">
         {death && (
           <div className="flex items-center gap-3 justify-center text-stone-900">
-            <Skull className="w-8 h-8 text-stone-700" />
+            <Home className="w-8 h-8 text-stone-700" />
             <p className="text-lg">
               <strong className="text-red-700">{(death.payload as { target_name?: string }).target_name ?? 'Alguém'}</strong>{' '}
-              foi <strong>sabotado</strong> esta noite e foi para a cozinha lavar a loiça.
+              ficou com medo esta noite e <strong>foi para casa</strong>.
             </p>
           </div>
         )}
@@ -81,7 +81,7 @@ export function DayAnnouncement({ sessionId, dayNumber, phaseEndsAt, phasePaused
           <div className="flex items-center gap-3 justify-center text-stone-900">
             <Shield className="w-8 h-8 text-sky-700" />
             <p className="text-lg">
-              O <strong>Conselheiro</strong> salvou um desbravador esta noite. Ninguém morreu!
+              O <strong>Conselheiro</strong> acalmou os ânimos esta noite. Ninguém foi para casa!
             </p>
           </div>
         )}

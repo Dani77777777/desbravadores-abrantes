@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { Navbar } from '@/components/layout/Navbar'
 import {
-  ChevronLeft, Flame, History, Plus, Trophy, Users, Bot, Eye, Skull, Crown, Sparkles,
+  ChevronLeft, Flame, History, Plus, Trophy, Users, Bot, Eye, VenetianMask, Crown, Sparkles,
 } from 'lucide-react'
 import { DeleteVanaCampSessionButton } from '@/components/vana-camp/DeleteVanaCampSessionButton'
 
@@ -88,8 +88,8 @@ export default async function VanaCampAdminPage() {
           <StatCard icon={History} label="Total" value={total} />
           <StatCard icon={Flame} label="A decorrer" value={active} accent="text-orange-300" />
           <StatCard icon={Trophy} label="Terminadas" value={finished} accent="text-emerald-300" />
-          <StatCard icon={Skull} label="Vitórias Inf." value={infWins} accent="text-red-300" />
-          <StatCard icon={Users} label="Vitórias Fiéis" value={fielWins} accent="text-amber-300" />
+          <StatCard icon={VenetianMask} label="Vitórias Inf." value={infWins} accent="text-red-300" />
+          <StatCard icon={Users} label="Vitórias Desbr." value={fielWins} accent="text-amber-300" />
         </section>
 
         {/* Lista de sessões */}
