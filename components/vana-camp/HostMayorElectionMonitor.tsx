@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { Crown, Play, Pause, Plus, FastForward, AlertCircle } from 'lucide-react'
 import {
   pausePhase, resumePhase, extendPhase, resolveMayorElection, getMayorElectionProgress,
@@ -28,6 +29,21 @@ export function HostMayorElectionMonitor({ sessionId, phaseEndsAt, phasePausedAt
   usePhaseReload(sessionId, 'mayor_election')
   const remaining = usePhaseCountdown(live.phase_ends_at, live.phase_paused_at)
   const isPaused = !!live.phase_paused_at
+
+  // Quando a eleição é apurada, a fase passa a night_infiltrators. O soft
+  // router.refresh() nem sempre invalida a route cache do /control de forma
+  // fiável (mesmo problema do HostNightMonitor), por isso forçamos refresh +
+  // hard reload como fallback. O painel do host não depende de user-activation.
+  const router = useRouter()
+  const outOfPhase = live.status !== 'mayor_election'
+  useEffect(() => {
+    if (!outOfPhase) return
+    router.refresh()
+    const t = setTimeout(() => {
+      if (typeof window !== 'undefined') window.location.reload()
+    }, 800)
+    return () => clearTimeout(t)
+  }, [outOfPhase, router])
 
   const [tally, setTally] = useState<Record<string, number>>({})
   const [busy, setBusy] = useState(false)
@@ -63,6 +79,16 @@ export function HostMayorElectionMonitor({ sessionId, phaseEndsAt, phasePausedAt
 
   const sorted = Object.entries(tally).sort(([, a], [, b]) => b - a)
   const max = sorted[0]?.[1] ?? 0
+
+  if (outOfPhase) {
+    return (
+      <main className="min-h-screen flex flex-col items-center justify-center text-center p-8 text-amber-100">
+        <Crown className="w-16 h-16 text-amber-300/60 mb-4 animate-pulse" />
+        <p className="text-xl font-semibold">Eleição terminada</p>
+        <p className="text-stone-400 text-sm mt-2">A começar a noite…</p>
+      </main>
+    )
+  }
 
   return (
     <main className="max-w-3xl mx-auto p-4 md:p-8 space-y-5">

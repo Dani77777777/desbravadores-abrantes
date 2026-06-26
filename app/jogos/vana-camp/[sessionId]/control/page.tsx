@@ -10,6 +10,7 @@ import { HostMayorElectionMonitor } from '@/components/vana-camp/HostMayorElecti
 import { HostFinishedPanel } from '@/components/vana-camp/HostFinishedPanel'
 import { DayAnnouncement } from '@/components/vana-camp/DayAnnouncement'
 import { HostDebugOverlay } from '@/components/vana-camp/HostDebugOverlay'
+import { HostChatMonitor } from '@/components/vana-camp/HostChatMonitor'
 import { OpenPresentButton } from '@/components/vana-camp/OpenPresentButton'
 
 export const dynamic = 'force-dynamic'
@@ -34,10 +35,17 @@ export default async function VanaCampControlPage({
   if (!session) notFound()
   if (session.host_id !== user.id) redirect(`/jogos/vana-camp/${sessionId}`)
 
+  // Nomes de todos os jogadores (vivos, em casa e bots) para o monitor de chat.
+  const { data: chatPlayers } = await createServiceClient()
+    .from('vanacamp_players')
+    .select('id, display_name')
+    .eq('session_id', sessionId)
+
   const wrap = (children: React.ReactNode) => (
     <div className="min-h-screen bg-gradient-to-br from-stone-900 via-amber-950 to-stone-900">
       <OpenPresentButton sessionId={sessionId} />
       {children}
+      <HostChatMonitor sessionId={sessionId} players={chatPlayers ?? []} raised={session.is_test_session} />
       {session.is_test_session && <HostDebugOverlay sessionId={sessionId} />}
     </div>
   )

@@ -51,6 +51,7 @@ export type VanaCampEventType =
   | 'reveal'
   | 'vote_tally'
   | 'win'
+  | 'eyes_closed'
 
 // ============================================
 // CONFIG (gravado em sessions.config_json)

@@ -68,7 +68,7 @@ export default async function VanaCampSessionDetailPage({
     .from('vanacamp_events')
     .select('*')
     .eq('session_id', sessionId)
-    .neq('event_type', 'vibrate')
+    .not('event_type', 'in', '("vibrate","eyes_closed")')
     .order('created_at', { ascending: true })
     .limit(200)
 

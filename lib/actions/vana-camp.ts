@@ -1681,6 +1681,7 @@ export async function getNightProgress(sessionId: string): Promise<{
   expected?: number
   submitted?: number
   pending_names?: string[]
+  eyes_closed_names?: string[]
   error?: string
 }> {
   try {
@@ -1690,7 +1691,7 @@ export async function getNightProgress(sessionId: string): Promise<{
     if (session.status === 'night_infiltrators') role = 'infiltrator'
     else if (session.status === 'night_seer') role = 'seer'
     else if (session.status === 'night_guardian') role = 'guardian'
-    else return { expected: 0, submitted: 0, pending_names: [] }
+    else return { expected: 0, submitted: 0, pending_names: [], eyes_closed_names: [] }
 
     const { data: actors } = await service
       .from('vanacamp_players')
@@ -1709,11 +1710,72 @@ export async function getNightProgress(sessionId: string): Promise<{
     const subbed = new Set((subs ?? []).map((s) => s.actor_player_id))
     const pending = (actors ?? []).filter((a) => !subbed.has(a.id)).map((a) => a.display_name)
 
+    // Quem sinalizou "olhos fechados" nesta fase/dia (estado mais recente por jogador).
+    const { data: eyeEvents } = await service
+      .from('vanacamp_events')
+      .select('payload, created_at')
+      .eq('session_id', sessionId)
+      .eq('event_type', 'eyes_closed')
+      .eq('day_number', session.day_number)
+      .order('created_at', { ascending: true })
+    const eyeState = new Map<string, boolean>()
+    for (const e of eyeEvents ?? []) {
+      const p = e.payload as { player_id?: string; closed?: boolean; phase?: string }
+      if (p.phase !== session.status || !p.player_id) continue
+      eyeState.set(p.player_id, !!p.closed)
+    }
+    const closedIds = new Set([...eyeState.entries()].filter(([, c]) => c).map(([id]) => id))
+    const eyes_closed_names = (actors ?? []).filter((a) => closedIds.has(a.id)).map((a) => a.display_name)
+
     return {
       expected: (actors ?? []).length,
       submitted: subbed.size,
       pending_names: pending,
+      eyes_closed_names,
     }
+  } catch (e) { return { error: e instanceof Error ? e.message : 'Erro.' } }
+}
+
+/**
+ * Sinaliza que o jogador fechou (ou reabriu) os olhos durante a sua fase noturna.
+ * Regista um evento `eyes_closed` que o painel do Narrador lê em tempo real.
+ */
+export async function signalEyesState(
+  sessionId: string,
+  closed: boolean,
+  actAsPlayerId?: string,
+): Promise<{ error?: string }> {
+  try {
+    const { user } = await requireUser()
+    const actor = await resolveActorPlayerId(sessionId, user.id, actAsPlayerId)
+    if ('error' in actor) return { error: actor.error }
+
+    const service = createServiceClient()
+    const { data: session } = await service
+      .from('vanacamp_sessions')
+      .select('status, day_number')
+      .eq('id', sessionId)
+      .single()
+    if (!session) return { error: 'Sessão não encontrada.' }
+
+    const { data: me } = await service
+      .from('vanacamp_players')
+      .select('display_name')
+      .eq('id', actor.player_id)
+      .single()
+
+    await service.from('vanacamp_events').insert({
+      session_id: sessionId,
+      day_number: session.day_number,
+      event_type: 'eyes_closed',
+      payload: {
+        player_id: actor.player_id,
+        player_name: me?.display_name ?? null,
+        closed,
+        phase: session.status,
+      },
+    })
+    return {}
   } catch (e) { return { error: e instanceof Error ? e.message : 'Erro.' } }
 }
 

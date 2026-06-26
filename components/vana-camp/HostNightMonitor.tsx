@@ -64,8 +64,8 @@ export function HostNightMonitor(props: Props) {
   const currentStatus = (live.status in PHASE_META ? live.status : status) as keyof typeof PHASE_META
   const liveDayNumber = live.day_number ?? dayNumber
 
-  const [progress, setProgress] = useState<{ expected: number; submitted: number; pending_names: string[] }>({
-    expected: 0, submitted: 0, pending_names: [],
+  const [progress, setProgress] = useState<{ expected: number; submitted: number; pending_names: string[]; eyes_closed_names: string[] }>({
+    expected: 0, submitted: 0, pending_names: [], eyes_closed_names: [],
   })
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -74,7 +74,12 @@ export function HostNightMonitor(props: Props) {
     async function refresh() {
       const r = await getNightProgress(sessionId)
       if (r.expected !== undefined) {
-        setProgress({ expected: r.expected, submitted: r.submitted ?? 0, pending_names: r.pending_names ?? [] })
+        setProgress({
+          expected: r.expected,
+          submitted: r.submitted ?? 0,
+          pending_names: r.pending_names ?? [],
+          eyes_closed_names: r.eyes_closed_names ?? [],
+        })
       }
     }
     refresh()
@@ -151,6 +156,16 @@ export function HostNightMonitor(props: Props) {
           </p>
         )}
       </section>
+
+      {/* Quem sinalizou que já está de olhos fechados */}
+      {progress.eyes_closed_names.length > 0 && (
+        <section className="bg-indigo-950/40 border border-indigo-700/40 rounded-lg p-4">
+          <div className="flex items-center gap-2 text-indigo-200 text-sm font-semibold mb-1">
+            <Moon className="w-4 h-4" /> Olhos fechados ({progress.eyes_closed_names.length}/{progress.expected})
+          </div>
+          <p className="text-indigo-100/80 text-xs">{progress.eyes_closed_names.join(', ')}</p>
+        </section>
+      )}
 
       {error && (
         <div className="bg-red-950/50 border border-red-700 text-red-200 rounded p-3 text-sm flex items-center gap-2">

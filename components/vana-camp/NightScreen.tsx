@@ -6,6 +6,7 @@ import {
   getMyNightContext,
   submitNightAction,
   sendChatMessage,
+  signalEyesState,
 } from '@/lib/actions/vana-camp'
 import { createClient } from '@/utils/supabase/client'
 import { vibrate } from '@/utils/vibrate'
@@ -209,7 +210,7 @@ export function NightScreen(props: Props) {
           <p className="text-blue-300/50 text-xs mt-6">a noite continua… {formatClock(remaining)}</p>
         )}
         <button
-          onClick={() => setResting(false)}
+          onClick={() => { setResting(false); void signalEyesState(sessionId, false, impersonatingBotId) }}
           className="mt-8 text-blue-300/60 hover:text-blue-100 text-xs underline underline-offset-4"
         >
           Rever a minha jogada
@@ -278,7 +279,7 @@ export function NightScreen(props: Props) {
 
         {hasActed && (
           <button
-            onClick={() => setResting(true)}
+            onClick={() => { setResting(true); void signalEyesState(sessionId, true, impersonatingBotId) }}
             className="w-full flex items-center justify-center gap-2 bg-indigo-900/60 hover:bg-indigo-800/70 border border-indigo-600/50 text-blue-100 font-semibold py-3 rounded-lg transition"
           >
             <Moon className="w-5 h-5" /> Já está — fechar os olhos e dormir
