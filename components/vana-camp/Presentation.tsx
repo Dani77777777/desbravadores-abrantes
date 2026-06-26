@@ -45,11 +45,15 @@ export function Presentation({
     phase_ends_at: initialPhaseEndsAt,
     phase_paused_at: initialPhasePausedAt,
     day_number: initialDayNumber,
+    winner_side: winnerSide,
   })
   usePhaseReload(sessionId, initialStatus)
 
   const status = live.status
   const dayNumber = live.day_number
+  // Vencedor sempre a partir do estado vivo — chega no mesmo update que põe
+  // status='finished', por isso nunca mostra o lado errado por instantes.
+  const liveWinner = (live.winner_side as VanaCampSide | null | undefined) ?? winnerSide
 
   if (status === 'lobby') {
     return <PresentLobby sessionId={sessionId} code={code} joinUrl={joinUrl} />
@@ -123,7 +127,7 @@ export function Presentation({
     )
   }
   if (status === 'finished') {
-    return <PresentFinished sessionId={sessionId} winnerSide={winnerSide} />
+    return <PresentFinished sessionId={sessionId} winnerSide={liveWinner} />
   }
   return <PresentSimple title={`(${status})`} subtitle="Fase ainda por implementar." icon="moon" />
 }

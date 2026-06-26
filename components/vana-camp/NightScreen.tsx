@@ -277,14 +277,18 @@ export function NightScreen(props: Props) {
           </div>
         )}
 
-        {hasActed && (
-          <button
-            onClick={() => { setResting(true); void signalEyesState(sessionId, true, impersonatingBotId) }}
-            className="w-full flex items-center justify-center gap-2 bg-indigo-900/60 hover:bg-indigo-800/70 border border-indigo-600/50 text-blue-100 font-semibold py-3 rounded-lg transition"
-          >
-            <Moon className="w-5 h-5" /> Já está — fechar os olhos e dormir
-          </button>
-        )}
+        {/* O jogador pode sempre fechar os olhos — tenha agido ou decidido passar. */}
+        <button
+          onClick={() => { setResting(true); void signalEyesState(sessionId, true, impersonatingBotId) }}
+          className={`w-full flex items-center justify-center gap-2 font-semibold py-3 rounded-lg transition ${
+            hasActed
+              ? 'bg-indigo-900/60 hover:bg-indigo-800/70 border border-indigo-600/50 text-blue-100'
+              : 'bg-transparent hover:bg-indigo-900/40 border border-indigo-700/40 text-blue-200/80'
+          }`}
+        >
+          <Moon className="w-5 h-5" />
+          {hasActed ? 'Já está — fechar os olhos e dormir' : 'Passar a vez e fechar os olhos'}
+        </button>
       </div>
     </main>
   )

@@ -103,6 +103,12 @@ export default async function VanaCampSessionDetailPage({
         if (elim?.name) return { label: `Votação: ${elim.name} foi para casa${tie ? ' (desempate do Diretor)' : ''}`, tone: 'text-orange-300' }
         return { label: 'Votação: ninguém foi para casa (empate)', tone: 'text-stone-400' }
       }
+      case 'mayor_elected': {
+        const name = payload?.mayor_name as string | null
+        return name
+          ? { label: `Diretor eleito: ${name}`, tone: 'text-amber-300' }
+          : { label: 'Sem Diretor (empate)', tone: 'text-stone-400' }
+      }
       case 'win':
         return { label: `Vitória dos ${payload?.side === 'infiltrators' ? 'Infiltrados' : 'Desbravadores'}`, tone: 'text-amber-300' }
       default:

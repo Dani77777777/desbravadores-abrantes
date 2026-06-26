@@ -9,6 +9,9 @@ interface PhaseState {
   phase_ends_at: string | null
   phase_paused_at: string | null
   day_number: number
+  /** Lado vencedor — vem no MESMO update que põe status='finished', evitando
+   *  mostrar o vencedor errado por instantes na transição. */
+  winner_side?: string | null
 }
 
 /**
@@ -37,11 +40,12 @@ export function useLiveSession(
         prev.status === initial.status &&
         prev.phase_ends_at === initial.phase_ends_at &&
         prev.phase_paused_at === initial.phase_paused_at &&
-        prev.day_number === initial.day_number
+        prev.day_number === initial.day_number &&
+        (prev.winner_side ?? null) === (initial.winner_side ?? null)
       ) return prev
       return initial
     })
-  }, [initial.status, initial.phase_ends_at, initial.phase_paused_at, initial.day_number])
+  }, [initial.status, initial.phase_ends_at, initial.phase_paused_at, initial.day_number, initial.winner_side])
 
   useEffect(() => {
     const supabase = createClient()
@@ -54,7 +58,8 @@ export function useLiveSession(
           prev.status === next.status &&
           prev.phase_ends_at === next.phase_ends_at &&
           prev.phase_paused_at === next.phase_paused_at &&
-          prev.day_number === next.day_number
+          prev.day_number === next.day_number &&
+          (prev.winner_side ?? null) === (next.winner_side ?? null)
         ) return prev
         // Status mudou → re-render do server p/ trocar de componente
         if (next.status !== prev.status) router.refresh()
@@ -65,7 +70,7 @@ export function useLiveSession(
     async function fetchOnce() {
       const { data } = await supabase
         .from('vanacamp_sessions')
-        .select('status, phase_ends_at, phase_paused_at, day_number')
+        .select('status, phase_ends_at, phase_paused_at, day_number, winner_side')
         .eq('id', sessionId)
         .maybeSingle()
       if (data) apply(data as PhaseState)
@@ -84,6 +89,7 @@ export function useLiveSession(
             phase_ends_at: next.phase_ends_at,
             phase_paused_at: next.phase_paused_at,
             day_number: next.day_number,
+            winner_side: next.winner_side ?? null,
           })
         }
       )

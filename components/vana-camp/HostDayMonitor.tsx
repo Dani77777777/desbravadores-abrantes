@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import {
-  Sun, Sunset, Vote, Play, Pause, FastForward, Plus, Check, AlertCircle, Crown, Moon,
+  Sun, Sunset, Vote, Play, Pause, FastForward, Plus, Check, AlertCircle, Crown, Moon, Home, Shield,
 } from 'lucide-react'
 import {
   getDayVoteProgress,
@@ -69,6 +69,32 @@ export function HostDayMonitor(props: Props) {
     expected: 0, submitted: 0, pending: [], tally: {},
   })
 
+  // Resumo da noite anterior (o mesmo que a projeção mostra na manhã).
+  const [night, setNight] = useState<{ kind: 'death' | 'save' | 'nobody' | null; name?: string }>({ kind: null })
+  useEffect(() => {
+    if (currentStatus === 'day_result') return
+    const supabase = createClient()
+    let mounted = true
+    supabase
+      .from('vanacamp_events')
+      .select('event_type, payload')
+      .eq('session_id', sessionId)
+      .eq('day_number', liveDay)
+      .in('event_type', ['death', 'save', 'night_resolved'])
+      .order('created_at', { ascending: true })
+      .then(({ data }) => {
+        if (!mounted || !data) return
+        const death = data.find((e) => e.event_type === 'death')
+        const save = data.find((e) => e.event_type === 'save')
+        const nobody = data.find((e) => e.event_type === 'night_resolved')
+        if (death) setNight({ kind: 'death', name: (death.payload as { target_name?: string })?.target_name ?? 'Alguém' })
+        else if (save) setNight({ kind: 'save' })
+        else if (nobody) setNight({ kind: 'nobody' })
+        else setNight({ kind: null })
+      })
+    return () => { mounted = false }
+  }, [sessionId, liveDay, currentStatus])
+
   // Polling do progress da votação (só durante day_vote)
   useEffect(() => {
     if (currentStatus !== 'day_vote') return
@@ -125,6 +151,36 @@ export function HostDayMonitor(props: Props) {
         <h1 className="text-3xl font-black text-amber-100">{meta.label}</h1>
         <p className="text-amber-300/60 text-sm">Dia {liveDay}</p>
       </header>
+
+      {/* Resumo da noite (o que aconteceu) — visível para o Narrador */}
+      {night.kind && currentStatus !== 'day_result' && (
+        <section className="bg-stone-800/60 border border-amber-700/40 rounded-lg p-4 flex items-center gap-3">
+          {night.kind === 'death' && (
+            <>
+              <Home className="w-8 h-8 text-stone-300 shrink-0" />
+              <p className="text-stone-100 text-sm">
+                <strong className="text-red-300">{night.name}</strong> ficou com medo esta noite e foi para casa.
+              </p>
+            </>
+          )}
+          {night.kind === 'save' && (
+            <>
+              <Shield className="w-8 h-8 text-sky-300 shrink-0" />
+              <p className="text-stone-100 text-sm">
+                O <strong>Conselheiro</strong> protegeu um desbravador. Ninguém foi para casa esta noite.
+              </p>
+            </>
+          )}
+          {night.kind === 'nobody' && (
+            <>
+              <Moon className="w-8 h-8 text-stone-400 shrink-0" />
+              <p className="text-stone-100 text-sm">
+                Nada de mau aconteceu esta noite. O acampamento está intacto.
+              </p>
+            </>
+          )}
+        </section>
+      )}
 
       {/* Timer */}
       {currentStatus !== 'day_result' && (
