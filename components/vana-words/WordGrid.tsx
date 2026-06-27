@@ -11,6 +11,8 @@ interface WordGridProps {
   showColors?: boolean
   onWordClick?: (wordId: string) => void
   disabled?: boolean
+  /** Variante grande para o projetor (texto e cartões maiores) */
+  large?: boolean
 }
 
 export function WordGrid({
@@ -21,6 +23,7 @@ export function WordGrid({
   showColors = false,
   onWordClick,
   disabled = false,
+  large = false,
 }: WordGridProps) {
   const sorted = [...words].sort((a, b) => a.grid_pos - b.grid_pos)
 
@@ -38,7 +41,7 @@ export function WordGrid({
   const interactive = !!onWordClick && !disabled
 
   return (
-    <div className="grid grid-cols-5 gap-1.5 sm:gap-2">
+    <div className={`grid grid-cols-5 ${large ? 'gap-3 lg:gap-4' : 'gap-1.5 sm:gap-2'}`}>
       {sorted.map((word) => {
         const guessers = guessMap.get(word.id) ?? []
         const isSelected = guesses.some((g) => g.word_id === word.id && g.player_id === myPlayerId)
@@ -50,23 +53,28 @@ export function WordGrid({
             key={word.id}
             onClick={() => interactive && !word.is_revealed && onWordClick?.(word.id)}
             className={`
-              relative rounded-lg border px-0.5 py-2 sm:p-2 min-h-[3.25rem] sm:min-h-[4rem]
-              flex flex-col items-center justify-center text-center select-none
+              relative rounded-lg border flex flex-col items-center justify-center text-center select-none
+              ${large
+                ? 'rounded-2xl px-2 py-5 lg:py-8 min-h-[5.5rem] lg:min-h-[7rem]'
+                : 'px-0.5 py-2 sm:p-2 min-h-[3.25rem] sm:min-h-[4rem]'}
               ${interactive ? 'transition-all duration-150' : ''}
               ${cls}
             `}
           >
-            <span className="font-bold text-[10px] leading-tight sm:text-sm sm:tracking-wide break-words hyphens-auto w-full">
+            <span className={`font-bold break-words hyphens-auto w-full ${large
+              ? 'text-xl lg:text-3xl tracking-wide'
+              : 'text-[10px] leading-tight sm:text-sm sm:tracking-wide'}`}>
               {word.word}
             </span>
 
             {/* Indicadores de quem votou */}
             {guessers.length > 0 && !word.is_revealed && (
-              <div className="absolute bottom-1 left-0 right-0 flex justify-center gap-0.5 flex-wrap px-1">
+              <div className={`absolute left-0 right-0 flex justify-center gap-0.5 flex-wrap px-1 ${large ? 'bottom-2' : 'bottom-1'}`}>
                 {guessers.slice(0, 4).map((p) => (
                   <span
                     key={p.id}
-                    className={`text-[9px] rounded px-1 font-semibold truncate max-w-[2rem]
+                    className={`rounded px-1 font-semibold truncate
+                      ${large ? 'text-sm max-w-[5rem]' : 'text-[9px] max-w-[2rem]'}
                       ${p.team === 'a' ? 'bg-amber-600/80' : 'bg-blue-600/80'} text-white`}
                     title={p.display_name}
                   >
@@ -74,14 +82,14 @@ export function WordGrid({
                   </span>
                 ))}
                 {guessers.length > 4 && (
-                  <span className="text-[9px] text-white/60">+{guessers.length - 4}</span>
+                  <span className={`text-white/60 ${large ? 'text-sm' : 'text-[9px]'}`}>+{guessers.length - 4}</span>
                 )}
               </div>
             )}
 
             {/* Revelada: mostrar ícone da equipa */}
             {word.is_revealed && (
-              <span className="text-[10px] mt-0.5 opacity-70">
+              <span className={`opacity-70 ${large ? 'text-2xl mt-1' : 'text-[10px] mt-0.5'}`}>
                 {word.team === 'a' ? '🦁' : word.team === 'b' ? '🦅' : word.team === 'black' ? '💀' : '—'}
               </span>
             )}

@@ -192,34 +192,34 @@ export function ProjectorView({ session: initSession, initialPlayers }: Projecto
 
           {/* Marcador */}
           <div className="flex gap-4">
-            <div className={`bg-slate-800/80 rounded-2xl px-6 py-2 border-2 ${activeTeam === 'a' && !isFinished ? 'border-amber-500 shadow-amber-500/30 shadow-lg' : 'border-slate-700'}`}>
-              <p className="text-amber-400 text-xs font-bold">🦁 Leão</p>
-              <p className="text-white text-2xl font-black">{wordsAFound}/{totalA}</p>
+            <div className={`bg-slate-800/80 rounded-2xl px-8 py-3 border-2 ${activeTeam === 'a' && !isFinished ? 'border-amber-500 shadow-amber-500/30 shadow-lg' : 'border-slate-700'}`}>
+              <p className="text-amber-400 text-base font-bold">🦁 Leão</p>
+              <p className="text-white text-4xl font-black">{wordsAFound}/{totalA}</p>
             </div>
-            <div className={`bg-slate-800/80 rounded-2xl px-6 py-2 border-2 ${activeTeam === 'b' && !isFinished ? 'border-blue-500 shadow-blue-500/30 shadow-lg' : 'border-slate-700'}`}>
-              <p className="text-blue-400 text-xs font-bold">🦅 Águia</p>
-              <p className="text-white text-2xl font-black">{wordsBFound}/{totalB}</p>
+            <div className={`bg-slate-800/80 rounded-2xl px-8 py-3 border-2 ${activeTeam === 'b' && !isFinished ? 'border-blue-500 shadow-blue-500/30 shadow-lg' : 'border-slate-700'}`}>
+              <p className="text-blue-400 text-base font-bold">🦅 Águia</p>
+              <p className="text-white text-4xl font-black">{wordsBFound}/{totalB}</p>
             </div>
           </div>
         </div>
 
         {/* Dica activa */}
         {!isFinished && activeTeam && (
-          <div className={`rounded-2xl px-6 py-3 border ${TEAM_COLORS[activeTeam].badge} flex items-center justify-between`}>
+          <div className={`rounded-2xl px-8 py-5 border ${TEAM_COLORS[activeTeam].badge} flex items-center justify-between`}>
             <div>
-              <p className={`text-sm font-bold ${TEAM_COLORS[activeTeam].text}`}>
+              <p className={`text-xl font-bold ${TEAM_COLORS[activeTeam].text}`}>
                 {activeTeam === 'a' ? '🦁' : '🦅'} Equipa {TEAM_LABELS[activeTeam]}
                 {' — '}{isHinting ? 'A dar dica…' : 'A adivinhar'}
               </p>
               {!isHinting && session.current_hint && (
-                <p className="text-white text-3xl font-black tracking-wide mt-1">
+                <p className="text-white text-5xl font-black tracking-wide mt-2">
                   «{session.current_hint}»
-                  <span className="text-slate-400 ml-3 text-xl">×{session.current_hint_number}</span>
+                  <span className="text-slate-400 ml-4 text-3xl">×{session.current_hint_number}</span>
                 </p>
               )}
             </div>
             {!isHinting && (
-              <p className={`text-2xl font-black ${TEAM_COLORS[activeTeam].text}`}>
+              <p className={`text-4xl font-black ${TEAM_COLORS[activeTeam].text}`}>
                 {session.guesses_remaining} restante(s)
               </p>
             )}
@@ -234,6 +234,7 @@ export function ProjectorView({ session: initSession, initialPlayers }: Projecto
             players={players}
             showColors={false}
             disabled
+            large
           />
         </div>
 
@@ -245,14 +246,14 @@ export function ProjectorView({ session: initSession, initialPlayers }: Projecto
             const colors = TEAM_COLORS[tid]
             const isWinner = isFinished && winner === tid
             return (
-              <div key={tid} className={`bg-slate-800/60 rounded-2xl p-3 border ${isWinner ? colors.border : 'border-slate-700'}`}>
-                <p className={`text-xs font-bold mb-2 ${colors.text}`}>
+              <div key={tid} className={`bg-slate-800/60 rounded-2xl p-4 border ${isWinner ? colors.border : 'border-slate-700'}`}>
+                <p className={`text-lg font-bold mb-2 ${colors.text}`}>
                   {tid === 'a' ? '🦁' : '🦅'} Equipa {TEAM_LABELS[tid]}
                   {isWinner && ' 🏆'}
                 </p>
-                <div className="flex flex-wrap gap-x-3 gap-y-1">
+                <div className="flex flex-wrap gap-x-4 gap-y-1">
                   {team.map((p) => (
-                    <span key={p.id} className={`text-sm ${p.is_arauto ? `font-bold ${colors.text}` : 'text-white/70'}`}>
+                    <span key={p.id} className={`text-lg ${p.is_arauto ? `font-bold ${colors.text}` : 'text-white/70'}`}>
                       {p.is_arauto ? '👑 ' : ''}{p.display_name}
                     </span>
                   ))}
