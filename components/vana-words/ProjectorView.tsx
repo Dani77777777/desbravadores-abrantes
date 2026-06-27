@@ -57,8 +57,10 @@ export function ProjectorView({ session: initSession, initialPlayers }: Projecto
 
   const wordsAFound = words.filter((w) => w.team === 'a' && w.is_revealed).length
   const wordsBFound = words.filter((w) => w.team === 'b' && w.is_revealed).length
-  const totalA = words.filter((w) => w.team === 'a').length || 5
-  const totalB = words.filter((w) => w.team === 'b').length || 5
+  // O RPC público esconde a equipa das palavras ainda não reveladas, logo não dá
+  // para contar o total a partir das palavras. Cada equipa tem sempre 5 palavras.
+  const totalA = 5
+  const totalB = 5
 
   const activeTeam = session.current_team as TeamId | null
   const isHinting = session.current_phase === 'hinting'

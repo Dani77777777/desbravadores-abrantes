@@ -34,26 +34,29 @@ export function WordGrid({
     guessMap.set(g.word_id, list)
   }
 
+  // Interativo apenas quando há handler e não está desativado (projetor = não interativo)
+  const interactive = !!onWordClick && !disabled
+
   return (
-    <div className="grid grid-cols-5 gap-2">
+    <div className="grid grid-cols-5 gap-1.5 sm:gap-2">
       {sorted.map((word) => {
         const guessers = guessMap.get(word.id) ?? []
         const isSelected = guesses.some((g) => g.word_id === word.id && g.player_id === myPlayerId)
 
-        const cls = wordCardClass(word.team, word.is_revealed, isSelected, showColors)
+        const cls = wordCardClass(word.team, word.is_revealed, isSelected, showColors, interactive)
 
         return (
           <div
             key={word.id}
-            onClick={() => !disabled && !word.is_revealed && onWordClick?.(word.id)}
+            onClick={() => interactive && !word.is_revealed && onWordClick?.(word.id)}
             className={`
-              relative rounded-lg border p-2 min-h-[4rem] flex flex-col items-center justify-center
-              transition-all duration-150 select-none text-center
+              relative rounded-lg border px-0.5 py-2 sm:p-2 min-h-[3.25rem] sm:min-h-[4rem]
+              flex flex-col items-center justify-center text-center select-none
+              ${interactive ? 'transition-all duration-150' : ''}
               ${cls}
-              ${disabled || word.is_revealed ? 'cursor-default' : ''}
             `}
           >
-            <span className="font-bold text-sm leading-tight tracking-wide">
+            <span className="font-bold text-[10px] leading-tight sm:text-sm sm:tracking-wide break-words hyphens-auto w-full">
               {word.word}
             </span>
 

@@ -124,7 +124,7 @@ export function HostControl({ session: initSession, initialPlayers, initialWords
             <a
               href={presentUrl}
               target="_blank"
-              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-700 hover:bg-slate-600 text-slate-300 text-sm font-semibold transition-colors"
+              className="hidden sm:flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-700 hover:bg-slate-600 text-slate-300 text-sm font-semibold transition-colors"
             >
               <MonitorPlay className="w-4 h-4" /> Projetor
             </a>
@@ -395,7 +395,7 @@ export function HostControl({ session: initSession, initialPlayers, initialWords
           <p className="text-slate-400 text-xs">/jogos/vana-words/{session.id}/arauto</p>
         </div>
 
-        <div className="flex gap-3">
+        <div className="hidden sm:flex gap-3">
           <a
             href={presentUrl}
             target="_blank"
@@ -437,7 +437,7 @@ export function HostControl({ session: initSession, initialPlayers, initialWords
               <span className="text-slate-400 font-normal text-sm">Host</span>
             </div>
             <a href={presentUrl} target="_blank"
-              className="text-xs text-slate-400 hover:text-white flex items-center gap-1">
+              className="hidden sm:flex text-xs text-slate-400 hover:text-white items-center gap-1">
               <MonitorPlay className="w-3 h-3" /> Projetor
             </a>
           </div>

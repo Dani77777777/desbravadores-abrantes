@@ -2,6 +2,7 @@ import { createClient } from '@/utils/supabase/server'
 import { createServiceClient } from '@/utils/supabase/service'
 import { redirect, notFound } from 'next/navigation'
 import { HostControl } from '@/components/vana-words/HostControl'
+import PresentationController from '@/components/presentation-effects/PresentationController'
 import type { VanaWordsSession, VanaWordsPlayer, VanaWordsWord } from '@/types/vana-words'
 
 export default async function VanaWordsControlPage({
@@ -46,11 +47,14 @@ export default async function VanaWordsControlPage({
     .order('position')
 
   return (
-    <HostControl
-      session={session as VanaWordsSession}
-      initialPlayers={(players ?? []) as VanaWordsPlayer[]}
-      initialWords={(words ?? []) as VanaWordsWord[]}
-      hostProfile={profile as { id: string; full_name: string }}
-    />
+    <>
+      <HostControl
+        session={session as VanaWordsSession}
+        initialPlayers={(players ?? []) as VanaWordsPlayer[]}
+        initialWords={(words ?? []) as VanaWordsWord[]}
+        hostProfile={profile as { id: string; full_name: string }}
+      />
+      <PresentationController />
+    </>
   )
 }

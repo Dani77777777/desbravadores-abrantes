@@ -1,6 +1,7 @@
 import { createClient } from '@/utils/supabase/server'
 import { notFound } from 'next/navigation'
 import { ProjectorView } from '@/components/vana-words/ProjectorView'
+import PresentationReceiver from '@/components/presentation-effects/PresentationReceiver'
 import type { VanaWordsSession, VanaWordsPlayer } from '@/types/vana-words'
 
 // A página do projetor é pública — não precisa de autenticação
@@ -27,9 +28,12 @@ export default async function VanaWordsPresentPage({
     .order('joined_at')
 
   return (
-    <ProjectorView
-      session={session as VanaWordsSession}
-      initialPlayers={(players ?? []) as VanaWordsPlayer[]}
-    />
+    <>
+      <ProjectorView
+        session={session as VanaWordsSession}
+        initialPlayers={(players ?? []) as VanaWordsPlayer[]}
+      />
+      <PresentationReceiver />
+    </>
   )
 }
