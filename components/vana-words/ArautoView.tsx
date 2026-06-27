@@ -118,7 +118,7 @@ export function ArautoView({ session: initSession, myPlayer, initialPlayers }: A
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-emerald-950 via-slate-900 to-indigo-950 p-4">
+    <div className="min-h-screen overflow-x-hidden bg-gradient-to-br from-emerald-950 via-slate-900 to-indigo-950 p-2 sm:p-4">
       <div className="max-w-2xl mx-auto space-y-4">
         {/* Header */}
         <div className={`flex items-center gap-3 px-4 py-3 rounded-xl border ${colors.badge}`}>
@@ -154,7 +154,7 @@ export function ArautoView({ session: initSession, myPlayer, initialPlayers }: A
             <p className={`font-bold ${colors.text} text-sm`}>A tua dica para a Equipa {label}</p>
             <div className="flex gap-2">
               <input
-                className="flex-1 bg-slate-700 text-white rounded-xl px-4 py-3 text-lg font-bold border border-slate-600 uppercase placeholder:normal-case placeholder:text-slate-400"
+                className="flex-1 min-w-0 bg-slate-700 text-white rounded-xl px-3 py-2.5 text-base sm:text-lg font-bold border border-slate-600 uppercase placeholder:normal-case placeholder:text-slate-400"
                 placeholder="Palavra-dica…"
                 value={hintInput}
                 onChange={(e) => setHintInput(e.target.value)}
@@ -164,7 +164,7 @@ export function ArautoView({ session: initSession, myPlayer, initialPlayers }: A
                 type="number"
                 min={1}
                 max={9}
-                className="w-20 bg-slate-700 text-white rounded-xl px-3 py-3 text-lg font-bold border border-slate-600 text-center"
+                className="w-16 shrink-0 bg-slate-700 text-white rounded-xl px-2 py-2.5 text-base sm:text-lg font-bold border border-slate-600 text-center"
                 value={hintNumber}
                 onChange={(e) => setHintNumber(parseInt(e.target.value) || 1)}
               />
