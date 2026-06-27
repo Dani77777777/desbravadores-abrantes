@@ -9,6 +9,7 @@ import {
 import { PlayerAvatar } from '@/components/vana-quest/PlayerAvatar'
 import { DeleteSessionButton } from '@/components/vana-quest/DeleteSessionButton'
 import { AwardSessionButton } from '@/components/vana-quest/AwardSessionButton'
+import { isAdminRole } from '@/utils/permissions'
 
 const OPTION_COLORS: Record<string, string> = {
   A: 'bg-red-500', B: 'bg-blue-500', C: 'bg-yellow-400', D: 'bg-green-500',
@@ -35,7 +36,7 @@ export default async function SessionDetailPage({
   if (!user) redirect('/login')
 
   const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single()
-  const isAdmin = profile?.role === 'coordenador' || profile?.role === 'dirigente'
+  const isAdmin = isAdminRole(profile)
   if (!isAdmin) redirect('/')
 
   const { data: session } = await supabase

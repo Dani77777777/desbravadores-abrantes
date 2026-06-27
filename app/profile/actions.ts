@@ -33,6 +33,7 @@ export async function updateUserProfile(data: {
   return { success: true }
 }
 
+
 export async function transferGoldAction(recipientId: string, amount: number) {
   const supabase = await createClient()
 

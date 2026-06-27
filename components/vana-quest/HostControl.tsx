@@ -2,16 +2,19 @@
 
 import { useEffect, useState, useRef } from 'react'
 import { createClient } from '@/utils/supabase/client'
-import { nextStage, awardSessionPoints } from '@/lib/actions/vana-quest'
+import { nextStage, awardSessionPoints, kickParticipant, leaveSession } from '@/lib/actions/vana-quest'
 import { getIntroSeconds } from '@/utils/vana-quest'
 import { QRCodeSVG } from 'qrcode.react'
 import {
   Users, ChevronRight, Trophy, Zap, Clock, Maximize2,
-  CheckCircle2, Flame, Play, MonitorPlay, Copy, Check, Volume2, VolumeX, Share2, Download
+  CheckCircle2, Flame, Play, MonitorPlay, Copy, Check, Volume2, VolumeX, Share2, Download, Lightbulb,
+  UserX, Gift, AlertTriangle, XCircle, ArrowUp, ArrowDown
 } from 'lucide-react'
 import { PodiumShareCard } from './PodiumShareCard'
 import { detectGender, articleFor, winnerWord } from '@/utils/name-gender'
 import { PlayerAvatar } from './PlayerAvatar'
+import { useLiveSession } from './useLiveSession'
+import { toast } from 'sonner'
 
 const OPTION_COLORS = ['bg-red-500', 'bg-blue-500', 'bg-yellow-400', 'bg-green-500']
 const OPTION_LABELS = ['▲ A', '● B', '◆ C', '■ D']
@@ -24,6 +27,7 @@ interface Question {
   option_c: string
   option_d: string
   correct_option: string
+  explanation: string | null
   time_seconds: number
   points_multiplier: number
 }
@@ -46,6 +50,8 @@ interface Participant {
   max_streak: number
   is_guest: boolean
   avatar_url?: string | null
+  rewards_recipient_id?: string | null
+  rewards_skipped?: boolean
 }
 
 interface Answer {
@@ -66,6 +72,10 @@ export function HostControl({ sessionId, initialSession, questions, siteUrl }: P
   const supabase = createClient()
   const [session, setSession] = useState<Session>(initialSession)
   const [participants, setParticipants] = useState<Participant[]>([])
+  // Espelho dos participantes para ler nomes dentro de closures (ex.: timers de presença)
+  // sem os capturar de forma obsoleta.
+  const participantsRef = useRef<Participant[]>([])
+  participantsRef.current = participants
   const [answers, setAnswers] = useState<Answer[]>([])
   const [timeLeft, setTimeLeft] = useState(0)
   const [qrZoomed, setQrZoomed] = useState(false)
@@ -76,6 +86,11 @@ export function HostControl({ sessionId, initialSession, questions, siteUrl }: P
   const [musicEnabled, setMusicEnabled] = useState(true)
   const [sharing, setSharing] = useState(false)
   const [shareToast, setShareToast] = useState<string | null>(null)
+  // Participante a confirmar expulsão
+  const [kickTarget, setKickTarget] = useState<Participant | null>(null)
+  const [kicking, setKicking] = useState(false)
+  // Confirmação ao atribuir prémios antes de todos os convidados decidirem
+  const [showAwardConfirm, setShowAwardConfirm] = useState(false)
   const inFlight = useRef(false)
   const podiumCardRef = useRef<HTMLDivElement | null>(null)
 
@@ -149,6 +164,8 @@ export function HostControl({ sessionId, initialSession, questions, siteUrl }: P
   const prevPointsRef = useRef<Record<string, number>>({})
   // Capturar os deltas ao entrar no leaderboard (e congelar até sair)
   const [deltas, setDeltas] = useState<Record<string, number>>({})
+  // Variação de posição face à ronda anterior (+ subiu, - desceu)
+  const [rankDeltas, setRankDeltas] = useState<Record<string, number>>({})
 
   async function copyLink() {
     try {
@@ -188,21 +205,91 @@ export function HostControl({ sessionId, initialSession, questions, siteUrl }: P
     broadcast({ musicEnabled })
   }, [musicEnabled])
 
-  // Realtime
+  // Sessão sincronizada de forma resiliente. O host CONDUZ o jogo (nextStage), mas a
+  // sua própria UI também só avança quando recebe o eco do UPDATE — se esse evento se
+  // perder, o painel ficava preso. O polling garante que apanha sempre o estado real.
+  useLiveSession(
+    sessionId,
+    (row) => setSession((prev) => ({ ...prev, ...(row as Session) })),
+    { pollMs: 3000 }
+  )
+
+  // Realtime (participantes + respostas). A sessão é tratada pela useLiveSession acima.
   useEffect(() => {
     const channel = supabase
       .channel(`control-${sessionId}`)
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'vana_quest_sessions', filter: `id=eq.${sessionId}` },
-        (p) => setSession((prev) => ({ ...prev, ...(p.new as Session) })))
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'vana_quest_participants', filter: `session_id=eq.${sessionId}` },
         (p) => setParticipants((prev) => prev.find((x) => x.id === (p.new as Participant).id) ? prev : [...prev, p.new as Participant]))
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'vana_quest_participants', filter: `session_id=eq.${sessionId}` },
         (p) => setParticipants((prev) => prev.map((x) => x.id === (p.new as Participant).id ? (p.new as Participant) : x)))
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'vana_quest_participants' },
+        (p) => setParticipants((prev) => prev.filter((x) => x.id !== (p.old as any)?.id)))
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'vana_quest_answers', filter: `session_id=eq.${sessionId}` },
         (p) => setAnswers((prev) => [...prev, p.new as Answer]))
       .subscribe()
     return () => { supabase.removeChannel(channel) }
   }, [sessionId])
+
+  // Sala de espera: remove automaticamente quem sai antes do jogo começar, para não
+  // ficarem "jogadores mortos" na lista (e depois na classificação) quando o jogo
+  // arranca. Usa Realtime Presence — cada jogador marca presença; quando a presença cai
+  // e NÃO regressa dentro de ~15s (tolerância para refresh / quebras curtas de rede), o
+  // participante é removido. Só corre durante 'waiting'; ao iniciar o jogo os timers são
+  // limpos e a `leaveSession` recusa apagar (está protegida por status === 'waiting').
+  useEffect(() => {
+    if (session.status !== 'waiting') return
+    const channel = supabase.channel(`vq-presence-${sessionId}`, {
+      config: { presence: { key: 'host' } },
+    })
+    const removalTimers = new Map<string, ReturnType<typeof setTimeout>>()
+
+    const stillPresent = (participantId: string) => {
+      const state = channel.presenceState() as Record<string, any[]>
+      return Object.values(state).some((entries) =>
+        entries.some((e: any) => e.participantId === participantId)
+      )
+    }
+
+    const cancelRemoval = (participantId: string) => {
+      const t = removalTimers.get(participantId)
+      if (t) { clearTimeout(t); removalTimers.delete(participantId) }
+    }
+
+    const scheduleRemoval = (participantId: string) => {
+      if (removalTimers.has(participantId)) return
+      const t = setTimeout(async () => {
+        removalTimers.delete(participantId)
+        if (stillPresent(participantId)) return // voltou entretanto (ex.: refresh)
+        const removed = participantsRef.current.find((p) => p.id === participantId)
+        const res = await leaveSession(participantId, sessionId)
+        if (res.ok) {
+          setParticipants((prev) => prev.filter((p) => p.id !== participantId))
+          toast(`${removed?.display_name || 'Um jogador'} saiu da sala`, {
+            icon: '👋',
+            description: 'Removido da lista automaticamente.',
+          })
+        }
+      }, 15000)
+      removalTimers.set(participantId, t)
+    }
+
+    channel
+      .on('presence', { event: 'leave' }, ({ leftPresences }) => {
+        ;(leftPresences as any[]).forEach((e) => { if (e?.participantId) scheduleRemoval(e.participantId) })
+      })
+      .on('presence', { event: 'join' }, ({ newPresences }) => {
+        ;(newPresences as any[]).forEach((e) => { if (e?.participantId) cancelRemoval(e.participantId) })
+      })
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') channel.track({ host: true })
+      })
+
+    return () => {
+      removalTimers.forEach((t) => clearTimeout(t))
+      removalTimers.clear()
+      supabase.removeChannel(channel)
+    }
+  }, [session.status, sessionId])
 
   // Load initial
   useEffect(() => {
@@ -257,11 +344,30 @@ export function HostControl({ sessionId, initialSession, questions, siteUrl }: P
   // Capturar deltas (pontos ganhos nesta ronda) quando entramos no leaderboard
   useEffect(() => {
     if (session.status === 'question_leaderboard') {
+      const prevSnap = { ...prevPointsRef.current }
+      const hadPrev = Object.keys(prevSnap).length > 0
+
       const d: Record<string, number> = {}
       participants.forEach((p) => {
-        d[p.id] = Number(p.total_points) - (prevPointsRef.current[p.id] ?? 0)
+        d[p.id] = Number(p.total_points) - (prevSnap[p.id] ?? 0)
       })
       setDeltas(d)
+
+      // Variação de posição: ranking anterior vs atual
+      if (hadPrev) {
+        const prevOrder = [...participants].sort((a, b) => (prevSnap[b.id] ?? 0) - (prevSnap[a.id] ?? 0))
+        const curOrder = [...participants].sort((a, b) => Number(b.total_points) - Number(a.total_points))
+        const prevRank = new Map(prevOrder.map((p, i) => [p.id, i]))
+        const curRank = new Map(curOrder.map((p, i) => [p.id, i]))
+        const rd: Record<string, number> = {}
+        participants.forEach((p) => {
+          rd[p.id] = (prevRank.get(p.id) ?? 0) - (curRank.get(p.id) ?? 0) // + subiu, - desceu
+        })
+        setRankDeltas(rd)
+      } else {
+        setRankDeltas({})
+      }
+
       // Atualiza o snapshot para a próxima ronda
       const snap: Record<string, number> = {}
       participants.forEach((p) => { snap[p.id] = Number(p.total_points) })
@@ -295,6 +401,7 @@ export function HostControl({ sessionId, initialSession, questions, siteUrl }: P
   }
 
   async function handleAward() {
+    setShowAwardConfirm(false)
     setAwarding(true)
     const result = await awardSessionPoints(sessionId)
     if (result?.ok || result?.alreadyAwarded) {
@@ -302,6 +409,33 @@ export function HostControl({ sessionId, initialSession, questions, siteUrl }: P
     }
     setAwarding(false)
   }
+
+  // Clica em atribuir: se ainda houver convidados por decidir → pede confirmação
+  function handleAwardClick() {
+    if (allGuestsDecided) {
+      handleAward()
+    } else {
+      setShowAwardConfirm(true)
+    }
+  }
+
+  async function handleKick() {
+    if (!kickTarget) return
+    setKicking(true)
+    const result = await kickParticipant(kickTarget.id, sessionId)
+    if (result.ok) {
+      setParticipants((prev) => prev.filter((x) => x.id !== kickTarget.id))
+    }
+    setKicking(false)
+    setKickTarget(null)
+  }
+
+  // ── Estado de decisão dos prémios (convidados) ────────────────
+  const guests = participants.filter((p) => p.is_guest)
+  const guestsChosen = guests.filter((p) => !!p.rewards_recipient_id)
+  const guestsSkipped = guests.filter((p) => !p.rewards_recipient_id && p.rewards_skipped)
+  const guestsDecided = guestsChosen.length + guestsSkipped.length
+  const allGuestsDecided = guests.length === 0 || guestsDecided >= guests.length
 
   const currentAnswers = currentQuestion ? answers.filter((a) => a.question_id === currentQuestion.id) : []
   const answerCounts = ['A', 'B', 'C', 'D'].map((opt) => currentAnswers.filter((a) => a.chosen_option === opt).length)
@@ -442,6 +576,13 @@ export function HostControl({ sessionId, initialSession, questions, siteUrl }: P
                       />
                       <span className="text-sm font-semibold truncate flex-1">{p.display_name}</span>
                       {p.is_guest && <span className="text-[9px] text-sky-400 bg-blue-500/10 rounded-full px-1.5 py-0.5">conv.</span>}
+                      <button
+                        onClick={() => setKickTarget(p)}
+                        title="Expulsar jogador"
+                        className="p-1.5 rounded-lg text-white/30 hover:text-red-400 hover:bg-red-500/10 transition-colors flex-shrink-0"
+                      >
+                        <UserX className="w-4 h-4" />
+                      </button>
                     </div>
                   ))}
                 </div>
@@ -586,6 +727,17 @@ export function HostControl({ sessionId, initialSession, questions, siteUrl }: P
                   <span className="text-white/40"> · {participants.length - currentAnswers.length} sem resposta</span>
                 )}
               </p>
+
+              {/* Nota / explicação — para o apresentador ler em voz alta */}
+              {currentQuestion.explanation && (
+                <div className="flex items-start gap-2.5 bg-amber-400/10 border border-amber-400/30 rounded-2xl px-3.5 py-3 mt-1">
+                  <Lightbulb className="w-4 h-4 text-amber-300 flex-shrink-0 mt-0.5" fill="currentColor" />
+                  <div className="min-w-0">
+                    <p className="text-amber-300 text-[10px] font-black uppercase tracking-widest mb-0.5">Porquê?</p>
+                    <p className="text-white text-sm font-medium leading-snug">{currentQuestion.explanation}</p>
+                  </div>
+                </div>
+              )}
             </div>
           )
         })()}
@@ -609,6 +761,7 @@ export function HostControl({ sessionId, initialSession, questions, siteUrl }: P
                 {sorted.map((p, i) => {
                   const delta = deltas[p.id] || 0
                   const showDelta = delta > 0.005
+                  const rankChange = rankDeltas[p.id] || 0
 
                   return (
                     <div
@@ -620,12 +773,22 @@ export function HostControl({ sessionId, initialSession, questions, siteUrl }: P
                         'bg-white/5 border-white/10'
                       }`}
                     >
-                      {/* Posição */}
-                      <div className="flex-shrink-0 w-7 text-center">
+                      {/* Posição + variação */}
+                      <div className="flex-shrink-0 w-8 flex flex-col items-center">
                         {i < 3 ? (
                           <span className="text-xl leading-none">{medals[i]}</span>
                         ) : (
                           <span className="text-sm font-black text-white/40 tabular-nums">{i + 1}</span>
+                        )}
+                        {rankChange !== 0 ? (
+                          <span className={`flex items-center text-[9px] font-black leading-none mt-0.5 ${
+                            rankChange > 0 ? 'text-green-400' : 'text-red-400'
+                          }`}>
+                            {rankChange > 0 ? <ArrowUp className="w-2.5 h-2.5" /> : <ArrowDown className="w-2.5 h-2.5" />}
+                            {Math.abs(rankChange)}
+                          </span>
+                        ) : (
+                          <span className="text-white/20 text-[9px] leading-none mt-0.5">—</span>
                         )}
                       </div>
 
@@ -695,6 +858,11 @@ export function HostControl({ sessionId, initialSession, questions, siteUrl }: P
               <p className="text-orange-300 text-[10px] font-black uppercase tracking-widest mb-2 flex items-center gap-1.5">
                 <Flame className="w-3.5 h-3.5" /> Em chamas! ×{maxStreak} streak
               </p>
+              {onFire.length > 3 && (
+                <p className="text-orange-200/70 text-xs font-bold mb-2">
+                  {onFire.length} pessoas em chamas
+                </p>
+              )}
               <div className="flex flex-wrap gap-2">
                 {onFire.map((p) => (
                   <div key={p.id} className="flex items-center gap-2 bg-orange-500/20 border border-orange-400/30 rounded-full pl-1 pr-3 py-1">
@@ -851,9 +1019,60 @@ export function HostControl({ sessionId, initialSession, questions, siteUrl }: P
               )
             })()}
 
+            {/* Estado das decisões dos convidados (quem recebe os prémios) */}
+            {!awarded && guests.length > 0 && (
+              <div className={`rounded-3xl p-4 border ${
+                allGuestsDecided
+                  ? 'bg-green-500/15 border-green-400/30'
+                  : 'bg-amber-500/10 border-amber-400/30'
+              }`}>
+                <div className="flex items-center justify-between mb-2">
+                  <p className={`text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 ${
+                    allGuestsDecided ? 'text-green-300' : 'text-amber-300'
+                  }`}>
+                    <Gift className="w-3.5 h-3.5" /> Destinatários dos convidados
+                  </p>
+                  <span className={`text-xs font-black tabular-nums ${
+                    allGuestsDecided ? 'text-green-300' : 'text-amber-300'
+                  }`}>
+                    {guestsDecided}/{guests.length}
+                  </span>
+                </div>
+                {/* Barra de progresso */}
+                <div className="h-2 bg-white/10 rounded-full overflow-hidden mb-2.5">
+                  <div
+                    className={`h-full transition-all ${allGuestsDecided ? 'bg-green-400' : 'bg-amber-400'}`}
+                    style={{ width: `${guests.length ? (guestsDecided / guests.length) * 100 : 0}%` }}
+                  />
+                </div>
+                <div className="flex items-center gap-3 text-[11px] text-white/60">
+                  <span className="flex items-center gap-1">
+                    <CheckCircle2 className="w-3 h-3 text-green-400" /> {guestsChosen.length} escolheram
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <XCircle className="w-3 h-3 text-white/40" /> {guestsSkipped.length} dispensaram
+                  </span>
+                  {guests.length - guestsDecided > 0 && (
+                    <span className="text-amber-300/80 font-bold ml-auto">
+                      {guests.length - guestsDecided} por decidir
+                    </span>
+                  )}
+                </div>
+                {allGuestsDecided ? (
+                  <p className="text-green-300/90 text-xs font-bold mt-2.5 flex items-center gap-1.5">
+                    <CheckCircle2 className="w-3.5 h-3.5" /> Tudo escolhido — podes atribuir em segurança!
+                  </p>
+                ) : (
+                  <p className="text-amber-200/80 text-xs mt-2.5">
+                    Ainda há convidados a decidir. Se atribuíres agora, esses prémios perdem-se.
+                  </p>
+                )}
+              </div>
+            )}
+
             {!awarded ? (
               <button
-                onClick={handleAward}
+                onClick={handleAwardClick}
                 disabled={awarding}
                 className="w-full bg-yellow-400 text-yellow-900 font-black text-lg py-4 rounded-2xl hover:bg-yellow-300 disabled:opacity-50 transition-all shadow-xl"
               >
@@ -906,6 +1125,90 @@ export function HostControl({ sessionId, initialSession, questions, siteUrl }: P
             participants={participants}
             questTitle={(initialSession.vana_quests as any)?.title || 'VanaQuest'}
           />
+        </div>
+      )}
+
+      {/* Modal: confirmar expulsão de jogador */}
+      {kickTarget && (
+        <div
+          className="fixed inset-0 z-50 bg-black/70 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200"
+          onClick={() => !kicking && setKickTarget(null)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-gradient-to-br from-slate-900 via-blue-900 to-indigo-950 border border-white/20 rounded-3xl shadow-2xl max-w-sm w-full p-6 space-y-5 animate-in zoom-in-95 fade-in duration-300"
+          >
+            <div className="text-center space-y-3">
+              <div className="w-16 h-16 rounded-full bg-red-500/20 border border-red-400/30 flex items-center justify-center mx-auto">
+                <UserX className="w-8 h-8 text-red-400" />
+              </div>
+              <h3 className="text-white font-black text-2xl">Expulsar jogador?</h3>
+              <p className="text-sky-200 text-sm leading-relaxed">
+                Vais remover <span className="text-white font-black">{kickTarget.display_name}</span> da sessão.
+                <span className="text-white/60 text-xs mt-2 block">
+                  As respostas dele também são apagadas. Pode voltar a entrar com o PIN.
+                </span>
+              </p>
+            </div>
+            <div className="flex flex-col gap-2">
+              <button
+                onClick={handleKick}
+                disabled={kicking}
+                className="w-full bg-red-600 hover:bg-red-500 text-white font-black py-3.5 rounded-2xl transition-all active:scale-[0.98] shadow-lg shadow-red-900/40 disabled:opacity-60"
+              >
+                {kicking ? 'A remover...' : 'Sim, expulsar'}
+              </button>
+              <button
+                onClick={() => setKickTarget(null)}
+                disabled={kicking}
+                className="w-full bg-white/5 hover:bg-white/10 text-white/60 hover:text-white/80 text-sm py-2.5 rounded-2xl transition-colors border border-white/10 disabled:opacity-60"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: confirmar atribuição com convidados por decidir */}
+      {showAwardConfirm && (
+        <div
+          className="fixed inset-0 z-50 bg-black/70 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200"
+          onClick={() => !awarding && setShowAwardConfirm(false)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-gradient-to-br from-slate-900 via-blue-900 to-indigo-950 border border-white/20 rounded-3xl shadow-2xl max-w-sm w-full p-6 space-y-5 animate-in zoom-in-95 fade-in duration-300"
+          >
+            <div className="text-center space-y-3">
+              <div className="w-16 h-16 rounded-full bg-amber-500/20 border border-amber-400/30 flex items-center justify-center mx-auto">
+                <AlertTriangle className="w-8 h-8 text-amber-400" />
+              </div>
+              <h3 className="text-white font-black text-2xl">Atribuir já?</h3>
+              <p className="text-sky-200 text-sm leading-relaxed">
+                Ainda há <span className="text-amber-300 font-black">{guests.length - guestsDecided}</span> convidado{guests.length - guestsDecided !== 1 ? 's' : ''} por decidir o destinatário.
+                <span className="text-white/60 text-xs mt-2 block">
+                  Se atribuíres agora, os prémios desses convidados perdem-se (não vão para ninguém).
+                </span>
+              </p>
+            </div>
+            <div className="flex flex-col gap-2">
+              <button
+                onClick={() => setShowAwardConfirm(false)}
+                disabled={awarding}
+                className="w-full bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-400 hover:to-emerald-400 text-white font-black py-3 rounded-2xl transition-all active:scale-[0.98] shadow-lg disabled:opacity-60"
+              >
+                Esperar pelos restantes
+              </button>
+              <button
+                onClick={handleAward}
+                disabled={awarding}
+                className="w-full bg-white/5 hover:bg-white/10 text-white/60 hover:text-white/80 text-sm py-2.5 rounded-2xl transition-colors border border-white/10 disabled:opacity-60"
+              >
+                {awarding ? 'A atribuir...' : 'Atribuir mesmo assim'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

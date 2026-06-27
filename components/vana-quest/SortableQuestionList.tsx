@@ -19,7 +19,7 @@ import {
   arrayMove,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { GripVertical, Check, Clock, Zap, Pencil, Trash2, X } from 'lucide-react'
+import { GripVertical, Check, Clock, Zap, Pencil, Trash2, X, Lightbulb } from 'lucide-react'
 import { reorderQuestions } from '@/lib/actions/vana-quest'
 
 const OPTION_COLORS: Record<string, string> = {
@@ -35,6 +35,7 @@ interface Question {
   option_c: string
   option_d: string
   correct_option: string
+  explanation: string | null
   time_seconds: number
   points_multiplier: number
   question_order: number
@@ -140,6 +141,13 @@ function QuestionCard({
               <span className="flex items-center gap-1"><Zap className="w-3 h-3" /> ×{q.points_multiplier}</span>
               <span className="text-blue-600 font-medium">max {10 * q.points_multiplier} pts</span>
             </div>
+
+            {q.explanation && (
+              <div className="mt-2.5 flex items-start gap-1.5 text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
+                <Lightbulb className="w-3.5 h-3.5 mt-0.5 flex-shrink-0 text-amber-500" />
+                <span className="leading-snug">{q.explanation}</span>
+              </div>
+            )}
           </div>
 
           <div className="flex items-center gap-1 flex-shrink-0">
@@ -215,6 +223,19 @@ function EditForm({
             />
           </div>
         ))}
+      </div>
+
+      <div>
+        <label className="text-xs font-bold text-gray-500 uppercase tracking-wide block mb-1.5 flex items-center gap-1">
+          <Lightbulb className="w-3 h-3 text-amber-500" /> Nota / Explicação <span className="text-gray-400 normal-case font-medium">(opcional)</span>
+        </label>
+        <textarea
+          name="explanation"
+          defaultValue={q.explanation ?? ''}
+          placeholder="Explica porque é esta a resposta correcta. Aparece ao apresentador depois de todos responderem."
+          rows={2}
+          className="w-full border rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+        />
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">

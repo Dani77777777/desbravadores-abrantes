@@ -5,7 +5,9 @@ import { createClient } from '@/utils/supabase/client'
 import { QRCodeSVG } from 'qrcode.react'
 import { Users, Trophy, Zap, Flame, CheckCircle2 } from 'lucide-react'
 import { PlayerAvatar } from './PlayerAvatar'
+import { useLiveSession } from './useLiveSession'
 import { getIntroSeconds, questionFontSize, optionFontSize } from '@/utils/vana-quest'
+import confetti from 'canvas-confetti'
 
 const OPTION_COLORS = ['bg-red-500', 'bg-blue-500', 'bg-yellow-400', 'bg-green-500']
 const OPTION_LABELS = ['▲', '●', '◆', '■']
@@ -19,6 +21,7 @@ interface Question {
   option_c: string
   option_d: string
   correct_option: string
+  explanation: string | null
   time_seconds: number
   points_multiplier: number
 }
@@ -167,16 +170,24 @@ export function Presentation({ sessionId, initialSession, questions, siteUrl }: 
     return () => { supabase.removeChannel(ch) }
   }, [sessionId])
 
-  // Realtime
+  // Sessão sincronizada de forma resiliente (realtime + polling + refetch ao reconectar).
+  // O projetor é um cliente só, mas também não pode ficar preso por um evento perdido.
+  useLiveSession(
+    sessionId,
+    (row) => setSession((prev) => ({ ...prev, ...(row as Session) })),
+    { pollMs: 3000 }
+  )
+
+  // Realtime (participantes + respostas). A sessão é tratada pela useLiveSession acima.
   useEffect(() => {
     const channel = supabase
       .channel(`present-${sessionId}`)
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'vana_quest_sessions', filter: `id=eq.${sessionId}` },
-        (p) => setSession((prev) => ({ ...prev, ...(p.new as Session) })))
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'vana_quest_participants', filter: `session_id=eq.${sessionId}` },
         (p) => setParticipants((prev) => prev.find((x) => x.id === (p.new as Participant).id) ? prev : [...prev, p.new as Participant]))
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'vana_quest_participants', filter: `session_id=eq.${sessionId}` },
         (p) => setParticipants((prev) => prev.map((x) => x.id === (p.new as Participant).id ? (p.new as Participant) : x)))
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'vana_quest_participants' },
+        (p) => setParticipants((prev) => prev.filter((x) => x.id !== (p.old as any)?.id)))
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'vana_quest_answers', filter: `session_id=eq.${sessionId}` },
         (p) => {
           const ans = p.new as Answer & { id?: string }
@@ -1061,58 +1072,24 @@ function SpotlightOnRank({ position, color }: { position: 'left' | 'center' | 'r
   )
 }
 
-// Confetti shower (pure CSS)
+// Confetti shower using canvas-confetti
 function Confetti() {
-  const pieces = Array.from({ length: 80 }, (_, i) => i)
-  const colors = ['#fbbf24', '#ef4444', '#3b82f6', '#10b981', '#f59e0b', '#ec4899', '#8b5cf6']
+  useEffect(() => {
+    const colors = ['#fbbf24', '#ef4444', '#3b82f6', '#10b981', '#f59e0b', '#ec4899', '#8b5cf6']
+    let running = true
 
-  return (
-    <div className="absolute inset-0 pointer-events-none overflow-hidden z-20">
-      {pieces.map((i) => {
-        const left = Math.random() * 100
-        const delay = Math.random() * 3
-        const duration = 3 + Math.random() * 3
-        const size = 6 + Math.random() * 8
-        const color = colors[Math.floor(Math.random() * colors.length)]
-        const rotation = Math.random() * 360
-        const drift = (Math.random() - 0.5) * 100
-        return (
-          <div
-            key={i}
-            className="absolute top-[-20px] confetti-piece"
-            style={{
-              left: `${left}%`,
-              width: `${size}px`,
-              height: `${size * 0.4}px`,
-              backgroundColor: color,
-              animationDelay: `${delay}s`,
-              animationDuration: `${duration}s`,
-              ['--drift' as any]: `${drift}px`,
-              ['--rot' as any]: `${rotation}deg`,
-            }}
-          />
-        )
-      })}
-      <style jsx>{`
-        @keyframes confettiFall {
-          0% {
-            transform: translateY(-20px) translateX(0) rotate(0deg);
-            opacity: 1;
-          }
-          100% {
-            transform: translateY(110vh) translateX(var(--drift, 0px)) rotate(calc(var(--rot, 0deg) * 4));
-            opacity: 0.3;
-          }
-        }
-        .confetti-piece {
-          animation-name: confettiFall;
-          animation-timing-function: cubic-bezier(0.2, 0.7, 0.6, 1);
-          animation-iteration-count: infinite;
-          border-radius: 2px;
-        }
-      `}</style>
-    </div>
-  )
+    const fire = () => {
+      if (!running) return
+      confetti({ particleCount: 8, angle: 60, spread: 55, origin: { x: 0, y: 0.9 }, colors })
+      confetti({ particleCount: 8, angle: 120, spread: 55, origin: { x: 1, y: 0.9 }, colors })
+      setTimeout(fire, 400)
+    }
+
+    fire()
+    return () => { running = false }
+  }, [])
+
+  return null
 }
 
 // ─────────────────────────────────────────────────────────────────
@@ -1213,17 +1190,17 @@ function LeaderboardScreen({
 
   // Map participant id → display index in the current ordering
   const indexById = new Map(orderedParticipants.map((p, idx) => [p.id, idx]))
-  // We still render only the top 5 (union of top-5 in either order so nobody pops in/out)
+  // Renderiza o top 6 (união do top-6 em qualquer das ordens para ninguém aparecer/desaparecer)
   const visibleIds = new Set<string>([
-    ...startOrder.slice(0, 5).map((p) => p.id),
-    ...endOrder.slice(0, 5).map((p) => p.id),
+    ...startOrder.slice(0, 6).map((p) => p.id),
+    ...endOrder.slice(0, 6).map((p) => p.id),
   ])
   const top = participants.filter((p) => visibleIds.has(p.id))
 
   const maxStreak = Math.max(...participants.map((p) => p.current_streak), 0)
   const onFire = maxStreak >= 2 ? participants.filter((p) => p.current_streak === maxStreak) : []
 
-  const rowHeight = 140 // px entre rows (apertado para caber tudo num ecrã sem scroll)
+  const rowHeight = 158 // px entre rows (com respiro entre cards, mas a caber sem scroll)
 
   return (
     <div className="h-screen w-screen bg-gradient-to-br from-blue-950 via-indigo-900 to-blue-950 flex flex-col p-6 md:p-8 gap-4 overflow-hidden relative [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
@@ -1326,22 +1303,31 @@ function LeaderboardScreen({
           >
             <Flame className="w-5 h-5 md:w-6 md:h-6" /> Em chamas! ×{maxStreak} streak
           </p>
-          <div className="flex flex-wrap gap-2 overflow-hidden" style={{ maxHeight: '12vh' }}>
-            {onFire.map((p) => (
-              <div
-                key={p.id}
-                className="flex items-center gap-2 bg-orange-500/25 border border-orange-400/40 rounded-full px-3 py-1.5 md:px-4 md:py-2"
-              >
-                <Flame className="w-4 h-4 md:w-5 md:h-5 text-orange-400 flex-shrink-0" />
-                <span
-                  className="text-white font-black whitespace-nowrap"
-                  style={{ fontSize: 'clamp(0.85rem, 1.2vw, 1.25rem)' }}
+          {onFire.length > 3 ? (
+            <p
+              className="text-white font-black"
+              style={{ fontSize: 'clamp(1.1rem, 2vw, 1.75rem)' }}
+            >
+              {onFire.length} pessoas estão numa streak ×{maxStreak}
+            </p>
+          ) : (
+            <div className="flex flex-wrap gap-2 overflow-hidden" style={{ maxHeight: '12vh' }}>
+              {onFire.map((p) => (
+                <div
+                  key={p.id}
+                  className="flex items-center gap-2 bg-orange-500/25 border border-orange-400/40 rounded-full px-3 py-1.5 md:px-4 md:py-2"
                 >
-                  {p.display_name}
-                </span>
-              </div>
-            ))}
-          </div>
+                  <Flame className="w-4 h-4 md:w-5 md:h-5 text-orange-400 flex-shrink-0" />
+                  <span
+                    className="text-white font-black whitespace-nowrap"
+                    style={{ fontSize: 'clamp(0.85rem, 1.2vw, 1.25rem)' }}
+                  >
+                    {p.display_name}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>

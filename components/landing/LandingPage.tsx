@@ -48,7 +48,7 @@ export function LandingPage() {
                   Começa a Tua Jornada <ArrowRight className="ml-2 w-5 h-5" />
                 </Button>
               </Link>
-              <button 
+              <button
                 onClick={() => document.getElementById('welcome')?.scrollIntoView({ behavior: 'smooth' })}
                 className="text-blue-800 font-semibold hover:underline cursor-pointer"
               >
@@ -92,11 +92,11 @@ export function LandingPage() {
             </div>
             <div className="relative">
               <div className="aspect-square bg-blue-50 rounded-3xl overflow-hidden shadow-2xl rotate-3 border-8 border-white">
-                 <img 
-                   src="/images/desbravadores.png" 
-                   alt="Clube de Desbravadores" 
-                   className="w-full h-full object-cover"
-                 />
+                <img
+                  src="/images/desbravadores todos.jpeg"
+                  alt="Clube de Desbravadores"
+                  className="w-full h-full object-cover"
+                />
               </div>
               <Card className="absolute -bottom-8 -left-8 w-64 border-none shadow-xl bg-white/90 backdrop-blur-sm p-6 transform -rotate-3">
                 <div className="flex items-center gap-4 mb-3">
@@ -122,7 +122,7 @@ export function LandingPage() {
             </p>
             <div className="space-y-6 text-blue-50 text-lg">
               <p>
-                O nosso clube nasceu do desejo de proporcionar aos jovens da região um ambiente seguro e estimulante para o seu desenvolvimento físico, mental e espiritual. 
+                O nosso clube nasceu do desejo de proporcionar aos jovens da região um ambiente seguro e estimulante para o seu desenvolvimento físico, mental e espiritual.
               </p>
               <p>
                 As nossas reuniões são cheias de energia, onde treinamos para campismos, aprendemos sobre a natureza do Ribatejo e preparamo-nos para ser cidadãos exemplares e servos de Deus.
@@ -248,10 +248,10 @@ export function LandingPage() {
       <footer className="py-12 bg-stone-900 text-stone-400 border-t border-stone-800">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row items-center justify-between gap-8">
           <div className="flex items-center gap-3">
-             <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center shrink-0 overflow-hidden p-1.5">
-                <img src="/images/Logo Desbravadores.png" alt="Logo" className="w-full h-full object-contain" />
-             </div>
-             <span className="font-bold text-white">Desbravadores Abrantes</span>
+            <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center shrink-0 overflow-hidden p-1.5">
+              <img src="/images/Logo Desbravadores.png" alt="Logo" className="w-full h-full object-contain" />
+            </div>
+            <span className="font-bold text-white">Desbravadores Abrantes</span>
           </div>
           <div className="flex gap-8 text-sm">
             <Link href="/contacts" className="hover:text-white transition-colors">Contactos</Link>
@@ -266,9 +266,9 @@ export function LandingPage() {
 }
 
 function Badge({ children, className }: { children: React.ReactNode, className?: string }) {
-    return (
-        <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${className}`}>
-            {children}
-        </span>
-    )
+  return (
+    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${className}`}>
+      {children}
+    </span>
+  )
 }

@@ -69,6 +69,7 @@ export async function addQuestion(vanaQuestId: string, formData: FormData) {
     option_c: formData.get('option_c') as string,
     option_d: formData.get('option_d') as string,
     correct_option: formData.get('correct_option') as string,
+    explanation: ((formData.get('explanation') as string) || '').trim() || null,
     time_seconds: parseInt(formData.get('time_seconds') as string) || 20,
     points_multiplier: parseInt(formData.get('points_multiplier') as string) || 1,
     question_order: nextOrder,
@@ -88,6 +89,7 @@ export async function updateQuestion(questionId: string, vanaQuestId: string, fo
     option_c: formData.get('option_c') as string,
     option_d: formData.get('option_d') as string,
     correct_option: formData.get('correct_option') as string,
+    explanation: ((formData.get('explanation') as string) || '').trim() || null,
     time_seconds: parseInt(formData.get('time_seconds') as string) || 20,
     points_multiplier: parseInt(formData.get('points_multiplier') as string) || 1,
   }).eq('id', questionId)
@@ -415,42 +417,36 @@ export async function submitAnswer(
   questionId: string,
   chosenOption: string,
   elapsedMs: number
-): Promise<{ ok: boolean; isCorrect?: boolean; finalPoints?: number; error?: string }> {
+): Promise<{ ok: boolean; isCorrect?: boolean; finalPoints?: number; alreadyAnswered?: boolean; error?: string }> {
   const supabase = createServiceClient()
 
+  // Idempotência: se já existe resposta, devolve-a tal como está. Isto cobre cliques
+  // duplos E retries do cliente após um timeout de rede (a 1ª chamada pode ter chegado
+  // a registar mesmo que a resposta se tenha perdido a caminho do telemóvel).
   const { data: existing } = await supabase
     .from('vana_quest_answers')
-    .select('id')
+    .select('is_correct, final_points')
     .eq('participant_id', participantId)
     .eq('question_id', questionId)
-    .single()
+    .maybeSingle()
 
-  if (existing) return { ok: false, error: 'Já respondeste a esta pergunta.' }
+  if (existing) {
+    return { ok: false, alreadyAnswered: true, isCorrect: existing.is_correct, finalPoints: Number(existing.final_points) }
+  }
 
-  const { data: session } = await supabase
-    .from('vana_quest_sessions')
-    .select('status')
-    .eq('id', sessionId)
-    .single()
+  // Lê sessão, pergunta e participante em PARALELO. Sob carga (muitos jogadores a
+  // responder ao mesmo tempo) isto reduz a latência da função e diminui a janela em
+  // que uma resposta válida é rejeitada por a pergunta já ter fechado.
+  const [{ data: session }, { data: question }, { data: participant }] = await Promise.all([
+    supabase.from('vana_quest_sessions').select('status').eq('id', sessionId).single(),
+    supabase.from('vana_quest_questions').select('correct_option, time_seconds, points_multiplier').eq('id', questionId).single(),
+    supabase.from('vana_quest_participants').select('current_streak, total_points, correct_answers, max_streak').eq('id', participantId).single(),
+  ])
 
   if (session?.status !== 'question_active') {
     return { ok: false, error: 'A pergunta já não está activa.' }
   }
-
-  const { data: question } = await supabase
-    .from('vana_quest_questions')
-    .select('correct_option, time_seconds, points_multiplier')
-    .eq('id', questionId)
-    .single()
-
   if (!question) return { ok: false, error: 'Pergunta não encontrada.' }
-
-  const { data: participant } = await supabase
-    .from('vana_quest_participants')
-    .select('current_streak, total_points, correct_answers, max_streak')
-    .eq('id', participantId)
-    .single()
-
   if (!participant) return { ok: false, error: 'Participante não encontrado.' }
 
   const isCorrect = chosenOption === question.correct_option
@@ -461,7 +457,7 @@ export async function submitAnswer(
     ? calcPoints(question.time_seconds, elapsedMs, question.points_multiplier, newStreak)
     : { speedPoints: 0, streakBonus: 0, finalPoints: 0 }
 
-  await supabase.from('vana_quest_answers').insert({
+  const { error: insertError } = await supabase.from('vana_quest_answers').insert({
     session_id: sessionId,
     participant_id: participantId,
     question_id: questionId,
@@ -473,6 +469,22 @@ export async function submitAnswer(
     final_points: finalPoints,
     streak_at_answer: isCorrect ? newStreak : currentStreak,
   })
+
+  if (insertError) {
+    // Corrida: outra submissão do mesmo participante entrou primeiro e violou a
+    // constraint única (participant_id, question_id). Trata como já respondido em vez
+    // de contar os pontos uma segunda vez.
+    const { data: dup } = await supabase
+      .from('vana_quest_answers')
+      .select('is_correct, final_points')
+      .eq('participant_id', participantId)
+      .eq('question_id', questionId)
+      .maybeSingle()
+    if (dup) {
+      return { ok: false, alreadyAnswered: true, isCorrect: dup.is_correct, finalPoints: Number(dup.final_points) }
+    }
+    return { ok: false, error: 'Erro ao registar a resposta.' }
+  }
 
   const prevCorrect = participant?.correct_answers ?? 0
   const prevMax = participant?.max_streak ?? 0
@@ -494,9 +506,104 @@ export async function setRewardsRecipient(
   const supabase = createServiceClient()
   await supabase
     .from('vana_quest_participants')
-    .update({ rewards_recipient_id: recipientId })
+    .update({ rewards_recipient_id: recipientId, rewards_skipped: false })
     .eq('id', participantId)
     .eq('is_guest', true)
+}
+
+/**
+ * Convidado decide NÃO dar os prémios a ninguém — fica registado na BD
+ * para que o host saiba (realtime) que este convidado já decidiu.
+ */
+export async function skipRewards(participantId: string): Promise<void> {
+  const supabase = createServiceClient()
+  await supabase
+    .from('vana_quest_participants')
+    .update({ rewards_recipient_id: null, rewards_skipped: true })
+    .eq('id', participantId)
+    .eq('is_guest', true)
+}
+
+/**
+ * Remove um participante que saiu da SALA DE ESPERA (fechou o separador / saiu antes
+ * de o jogo começar). Guardado por `status === 'waiting'` para NUNCA apagar jogadores
+ * a meio do jogo (que podiam só estar a recarregar a página ou com a rede a falhar).
+ * Chamado pelo host quando a presença do jogador cai e não regressa dentro do período
+ * de tolerância — evita "jogadores mortos" na lista quando o jogo arranca.
+ */
+export async function leaveSession(
+  participantId: string,
+  sessionId: string
+): Promise<{ ok: boolean }> {
+  const authed = await createClient()
+  const { data: { user } } = await authed.auth.getUser()
+  if (!user) return { ok: false }
+
+  const service = createServiceClient()
+
+  const { data: session } = await service
+    .from('vana_quest_sessions')
+    .select('status, host_id')
+    .eq('id', sessionId)
+    .single()
+
+  // Nunca apaga a meio do jogo — só na sala de espera.
+  if (!session || session.status !== 'waiting') return { ok: false }
+
+  // Só o host da sessão (ou um admin) pode remover jogadores da sala — evita que um
+  // convidado mal-intencionado expulse outros através desta action.
+  if (session.host_id !== user.id) {
+    const { data: profile } = await service
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single()
+    if (!profile || (profile.role !== 'coordenador' && profile.role !== 'dirigente')) {
+      return { ok: false }
+    }
+  }
+
+  await service
+    .from('vana_quest_participants')
+    .delete()
+    .eq('id', participantId)
+    .eq('session_id', sessionId)
+
+  return { ok: true }
+}
+
+/**
+ * Expulsar um participante da sessão (host only). Apaga o participante e,
+ * por CASCADE, as respostas associadas. Usado para remover convidados a
+ * fazer lixo (nomes inapropriados, etc.).
+ */
+export async function kickParticipant(
+  participantId: string,
+  sessionId: string
+): Promise<{ ok: boolean; error?: string }> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { ok: false, error: 'Não autorizado' }
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', user.id)
+    .single()
+
+  if (!profile || (profile.role !== 'coordenador' && profile.role !== 'dirigente')) {
+    return { ok: false, error: 'Sem permissões' }
+  }
+
+  const service = createServiceClient()
+  const { error } = await service
+    .from('vana_quest_participants')
+    .delete()
+    .eq('id', participantId)
+    .eq('session_id', sessionId)
+
+  if (error) return { ok: false, error: error.message }
+  return { ok: true }
 }
 
 /**

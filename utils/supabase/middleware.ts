@@ -43,6 +43,7 @@ export async function updateSession(request: NextRequest) {
     !request.nextUrl.pathname.startsWith('/contacts') &&
     !request.nextUrl.pathname.startsWith('/codes') &&
     !request.nextUrl.pathname.startsWith('/jogos/vana-quest') &&
+    !request.nextUrl.pathname.startsWith('/embed') &&
     !request.nextUrl.pathname.includes('/present') &&
     request.nextUrl.pathname !== '/jogos'
   ) {
@@ -64,7 +65,7 @@ export async function updateSession(request: NextRequest) {
   const isResetPassword = request.nextUrl.pathname.startsWith('/login/reset-password')
 
   // If no birth_date and not on onboarding or reset-password, redirect to onboarding
-  if ((!profile || !profile.birth_date) && !isOnboarding && !isResetPassword) {
+  if ((!profile || !profile.birth_date) && !isOnboarding && !isResetPassword && !request.nextUrl.pathname.startsWith('/embed')) {
        const url = request.nextUrl.clone()
        url.pathname = '/onboarding'
        const redirectResponse = NextResponse.redirect(url)

@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Mail } from 'lucide-react'
+import { Mail, Eye, EyeOff } from 'lucide-react'
 import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
@@ -14,12 +14,18 @@ import { getSignedCallbackUrl } from './actions'
 function LoginContent() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const router = useRouter()
   const searchParams = useSearchParams()
   const mode = searchParams.get('mode')
   const [isSignUp, setIsSignUp] = useState(mode === 'signup')
   const supabase = createClient()
+
+  // Para onde redirecionar após entrar. Só aceita caminhos internos (começados por "/")
+  // para evitar open-redirects. Por defeito vai para a home.
+  const nextParam = searchParams.get('next')
+  const next = nextParam && nextParam.startsWith('/') ? nextParam : '/'
 
   useEffect(() => {
     // If mode changes in URL, update state
@@ -58,7 +64,7 @@ function LoginContent() {
           if (!error && data.session) {
             // Clear the hash from URL and redirect
             window.location.hash = ''
-            router.push('/')
+            router.push(next)
             router.refresh()
           }
         })
@@ -71,7 +77,7 @@ function LoginContent() {
       if (event === 'PASSWORD_RECOVERY') {
         router.replace('/login/reset-password' + window.location.hash)
       } else if (event === 'SIGNED_IN' && session) {
-        router.push('/')
+        router.push(next)
         router.refresh()
       }
     })
@@ -102,7 +108,7 @@ function LoginContent() {
           password,
         })
         if (error) throw error
-        router.push('/')
+        router.push(next)
         router.refresh()
       }
     } catch (error: any) {
@@ -151,15 +157,27 @@ function LoginContent() {
             </div>
             <div className="space-y-2">
               <Label htmlFor="password">Password</Label>
-              <Input
-                id="password"
-                type="password"
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                minLength={6}
-              />
+              <div className="relative">
+                <Input
+                  id="password"
+                  type={showPassword ? 'text' : 'password'}
+                  placeholder="••••••••"
+                  className="pr-10"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  minLength={6}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-2.5 text-gray-400 hover:text-gray-600"
+                  aria-label={showPassword ? 'Esconder password' : 'Mostrar password'}
+                  tabIndex={-1}
+                >
+                  {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                </button>
+              </div>
             </div>
             <Button 
               type="submit"

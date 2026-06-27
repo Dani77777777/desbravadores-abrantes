@@ -2,6 +2,8 @@ import { createClient } from '@/utils/supabase/server'
 import { redirect } from 'next/navigation'
 import { HostControl } from '@/components/vana-quest/HostControl'
 import { getSiteUrl } from '@/utils/site-url'
+import PresentationController from '@/components/presentation-effects/PresentationController'
+import { isAdminRole } from '@/utils/permissions'
 
 export default async function ControlPage({ params }: { params: Promise<{ sessionId: string }> }) {
   const { sessionId } = await params
@@ -10,7 +12,7 @@ export default async function ControlPage({ params }: { params: Promise<{ sessio
   if (!user) redirect('/login')
 
   const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single()
-  const isAdmin = profile?.role === 'coordenador' || profile?.role === 'dirigente'
+  const isAdmin = isAdminRole(profile)
   if (!isAdmin) redirect('/')
 
   const { data: session } = await supabase
@@ -30,11 +32,14 @@ export default async function ControlPage({ params }: { params: Promise<{ sessio
   const siteUrl = await getSiteUrl()
 
   return (
-    <HostControl
-      sessionId={sessionId}
-      initialSession={session}
-      questions={questions || []}
-      siteUrl={siteUrl}
-    />
+    <>
+      <HostControl
+        sessionId={sessionId}
+        initialSession={session}
+        questions={questions || []}
+        siteUrl={siteUrl}
+      />
+      <PresentationController />
+    </>
   )
 }

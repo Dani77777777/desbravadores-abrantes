@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { createClient } from '@/utils/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
@@ -12,8 +12,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
-import { Plus, Trophy, Coins, Calendar, MapPin, Users, Trash2, CheckCircle2, ListChecks, History, Pencil } from 'lucide-react'
+import { Plus, Trophy, Coins, Calendar, MapPin, Users, Trash2, CheckCircle2, ListChecks, History, Pencil, Share2, AlertTriangle, RotateCcw, Loader2 } from 'lucide-react'
 import { EventAttendanceManager } from './EventAttendanceManager'
+import { EventShareDialog } from '@/components/events/EventShareDialog'
 
 interface EventPanelProps {
   profile: any
@@ -60,6 +61,18 @@ export function EventPanel({ profile, members, events }: EventPanelProps) {
   const [attendanceOpen, setAttendanceOpen] = useState(false)
   const [selectedEvent, setSelectedEvent] = useState<any>(null)
 
+  // Current time (updated every minute, starts at 0 to avoid SSR hydration mismatch)
+  const [now, setNow] = useState(0)
+  useEffect(() => {
+    setNow(Date.now())
+    const timer = setInterval(() => setNow(Date.now()), 60_000)
+    return () => clearInterval(timer)
+  }, [])
+
+  // Share event state
+  const [shareOpen, setShareOpen] = useState(false)
+  const [sharingEvent, setSharingEvent] = useState<any>(null)
+
   // Edit event state
   const [editOpen, setEditOpen] = useState(false)
   const [editingEvent, setEditingEvent] = useState<any>(null)
@@ -78,7 +91,7 @@ export function EventPanel({ profile, members, events }: EventPanelProps) {
         description: description || null,
         location: location || null,
         start_at: new_date_with_time(startAt),
-        end_at: new_date_with_time(endAt),
+        end_at: endAt ? new_date_with_time(endAt) : null,
         target_section: targetSection === '__all__' ? null : targetSection,
         xp_reward: xpReward,
         gold_reward: goldReward,
@@ -115,7 +128,7 @@ export function EventPanel({ profile, members, events }: EventPanelProps) {
     try {
       const { error } = await supabase.from('events').update({
         start_at: new_date_with_time(newStartAt),
-        end_at: new_date_with_time(newEndAt),
+        end_at: newEndAt ? new_date_with_time(newEndAt) : null,
         updated_at: new Date().toISOString()
       }).eq('id', reschedulingEvent.id)
 
@@ -205,6 +218,24 @@ export function EventPanel({ profile, members, events }: EventPanelProps) {
     setAbsentPenalty(0)
   }
 
+  // Revert a finished event: remove awarded points and reopen for correction
+  const [revertingId, setRevertingId] = useState<string | null>(null)
+
+  const handleRevertEvent = async (event: any) => {
+    if (!confirm(`Reverter o evento "${event.title}"?\n\nOs pontos (XP/Ouro) atribuídos a todos os membros serão removidos e o evento voltará ao estado "por finalizar" para corrigires a atribuição. As presenças marcadas são mantidas.`)) return
+    setRevertingId(event.id)
+    try {
+      const { error } = await supabase.rpc('revert_event_points', { p_event_id: event.id })
+      if (error) throw error
+      toast.success('Evento revertido. Os pontos foram removidos — podes corrigir a atribuição.')
+      router.refresh()
+    } catch (e: any) {
+      toast.error(e.message || 'Erro ao reverter evento.')
+    } finally {
+      setRevertingId(null)
+    }
+  }
+
   const handleDeleteEvent = async (eventId: string) => {
     if (!confirm('Tens a certeza que queres apagar este evento? (Sem aviso de cancelamento)')) return
     const { error } = await supabase.from('events').delete().eq('id', eventId)
@@ -257,8 +288,9 @@ export function EventPanel({ profile, members, events }: EventPanelProps) {
                   <Input id="event-start" type="datetime-local" value={startAt} onChange={e => setStartAt(e.target.value)} required />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="event-end">Fim *</Label>
-                  <Input id="event-end" type="datetime-local" value={endAt} onChange={e => setEndAt(e.target.value)} required />
+                  <Label htmlFor="event-end">Fim <span className="text-gray-400 font-normal">(opcional)</span></Label>
+                  <Input id="event-end" type="datetime-local" value={endAt} onChange={e => setEndAt(e.target.value)} />
+                  <p className="text-[10px] text-slate-400">Deixa em branco se o evento não tiver hora de fim definida.</p>
                 </div>
               </div>
 
@@ -324,73 +356,103 @@ export function EventPanel({ profile, members, events }: EventPanelProps) {
               {upcomingEvents.length === 0 && (
                 <p className="text-center text-gray-500 py-10">Não há eventos marcados.</p>
               )}
-              {upcomingEvents.map(event => (
-                <div key={event.id} className="p-4 border rounded-xl hover:shadow-md transition-shadow bg-white flex flex-col md:flex-row md:items-center justify-between gap-4">
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <h3 className="font-bold text-gray-900">{event.title}</h3>
-                      <Badge variant="outline" className="text-[10px]">
-                        {event.target_section ? SECTION_LABELS[event.target_section] : 'Todos'}
-                      </Badge>
+              {upcomingEvents.map(event => {
+                const startMs = new Date(event.start_at).getTime()
+                const endMs = event.end_at ? new Date(event.end_at).getTime() : null
+                const showAttendance = now > 0 && now >= startMs - 60 * 60 * 1000
+                const isOverdue = now > 0 && endMs !== null && now >= endMs
+
+                return (
+                  <div key={event.id} className="p-4 border rounded-xl hover:shadow-md transition-shadow bg-white flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div className="space-y-1 flex-1">
+                      <div className="flex items-center gap-2">
+                        <h3 className="font-bold text-gray-900">{event.title}</h3>
+                        <Badge variant="outline" className="text-[10px]">
+                          {event.target_section ? SECTION_LABELS[event.target_section] : 'Todos'}
+                        </Badge>
+                      </div>
+                      <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500">
+                        <span className="flex items-center gap-1"><Calendar className="w-3 h-3" /> {new Date(event.start_at).toLocaleString('pt-PT')}</span>
+                        {event.location && <span className="flex items-center gap-1"><MapPin className="w-3 h-3" /> {event.location}</span>}
+                      </div>
+                      <div className="flex gap-3 pt-1">
+                        <span className="text-[10px] font-bold text-indigo-600 flex items-center gap-1"><Trophy className="w-3 h-3" /> {event.xp_reward} XP</span>
+                        <span className="text-[10px] font-bold text-yellow-600 flex items-center gap-1"><Coins className="w-3 h-3" /> {event.gold_reward} Gold</span>
+                      </div>
+                      {isOverdue && (
+                        <div className="flex items-center gap-1.5 mt-1.5 text-[11px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-2.5 py-1.5 w-fit">
+                          <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                          Evento terminado — regista as presenças!
+                        </div>
+                      )}
                     </div>
-                    <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500">
-                      <span className="flex items-center gap-1"><Calendar className="w-3 h-3" /> {new Date(event.start_at).toLocaleString('pt-PT')}</span>
-                      {event.location && <span className="flex items-center gap-1"><MapPin className="w-3 h-3" /> {event.location}</span>}
-                    </div>
-                    <div className="flex gap-3 pt-1">
-                       <span className="text-[10px] font-bold text-indigo-600 flex items-center gap-1"><Trophy className="w-3 h-3" /> {event.xp_reward} XP</span>
-                       <span className="text-[10px] font-bold text-yellow-600 flex items-center gap-1"><Coins className="w-3 h-3" /> {event.gold_reward} Gold</span>
+                    <div className="flex flex-col gap-2 w-full md:w-auto">
+                      {/* row 1: main action buttons */}
+                      <div className="flex gap-2">
+                        {showAttendance && (
+                          <Button
+                            size="sm"
+                            className="bg-green-600 hover:bg-green-700 gap-1 text-xs flex-1 md:flex-none"
+                            onClick={() => { setSelectedEvent(event); setAttendanceOpen(true) }}
+                          >
+                            <ListChecks className="w-3 h-3" /> Presenças
+                          </Button>
+                        )}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="text-blue-600 border-blue-200 hover:bg-blue-50 gap-1 text-xs flex-1 md:flex-none"
+                          onClick={() => {
+                            setReschedulingEvent(event)
+                            setNewStartAt(new Date(event.start_at).toISOString().slice(0, 16))
+                            setNewEndAt(event.end_at ? new Date(event.end_at).toISOString().slice(0, 16) : '')
+                            setRescheduleOpen(true)
+                          }}
+                        >
+                          <Calendar className="w-3 h-3" /> Reagendar
+                        </Button>
+                      </div>
+                      {/* row 2: icon buttons */}
+                      <div className="flex gap-1 justify-end">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="text-gray-400 hover:text-blue-600 shrink-0"
+                          title="Partilhar Evento"
+                          onClick={() => { setSharingEvent(event); setShareOpen(true) }}
+                        >
+                          <Share2 className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="text-gray-400 hover:text-blue-600 shrink-0"
+                          title="Editar Evento"
+                          onClick={() => {
+                            setEditingEvent(event)
+                            setEditDescription(event.description || '')
+                            setEditLocation(event.location || '')
+                            setEditXpReward(event.xp_reward)
+                            setEditGoldReward(event.gold_reward)
+                            setEditOpen(true)
+                          }}
+                        >
+                          <Pencil className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="text-gray-400 hover:text-orange-600 shrink-0"
+                          title="Cancelar Evento"
+                          onClick={() => handleCancelEvent(event)}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Button 
-                      size="sm" 
-                      className="bg-green-600 hover:bg-green-700 gap-1 text-xs"
-                      onClick={() => { setSelectedEvent(event); setAttendanceOpen(true) }}
-                    >
-                      <ListChecks className="w-3 h-3" /> Presenças
-                    </Button>
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      className="text-blue-600 border-blue-200 hover:bg-blue-50 gap-1 text-xs"
-                      onClick={() => {
-                        setReschedulingEvent(event)
-                        setNewStartAt(new Date(event.start_at).toISOString().slice(0, 16))
-                        setNewEndAt(new Date(event.end_at).toISOString().slice(0, 16))
-                        setRescheduleOpen(true)
-                      }}
-                    >
-                      <Calendar className="w-3 h-3" /> Reagendar
-                    </Button>
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      className="text-gray-400 hover:text-blue-600 shrink-0" 
-                      title="Editar Evento"
-                      onClick={() => {
-                        setEditingEvent(event)
-                        setEditDescription(event.description || '')
-                        setEditLocation(event.location || '')
-                        setEditXpReward(event.xp_reward)
-                        setEditGoldReward(event.gold_reward)
-                        setEditOpen(true)
-                      }}
-                    >
-                      <Pencil className="w-4 h-4" />
-                    </Button>
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      className="text-gray-400 hover:text-orange-600 shrink-0" 
-                      title="Cancelar Evento"
-                      onClick={() => handleCancelEvent(event)}
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
-                  </div>
-                </div>
-              ))}
+                )
+              })}
             </CardContent>
           </Card>
 
@@ -409,13 +471,26 @@ export function EventPanel({ profile, members, events }: EventPanelProps) {
                     <p className="text-[10px] text-gray-500">{new Date(event.start_at).toLocaleDateString('pt-PT')}</p>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
+                    <Button
+                      variant="ghost"
+                      size="sm"
                       className="text-gray-600 hover:text-blue-600 gap-1 text-[10px] h-8"
                       onClick={() => { setSelectedEvent(event); setAttendanceOpen(true) }}
                     >
                       <ListChecks className="w-3 h-3" /> Ver Histórico
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-gray-600 hover:text-orange-600 gap-1 text-[10px] h-8"
+                      title="Reverter atribuição de pontos"
+                      onClick={() => handleRevertEvent(event)}
+                      disabled={revertingId === event.id}
+                    >
+                      {revertingId === event.id
+                        ? <Loader2 className="w-3 h-3 animate-spin" />
+                        : <RotateCcw className="w-3 h-3" />}
+                      Reverter
                     </Button>
                     <Badge className="bg-green-100 text-green-700 border-green-200">Concluído</Badge>
                   </div>
@@ -460,8 +535,8 @@ export function EventPanel({ profile, members, events }: EventPanelProps) {
               <Input type="datetime-local" value={newStartAt} onChange={e => setNewStartAt(e.target.value)} required />
             </div>
             <div className="space-y-2">
-              <Label>Novo Horário de Fim</Label>
-              <Input type="datetime-local" value={newEndAt} onChange={e => setNewEndAt(e.target.value)} required />
+              <Label>Novo Horário de Fim <span className="text-gray-400 font-normal">(opcional)</span></Label>
+              <Input type="datetime-local" value={newEndAt} onChange={e => setNewEndAt(e.target.value)} />
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setRescheduleOpen(false)}>Cancelar</Button>
@@ -517,6 +592,14 @@ export function EventPanel({ profile, members, events }: EventPanelProps) {
           </form>
         </DialogContent>
       </Dialog>
+
+      {sharingEvent && (
+        <EventShareDialog
+          event={sharingEvent}
+          open={shareOpen}
+          onOpenChange={(v) => { setShareOpen(v); if (!v) setSharingEvent(null) }}
+        />
+      )}
 
       {selectedEvent && (
         <Dialog open={attendanceOpen} onOpenChange={setAttendanceOpen}>

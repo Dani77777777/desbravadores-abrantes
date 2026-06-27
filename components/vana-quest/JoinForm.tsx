@@ -37,6 +37,9 @@ export function JoinForm({ user, profile, initialPin, activeSessions = [] }: Pro
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
+  // Para onde voltar depois de criar conta / entrar (preserva o PIN escrito).
+  const nextUrl = `/jogos/vana-quest${pin ? `?pin=${pin}` : ''}`
+
   async function handleJoin(e: React.FormEvent) {
     e.preventDefault()
     setLoading(true)
@@ -143,6 +146,31 @@ export function JoinForm({ user, profile, initialPin, activeSessions = [] }: Pro
             {loading ? 'A entrar...' : 'Entrar no jogo'}
           </button>
         </form>
+
+        {/* Convidados: convite para criar conta / entrar (prémios ficam guardados) */}
+        {!user && (
+          <div className="mt-5 text-center">
+            <p className="text-sky-200/80 text-sm">És desbravador do clube?</p>
+            <div className="flex items-center justify-center gap-2 mt-1.5 text-sm">
+              <Link
+                href={`/login?mode=signup&next=${encodeURIComponent(nextUrl)}`}
+                className="text-white font-bold underline underline-offset-2"
+              >
+                Criar conta
+              </Link>
+              <span className="text-sky-300/50">·</span>
+              <Link
+                href={`/login?mode=login&next=${encodeURIComponent(nextUrl)}`}
+                className="text-white font-bold underline underline-offset-2"
+              >
+                Entrar
+              </Link>
+            </div>
+            <p className="text-sky-300/60 text-[11px] mt-1.5">
+              Com conta, os teus prémios ficam guardados no teu perfil.
+            </p>
+          </div>
+        )}
 
         {/* Failsafe: jogos a decorrer onde já estás como participante */}
         {activeSessions.length > 0 && (

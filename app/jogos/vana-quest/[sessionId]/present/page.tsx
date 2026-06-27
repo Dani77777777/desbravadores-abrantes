@@ -1,6 +1,7 @@
 import { createClient } from '@/utils/supabase/server'
 import { Presentation } from '@/components/vana-quest/Presentation'
 import { getSiteUrl } from '@/utils/site-url'
+import PresentationReceiver from '@/components/presentation-effects/PresentationReceiver'
 
 export default async function PresentPage({ params }: { params: Promise<{ sessionId: string }> }) {
   const { sessionId } = await params
@@ -29,11 +30,15 @@ export default async function PresentPage({ params }: { params: Promise<{ sessio
   const siteUrl = await getSiteUrl()
 
   return (
-    <Presentation
-      sessionId={sessionId}
-      initialSession={session}
-      questions={questions || []}
-      siteUrl={siteUrl}
-    />
+    <>
+      <Presentation
+        sessionId={sessionId}
+        initialSession={session}
+        questions={questions || []}
+        siteUrl={siteUrl}
+      />
+      <PresentationReceiver />
+    </>
   )
 }
+
