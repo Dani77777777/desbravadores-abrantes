@@ -31,10 +31,14 @@ export function PlayerView({ session: initSession, myPlayer, initialPlayers, asB
     if (data) setWords(data as VanaWordsWord[])
   }, [session.id])
 
+  const fetchGuesses = useCallback(async () => {
+    const { data } = await supabase.from('vanawords_guesses').select('*').eq('session_id', session.id)
+    if (data) setGuesses(data as VanaWordsGuess[])
+  }, [session.id])
+
   useEffect(() => {
     fetchWords()
-    supabase.from('vanawords_guesses').select('*').eq('session_id', session.id)
-      .then(({ data }) => { if (data) setGuesses(data as VanaWordsGuess[]) })
+    fetchGuesses()
 
     const chan = supabase.channel(`vanawords-player-${session.id}-${myPlayer.id}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'vanawords_sessions', filter: `id=eq.${session.id}` },
@@ -45,10 +49,7 @@ export function PlayerView({ session: initSession, myPlayer, initialPlayers, asB
             .then(({ data }) => { if (data) setPlayers(data as VanaWordsPlayer[]) })
         })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'vanawords_guesses', filter: `session_id=eq.${session.id}` },
-        () => {
-          supabase.from('vanawords_guesses').select('*').eq('session_id', session.id)
-            .then(({ data }) => { if (data) setGuesses(data as VanaWordsGuess[]) })
-        })
+        () => { fetchGuesses() })
       .subscribe()
 
     return () => { supabase.removeChannel(chan) }
@@ -69,6 +70,8 @@ export function PlayerView({ session: initSession, myPlayer, initialPlayers, asB
     // Passa asBotId quando em modo de impersonação
     const res = await toggleGuess(session.id, wordId, asBotId)
     if (res?.error) setError(res.error)
+    // Atualiza logo a grelha sem depender só do realtime (que pode falhar p/ DELETE)
+    await fetchGuesses()
     setLoading(false)
   }
 
