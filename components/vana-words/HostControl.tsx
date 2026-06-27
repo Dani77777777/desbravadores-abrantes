@@ -475,7 +475,7 @@ export function HostControl({ session: initSession, initialPlayers, initialWords
               <p className="text-slate-300 text-sm font-semibold">Submeter dica (Arauto ou Host)</p>
               <div className="flex gap-2">
                 <input
-                  className="flex-1 bg-slate-700 text-white rounded-lg px-3 py-2 text-sm border border-slate-600 uppercase"
+                  className="flex-1 min-w-0 bg-slate-700 text-white rounded-lg px-3 py-2 text-sm border border-slate-600 uppercase"
                   placeholder="Palavra-dica"
                   value={hintInput}
                   onChange={(e) => setHintInput(e.target.value)}
@@ -484,7 +484,7 @@ export function HostControl({ session: initSession, initialPlayers, initialWords
                   type="number"
                   min={1}
                   max={9}
-                  className="w-16 bg-slate-700 text-white rounded-lg px-3 py-2 text-sm border border-slate-600 text-center"
+                  className="w-14 shrink-0 bg-slate-700 text-white rounded-lg px-2 py-2 text-sm border border-slate-600 text-center"
                   value={hintNumber}
                   onChange={(e) => setHintNumber(parseInt(e.target.value) || 1)}
                 />
@@ -496,7 +496,7 @@ export function HostControl({ session: initSession, initialPlayers, initialWords
                     return res
                   })}
                   disabled={loading || !hintInput.trim()}
-                  className={`px-3 py-2 rounded-lg font-bold text-sm text-white transition-colors disabled:opacity-40 ${colors.bg}`}
+                  className={`px-4 py-2 shrink-0 rounded-lg font-bold text-sm text-white transition-colors disabled:opacity-40 ${colors.bg}`}
                 >
                   OK
                 </button>
