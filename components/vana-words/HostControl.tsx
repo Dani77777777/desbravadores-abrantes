@@ -53,29 +53,41 @@ export function HostControl({ session: initSession, initialPlayers, initialWords
     if (data) setWords(data as VanaWordsWord[])
   }, [session.id])
 
+  const fetchGuesses = useCallback(async () => {
+    const { data } = await supabase.from('vanawords_guesses').select('*').eq('session_id', session.id)
+    if (data) setGuesses(data as VanaWordsGuess[])
+  }, [session.id])
+
+  const fetchPlayers = useCallback(async () => {
+    const { data } = await supabase.from('vanawords_players').select('*').eq('session_id', session.id)
+    if (data) setPlayers(data as VanaWordsPlayer[])
+  }, [session.id])
+
+  const fetchSession = useCallback(async () => {
+    const { data } = await supabase.from('vanawords_sessions').select('*').eq('id', session.id).maybeSingle()
+    if (data) setSession((s) => ({ ...s, ...(data as VanaWordsSession) }))
+  }, [session.id])
+
   useEffect(() => {
     fetchWords()
-
-    // Guesses
-    supabase.from('vanawords_guesses').select('*').eq('session_id', session.id)
-      .then(({ data }) => { if (data) setGuesses(data) })
+    fetchGuesses()
 
     const chan = supabase.channel(`vanawords-host-${session.id}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'vanawords_sessions', filter: `id=eq.${session.id}` },
         (payload) => { setSession((s) => ({ ...s, ...(payload.new as VanaWordsSession) })) })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'vanawords_players', filter: `session_id=eq.${session.id}` },
-        () => {
-          supabase.from('vanawords_players').select('*').eq('session_id', session.id)
-            .then(({ data }) => { if (data) setPlayers(data as VanaWordsPlayer[]) })
-        })
+        () => { fetchPlayers() })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'vanawords_guesses', filter: `session_id=eq.${session.id}` },
-        () => {
-          supabase.from('vanawords_guesses').select('*').eq('session_id', session.id)
-            .then(({ data }) => { if (data) setGuesses(data as VanaWordsGuess[]) })
-        })
+        () => { fetchGuesses() })
       .subscribe()
 
-    return () => { supabase.removeChannel(chan) }
+    // Reforço: sondagem periódica caso o realtime falhe (votos de bots/jogadores)
+    const poll = setInterval(() => {
+      fetchGuesses()
+      fetchSession()
+    }, 2500)
+
+    return () => { supabase.removeChannel(chan); clearInterval(poll) }
   }, [session.id])
 
   // Re-fetch words whenever board_version changes
@@ -86,6 +98,8 @@ export function HostControl({ session: initSession, initialPlayers, initialWords
     setError(null)
     const res = await fn()
     if (res && 'error' in res && res.error) setError(res.error)
+    // Atualiza imediatamente após a ação, sem depender só do realtime
+    await Promise.all([fetchWords(), fetchGuesses(), fetchSession()])
     setLoading(false)
   }
 
@@ -527,7 +541,11 @@ export function HostControl({ session: initSession, initialPlayers, initialWords
             </button>
           )}
 
-          <p className="text-slate-500 text-xs text-center">Clica numa palavra para a revelar</p>
+          <p className="text-slate-500 text-xs text-center">
+            {isHinting
+              ? 'Insere a dica acima para a equipa começar a adivinhar'
+              : 'Clica numa palavra para a revelar'}
+          </p>
         </div>
       </div>
     )

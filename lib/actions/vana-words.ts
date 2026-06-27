@@ -402,7 +402,8 @@ export async function submitHint(
     current_hint: clean.toUpperCase(),
     current_hint_number: safeNumber,
     current_phase: 'guessing',
-    guesses_remaining: safeNumber,
+    // Regra do Codenames: a equipa tem direito a uma tentativa extra (N + 1)
+    guesses_remaining: safeNumber + 1,
   }).eq('id', sessionId)
 
   // Limpar palpites anteriores
