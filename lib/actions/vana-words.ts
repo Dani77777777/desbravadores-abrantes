@@ -374,8 +374,29 @@ export async function submitHint(
     return { error: 'Não és o Arauto da equipa activa.' }
   }
 
+  // ── Validação da dica (regras do Codenames) ─────────────────
+  const clean = hintWord.trim()
+  if (!clean) return { error: 'Escreve uma dica.' }
+  // Tem de ser uma única palavra (sem espaços nem hífens)
+  if (/[\s\-]/.test(clean)) {
+    return { error: 'A dica tem de ser uma única palavra.' }
+  }
+  // Normaliza (sem acentos, minúsculas) para comparar com o quadro
+  const normalize = (s: string) =>
+    s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim()
+  const normHint = normalize(clean)
+
+  const { data: boardWords } = await service
+    .from('vanawords_words')
+    .select('word')
+    .eq('session_id', sessionId)
+  const onBoard = (boardWords ?? []).some((w) => normalize(w.word) === normHint)
+  if (onBoard) {
+    return { error: 'A dica não pode ser uma palavra que está no quadro.' }
+  }
+
   await service.from('vanawords_sessions').update({
-    current_hint: hintWord.trim().toUpperCase(),
+    current_hint: clean.toUpperCase(),
     current_hint_number: hintNumber,
     current_phase: 'guessing',
     guesses_remaining: hintNumber,

@@ -152,6 +152,7 @@ export function ArautoView({ session: initSession, myPlayer, initialPlayers }: A
         {isMyTurn && isHinting && !submitted && (
           <div className={`bg-slate-800/80 rounded-2xl p-5 border ${colors.border} space-y-3`}>
             <p className={`font-bold ${colors.text} text-sm`}>A tua dica para a Equipa {label}</p>
+            <p className="text-slate-400 text-xs -mt-1">Uma só palavra, que não esteja no quadro.</p>
             <div className="flex gap-2">
               <input
                 className="flex-1 min-w-0 bg-slate-700 text-white rounded-xl px-3 py-2.5 text-base sm:text-lg font-bold border border-slate-600 uppercase placeholder:normal-case placeholder:text-slate-400"
