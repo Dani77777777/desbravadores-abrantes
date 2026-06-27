@@ -4,9 +4,10 @@ import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
 import { Navbar } from '@/components/layout/Navbar'
 import { createVanaWordsSession, addWordToBank, addWordsToBank, deleteWordFromBank } from '@/lib/actions/vana-words'
-import { ChevronLeft, Plus, FlaskConical, ExternalLink, Users, Clock, Trash2, BookOpen } from 'lucide-react'
+import { ChevronLeft, Plus, FlaskConical, BookOpen } from 'lucide-react'
 import Link from 'next/link'
 import { WordBankClient } from './WordBankClient'
+import { SessionsClient } from './SessionsClient'
 
 export default async function VanaWordsAdminPage() {
   const supabase = await createClient()
@@ -67,15 +68,6 @@ export default async function VanaWordsAdminPage() {
     revalidatePath('/admin/vana-words')
   }
 
-  const statusLabels: Record<string, string> = {
-    lobby: 'Lobby',
-    team_preview: 'A definir equipas',
-    arauto_spin: 'A escolher Arautos',
-    arauto_ready: 'Arautos prontos',
-    playing: 'A jogar',
-    finished: 'Terminado',
-  }
-
   const wordCount = wordBank?.length ?? 0
   const enoughWords = wordCount >= 25
 
@@ -93,21 +85,21 @@ export default async function VanaWordsAdminPage() {
 
         {/* ── Sessões ─────────────────────────────────────────── */}
         <section className="space-y-4">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <h2 className="font-semibold text-gray-700 text-lg">Sessões</h2>
-            <div className="flex gap-3">
-              <form action={handleCreate}>
+            <div className="flex gap-2 sm:gap-3">
+              <form action={handleCreate} className="flex-1 sm:flex-none">
                 <button
                   type="submit"
-                  className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-semibold text-sm transition-colors"
+                  className="flex w-full items-center justify-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-semibold text-sm transition-colors"
                 >
                   <Plus className="w-4 h-4" /> Nova Sessão
                 </button>
               </form>
-              <form action={handleCreateTest}>
+              <form action={handleCreateTest} className="flex-1 sm:flex-none">
                 <button
                   type="submit"
-                  className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-semibold text-sm transition-colors"
+                  className="flex w-full items-center justify-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-semibold text-sm transition-colors"
                 >
                   <FlaskConical className="w-4 h-4" /> Teste (Bots)
                 </button>
@@ -122,56 +114,7 @@ export default async function VanaWordsAdminPage() {
             </div>
           )}
 
-          {(!sessions || sessions.length === 0) && (
-            <p className="text-slate-500 text-sm">Ainda não criaste nenhuma sessão.</p>
-          )}
-          <div className="space-y-3">
-            {sessions?.map((s) => {
-              const playerCount = (s.vanawords_players as any)?.[0]?.count ?? 0
-              const isActive = s.status !== 'finished'
-              return (
-                <div key={s.id} className="bg-white rounded-2xl border border-gray-200 p-4 flex items-center justify-between gap-4 shadow-sm">
-                  <div className="flex items-center gap-4">
-                    <div className="bg-emerald-50 rounded-xl px-3 py-2 text-center min-w-[56px]">
-                      <p className="text-emerald-700 font-black text-lg tracking-widest">{s.code}</p>
-                    </div>
-                    <div>
-                      <p className="font-semibold text-gray-900 flex items-center gap-2">
-                        {statusLabels[s.status] ?? s.status}
-                        {s.is_test_session && (
-                          <span className="text-[10px] bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded font-bold">TESTE</span>
-                        )}
-                      </p>
-                      <div className="flex items-center gap-3 text-slate-400 text-xs mt-0.5">
-                        <span className="flex items-center gap-1"><Users className="w-3 h-3" /> {playerCount}</span>
-                        <span className="flex items-center gap-1">
-                          <Clock className="w-3 h-3" />
-                          {new Date(s.created_at).toLocaleDateString('pt-PT', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex gap-2">
-                    {isActive && (
-                      <Link
-                        href={`/jogos/vana-words/${s.id}/control`}
-                        className="flex items-center gap-1 px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-semibold"
-                      >
-                        <ExternalLink className="w-3.5 h-3.5" /> Abrir
-                      </Link>
-                    )}
-                    <Link
-                      href={`/jogos/vana-words/${s.id}/present`}
-                      target="_blank"
-                      className="flex items-center gap-1 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-sm font-semibold"
-                    >
-                      Projetor
-                    </Link>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
+          <SessionsClient sessions={(sessions ?? []) as any} />
         </section>
 
         {/* ── Banco de Palavras ────────────────────────────────── */}

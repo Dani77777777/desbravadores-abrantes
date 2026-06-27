@@ -57,8 +57,8 @@ export async function joinVanaWordsSession(
     .eq('id', user.id)
     .single()
 
-  if (!profile || profile.role !== 'desbravador') {
-    return { sessionId: '', error: 'Apenas desbravadores inscritos podem jogar.' }
+  if (!profile || !profile.role) {
+    return { sessionId: '', error: 'Apenas membros do clube podem jogar.' }
   }
 
   const { data: session } = await supabase
@@ -810,6 +810,38 @@ export async function getVanaWordsBotForImpersonation(
 
   if (error || !data || data.length === 0) return { error: 'Bot não encontrado.' }
   return { bot: data[0] }
+}
+
+// ── Apagar sessão (antes de começar ou depois de acabar) ──────
+export async function deleteVanaWordsSession(
+  sessionId: string,
+): Promise<{ error?: string }> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Não autenticado' }
+
+  const service = createServiceClient()
+  const { data: session } = await service
+    .from('vanawords_sessions')
+    .select('host_id, status')
+    .eq('id', sessionId)
+    .maybeSingle()
+
+  if (!session || session.host_id !== user.id) return { error: 'Sem permissão' }
+  if (session.status === 'playing') {
+    return { error: 'Não podes apagar uma sessão a decorrer. Termina o jogo primeiro.' }
+  }
+
+  // Apagar dados dependentes primeiro (caso não haja ON DELETE CASCADE)
+  await Promise.all([
+    service.from('vanawords_guesses').delete().eq('session_id', sessionId),
+    service.from('vanawords_words').delete().eq('session_id', sessionId),
+    service.from('vanawords_turns').delete().eq('session_id', sessionId),
+    service.from('vanawords_players').delete().eq('session_id', sessionId),
+  ])
+  const { error } = await service.from('vanawords_sessions').delete().eq('id', sessionId)
+  if (error) return { error: error.message }
+  return {}
 }
 
 // ── Banco de Palavras — CRUD ──────────────────────────────────

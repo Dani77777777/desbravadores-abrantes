@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
 import { createClient } from '@/utils/supabase/client'
 import {
   proposeVanaWordsTeams,
@@ -14,13 +15,14 @@ import {
   passTurn,
   awardVanaWordsPoints,
   addVanaWordsBot,
+  deleteVanaWordsSession,
 } from '@/lib/actions/vana-words'
 import { WordGrid } from './WordGrid'
 import { TeamRoulette } from './TeamRoulette'
 import { HostBotOverlay } from './HostBotOverlay'
 import { TEAM_LABELS, TEAM_COLORS } from '@/types/vana-words'
 import type { VanaWordsSession, VanaWordsPlayer, VanaWordsWord, VanaWordsGuess, TeamId } from '@/types/vana-words'
-import { Users, Crown, RefreshCw, Play, CheckCircle2, Trophy, ArrowRight, Shuffle, MonitorPlay, Bot } from 'lucide-react'
+import { Users, Crown, RefreshCw, Play, CheckCircle2, Trophy, ArrowRight, Shuffle, MonitorPlay, Bot, Trash2 } from 'lucide-react'
 
 interface HostControlProps {
   session: VanaWordsSession
@@ -41,7 +43,9 @@ export function HostControl({ session: initSession, initialPlayers, initialWords
   const [hintInput, setHintInput] = useState('')
   const [hintNumber, setHintNumber] = useState(1)
   const [botName, setBotName] = useState('')
+  const [confirmDelete, setConfirmDelete] = useState(false)
 
+  const router = useRouter()
   const supabase = createClient()
 
   const fetchWords = useCallback(async () => {
@@ -195,7 +199,7 @@ export function HostControl({ session: initSession, initialPlayers, initialWords
           <button
             onClick={() => run(() => proposeVanaWordsTeams(session.id))}
             disabled={loading || players.length < 4}
-            className="w-full py-4 rounded-2xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white font-bold text-lg flex items-center justify-center gap-2 transition-colors"
+            className="w-full py-4 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 disabled:opacity-40 disabled:saturate-50 text-white font-bold text-lg flex items-center justify-center gap-2 shadow-lg shadow-emerald-900/40 active:scale-[0.98] transition-all"
           >
             <Shuffle className="w-5 h-5" />
             {loading ? 'A atribuir…' : 'Atribuir Equipas'}
@@ -373,13 +377,13 @@ export function HostControl({ session: initSession, initialPlayers, initialWords
           <p className="text-slate-400 text-sm">Os Arautos devem ir para o ecrã grande e abrir a vista de Arauto nos seus dispositivos.</p>
         </div>
 
-        <div className="flex gap-6">
-          <div className="bg-slate-800/60 rounded-2xl p-5 border border-amber-500/40 text-center min-w-[140px]">
+        <div className="grid grid-cols-2 gap-3 sm:gap-6 w-full max-w-sm">
+          <div className="bg-slate-800/60 rounded-2xl p-5 border border-amber-500/40 text-center">
             <p className="text-amber-400 text-xs font-bold mb-2">🦁 Leão</p>
             <p className="text-white font-bold">{arautoA?.display_name ?? '—'}</p>
             <p className="text-slate-400 text-xs mt-1">Arauto</p>
           </div>
-          <div className="bg-slate-800/60 rounded-2xl p-5 border border-blue-500/40 text-center min-w-[140px]">
+          <div className="bg-slate-800/60 rounded-2xl p-5 border border-blue-500/40 text-center">
             <p className="text-blue-400 text-xs font-bold mb-2">🦅 Águia</p>
             <p className="text-white font-bold">{arautoB?.display_name ?? '—'}</p>
             <p className="text-slate-400 text-xs mt-1">Arauto</p>
@@ -406,7 +410,7 @@ export function HostControl({ session: initSession, initialPlayers, initialWords
         <button
           onClick={() => run(() => startVanaWordsGame(session.id))}
           disabled={loading}
-          className="px-10 py-4 rounded-2xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white font-bold text-lg flex items-center gap-2 transition-colors"
+          className="px-10 py-4 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 disabled:opacity-40 text-white font-bold text-lg flex items-center gap-2 shadow-lg shadow-emerald-900/40 active:scale-[0.98] transition-all"
         >
           <Play className="w-5 h-5" />
           {loading ? 'A iniciar…' : 'Os Arautos estão prontos — Começar!'}
@@ -581,6 +585,40 @@ export function HostControl({ session: initSession, initialPlayers, initialWords
           <p className="text-emerald-400 font-semibold flex items-center gap-2">
             <CheckCircle2 className="w-5 h-5" /> XP e Gold atribuídos!
           </p>
+        )}
+
+        {/* Apagar a sessão depois de terminada */}
+        {!confirmDelete ? (
+          <button
+            onClick={() => { setConfirmDelete(true); setError(null) }}
+            className="mt-2 flex items-center gap-1.5 text-slate-500 hover:text-red-400 text-sm font-medium transition-colors"
+          >
+            <Trash2 className="w-4 h-4" /> Apagar sessão
+          </button>
+        ) : (
+          <div className="w-full max-w-sm rounded-2xl border border-red-500/30 bg-red-950/30 p-4 text-center space-y-3">
+            <p className="text-sm text-slate-200">Apagar a sessão <span className="font-black">{session.code}</span>? Esta ação é permanente.</p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setConfirmDelete(false)}
+                disabled={loading}
+                className="flex-1 rounded-xl bg-slate-700 hover:bg-slate-600 py-2 text-sm font-semibold text-white disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => run(async () => {
+                  const res = await deleteVanaWordsSession(session.id)
+                  if (!res.error) router.push('/admin/vana-words')
+                  return res
+                })}
+                disabled={loading}
+                className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-red-600 hover:bg-red-700 py-2 text-sm font-semibold text-white disabled:opacity-60"
+              >
+                <Trash2 className="w-4 h-4" /> {loading ? 'A apagar…' : 'Apagar'}
+              </button>
+            </div>
+          </div>
         )}
       </div>
     )

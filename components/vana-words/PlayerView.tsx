@@ -142,7 +142,7 @@ export function PlayerView({ session: initSession, myPlayer, initialPlayers, asB
             <p className="text-yellow-400/70 text-xs mt-1">Abre a Vista de Arauto no teu dispositivo.</p>
             <a
               href={`/jogos/vana-words/${session.id}/arauto`}
-              className="mt-3 inline-block px-4 py-2 rounded-xl bg-yellow-500 text-black font-bold text-sm"
+              className="mt-3 inline-block px-4 py-2 rounded-xl bg-gradient-to-r from-yellow-400 to-amber-500 text-black font-bold text-sm shadow-lg shadow-yellow-900/30 active:scale-95 transition-transform"
             >
               Abrir Vista de Arauto
             </a>
@@ -200,7 +200,7 @@ export function PlayerView({ session: initSession, myPlayer, initialPlayers, asB
           </div>
 
           {/* Estado do turno */}
-          <div className={`rounded-xl p-3 border ${activeColors.badge}`}>
+          <div className={`rounded-xl p-3 border ${activeColors.badge} ${canVote ? 'ring-2 ring-emerald-400/60 shadow-lg shadow-emerald-900/30' : ''}`}>
             <p className={`font-bold text-sm ${activeColors.text}`}>{activeIcon} Vez da Equipa {activeLabel}</p>
             {isHinting ? (
               <p className="text-slate-400 text-sm mt-0.5">A aguardar dica do Arauto…</p>
@@ -234,7 +234,7 @@ export function PlayerView({ session: initSession, myPlayer, initialPlayers, asB
               <p className="text-yellow-300 font-bold text-sm">É a tua vez de dar a dica!</p>
               <a
                 href={`/jogos/vana-words/${session.id}/arauto`}
-                className="mt-2 inline-block px-4 py-2 rounded-xl bg-yellow-500 text-black font-bold text-sm"
+                className="mt-2 inline-block px-4 py-2 rounded-xl bg-gradient-to-r from-yellow-400 to-amber-500 text-black font-bold text-sm shadow-lg shadow-yellow-900/30 active:scale-95 transition-transform"
               >
                 Abrir Vista de Arauto
               </a>
