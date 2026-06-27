@@ -164,10 +164,10 @@ export function ArautoView({ session: initSession, myPlayer, initialPlayers }: A
               <input
                 type="number"
                 min={1}
-                max={9}
+                max={5}
                 className="w-16 shrink-0 bg-slate-700 text-white rounded-xl px-2 py-2.5 text-base sm:text-lg font-bold border border-slate-600 text-center"
                 value={hintNumber}
-                onChange={(e) => setHintNumber(parseInt(e.target.value) || 1)}
+                onChange={(e) => setHintNumber(Math.min(5, Math.max(1, parseInt(e.target.value) || 1)))}
               />
             </div>
             {error && <p className="text-red-400 text-sm">{error}</p>}

@@ -395,11 +395,14 @@ export async function submitHint(
     return { error: 'A dica não pode ser uma palavra que está no quadro.' }
   }
 
+  // Limitar o número entre 1 e 5
+  const safeNumber = Math.min(5, Math.max(1, Math.floor(hintNumber) || 1))
+
   await service.from('vanawords_sessions').update({
     current_hint: clean.toUpperCase(),
-    current_hint_number: hintNumber,
+    current_hint_number: safeNumber,
     current_phase: 'guessing',
-    guesses_remaining: hintNumber,
+    guesses_remaining: safeNumber,
   }).eq('id', sessionId)
 
   // Limpar palpites anteriores

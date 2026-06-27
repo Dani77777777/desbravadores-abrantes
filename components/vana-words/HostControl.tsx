@@ -483,10 +483,10 @@ export function HostControl({ session: initSession, initialPlayers, initialWords
                 <input
                   type="number"
                   min={1}
-                  max={9}
+                  max={5}
                   className="w-14 shrink-0 bg-slate-700 text-white rounded-lg px-2 py-2 text-sm border border-slate-600 text-center"
                   value={hintNumber}
-                  onChange={(e) => setHintNumber(parseInt(e.target.value) || 1)}
+                  onChange={(e) => setHintNumber(Math.min(5, Math.max(1, parseInt(e.target.value) || 1)))}
                 />
                 <button
                   onClick={() => run(async () => {
