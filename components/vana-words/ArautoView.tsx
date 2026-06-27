@@ -6,7 +6,7 @@ import { submitHint } from '@/lib/actions/vana-words'
 import { WordGrid } from './WordGrid'
 import { TEAM_LABELS, TEAM_COLORS } from '@/types/vana-words'
 import type { VanaWordsSession, VanaWordsPlayer, VanaWordsWord, VanaWordsGuess, TeamId } from '@/types/vana-words'
-import { Crown } from 'lucide-react'
+import { Crown, Minus, Plus } from 'lucide-react'
 
 interface ArautoViewProps {
   session: VanaWordsSession
@@ -161,14 +161,29 @@ export function ArautoView({ session: initSession, myPlayer, initialPlayers }: A
                 onChange={(e) => setHintInput(e.target.value)}
                 onKeyDown={(e) => { if (e.key === 'Enter') handleSubmitHint() }}
               />
-              <input
-                type="number"
-                min={1}
-                max={5}
-                className="w-16 shrink-0 bg-slate-700 text-white rounded-xl px-2 py-2.5 text-base sm:text-lg font-bold border border-slate-600 text-center"
-                value={hintNumber}
-                onChange={(e) => setHintNumber(Math.min(5, Math.max(1, parseInt(e.target.value) || 1)))}
-              />
+              <div className="flex shrink-0 items-stretch rounded-xl border border-slate-600 bg-slate-700 overflow-hidden">
+                <button
+                  type="button"
+                  onClick={() => setHintNumber((n) => Math.max(1, n - 1))}
+                  disabled={hintNumber <= 1}
+                  aria-label="Diminuir"
+                  className="px-3 flex items-center text-white hover:bg-slate-600 disabled:opacity-30 active:bg-slate-500"
+                >
+                  <Minus className="w-5 h-5" />
+                </button>
+                <span className="w-9 flex items-center justify-center text-lg font-black text-white tabular-nums select-none">
+                  {hintNumber}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setHintNumber((n) => Math.min(5, n + 1))}
+                  disabled={hintNumber >= 5}
+                  aria-label="Aumentar"
+                  className="px-3 flex items-center text-white hover:bg-slate-600 disabled:opacity-30 active:bg-slate-500"
+                >
+                  <Plus className="w-5 h-5" />
+                </button>
+              </div>
             </div>
             {error && <p className="text-red-400 text-sm">{error}</p>}
             <button

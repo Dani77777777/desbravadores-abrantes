@@ -22,7 +22,7 @@ import { TeamRoulette } from './TeamRoulette'
 import { HostBotOverlay } from './HostBotOverlay'
 import { TEAM_LABELS, TEAM_COLORS } from '@/types/vana-words'
 import type { VanaWordsSession, VanaWordsPlayer, VanaWordsWord, VanaWordsGuess, TeamId } from '@/types/vana-words'
-import { Users, Crown, RefreshCw, Play, CheckCircle2, Trophy, ArrowRight, Shuffle, MonitorPlay, Bot, Trash2 } from 'lucide-react'
+import { Users, Crown, RefreshCw, Play, CheckCircle2, Trophy, ArrowRight, Shuffle, MonitorPlay, Bot, Trash2, Minus, Plus } from 'lucide-react'
 
 interface HostControlProps {
   session: VanaWordsSession
@@ -494,14 +494,29 @@ export function HostControl({ session: initSession, initialPlayers, initialWords
                   value={hintInput}
                   onChange={(e) => setHintInput(e.target.value)}
                 />
-                <input
-                  type="number"
-                  min={1}
-                  max={5}
-                  className="w-14 shrink-0 bg-slate-700 text-white rounded-lg px-2 py-2 text-sm border border-slate-600 text-center"
-                  value={hintNumber}
-                  onChange={(e) => setHintNumber(Math.min(5, Math.max(1, parseInt(e.target.value) || 1)))}
-                />
+                <div className="flex shrink-0 items-stretch rounded-lg border border-slate-600 bg-slate-700 overflow-hidden">
+                  <button
+                    type="button"
+                    onClick={() => setHintNumber((n) => Math.max(1, n - 1))}
+                    disabled={hintNumber <= 1}
+                    aria-label="Diminuir"
+                    className="px-2.5 flex items-center text-white hover:bg-slate-600 disabled:opacity-30 active:bg-slate-500"
+                  >
+                    <Minus className="w-4 h-4" />
+                  </button>
+                  <span className="w-7 flex items-center justify-center text-sm font-black text-white tabular-nums select-none">
+                    {hintNumber}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setHintNumber((n) => Math.min(5, n + 1))}
+                    disabled={hintNumber >= 5}
+                    aria-label="Aumentar"
+                    className="px-2.5 flex items-center text-white hover:bg-slate-600 disabled:opacity-30 active:bg-slate-500"
+                  >
+                    <Plus className="w-4 h-4" />
+                  </button>
+                </div>
                 <button
                   onClick={() => run(async () => {
                     if (!hintInput.trim()) return
