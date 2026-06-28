@@ -22,7 +22,7 @@ import { TeamRoulette } from './TeamRoulette'
 import { HostBotOverlay } from './HostBotOverlay'
 import { TEAM_LABELS, TEAM_COLORS } from '@/types/vana-words'
 import type { VanaWordsSession, VanaWordsPlayer, VanaWordsWord, VanaWordsGuess, TeamId } from '@/types/vana-words'
-import { Users, Crown, RefreshCw, Play, CheckCircle2, Trophy, ArrowRight, Shuffle, MonitorPlay, Bot, Trash2, Minus, Plus, Copy, Check, Maximize2 } from 'lucide-react'
+import { Users, Crown, RefreshCw, Play, CheckCircle2, Trophy, ArrowRight, Shuffle, MonitorPlay, Bot, Trash2, Minus, Plus, Copy, Check, Maximize2, Eye, EyeOff } from 'lucide-react'
 
 interface HostControlProps {
   session: VanaWordsSession
@@ -46,6 +46,7 @@ export function HostControl({ session: initSession, initialPlayers, initialWords
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [copied, setCopied] = useState(false)
   const [qrZoomed, setQrZoomed] = useState(false)
+  const [boardHidden, setBoardHidden] = useState(false)
 
   const router = useRouter()
   const supabase = createClient()
@@ -599,15 +600,36 @@ export function HostControl({ session: initSession, initialPlayers, initialWords
             </div>
           )}
 
+          {/* Esconder/mostrar a grelha (privacidade ao aproximar-se de não-arautos) */}
+          <button
+            onClick={() => setBoardHidden((v) => !v)}
+            className={`w-full rounded-xl p-3 flex items-center justify-center gap-2 text-sm font-semibold transition-colors ${
+              boardHidden ? 'bg-yellow-500 text-black hover:bg-yellow-400' : 'bg-slate-700 text-white hover:bg-slate-600'
+            }`}
+          >
+            {boardHidden ? <><Eye className="w-4 h-4" /> Mostrar quadro</> : <><EyeOff className="w-4 h-4" /> Esconder quadro</>}
+          </button>
+
           {/* Grelha de palavras */}
-          <WordGrid
-            words={words}
-            guesses={guesses}
-            players={players}
-            showColors={true}
-            onWordClick={!isHinting ? (wordId) => run(() => confirmWord(session.id, wordId)) : undefined}
-            disabled={isHinting}
-          />
+          {boardHidden ? (
+            <button
+              onClick={() => setBoardHidden(false)}
+              className="w-full rounded-xl border border-dashed border-slate-600 bg-slate-800/40 py-16 flex flex-col items-center justify-center gap-2 text-slate-400 hover:bg-slate-800/60 transition-colors"
+            >
+              <EyeOff className="w-8 h-8" />
+              <p className="font-semibold text-sm">Quadro escondido</p>
+              <p className="text-xs">Toca para voltar a mostrar</p>
+            </button>
+          ) : (
+            <WordGrid
+              words={words}
+              guesses={guesses}
+              players={players}
+              showColors={true}
+              onWordClick={!isHinting ? (wordId) => run(() => confirmWord(session.id, wordId)) : undefined}
+              disabled={isHinting}
+            />
+          )}
 
           {error && <p className="text-red-400 text-sm text-center">{error}</p>}
 

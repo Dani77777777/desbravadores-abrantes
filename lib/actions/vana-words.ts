@@ -324,7 +324,7 @@ export async function startVanaWordsGame(
   const service = createServiceClient()
   const { data: session } = await service
     .from('vanawords_sessions')
-    .select('host_id, status')
+    .select('host_id, status, board_version')
     .eq('id', sessionId)
     .maybeSingle()
   if (!session || session.host_id !== user.id) return { error: 'Sem permissão' }
@@ -335,6 +335,9 @@ export async function startVanaWordsGame(
     current_team: 'a',
     current_phase: 'hinting',
     started_at: new Date().toISOString(),
+    // Força o refetch das palavras nos clientes que montaram antes da grelha
+    // ser gerada (lobby/arauto) — eles só recarregam quando board_version muda.
+    board_version: (session.board_version ?? 0) + 1,
   }).eq('id', sessionId)
 
   return {}
