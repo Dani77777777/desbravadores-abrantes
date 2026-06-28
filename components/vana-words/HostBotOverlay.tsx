@@ -20,7 +20,7 @@ export function HostBotOverlay({ sessionId, players }: Props) {
   const [open, setOpen] = useState(true)
 
   return (
-    <div className="fixed bottom-4 right-4 z-50 max-w-sm">
+    <div className="fixed bottom-4 left-4 z-50 max-w-sm">
       {!open ? (
         <button
           onClick={() => setOpen(true)}
