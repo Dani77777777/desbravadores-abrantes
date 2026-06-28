@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
+import { QRCodeSVG } from 'qrcode.react'
 import { createClient } from '@/utils/supabase/client'
 import { WordGrid } from './WordGrid'
 import { TeamRoulette } from './TeamRoulette'
@@ -17,8 +18,23 @@ export function ProjectorView({ session: initSession, initialPlayers }: Projecto
   const [players, setPlayers] = useState(initialPlayers)
   const [words, setWords] = useState<VanaWordsWord[]>([])
   const [guesses, setGuesses] = useState<VanaWordsGuess[]>([])
+  const [qrZoomed, setQrZoomed] = useState(false)
 
   const supabase = createClient()
+
+  const joinUrl = typeof window !== 'undefined'
+    ? `${window.location.origin}/jogos/vana-words?code=${session.code}`
+    : ''
+
+  // Recebe comandos do host (ampliar QR Code)
+  useEffect(() => {
+    const ch = supabase.channel(`vanawords-present-${session.id}`, { config: { broadcast: { self: false } } })
+    ch.on('broadcast', { event: 'cmd' }, ({ payload }) => {
+      if (typeof payload?.qrZoomed === 'boolean') setQrZoomed(payload.qrZoomed)
+    })
+    ch.subscribe()
+    return () => { supabase.removeChannel(ch) }
+  }, [session.id])
 
   const fetchWords = useCallback(async () => {
     const { data } = await supabase.rpc('get_vanawords_public', { p_session_id: session.id })
@@ -106,11 +122,16 @@ export function ProjectorView({ session: initSession, initialPlayers }: Projecto
           </p>
         </div>
 
-        {/* Código de entrada em destaque */}
+        {/* Código de entrada + QR Code em destaque */}
         {!isPreview && (
-          <div className="bg-slate-800/60 border border-slate-700 rounded-3xl px-12 py-6 text-center">
-            <p className="text-slate-400 text-sm uppercase tracking-widest mb-1">Código</p>
-            <p className="text-7xl font-black text-white tracking-[0.3em]">{session.code}</p>
+          <div className="flex flex-wrap items-center justify-center gap-8">
+            <div className="bg-slate-800/60 border border-slate-700 rounded-3xl px-12 py-6 text-center">
+              <p className="text-slate-400 text-sm uppercase tracking-widest mb-1">Código</p>
+              <p className="text-7xl font-black text-white tracking-[0.3em]">{session.code}</p>
+            </div>
+            <div className="bg-white rounded-3xl p-5 shadow-2xl">
+              <QRCodeSVG value={joinUrl} size={180} />
+            </div>
           </div>
         )}
 
@@ -155,6 +176,17 @@ export function ProjectorView({ session: initSession, initialPlayers }: Projecto
                 </div>
               )
             })}
+          </div>
+        )}
+
+        {/* QR Code ampliado (controlado pelo host) */}
+        {qrZoomed && !isPreview && (
+          <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-6 animate-in fade-in duration-300">
+            <div className="bg-white rounded-3xl p-10 shadow-2xl animate-in zoom-in-95 duration-500">
+              <QRCodeSVG value={joinUrl} size={500} />
+              <p className="text-center mt-6 text-5xl font-black text-gray-900 tracking-widest">{session.code}</p>
+              <p className="text-center text-gray-500 text-lg mt-2">Lê o código ou usa o código de entrada</p>
+            </div>
           </div>
         )}
       </div>

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/utils/supabase/client'
 import {
@@ -22,7 +22,7 @@ import { TeamRoulette } from './TeamRoulette'
 import { HostBotOverlay } from './HostBotOverlay'
 import { TEAM_LABELS, TEAM_COLORS } from '@/types/vana-words'
 import type { VanaWordsSession, VanaWordsPlayer, VanaWordsWord, VanaWordsGuess, TeamId } from '@/types/vana-words'
-import { Users, Crown, RefreshCw, Play, CheckCircle2, Trophy, ArrowRight, Shuffle, MonitorPlay, Bot, Trash2, Minus, Plus } from 'lucide-react'
+import { Users, Crown, RefreshCw, Play, CheckCircle2, Trophy, ArrowRight, Shuffle, MonitorPlay, Bot, Trash2, Minus, Plus, Copy, Check, Maximize2 } from 'lucide-react'
 
 interface HostControlProps {
   session: VanaWordsSession
@@ -44,6 +44,8 @@ export function HostControl({ session: initSession, initialPlayers, initialWords
   const [hintNumber, setHintNumber] = useState(1)
   const [botName, setBotName] = useState('')
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [copied, setCopied] = useState(false)
+  const [qrZoomed, setQrZoomed] = useState(false)
 
   const router = useRouter()
   const supabase = createClient()
@@ -117,6 +119,31 @@ export function HostControl({ session: initSession, initialPlayers, initialWords
   const presentUrl = typeof window !== 'undefined'
     ? `${window.location.origin}/jogos/vana-words/${session.id}/present`
     : ''
+  const joinUrl = typeof window !== 'undefined'
+    ? `${window.location.origin}/jogos/vana-words?code=${session.code}`
+    : ''
+
+  async function copyCode() {
+    try {
+      await navigator.clipboard.writeText(session.code)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch {}
+  }
+
+  // Canal de broadcast para comandar o projetor (ampliar QR Code)
+  const broadcastRef = useRef<ReturnType<typeof supabase.channel> | null>(null)
+  useEffect(() => {
+    const ch = supabase.channel(`vanawords-present-${session.id}`, { config: { broadcast: { self: false } } })
+    ch.subscribe()
+    broadcastRef.current = ch
+    return () => { supabase.removeChannel(ch) }
+  }, [session.id])
+
+  // Sincroniza o estado do zoom do QR com o projetor sempre que muda
+  useEffect(() => {
+    broadcastRef.current?.send({ type: 'broadcast', event: 'cmd', payload: { qrZoomed } })
+  }, [qrZoomed])
 
   // FAB de impersonação de bots — visível em todas as fases das sessões de teste
   const overlay = session.is_test_session
@@ -149,6 +176,45 @@ export function HostControl({ session: initSession, initialPlayers, initialWords
             <p className="text-5xl font-black text-white tracking-widest">{session.code}</p>
             <p className="text-slate-500 text-xs mt-2">/jogos/vana-words</p>
           </div>
+
+          {/* Copiar código */}
+          <button
+            onClick={copyCode}
+            className={`w-full rounded-2xl p-4 flex items-center gap-3 transition-all active:scale-[0.98] ${
+              copied ? 'bg-emerald-500 text-white' : 'bg-slate-800/60 text-white border border-slate-700 hover:bg-slate-700/60'
+            }`}
+          >
+            <div className={`p-2.5 rounded-xl flex-shrink-0 ${copied ? 'bg-white/20' : 'bg-emerald-500/20'}`}>
+              {copied ? <Check className="w-5 h-5" /> : <Copy className="w-5 h-5 text-emerald-300" />}
+            </div>
+            <div className="flex-1 text-left min-w-0">
+              <p className="font-bold text-sm">{copied ? 'Código copiado!' : 'Copiar código'}</p>
+              <p className={`text-xs truncate ${copied ? 'text-white/70' : 'text-slate-400'}`}>
+                {copied ? 'Cola onde quiseres partilhar' : `${session.code} · toca para copiar`}
+              </p>
+            </div>
+          </button>
+
+          {/* Ampliar QR Code no projetor */}
+          <button
+            onClick={() => setQrZoomed((v) => !v)}
+            className={`w-full rounded-2xl p-4 flex items-center gap-3 transition-all active:scale-[0.98] ${
+              qrZoomed ? 'bg-yellow-400 text-yellow-900' : 'bg-white text-gray-900'
+            }`}
+          >
+            <div className={`p-2.5 rounded-xl flex-shrink-0 ${qrZoomed ? 'bg-yellow-900/10' : 'bg-gray-100'}`}>
+              <Maximize2 className={`w-5 h-5 ${qrZoomed ? 'text-yellow-900' : 'text-gray-700'}`} />
+            </div>
+            <div className="flex-1 text-left">
+              <p className="font-bold text-sm">
+                {qrZoomed ? 'A mostrar QR Code grande' : 'Ampliar QR Code no projetor'}
+              </p>
+              <p className={`text-xs ${qrZoomed ? 'text-yellow-900/70' : 'text-gray-500'}`}>
+                {qrZoomed ? 'Toca para fechar' : 'Toca para ampliar no ecrã grande'}
+              </p>
+            </div>
+            {qrZoomed && <span className="w-2 h-2 bg-yellow-900 rounded-full animate-pulse" />}
+          </button>
 
           <div className="bg-slate-800/60 rounded-2xl p-4 border border-slate-700">
             <div className="flex items-center gap-2 mb-3">

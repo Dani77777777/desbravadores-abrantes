@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { joinVanaWordsSession } from '@/lib/actions/vana-words'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -31,6 +31,13 @@ export function VanaWordsHome({ userId, canPlay, activeSessions = [] }: VanaWord
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const router = useRouter()
+
+  // Prefill do código a partir do QR Code / link partilhado (?code=XXXX)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const c = params.get('code')
+    if (c) setCode(c.toUpperCase())
+  }, [])
 
   async function handleJoin(e: React.FormEvent) {
     e.preventDefault()
