@@ -67,7 +67,7 @@ export function PlayerView({ session: initSession, myPlayer, initialPlayers, asB
     return () => { supabase.removeChannel(chan); clearInterval(poll) }
   }, [session.id])
 
-  useEffect(() => { fetchWords() }, [session.board_version])
+  useEffect(() => { fetchWords() }, [session.board_version, session.status])
 
   // O id efectivo para identificar palpites: bot impersonado ou jogador real
   const effectivePlayerId = asBotId ?? myPlayer.id
@@ -290,7 +290,8 @@ export function PlayerView({ session: initSession, myPlayer, initialPlayers, asB
         {session.win_reason === 'black_hit' && (
           <p className="text-red-400 text-sm">A palavra preta foi revelada! 💀</p>
         )}
-        <WordGrid words={words} guesses={[]} players={players} showColors={false} disabled />
+        <p className="text-slate-500 text-sm -mb-2">Todas as palavras:</p>
+        <WordGrid words={words} guesses={[]} players={players} showColors disabled />
       </div>
     )
   }

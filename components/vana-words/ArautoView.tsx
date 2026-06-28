@@ -28,8 +28,8 @@ export function ArautoView({ session: initSession, myPlayer, initialPlayers }: A
   const supabase = createClient()
 
   const fetchWords = useCallback(async () => {
-    // As cores só são reveladas ao Arauto depois do host iniciar o jogo
-    if (session.status !== 'playing') return
+    // As cores só são reveladas ao Arauto a partir do início do jogo (e no fim)
+    if (session.status !== 'playing' && session.status !== 'finished') return
     const { data } = await supabase.rpc('get_vanawords_with_teams', { p_session_id: session.id })
     if (data) setWords(data as VanaWordsWord[])
   }, [session.id, session.status])
@@ -142,6 +142,10 @@ export function ArautoView({ session: initSession, myPlayer, initialPlayers }: A
         {session.win_reason === 'black_hit' && (
           <p className="text-red-400 text-sm">A palavra preta foi revelada! 💀</p>
         )}
+        <div className="w-full max-w-2xl">
+          <p className="text-slate-500 text-sm mb-2">Todas as palavras:</p>
+          <WordGrid words={words} guesses={[]} players={players} showColors disabled />
+        </div>
       </div>
     )
   }

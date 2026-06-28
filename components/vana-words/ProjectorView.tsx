@@ -72,7 +72,7 @@ export function ProjectorView({ session: initSession, initialPlayers }: Projecto
     return () => { supabase.removeChannel(chan); clearInterval(poll) }
   }, [session.id])
 
-  useEffect(() => { fetchWords() }, [session.board_version])
+  useEffect(() => { fetchWords() }, [session.board_version, session.status])
 
   const teamA = players.filter((p) => p.team === 'a')
   const teamB = players.filter((p) => p.team === 'b')
@@ -272,7 +272,7 @@ export function ProjectorView({ session: initSession, initialPlayers }: Projecto
             words={words}
             guesses={guesses}
             players={players}
-            showColors={false}
+            showColors={isFinished}
             disabled
             large
           />
