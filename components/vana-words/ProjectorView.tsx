@@ -61,7 +61,15 @@ export function ProjectorView({ session: initSession, initialPlayers }: Projecto
         })
       .subscribe()
 
-    return () => { supabase.removeChannel(chan) }
+    // Reforço: sondagem periódica caso o realtime falhe (dica/fase do turno)
+    const poll = setInterval(() => {
+      supabase.from('vanawords_sessions').select('*').eq('id', session.id).maybeSingle()
+        .then(({ data }) => { if (data) setSession((s) => ({ ...s, ...(data as VanaWordsSession) })) })
+      supabase.from('vanawords_guesses').select('*').eq('session_id', session.id)
+        .then(({ data }) => { if (data) setGuesses(data as VanaWordsGuess[]) })
+    }, 2500)
+
+    return () => { supabase.removeChannel(chan); clearInterval(poll) }
   }, [session.id])
 
   useEffect(() => { fetchWords() }, [session.board_version])

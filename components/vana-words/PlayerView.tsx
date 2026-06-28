@@ -36,6 +36,11 @@ export function PlayerView({ session: initSession, myPlayer, initialPlayers, asB
     if (data) setGuesses(data as VanaWordsGuess[])
   }, [session.id])
 
+  const fetchSession = useCallback(async () => {
+    const { data } = await supabase.from('vanawords_sessions').select('*').eq('id', session.id).maybeSingle()
+    if (data) setSession((s) => ({ ...s, ...(data as VanaWordsSession) }))
+  }, [session.id])
+
   useEffect(() => {
     fetchWords()
     fetchGuesses()
@@ -52,7 +57,14 @@ export function PlayerView({ session: initSession, myPlayer, initialPlayers, asB
         () => { fetchGuesses() })
       .subscribe()
 
-    return () => { supabase.removeChannel(chan) }
+    // Reforço: sondagem periódica caso o realtime falhe (ex.: dica do Arauto que
+    // muda current_phase de 'hinting' para 'guessing' não chegava ao jogador).
+    const poll = setInterval(() => {
+      fetchSession()
+      fetchGuesses()
+    }, 2500)
+
+    return () => { supabase.removeChannel(chan); clearInterval(poll) }
   }, [session.id])
 
   useEffect(() => { fetchWords() }, [session.board_version])
