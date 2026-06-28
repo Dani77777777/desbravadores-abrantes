@@ -54,7 +54,20 @@ export function ArautoView({ session: initSession, myPlayer, initialPlayers }: A
         })
       .subscribe()
 
-    return () => { supabase.removeChannel(chan) }
+    // Reforço: sondagem periódica caso o realtime falhe (fase do turno / fim do jogo)
+    const poll = setInterval(() => {
+      supabase.from('vanawords_sessions').select('*').eq('id', session.id).maybeSingle()
+        .then(({ data }) => {
+          if (!data) return
+          const next = data as VanaWordsSession
+          setSession((s) => ({ ...s, ...next }))
+          if (next.current_phase === 'hinting') setSubmitted(false)
+        })
+      supabase.from('vanawords_guesses').select('*').eq('session_id', session.id)
+        .then(({ data }) => { if (data) setGuesses(data as VanaWordsGuess[]) })
+    }, 2500)
+
+    return () => { supabase.removeChannel(chan); clearInterval(poll) }
   }, [session.id])
 
   useEffect(() => { fetchWords() }, [session.board_version, session.status])
@@ -105,6 +118,30 @@ export function ArautoView({ session: initSession, myPlayer, initialPlayers }: A
           <span className="inline-block w-3 h-3 bg-emerald-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
         </div>
         <p className="text-slate-500 text-xs">A aguardar que o host revele as grelhas…</p>
+      </div>
+    )
+  }
+
+  // Fim do jogo
+  if (session.status === 'finished') {
+    const winner = session.winner_team as TeamId | null
+    const iWon = winner && myTeam === winner
+    const winnerLabel = winner ? TEAM_LABELS[winner] : null
+    const icon = winner === 'a' ? '🦁' : winner === 'b' ? '🦅' : '🏆'
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-emerald-950 via-slate-900 to-indigo-950 flex flex-col items-center justify-center p-6 gap-6 text-center">
+        <p className="text-7xl">{iWon ? '🏆' : icon}</p>
+        <h1 className="text-3xl font-black text-white">
+          {winner ? `Equipa ${winnerLabel} venceu!` : 'Jogo terminado!'}
+        </h1>
+        {iWon ? (
+          <p className="text-emerald-400 text-lg font-semibold">Parabéns! A tua equipa ganhou 100 XP e 50 Gold!</p>
+        ) : (
+          <p className="text-slate-400">Boa sorte na próxima vez!</p>
+        )}
+        {session.win_reason === 'black_hit' && (
+          <p className="text-red-400 text-sm">A palavra preta foi revelada! 💀</p>
+        )}
       </div>
     )
   }
