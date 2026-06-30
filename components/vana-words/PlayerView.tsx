@@ -215,14 +215,57 @@ export function PlayerView({ session: initSession, myPlayer, initialPlayers, asB
 
   // ── Arauto Spin ────────────────────────────────────────────
   if (session.status === 'arauto_spin') {
+    const amArautoNow = myPlayerLive.is_arauto
+
     return (
       <div className="min-h-screen bg-gradient-to-br from-emerald-950 via-slate-900 to-indigo-950 flex flex-col items-center justify-center p-6 gap-6">
         {isBotMode && <BotBanner name={myPlayer.display_name} />}
-        <div className="text-6xl" style={{ animation: 'spin 1s linear infinite' }}>🎰</div>
-        <div className="text-center">
-          <h2 className="text-2xl font-black text-white">A Escolher os Arautos…</h2>
-          <p className="text-slate-400 text-sm mt-1">A roleta está a decidir quem guiará cada equipa</p>
-        </div>
+
+        {!amArautoNow && (
+          <>
+            <div className="text-6xl" style={{ animation: 'spin 1s linear infinite' }}>🎰</div>
+            <div className="text-center">
+              <h2 className="text-2xl font-black text-white">A Escolher os Arautos…</h2>
+              <p className="text-slate-400 text-sm mt-1">A roleta está a decidir quem guiará cada equipa</p>
+            </div>
+          </>
+        )}
+
+        {amArautoNow && (
+          <div className="bg-yellow-500/10 border border-yellow-500/40 rounded-2xl p-4 text-center max-w-xs">
+            <Crown className="w-8 h-8 text-yellow-400 mx-auto mb-2" />
+            <p className="text-yellow-300 font-bold">A roleta escolheu-te como Arauto!</p>
+
+            {myPlayerLive.arauto_response === 'pending' && (
+              <>
+                <p className="text-yellow-400/70 text-xs mt-1">Aceitas guiar a tua equipa?</p>
+                <div className="flex items-center justify-center gap-2 mt-3">
+                  <button
+                    onClick={() => handleArautoResponse(true)}
+                    disabled={arautoResponseLoading}
+                    className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-bold disabled:opacity-50"
+                  >
+                    Aceito
+                  </button>
+                  <button
+                    onClick={() => handleArautoResponse(false)}
+                    disabled={arautoResponseLoading}
+                    className="px-4 py-2 rounded-xl bg-slate-700 hover:bg-slate-600 text-white text-sm font-bold disabled:opacity-50"
+                  >
+                    Prefiro não
+                  </button>
+                </div>
+                <p className="text-yellow-400/50 text-[11px] mt-2">É só uma preferência — o host vê e decide se gira a roleta outra vez.</p>
+              </>
+            )}
+            {myPlayerLive.arauto_response === 'accepted' && (
+              <p className="text-emerald-400 text-xs mt-1 font-semibold">✅ Disseste que aceitas. A aguardar o host…</p>
+            )}
+            {myPlayerLive.arauto_response === 'declined' && (
+              <p className="text-yellow-400/70 text-xs mt-1 font-semibold">Disseste que preferias não ser. O host pode girar a roleta outra vez.</p>
+            )}
+          </div>
+        )}
       </div>
     )
   }

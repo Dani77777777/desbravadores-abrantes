@@ -128,6 +128,17 @@ export function HostControl({ session: initSession, initialPlayers, initialWords
     setLoading(false)
   }
 
+  function renderArautoResponseBadge(arauto: VanaWordsPlayer | undefined) {
+    if (!arauto) return null
+    if (arauto.arauto_response === 'accepted') {
+      return <p className="text-emerald-400 text-[11px] font-semibold">✅ Aceitou</p>
+    }
+    if (arauto.arauto_response === 'declined') {
+      return <p className="text-red-400 text-[11px] font-semibold">❌ Prefere não ser — gira outra vez?</p>
+    }
+    return <p className="text-slate-500 text-[11px]">⏳ A aguardar resposta</p>
+  }
+
   function renderArautoPicker(tid: TeamId) {
     const team = tid === 'a' ? teamA : teamB
     const current = tid === 'a' ? arautoA : arautoB
@@ -485,6 +496,7 @@ export function HostControl({ session: initSession, initialPlayers, initialWords
                   <Users className="w-3 h-3" /> Escolher
                 </button>
               </div>
+              {renderArautoResponseBadge(arautoA)}
               {arautoPicker === 'a' && renderArautoPicker('a')}
             </div>
           )}
@@ -514,6 +526,7 @@ export function HostControl({ session: initSession, initialPlayers, initialWords
                   <Users className="w-3 h-3" /> Escolher
                 </button>
               </div>
+              {renderArautoResponseBadge(arautoB)}
               {arautoPicker === 'b' && renderArautoPicker('b')}
             </div>
           )}
