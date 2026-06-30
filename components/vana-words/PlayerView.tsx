@@ -41,6 +41,11 @@ export function PlayerView({ session: initSession, myPlayer, initialPlayers, asB
     if (data) setSession((s) => ({ ...s, ...(data as VanaWordsSession) }))
   }, [session.id])
 
+  const fetchPlayers = useCallback(async () => {
+    const { data } = await supabase.from('vanawords_players').select('*').eq('session_id', session.id)
+    if (data) setPlayers(data as VanaWordsPlayer[])
+  }, [session.id])
+
   useEffect(() => {
     fetchWords()
     fetchGuesses()
@@ -49,19 +54,18 @@ export function PlayerView({ session: initSession, myPlayer, initialPlayers, asB
       .on('postgres_changes', { event: '*', schema: 'public', table: 'vanawords_sessions', filter: `id=eq.${session.id}` },
         (payload) => { setSession((s) => ({ ...s, ...(payload.new as VanaWordsSession) })) })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'vanawords_players', filter: `session_id=eq.${session.id}` },
-        () => {
-          supabase.from('vanawords_players').select('*').eq('session_id', session.id)
-            .then(({ data }) => { if (data) setPlayers(data as VanaWordsPlayer[]) })
-        })
+        () => { fetchPlayers() })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'vanawords_guesses', filter: `session_id=eq.${session.id}` },
         () => { fetchGuesses() })
       .subscribe()
 
     // Reforço: sondagem periódica caso o realtime falhe (ex.: dica do Arauto que
-    // muda current_phase de 'hinting' para 'guessing' não chegava ao jogador).
+    // muda current_phase de 'hinting' para 'guessing', ou mudança de equipa, que
+    // não chegavam ao jogador em separadores em segundo plano).
     const poll = setInterval(() => {
       fetchSession()
       fetchGuesses()
+      fetchPlayers()
     }, 2500)
 
     return () => { supabase.removeChannel(chan); clearInterval(poll) }

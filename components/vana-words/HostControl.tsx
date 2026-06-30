@@ -102,7 +102,7 @@ export function HostControl({ session: initSession, initialPlayers, initialWords
     const res = await fn()
     if (res && 'error' in res && res.error) setError(res.error)
     // Atualiza imediatamente após a ação, sem depender só do realtime
-    await Promise.all([fetchWords(), fetchGuesses(), fetchSession()])
+    await Promise.all([fetchWords(), fetchGuesses(), fetchSession(), fetchPlayers()])
     setLoading(false)
   }
 
