@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { createClient } from '@/utils/supabase/client'
-import { toggleGuess } from '@/lib/actions/vana-words'
+import { toggleGuess, requestVanaWordsSwap } from '@/lib/actions/vana-words'
 import { WordGrid } from './WordGrid'
 import { TEAM_LABELS, TEAM_COLORS } from '@/types/vana-words'
 import type { VanaWordsSession, VanaWordsPlayer, VanaWordsWord, VanaWordsGuess, TeamId } from '@/types/vana-words'
@@ -23,6 +23,7 @@ export function PlayerView({ session: initSession, myPlayer, initialPlayers, asB
   const [guesses, setGuesses] = useState<VanaWordsGuess[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [swapLoading, setSwapLoading] = useState(false)
 
   const supabase = createClient()
 
@@ -91,6 +92,13 @@ export function PlayerView({ session: initSession, myPlayer, initialPlayers, asB
     // Atualiza logo a grelha sem depender só do realtime (que pode falhar p/ DELETE)
     await fetchGuesses()
     setLoading(false)
+  }
+
+  async function handleSwapRequest(requested: boolean) {
+    setSwapLoading(true)
+    await requestVanaWordsSwap(session.id, requested)
+    await fetchPlayers()
+    setSwapLoading(false)
   }
 
   // ── Lobby ────────────────────────────────────────────────────
@@ -167,6 +175,30 @@ export function PlayerView({ session: initSession, myPlayer, initialPlayers, asB
             ))}
           </div>
         </div>
+
+        {!isBotMode && (
+          myPlayerLive.swap_requested ? (
+            <div className="w-full max-w-xs rounded-2xl p-4 border border-yellow-500/40 bg-yellow-500/10 text-center space-y-2">
+              <p className="text-yellow-300 text-sm font-semibold">⏳ Pedido de troca enviado</p>
+              <p className="text-yellow-400/70 text-xs">O host vai decidir se trocas de equipa.</p>
+              <button
+                onClick={() => handleSwapRequest(false)}
+                disabled={swapLoading}
+                className="text-xs text-yellow-300/80 underline disabled:opacity-50"
+              >
+                Cancelar pedido
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => handleSwapRequest(true)}
+              disabled={swapLoading}
+              className="px-4 py-2.5 rounded-xl bg-slate-800/60 border border-slate-700 hover:bg-slate-700/60 text-slate-300 text-sm font-semibold transition-colors disabled:opacity-50"
+            >
+              🔁 Pedir para trocar de equipa
+            </button>
+          )
+        )}
 
         <p className="text-slate-500 text-sm">A aguardar que o host confirme as equipas…</p>
       </div>

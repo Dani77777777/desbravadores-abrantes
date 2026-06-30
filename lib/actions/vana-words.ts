@@ -164,7 +164,71 @@ export async function moveVanaWordsPlayer(
     .maybeSingle()
   if (!session || session.host_id !== user.id || session.status !== 'team_preview') return
 
-  await service.from('vanawords_players').update({ team: toTeam }).eq('id', playerId)
+  await service.from('vanawords_players').update({ team: toTeam, swap_requested: false }).eq('id', playerId)
+}
+
+// ── Pedir/cancelar troca de equipa (jogador, durante team_preview) ──
+export async function requestVanaWordsSwap(
+  sessionId: string,
+  requested: boolean,
+): Promise<{ error?: string }> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Não autenticado' }
+
+  const service = createServiceClient()
+  const { data: session } = await service
+    .from('vanawords_sessions')
+    .select('status')
+    .eq('id', sessionId)
+    .maybeSingle()
+  if (!session || session.status !== 'team_preview') return { error: 'Estado inválido' }
+
+  const { data: player } = await service
+    .from('vanawords_players')
+    .select('id')
+    .eq('session_id', sessionId)
+    .eq('user_id', user.id)
+    .maybeSingle()
+  if (!player) return { error: 'Não estás nesta sessão' }
+
+  await service.from('vanawords_players').update({ swap_requested: requested }).eq('id', player.id)
+  return {}
+}
+
+// ── Host responde a um pedido de troca (aceitar troca / recusar) ────
+export async function respondVanaWordsSwap(
+  sessionId: string,
+  playerId: string,
+  accept: boolean,
+): Promise<{ error?: string }> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Não autenticado' }
+
+  const service = createServiceClient()
+  const { data: session } = await service
+    .from('vanawords_sessions')
+    .select('host_id, status')
+    .eq('id', sessionId)
+    .maybeSingle()
+  if (!session || session.host_id !== user.id || session.status !== 'team_preview') {
+    return { error: 'Sem permissão' }
+  }
+
+  if (accept) {
+    const { data: player } = await service
+      .from('vanawords_players')
+      .select('team')
+      .eq('id', playerId)
+      .maybeSingle()
+    if (!player?.team) return { error: 'Jogador sem equipa' }
+    const otherTeam: TeamId = player.team === 'a' ? 'b' : 'a'
+    await service.from('vanawords_players').update({ team: otherTeam, swap_requested: false }).eq('id', playerId)
+  } else {
+    await service.from('vanawords_players').update({ swap_requested: false }).eq('id', playerId)
+  }
+  return {}
 }
 
 // ── Confirmar equipas e avançar para sorteio de Arautos ───────

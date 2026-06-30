@@ -60,6 +60,7 @@ export default async function VanaWordsBotImpersonatePage({
     team: bot.team as 'a' | 'b' | null,
     is_arauto: bot.is_arauto,
     is_bot: true,
+    swap_requested: false,
     joined_at: new Date().toISOString(),
   }
 

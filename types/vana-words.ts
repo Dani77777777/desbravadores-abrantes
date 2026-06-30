@@ -41,6 +41,7 @@ export interface VanaWordsPlayer {
   team: TeamId | null
   is_arauto: boolean
   is_bot: boolean
+  swap_requested: boolean
   joined_at: string
 }
 

@@ -158,32 +158,59 @@ export function ProjectorView({ session: initSession, initialPlayers }: Projecto
             <span className="inline-block w-4 h-4 bg-emerald-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
             <span className="inline-block w-4 h-4 bg-emerald-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
           </div>
-        ) : (
-          <div className="flex flex-wrap justify-center gap-3 max-w-4xl">
-            {players.map((p) => {
-              const teamColor = p.team === 'a'
-                ? 'border-amber-500 bg-amber-500/10'
-                : p.team === 'b'
-                  ? 'border-blue-500 bg-blue-500/10'
-                  : 'border-slate-600 bg-slate-800/60'
+        ) : isPreview ? (
+          <div className="grid grid-cols-2 gap-8 max-w-5xl w-full">
+            {(['a', 'b'] as const).map((tid) => {
+              const teamPlayers = players.filter((p) => p.team === tid)
+              const colors = tid === 'a'
+                ? { border: 'border-amber-500', bg: 'bg-amber-500/10', text: 'text-amber-300' }
+                : { border: 'border-blue-500', bg: 'bg-blue-500/10', text: 'text-blue-300' }
               return (
-                <div
-                  key={p.id}
-                  className={`flex items-center gap-2 px-5 py-3 rounded-2xl border ${teamColor} text-white font-semibold text-lg animate-in fade-in zoom-in-95 duration-500`}
-                >
-                  {p.avatar_url ? (
-                    <img src={p.avatar_url} alt="" className="w-7 h-7 rounded-full object-cover" />
-                  ) : (
-                    <span className="w-7 h-7 rounded-full bg-emerald-600 flex items-center justify-center text-sm">
-                      {p.display_name.charAt(0).toUpperCase()}
-                    </span>
-                  )}
-                  {p.team === 'a' && <span>🦁</span>}
-                  {p.team === 'b' && <span>🦅</span>}
-                  {p.display_name}
+                <div key={tid} className={`rounded-3xl border ${colors.border} ${colors.bg} p-6`}>
+                  <p className={`${colors.text} font-black text-2xl text-center mb-4`}>
+                    {tid === 'a' ? '🦁 Leão' : '🦅 Águia'}
+                  </p>
+                  <div className="flex flex-wrap justify-center gap-3">
+                    {teamPlayers.map((p) => (
+                      <div
+                        key={p.id}
+                        className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-slate-800/70 text-white font-semibold text-lg animate-in fade-in zoom-in-95 duration-500"
+                      >
+                        {p.avatar_url ? (
+                          <img src={p.avatar_url} alt="" className="w-7 h-7 rounded-full object-cover" />
+                        ) : (
+                          <span className="w-7 h-7 rounded-full bg-emerald-600 flex items-center justify-center text-sm">
+                            {p.display_name.charAt(0).toUpperCase()}
+                          </span>
+                        )}
+                        {p.display_name}
+                      </div>
+                    ))}
+                    {teamPlayers.length === 0 && (
+                      <p className="text-slate-500 text-sm">Vazia</p>
+                    )}
+                  </div>
                 </div>
               )
             })}
+          </div>
+        ) : (
+          <div className="flex flex-wrap justify-center gap-3 max-w-4xl">
+            {players.map((p) => (
+              <div
+                key={p.id}
+                className="flex items-center gap-2 px-5 py-3 rounded-2xl border border-slate-600 bg-slate-800/60 text-white font-semibold text-lg animate-in fade-in zoom-in-95 duration-500"
+              >
+                {p.avatar_url ? (
+                  <img src={p.avatar_url} alt="" className="w-7 h-7 rounded-full object-cover" />
+                ) : (
+                  <span className="w-7 h-7 rounded-full bg-emerald-600 flex items-center justify-center text-sm">
+                    {p.display_name.charAt(0).toUpperCase()}
+                  </span>
+                )}
+                {p.display_name}
+              </div>
+            ))}
           </div>
         )}
 

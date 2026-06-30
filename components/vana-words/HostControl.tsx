@@ -6,6 +6,7 @@ import { createClient } from '@/utils/supabase/client'
 import {
   proposeVanaWordsTeams,
   moveVanaWordsPlayer,
+  respondVanaWordsSwap,
   confirmVanaWordsTeams,
   rerollArauto,
   confirmVanaWordsArautos,
@@ -22,7 +23,7 @@ import { TeamRoulette } from './TeamRoulette'
 import { HostBotOverlay } from './HostBotOverlay'
 import { TEAM_LABELS, TEAM_COLORS } from '@/types/vana-words'
 import type { VanaWordsSession, VanaWordsPlayer, VanaWordsWord, VanaWordsGuess, TeamId } from '@/types/vana-words'
-import { Users, Crown, RefreshCw, Play, CheckCircle2, Trophy, ArrowRight, Shuffle, MonitorPlay, Bot, Trash2, Minus, Plus, Copy, Check, Maximize2, Eye, EyeOff } from 'lucide-react'
+import { Users, Crown, RefreshCw, Play, CheckCircle2, Trophy, ArrowRight, Shuffle, MonitorPlay, Bot, Trash2, Minus, Plus, Copy, Check, Maximize2, Eye, EyeOff, X, Repeat } from 'lucide-react'
 
 interface HostControlProps {
   session: VanaWordsSession
@@ -297,6 +298,7 @@ export function HostControl({ session: initSession, initialPlayers, initialWords
 
   // ── Team Preview ───────────────────────────────────────────
   if (session.status === 'team_preview') {
+    const swapRequests = players.filter((p) => p.swap_requested)
     return wrap(
       <div className="min-h-screen bg-gradient-to-br from-emerald-950 via-slate-900 to-indigo-950 p-4">
         <div className="max-w-2xl mx-auto space-y-6 pt-8">
@@ -304,6 +306,37 @@ export function HostControl({ session: initSession, initialPlayers, initialWords
             <h1 className="text-2xl font-black text-white">Pré-visualização das Equipas</h1>
             <p className="text-slate-400 text-sm mt-1">Clica num nome para mudar de equipa</p>
           </div>
+
+          {swapRequests.length > 0 && (
+            <div className="bg-yellow-500/10 border border-yellow-500/40 rounded-2xl p-4 space-y-2">
+              <p className="text-yellow-300 text-xs font-bold uppercase tracking-wider flex items-center gap-1.5">
+                <Repeat className="w-3.5 h-3.5" /> Pedidos de troca de equipa
+              </p>
+              {swapRequests.map((p) => (
+                <div key={p.id} className="flex items-center justify-between gap-2 bg-slate-800/60 rounded-xl px-3 py-2">
+                  <span className="text-white text-sm font-semibold">
+                    {p.display_name} <span className="text-slate-400 font-normal">— Equipa {p.team ? TEAM_LABELS[p.team] : '?'}</span>
+                  </span>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      onClick={() => run(() => respondVanaWordsSwap(session.id, p.id, true))}
+                      disabled={loading}
+                      className="px-2.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold flex items-center gap-1 disabled:opacity-50"
+                    >
+                      <Check className="w-3.5 h-3.5" /> Aceitar
+                    </button>
+                    <button
+                      onClick={() => run(() => respondVanaWordsSwap(session.id, p.id, false))}
+                      disabled={loading}
+                      className="px-2.5 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-white text-xs font-bold flex items-center gap-1 disabled:opacity-50"
+                    >
+                      <X className="w-3.5 h-3.5" /> Recusar
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
 
           <div className="grid grid-cols-2 gap-4">
             {(['a', 'b'] as TeamId[]).map((tid) => {
@@ -324,6 +357,7 @@ export function HostControl({ session: initSession, initialPlayers, initialWords
                       >
                         <ArrowRight className="w-3 h-3 text-slate-400" />
                         {p.display_name}
+                        {p.swap_requested && <span title="Pediu para trocar de equipa">🔁</span>}
                         {p.is_bot && <span className="text-[10px] text-purple-400 ml-auto">bot</span>}
                       </button>
                     ))}
