@@ -22,11 +22,6 @@ export default async function VanaWordsSessionPage({
 
   if (!session) notFound()
 
-  // Host → control
-  if (session.host_id === user.id) {
-    redirect(`/jogos/vana-words/${sessionId}/control`)
-  }
-
   const { data: me } = await supabase
     .from('vanawords_players')
     .select('*')
