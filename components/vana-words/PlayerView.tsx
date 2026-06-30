@@ -71,7 +71,9 @@ export function PlayerView({ session: initSession, myPlayer, initialPlayers, asB
 
   // O id efectivo para identificar palpites: bot impersonado ou jogador real
   const effectivePlayerId = asBotId ?? myPlayer.id
-  const myTeam = myPlayer.team as TeamId | null
+  // Usa o estado em tempo real (players) para refletir mudanças de equipa feitas pelo host
+  const myPlayerLive = players.find((p) => p.id === myPlayer.id) ?? myPlayer
+  const myTeam = myPlayerLive.team as TeamId | null
   const colors = myTeam ? TEAM_COLORS[myTeam] : null
   const teamLabel = myTeam ? TEAM_LABELS[myTeam] : null
   const isBotMode = !!asBotId
@@ -87,8 +89,8 @@ export function PlayerView({ session: initSession, myPlayer, initialPlayers, asB
     setLoading(false)
   }
 
-  // ── Lobby / team_preview ───────────────────────────────────
-  if (session.status === 'lobby' || session.status === 'team_preview') {
+  // ── Lobby ────────────────────────────────────────────────────
+  if (session.status === 'lobby') {
     return (
       <div className="min-h-screen bg-gradient-to-br from-emerald-950 via-slate-900 to-indigo-950 flex flex-col items-center justify-center p-6 gap-6">
         {isBotMode && <BotBanner name={myPlayer.display_name} />}
@@ -105,6 +107,64 @@ export function PlayerView({ session: initSession, myPlayer, initialPlayers, asB
           </div>
         </div>
         <p className="text-slate-600 text-xs">{players.length} jogador(es) no lobby</p>
+      </div>
+    )
+  }
+
+  // ── Team Preview ───────────────────────────────────────────
+  if (session.status === 'team_preview') {
+    const teamMates = players.filter((p) => p.team === myTeam)
+    const otherTeam = myTeam === 'a' ? 'b' : 'a'
+    const opponents = players.filter((p) => p.team === otherTeam)
+    const opponentColors = TEAM_COLORS[otherTeam]
+    const opponentLabel = TEAM_LABELS[otherTeam]
+
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-emerald-950 via-slate-900 to-indigo-950 flex flex-col items-center justify-center p-6 gap-6">
+        {isBotMode && <BotBanner name={myPlayer.display_name} />}
+        <div className="flex flex-col items-center text-center gap-2">
+          <img src="/images/VanaWords.png" alt="VanaWords" className="h-16 w-auto object-contain drop-shadow-2xl" />
+          {myTeam && colors && (
+            <p className={`${colors.text} font-bold text-lg mt-1`}>
+              {myTeam === 'a' ? '🦁' : '🦅'} Estás na Equipa {teamLabel}!
+            </p>
+          )}
+        </div>
+
+        {myTeam && colors && (
+          <div className={`w-full max-w-xs rounded-2xl p-4 border ${colors.badge}`}>
+            <p className={`text-xs font-bold uppercase tracking-wider mb-2 ${colors.text}`}>
+              A tua equipa
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {teamMates.map((p) => (
+                <span
+                  key={p.id}
+                  className={`px-3 py-1.5 rounded-full text-sm font-semibold ${
+                    p.id === myPlayer.id ? 'bg-white text-slate-900' : `${colors.bg}/20 text-white`
+                  }`}
+                >
+                  {p.display_name}{p.id === myPlayer.id ? ' (tu)' : ''}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div className={`w-full max-w-xs rounded-2xl p-4 border ${opponentColors.badge} opacity-70`}>
+          <p className={`text-xs font-bold uppercase tracking-wider mb-2 ${opponentColors.text}`}>
+            Equipa {opponentLabel}
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {opponents.map((p) => (
+              <span key={p.id} className="px-3 py-1.5 rounded-full text-sm font-semibold bg-white/10 text-white/80">
+                {p.display_name}
+              </span>
+            ))}
+          </div>
+        </div>
+
+        <p className="text-slate-500 text-sm">A aguardar que o host confirme as equipas…</p>
       </div>
     )
   }
