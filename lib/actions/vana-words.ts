@@ -296,10 +296,16 @@ export async function confirmVanaWordsTeams(
   return {}
 }
 
-// ── Trocar arauto manualmente (durante arauto_spin) ───────────
+// ── Trocar arauto manualmente (durante arauto_spin ou arauto_ready) ──
+// Sem `playerId`: escolhe aleatoriamente (sorteio normal).
+// Com `playerId`: o host escolhe diretamente quem vai ser Arauto.
+// `instant`: true → revela sem animação de roleta; false/omitido → mostra a
+// roleta a girar até parar nessa pessoa ("viciar a roleta" — visualmente
+// igual a um sorteio normal).
 export async function rerollArauto(
   sessionId: string,
   team: TeamId,
+  opts?: { playerId?: string; instant?: boolean },
 ): Promise<{ error?: string }> {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -312,7 +318,9 @@ export async function rerollArauto(
     .eq('id', sessionId)
     .maybeSingle()
   if (!session || session.host_id !== user.id) return { error: 'Sem permissão' }
-  if (session.status !== 'arauto_spin') return { error: 'Estado inválido' }
+  if (session.status !== 'arauto_spin' && session.status !== 'arauto_ready') {
+    return { error: 'Estado inválido' }
+  }
 
   const { data: players } = await service
     .from('vanawords_players')
@@ -326,29 +334,64 @@ export async function rerollArauto(
   const candidates = players.filter((p) => !p.is_arauto)
   if (!candidates.length) return { error: 'Sem candidatos' }
 
-  // Histórico
-  const allUserIds = players.map((p) => p.user_id).filter(Boolean)
-  const { data: recentHistory } = await service
-    .from('vanawords_players')
-    .select('user_id, vanawords_sessions(created_at)')
-    .in('user_id', allUserIds as string[])
-    .eq('is_arauto', true)
-    .order('joined_at', { ascending: false })
-    .limit(100)
+  let newArauto: { id: string }
+  if (opts?.playerId) {
+    const picked = candidates.find((p) => p.id === opts.playerId)
+    if (!picked) return { error: 'Jogador inválido' }
+    newArauto = picked
+  } else {
+    // Histórico — só é preciso para o sorteio aleatório
+    const allUserIds = players.map((p) => p.user_id).filter(Boolean)
+    const { data: recentHistory } = await service
+      .from('vanawords_players')
+      .select('user_id, vanawords_sessions(created_at)')
+      .in('user_id', allUserIds as string[])
+      .eq('is_arauto', true)
+      .order('joined_at', { ascending: false })
+      .limit(100)
 
-  const recentArautosMap: Record<string, string> = {}
-  for (const h of recentHistory ?? []) {
-    if (h.user_id && !recentArautosMap[h.user_id]) {
-      const sess = h.vanawords_sessions as any
-      recentArautosMap[h.user_id] = sess?.created_at ?? new Date().toISOString()
+    const recentArautosMap: Record<string, string> = {}
+    for (const h of recentHistory ?? []) {
+      if (h.user_id && !recentArautosMap[h.user_id]) {
+        const sess = h.vanawords_sessions as any
+        recentArautosMap[h.user_id] = sess?.created_at ?? new Date().toISOString()
+      }
     }
+    const recentArautos = Object.entries(recentArautosMap).map(([user_id, last_at]) => ({ user_id, last_at }))
+    newArauto = selectArauto(candidates as PlayerForTeam[], recentArautos)
   }
-  const recentArautos = Object.entries(recentArautosMap).map(([user_id, last_at]) => ({ user_id, last_at }))
 
-  const newArauto = selectArauto(candidates as PlayerForTeam[], recentArautos)
   if (currentArauto) await service.from('vanawords_players').update({ is_arauto: false }).eq('id', currentArauto.id)
-  await service.from('vanawords_players').update({ is_arauto: true }).eq('id', newArauto.id)
+  await service.from('vanawords_players').update({ is_arauto: true, arauto_response: 'pending' }).eq('id', newArauto.id)
 
+  if (session.status === 'arauto_spin') {
+    const revealCol = team === 'a' ? 'arauto_reveal_a' : 'arauto_reveal_b'
+    await service.from('vanawords_sessions').update({ [revealCol]: opts?.instant ? 'instant' : 'spin' }).eq('id', sessionId)
+  }
+
+  return {}
+}
+
+// ── Arauto responde se aceita ou prefere não ser (apenas preferência) ──
+export async function respondArautoChoice(
+  sessionId: string,
+  accept: boolean,
+): Promise<{ error?: string }> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Não autenticado' }
+
+  const service = createServiceClient()
+  const { data: player } = await service
+    .from('vanawords_players')
+    .select('id, is_arauto')
+    .eq('session_id', sessionId)
+    .eq('user_id', user.id)
+    .maybeSingle()
+
+  if (!player || !player.is_arauto) return { error: 'Não és o Arauto desta equipa' }
+
+  await service.from('vanawords_players').update({ arauto_response: accept ? 'accepted' : 'declined' }).eq('id', player.id)
   return {}
 }
 

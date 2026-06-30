@@ -61,6 +61,7 @@ export default async function VanaWordsBotImpersonatePage({
     is_arauto: bot.is_arauto,
     is_bot: true,
     swap_requested: false,
+    arauto_response: 'pending',
     joined_at: new Date().toISOString(),
   }
 

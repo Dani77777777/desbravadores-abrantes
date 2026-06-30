@@ -26,6 +26,8 @@ export interface VanaWordsSession {
   board_version: number
   is_test_session: boolean
   rewards_awarded: boolean
+  arauto_reveal_a: 'spin' | 'instant'
+  arauto_reveal_b: 'spin' | 'instant'
   created_at: string
   started_at: string | null
   ended_at: string | null
@@ -42,6 +44,7 @@ export interface VanaWordsPlayer {
   is_arauto: boolean
   is_bot: boolean
   swap_requested: boolean
+  arauto_response: 'pending' | 'accepted' | 'declined'
   joined_at: string
 }
 

@@ -103,6 +103,7 @@ export function ProjectorView({ session: initSession, initialPlayers }: Projecto
               candidates={teamA}
               winner={arautoA}
               onDone={() => {}}
+              instant={session.arauto_reveal_a === 'instant'}
             />
           )}
           {arautoB && teamB.length > 0 && (
@@ -112,6 +113,7 @@ export function ProjectorView({ session: initSession, initialPlayers }: Projecto
               candidates={teamB}
               winner={arautoB}
               onDone={() => {}}
+              instant={session.arauto_reveal_b === 'instant'}
             />
           )}
         </div>

@@ -48,6 +48,7 @@ export function HostControl({ session: initSession, initialPlayers, initialWords
   const [copied, setCopied] = useState(false)
   const [qrZoomed, setQrZoomed] = useState(false)
   const [boardHidden, setBoardHidden] = useState(false)
+  const [arautoPicker, setArautoPicker] = useState<TeamId | null>(null)
 
   const router = useRouter()
   const supabase = createClient()
@@ -112,6 +113,61 @@ export function HostControl({ session: initSession, initialPlayers, initialWords
   const arautoA = players.find((p) => p.team === 'a' && p.is_arauto)
   const arautoB = players.find((p) => p.team === 'b' && p.is_arauto)
   const lobby = players.filter((p) => !p.team)
+
+  async function doReroll(team: TeamId, opts?: { playerId?: string; instant?: boolean }) {
+    setError(null)
+    setLoading(true)
+    if (team === 'a') setRouletteADone(false); else setRouletteBDone(false)
+    const res = await rerollArauto(session.id, team, opts)
+    if (res?.error) {
+      setError(res.error)
+      if (team === 'a') setRouletteADone(true); else setRouletteBDone(true)
+    }
+    setArautoPicker(null)
+    await fetchPlayers()
+    setLoading(false)
+  }
+
+  function renderArautoPicker(tid: TeamId) {
+    const team = tid === 'a' ? teamA : teamB
+    const current = tid === 'a' ? arautoA : arautoB
+    const candidates = team.filter((p) => p.id !== current?.id)
+    return (
+      <div className="w-full max-w-[220px] bg-slate-900 border border-slate-600 rounded-xl p-3 space-y-2 text-left">
+        <p className="text-slate-400 text-[11px] font-bold uppercase tracking-wider">Escolher Arauto</p>
+        {candidates.length === 0 && <p className="text-slate-500 text-xs">Sem outros candidatos</p>}
+        {candidates.map((p) => (
+          <div key={p.id} className="flex items-center justify-between gap-2">
+            <span className="text-white text-sm truncate">{p.display_name}</span>
+            <div className="flex items-center gap-1 shrink-0">
+              <button
+                onClick={() => doReroll(tid, { playerId: p.id, instant: false })}
+                disabled={loading}
+                title="Girar a roleta até parar nesta pessoa"
+                className="px-2 py-1 rounded-md bg-slate-700 hover:bg-slate-600 text-white text-xs disabled:opacity-40"
+              >
+                🎰
+              </button>
+              <button
+                onClick={() => doReroll(tid, { playerId: p.id, instant: true })}
+                disabled={loading}
+                title="Definir já, sem animação"
+                className="px-2 py-1 rounded-md bg-emerald-700 hover:bg-emerald-600 text-white text-xs disabled:opacity-40"
+              >
+                ⚡
+              </button>
+            </div>
+          </div>
+        ))}
+        <button
+          onClick={() => setArautoPicker(null)}
+          className="text-slate-500 hover:text-slate-300 text-xs w-full text-center pt-1"
+        >
+          Fechar
+        </button>
+      </div>
+    )
+  }
 
   const wordsA = words.filter((w) => w.team === 'a')
   const wordsB = words.filter((w) => w.team === 'b')
@@ -402,7 +458,7 @@ export function HostControl({ session: initSession, initialPlayers, initialWords
           <p className="text-slate-400 text-sm mt-1">A roleta está a decidir quem guiará cada equipa</p>
         </div>
 
-        <div className="flex gap-8 flex-wrap justify-center">
+        <div className="flex gap-8 flex-wrap justify-center items-start">
           {arautoA && teamA.length > 0 && (
             <div className="flex flex-col items-center gap-2">
               <TeamRoulette
@@ -411,22 +467,25 @@ export function HostControl({ session: initSession, initialPlayers, initialWords
                 candidates={teamA}
                 winner={arautoA}
                 onDone={() => setRouletteADone(true)}
+                instant={session.arauto_reveal_a === 'instant'}
               />
-              <button
-                onClick={async () => {
-                  if (loading || teamA.length < 2) return
-                  setError(null)
-                  setLoading(true)
-                  setRouletteADone(false)
-                  const res = await rerollArauto(session.id, 'a')
-                  if (res?.error) { setError(res.error); setRouletteADone(true) }
-                  setLoading(false)
-                }}
-                className="text-xs text-slate-400 hover:text-white flex items-center gap-1 mt-1 disabled:opacity-40"
-                disabled={loading || teamA.length < 2}
-              >
-                <RefreshCw className="w-3 h-3" /> Trocar
-              </button>
+              <div className="flex items-center gap-3 mt-1">
+                <button
+                  onClick={() => doReroll('a')}
+                  className="text-xs text-slate-400 hover:text-white flex items-center gap-1 disabled:opacity-40"
+                  disabled={loading || teamA.length < 2}
+                >
+                  <RefreshCw className="w-3 h-3" /> Aleatório
+                </button>
+                <button
+                  onClick={() => setArautoPicker(arautoPicker === 'a' ? null : 'a')}
+                  className="text-xs text-slate-400 hover:text-white flex items-center gap-1 disabled:opacity-40"
+                  disabled={loading || teamA.length < 2}
+                >
+                  <Users className="w-3 h-3" /> Escolher
+                </button>
+              </div>
+              {arautoPicker === 'a' && renderArautoPicker('a')}
             </div>
           )}
           {arautoB && teamB.length > 0 && (
@@ -437,22 +496,25 @@ export function HostControl({ session: initSession, initialPlayers, initialWords
                 candidates={teamB}
                 winner={arautoB}
                 onDone={() => setRouletteBDone(true)}
+                instant={session.arauto_reveal_b === 'instant'}
               />
-              <button
-                onClick={async () => {
-                  if (loading || teamB.length < 2) return
-                  setError(null)
-                  setLoading(true)
-                  setRouletteBDone(false)
-                  const res = await rerollArauto(session.id, 'b')
-                  if (res?.error) { setError(res.error); setRouletteBDone(true) }
-                  setLoading(false)
-                }}
-                className="text-xs text-slate-400 hover:text-white flex items-center gap-1 mt-1 disabled:opacity-40"
-                disabled={loading || teamB.length < 2}
-              >
-                <RefreshCw className="w-3 h-3" /> Trocar
-              </button>
+              <div className="flex items-center gap-3 mt-1">
+                <button
+                  onClick={() => doReroll('b')}
+                  className="text-xs text-slate-400 hover:text-white flex items-center gap-1 disabled:opacity-40"
+                  disabled={loading || teamB.length < 2}
+                >
+                  <RefreshCw className="w-3 h-3" /> Aleatório
+                </button>
+                <button
+                  onClick={() => setArautoPicker(arautoPicker === 'b' ? null : 'b')}
+                  className="text-xs text-slate-400 hover:text-white flex items-center gap-1 disabled:opacity-40"
+                  disabled={loading || teamB.length < 2}
+                >
+                  <Users className="w-3 h-3" /> Escolher
+                </button>
+              </div>
+              {arautoPicker === 'b' && renderArautoPicker('b')}
             </div>
           )}
         </div>
@@ -493,16 +555,31 @@ export function HostControl({ session: initSession, initialPlayers, initialWords
         </div>
 
         <div className="grid grid-cols-2 gap-3 sm:gap-6 w-full max-w-sm">
-          <div className="bg-slate-800/60 rounded-2xl p-5 border border-amber-500/40 text-center">
-            <p className="text-amber-400 text-xs font-bold mb-2">🦁 Leão</p>
-            <p className="text-white font-bold">{arautoA?.display_name ?? '—'}</p>
-            <p className="text-slate-400 text-xs mt-1">Arauto</p>
-          </div>
-          <div className="bg-slate-800/60 rounded-2xl p-5 border border-blue-500/40 text-center">
-            <p className="text-blue-400 text-xs font-bold mb-2">🦅 Águia</p>
-            <p className="text-white font-bold">{arautoB?.display_name ?? '—'}</p>
-            <p className="text-slate-400 text-xs mt-1">Arauto</p>
-          </div>
+          {([['a', arautoA, 'border-amber-500/40', 'text-amber-400', '🦁 Leão'], ['b', arautoB, 'border-blue-500/40', 'text-blue-400', '🦅 Águia']] as const).map(
+            ([tid, arauto, border, text, label]) => (
+              <div key={tid} className={`bg-slate-800/60 rounded-2xl p-5 border ${border} text-center space-y-1.5`}>
+                <p className={`${text} text-xs font-bold`}>{label}</p>
+                <p className="text-white font-bold">{arauto?.display_name ?? '—'}</p>
+                {arauto?.arauto_response === 'accepted' && (
+                  <p className="text-emerald-400 text-[11px] font-semibold">✅ Aceitou</p>
+                )}
+                {arauto?.arauto_response === 'declined' && (
+                  <p className="text-red-400 text-[11px] font-semibold">❌ Prefere não ser</p>
+                )}
+                {arauto?.arauto_response === 'pending' && (
+                  <p className="text-slate-500 text-[11px]">⏳ A aguardar resposta</p>
+                )}
+                <button
+                  onClick={() => setArautoPicker(arautoPicker === tid ? null : tid)}
+                  className="text-slate-400 hover:text-white text-[11px] underline disabled:opacity-40"
+                  disabled={loading || (tid === 'a' ? teamA.length : teamB.length) < 2}
+                >
+                  Escolher outro
+                </button>
+                {arautoPicker === tid && <div className="pt-1">{renderArautoPicker(tid)}</div>}
+              </div>
+            )
+          )}
         </div>
 
         <div className="bg-slate-800/40 rounded-xl p-4 border border-slate-700 text-sm text-slate-300 text-center max-w-sm">

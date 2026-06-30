@@ -10,19 +10,27 @@ interface TeamRouletteProps {
   winner: VanaWordsPlayer
   onDone: () => void
   autoStart?: boolean
+  /** true → mostra logo o vencedor, sem animação de roleta */
+  instant?: boolean
 }
 
-export function TeamRoulette({ team, candidates, winner, onDone, autoStart = true }: TeamRouletteProps) {
-  const [current, setCurrent] = useState(candidates[0])
+export function TeamRoulette({ team, candidates, winner, onDone, autoStart = true, instant = false }: TeamRouletteProps) {
+  const [current, setCurrent] = useState(instant ? winner : candidates[0])
   const [spinning, setSpinning] = useState(false)
-  const [done, setDone] = useState(false)
+  const [done, setDone] = useState(instant)
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   useEffect(() => {
+    if (instant) {
+      setCurrent(winner)
+      setDone(true)
+      const t = setTimeout(onDone, 300)
+      return () => clearTimeout(t)
+    }
     if (!autoStart) return
     startSpin()
     return () => { if (intervalRef.current) clearInterval(intervalRef.current) }
-  }, [])
+  }, [instant])
 
   function startSpin() {
     setSpinning(true)

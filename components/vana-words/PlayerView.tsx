@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { createClient } from '@/utils/supabase/client'
-import { toggleGuess, requestVanaWordsSwap } from '@/lib/actions/vana-words'
+import { toggleGuess, requestVanaWordsSwap, respondArautoChoice } from '@/lib/actions/vana-words'
 import { WordGrid } from './WordGrid'
 import { TEAM_LABELS, TEAM_COLORS } from '@/types/vana-words'
 import type { VanaWordsSession, VanaWordsPlayer, VanaWordsWord, VanaWordsGuess, TeamId } from '@/types/vana-words'
@@ -24,6 +24,7 @@ export function PlayerView({ session: initSession, myPlayer, initialPlayers, asB
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [swapLoading, setSwapLoading] = useState(false)
+  const [arautoResponseLoading, setArautoResponseLoading] = useState(false)
 
   const supabase = createClient()
 
@@ -99,6 +100,13 @@ export function PlayerView({ session: initSession, myPlayer, initialPlayers, asB
     await requestVanaWordsSwap(session.id, requested)
     await fetchPlayers()
     setSwapLoading(false)
+  }
+
+  async function handleArautoResponse(accept: boolean) {
+    setArautoResponseLoading(true)
+    await respondArautoChoice(session.id, accept)
+    await fetchPlayers()
+    setArautoResponseLoading(false)
   }
 
   // ── Lobby ────────────────────────────────────────────────────
@@ -223,7 +231,7 @@ export function PlayerView({ session: initSession, myPlayer, initialPlayers, asB
   if (session.status === 'arauto_ready') {
     const arautoA = players.find((p) => p.team === 'a' && p.is_arauto)
     const arautoB = players.find((p) => p.team === 'b' && p.is_arauto)
-    const amArauto = myPlayer.is_arauto
+    const amArauto = myPlayerLive.is_arauto
 
     return (
       <div className="min-h-screen bg-gradient-to-br from-emerald-950 via-slate-900 to-indigo-950 flex flex-col items-center justify-center p-6 gap-6">
@@ -249,8 +257,37 @@ export function PlayerView({ session: initSession, myPlayer, initialPlayers, asB
         {amArauto && (
           <div className="bg-yellow-500/10 border border-yellow-500/40 rounded-2xl p-4 text-center">
             <Crown className="w-8 h-8 text-yellow-400 mx-auto mb-2" />
-            <p className="text-yellow-300 font-bold">Tu és o Arauto!</p>
-            <p className="text-yellow-400/70 text-xs mt-1">Abre a Vista de Arauto no teu dispositivo.</p>
+            <p className="text-yellow-300 font-bold">Foste escolhido Arauto!</p>
+
+            {myPlayerLive.arauto_response === 'pending' && (
+              <>
+                <p className="text-yellow-400/70 text-xs mt-1">Aceitas guiar a tua equipa?</p>
+                <div className="flex items-center justify-center gap-2 mt-3">
+                  <button
+                    onClick={() => handleArautoResponse(true)}
+                    disabled={arautoResponseLoading}
+                    className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-bold disabled:opacity-50"
+                  >
+                    Aceito
+                  </button>
+                  <button
+                    onClick={() => handleArautoResponse(false)}
+                    disabled={arautoResponseLoading}
+                    className="px-4 py-2 rounded-xl bg-slate-700 hover:bg-slate-600 text-white text-sm font-bold disabled:opacity-50"
+                  >
+                    Prefiro não
+                  </button>
+                </div>
+                <p className="text-yellow-400/50 text-[11px] mt-2">É só uma preferência — o host decide.</p>
+              </>
+            )}
+            {myPlayerLive.arauto_response === 'accepted' && (
+              <p className="text-emerald-400 text-xs mt-1 font-semibold">✅ Disseste que aceitas</p>
+            )}
+            {myPlayerLive.arauto_response === 'declined' && (
+              <p className="text-yellow-400/70 text-xs mt-1 font-semibold">Disseste que preferias não ser. O host pode escolher outro Arauto.</p>
+            )}
+
             <a
               href={`/jogos/vana-words/${session.id}/arauto`}
               className="mt-3 inline-block px-4 py-2 rounded-xl bg-gradient-to-r from-yellow-400 to-amber-500 text-black font-bold text-sm shadow-lg shadow-yellow-900/30 active:scale-95 transition-transform"
