@@ -126,7 +126,7 @@ export function HostControl({ session: initSession, initialPlayers, initialWords
 
   async function copyCode() {
     try {
-      await navigator.clipboard.writeText(session.code)
+      await navigator.clipboard.writeText(joinUrl)
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
     } catch {}
@@ -189,9 +189,9 @@ export function HostControl({ session: initSession, initialPlayers, initialWords
               {copied ? <Check className="w-5 h-5" /> : <Copy className="w-5 h-5 text-emerald-300" />}
             </div>
             <div className="flex-1 text-left min-w-0">
-              <p className="font-bold text-sm">{copied ? 'Código copiado!' : 'Copiar código'}</p>
+              <p className="font-bold text-sm">{copied ? 'Link copiado!' : 'Copiar link de entrada'}</p>
               <p className={`text-xs truncate ${copied ? 'text-white/70' : 'text-slate-400'}`}>
-                {copied ? 'Cola onde quiseres partilhar' : `${session.code} · toca para copiar`}
+                {copied ? 'Cola onde quiseres partilhar' : `Código já incluído · toca para copiar`}
               </p>
             </div>
           </button>
