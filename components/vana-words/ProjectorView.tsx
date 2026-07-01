@@ -350,7 +350,7 @@ export function ProjectorView({ session: initSession, initialPlayers }: Projecto
                 </div>
                 <div className="flex gap-3 items-center ml-auto flex-wrap">
                   {visible.map((p) => (
-                    <Avatar key={p.id} initials={initials(p.display_name)} team={tid} isArauto={p.id === arauto?.id} />
+                    <Avatar key={p.id} initials={initials(p.display_name)} team={tid} isArauto={p.id === arauto?.id} avatarUrl={p.avatar_url} />
                   ))}
                   {overflow > 0 && <OverflowAvatar count={overflow} />}
                 </div>

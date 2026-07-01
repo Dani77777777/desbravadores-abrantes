@@ -23,31 +23,37 @@ export function BlipDots({ className = '', style }: { className?: string; style?
   )
 }
 
-/** Avatar circular com iniciais, anel dourado + coroa quando é o Arauto */
+/** Avatar circular (foto de perfil, se existir, senão iniciais), anel dourado + coroa quando é o Arauto */
 export function Avatar({
   initials,
   team,
   isArauto,
+  avatarUrl,
   size = 46,
 }: {
   initials: string
   team: TeamId
   isArauto?: boolean
+  avatarUrl?: string | null
   size?: number
 }) {
   return (
     <div className="relative shrink-0" style={{ width: size, height: size }}>
       <div
-        className="w-full h-full rounded-full flex items-center justify-center font-extrabold"
+        className="w-full h-full rounded-full flex items-center justify-center font-extrabold overflow-hidden"
         style={{
-          background: TEAM_GRADIENT[team],
+          background: avatarUrl ? undefined : TEAM_GRADIENT[team],
           color: '#12131f',
           fontSize: size * 0.32,
           border: '2px solid rgba(255,255,255,.3)',
           boxShadow: isArauto ? `0 0 0 2px ${VW.gold}, 0 4px 10px rgba(0,0,0,.4)` : '0 3px 8px rgba(0,0,0,.35)',
         }}
       >
-        {initials}
+        {avatarUrl ? (
+          <img src={avatarUrl} alt="" className="w-full h-full object-cover" />
+        ) : (
+          initials
+        )}
       </div>
       {isArauto && (
         <span
