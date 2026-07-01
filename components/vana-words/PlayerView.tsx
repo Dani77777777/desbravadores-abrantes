@@ -71,6 +71,9 @@ export function PlayerView({ session: initSession, myPlayer, initialPlayers, asB
       fetchSession()
       fetchGuesses()
       fetchPlayers()
+      // Refetch directo das palavras: não depender só do board_version mudar
+      // no estado da sessão para descobrir que uma palavra foi revelada.
+      fetchWords()
     }, 2500)
 
     return () => { supabase.removeChannel(chan); clearInterval(poll) }

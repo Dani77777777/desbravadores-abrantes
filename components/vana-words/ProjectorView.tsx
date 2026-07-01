@@ -69,6 +69,9 @@ export function ProjectorView({ session: initSession, initialPlayers }: Projecto
         .then(({ data }) => { if (data) setSession((s) => ({ ...s, ...(data as VanaWordsSession) })) })
       supabase.from('vanawords_guesses').select('*').eq('session_id', session.id)
         .then(({ data }) => { if (data) setGuesses(data as VanaWordsGuess[]) })
+      // Refetch directo das palavras: não depender só do board_version mudar
+      // no estado da sessão para descobrir que uma palavra foi revelada.
+      fetchWords()
     }, 2500)
 
     return () => { supabase.removeChannel(chan); clearInterval(poll) }

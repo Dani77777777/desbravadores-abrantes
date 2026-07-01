@@ -66,6 +66,9 @@ export function ArautoView({ session: initSession, myPlayer, initialPlayers }: A
         })
       supabase.from('vanawords_guesses').select('*').eq('session_id', session.id)
         .then(({ data }) => { if (data) setGuesses(data as VanaWordsGuess[]) })
+      // Refetch directo das palavras: não depender só do board_version mudar
+      // no estado da sessão para descobrir que o host revelou uma palavra.
+      fetchWords()
     }, 2500)
 
     return () => { supabase.removeChannel(chan); clearInterval(poll) }

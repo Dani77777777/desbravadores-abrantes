@@ -110,6 +110,18 @@ export function HostControl({ session: initSession, initialPlayers, initialWords
     setLoading(false)
   }
 
+  async function handleConfirmWord(wordId: string) {
+    setError(null)
+    // Feedback imediato: a palavra fica cinzenta já, sem esperar pelo servidor
+    setWords((ws) => ws.map((w) => (w.id === wordId ? { ...w, is_revealed: true } : w)))
+    setLoading(true)
+    const res = await confirmWord(session.id, wordId)
+    if (res?.error) setError(res.error)
+    // Reconcilia com o servidor (marcador, turno, etc.)
+    await Promise.all([fetchWords(), fetchGuesses(), fetchSession(), fetchPlayers()])
+    setLoading(false)
+  }
+
   const teamA = players.filter((p) => p.team === 'a')
   const teamB = players.filter((p) => p.team === 'b')
   const arautoA = players.find((p) => p.team === 'a' && p.is_arauto)
@@ -751,7 +763,7 @@ export function HostControl({ session: initSession, initialPlayers, initialWords
               guesses={guesses}
               players={players}
               showColors={true}
-              onWordClick={!isHinting ? (wordId) => run(() => confirmWord(session.id, wordId)) : undefined}
+              onWordClick={!isHinting ? handleConfirmWord : undefined}
               disabled={isHinting}
             />
           )}
