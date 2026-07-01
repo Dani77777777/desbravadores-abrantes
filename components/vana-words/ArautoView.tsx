@@ -172,7 +172,7 @@ export function ArautoView({ session: initSession, myPlayer, initialPlayers }: A
               className="px-2 py-1 rounded font-semibold"
               style={{ background: TEAM_CARD_PALETTE[t].fill, color: TEAM_CARD_PALETTE[t].text }}
             >
-              {t === 'a' ? 'Leão' : t === 'b' ? 'Águia' : t === 'black' ? 'Preta' : 'Neutra'}
+              {t === 'a' ? 'Leão' : t === 'b' ? 'Águia' : t === 'black' ? 'Perca instantânea' : 'Neutra'}
             </span>
           ))}
         </div>
