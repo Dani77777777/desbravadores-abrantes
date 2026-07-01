@@ -23,7 +23,6 @@ export function ArautoView({ session: initSession, myPlayer, initialPlayers }: A
   const [guesses, setGuesses] = useState<VanaWordsGuess[]>([])
   const [hintInput, setHintInput] = useState('')
   const [hintNumber, setHintNumber] = useState(1)
-  const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [submitted, setSubmitted] = useState(false)
 
@@ -80,17 +79,19 @@ export function ArautoView({ session: initSession, myPlayer, initialPlayers }: A
   const isHinting = session.current_phase === 'hinting'
 
   async function handleSubmitHint() {
-    if (!hintInput.trim()) return
-    setLoading(true)
+    const hint = hintInput.trim()
+    if (!hint) return
     setError(null)
-    const res = await submitHint(session.id, hintInput.trim(), hintNumber)
+    // Feedback imediato: mostra "dica enviada" já, sem esperar pelo servidor
+    setSubmitted(true)
+    setHintInput('')
+    const res = await submitHint(session.id, hint, hintNumber)
     if (res.error) {
+      // Reverte o optimismo se o servidor recusar a dica
       setError(res.error)
-    } else {
-      setSubmitted(true)
-      setHintInput('')
+      setSubmitted(false)
+      setHintInput(hint)
     }
-    setLoading(false)
   }
 
   // Antes do jogo começar, o Arauto NÃO vê a grelha — vai ter com o host
@@ -228,11 +229,11 @@ export function ArautoView({ session: initSession, myPlayer, initialPlayers }: A
             {error && <p className="text-red-400 text-sm">{error}</p>}
             <button
               onClick={handleSubmitHint}
-              disabled={loading || !hintInput.trim()}
+              disabled={!hintInput.trim()}
               className="w-full py-3 rounded-xl font-bold disabled:opacity-40 transition-colors"
               style={{ background: TEAM_GRADIENT[myTeam], color: myTeam === 'a' ? '#1e1305' : '#f5f9ff' }}
             >
-              {loading ? 'A enviar…' : 'Enviar Dica'}
+              Enviar Dica
             </button>
           </div>
         )}
