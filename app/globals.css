@@ -170,3 +170,19 @@ html {
     @apply bg-background text-foreground;
   }
 }
+
+/* ── VanaWords design system (Claude Design: VanaWords.dc.html) ──── */
+@keyframes vw-popReveal {
+  0% { transform: scale(.7) rotate(-3deg); opacity: 0; }
+  60% { transform: scale(1.06); }
+  100% { transform: scale(1) rotate(0); opacity: 1; }
+}
+@keyframes vw-softPulse {
+  0%, 100% { box-shadow: 0 0 0 1px rgba(63,140,255,.9), 0 0 0 4px rgba(63,140,255,.10); }
+  50% { box-shadow: 0 0 0 1px rgba(63,140,255,.9), 0 0 24px 4px rgba(63,140,255,.28); }
+}
+@keyframes vw-blip {
+  0%, 20% { opacity: .2; }
+  50% { opacity: 1; }
+  100% { opacity: .2; }
+}

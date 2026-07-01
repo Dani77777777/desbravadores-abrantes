@@ -1,8 +1,9 @@
 'use client'
 
 import { useEffect, useState, useRef } from 'react'
-import { TEAM_LABELS, TEAM_COLORS } from '@/types/vana-words'
+import { TEAM_LABELS } from '@/types/vana-words'
 import type { VanaWordsPlayer, TeamId } from '@/types/vana-words'
+import { VW, TEAM_GRADIENT, vwSerif } from './theme'
 
 interface TeamRouletteProps {
   team: TeamId
@@ -68,30 +69,27 @@ export function TeamRoulette({ team, candidates, winner, onDone, autoStart = tru
     intervalRef.current = setInterval(tick, delay)
   }
 
-  const colors = TEAM_COLORS[team]
   const teamLabel = TEAM_LABELS[team]
+  const accent = team === 'a' ? VW.amber : VW.blue
 
   return (
     <div className="flex flex-col items-center gap-3">
-      <p className={`text-xs font-bold uppercase tracking-widest ${colors.text}`}>
-        {team === 'a' ? '🦁' : '🦅'} Equipa {teamLabel}
+      <p className="text-xs font-bold uppercase tracking-widest" style={{ color: accent }}>
+        Equipa {teamLabel}
       </p>
       <div
-        className={`
-          w-48 h-16 rounded-xl border-2 flex items-center justify-center
-          transition-all duration-200
-          ${done ? `${colors.bg} border-transparent shadow-lg scale-105` : 'bg-slate-800 border-slate-600'}
-          ${spinning ? 'opacity-90' : ''}
-        `}
+        className={`w-48 h-16 rounded-xl border-2 flex items-center justify-center transition-all duration-200 ${spinning ? 'opacity-90' : ''} ${done ? 'border-transparent shadow-lg scale-105' : ''}`}
+        style={done ? { background: TEAM_GRADIENT[team] } : { background: '#111834', borderColor: 'rgba(255,255,255,.15)' }}
       >
         <span
-          className={`font-bold text-lg tracking-wide truncate px-4 ${done ? 'text-white' : 'text-white/80'}`}
+          className={`${vwSerif.className} font-semibold text-lg tracking-wide truncate px-4`}
+          style={{ color: done ? (team === 'a' ? '#1e1305' : '#f5f9ff') : 'rgba(255,255,255,.8)' }}
         >
           {current?.display_name ?? '…'}
         </span>
       </div>
       {done && (
-        <p className="text-xs text-white/50">Arauto da Equipa {teamLabel}</p>
+        <p className="text-xs" style={{ color: 'rgba(255,255,255,.5)' }}>Arauto da Equipa {teamLabel}</p>
       )}
     </div>
   )

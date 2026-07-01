@@ -1,4 +1,4 @@
-import type { VanaWordsPlayer, WordTeam } from '@/types/vana-words'
+import type { WordTeam } from '@/types/vana-words'
 
 // ── Lista de palavras (banco com ≥ 100 entradas) ─────────────
 export const WORD_LIST = [
@@ -132,40 +132,6 @@ export function selectArauto(
     if (rand <= 0) return teamPlayers[i]
   }
   return teamPlayers[teamPlayers.length - 1]
-}
-
-// ── Helpers de cor para a grelha ────────────────────────────
-export function wordCardClass(
-  team: WordTeam | null | undefined,
-  isRevealed: boolean,
-  isSelected: boolean,
-  showColors: boolean,
-  interactive = true, // false no projetor: sem hover nem cursor de clique
-): string {
-  const cursor = interactive ? 'cursor-pointer' : 'cursor-default'
-
-  if (isRevealed) {
-    const base = 'opacity-80 cursor-default'
-    if (team === 'a')       return `${base} bg-amber-600 text-white border-amber-400`
-    if (team === 'b')       return `${base} bg-blue-600 text-white border-blue-400`
-    if (team === 'black')   return `${base} bg-stone-950 text-red-300 border-red-900`
-    return `${base} bg-stone-700 text-stone-300 border-stone-600`
-  }
-
-  if (showColors && team) {
-    // Vista do Arauto/Host: cartão inteiro pintado com a cor da equipa
-    const sel = isSelected ? 'ring-4 ring-white/70' : ''
-    if (team === 'a')     return `bg-amber-500 text-stone-900 border-amber-300 font-extrabold ${sel} ${cursor}`
-    if (team === 'b')     return `bg-blue-600 text-white border-blue-300 font-extrabold ${sel} ${cursor}`
-    if (team === 'black') return `bg-black text-red-400 border-4 border-red-500 font-extrabold ${sel} ${cursor}`
-    // neutra
-    return `bg-stone-300 text-stone-700 border-stone-400 font-semibold ${sel} ${cursor}`
-  }
-
-  // Cartão "tapado" (jogador/projetor). Só dá hover quando é interativo.
-  if (isSelected) return `ring-2 ring-indigo-400 bg-indigo-900/50 text-white border-slate-600 ${cursor}`
-  const hover = interactive ? 'bg-slate-800 hover:bg-slate-700' : 'bg-slate-800'
-  return `${hover} text-white border-slate-600 ${cursor}`
 }
 
 // Geração de código de sessão único (4 letras maiúsculas)

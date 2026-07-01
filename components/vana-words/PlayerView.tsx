@@ -1,10 +1,13 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
 import { createClient } from '@/utils/supabase/client'
 import { toggleGuess, requestVanaWordsSwap, respondArautoChoice } from '@/lib/actions/vana-words'
 import { WordGrid } from './WordGrid'
-import { TEAM_LABELS, TEAM_COLORS } from '@/types/vana-words'
+import { TeamChip, BlipDots } from './ui'
+import { VW, VW_SCREEN_STYLE, VW_PANEL_STYLE, VW_SOFT_PULSE, teamPanelStyle, vwSans, vwSerif } from './theme'
+import { TEAM_LABELS } from '@/types/vana-words'
 import type { VanaWordsSession, VanaWordsPlayer, VanaWordsWord, VanaWordsGuess, TeamId } from '@/types/vana-words'
 import { Crown, Bot } from 'lucide-react'
 
@@ -17,6 +20,7 @@ interface PlayerViewProps {
 }
 
 export function PlayerView({ session: initSession, myPlayer, initialPlayers, asBotId }: PlayerViewProps) {
+  const router = useRouter()
   const [session, setSession] = useState(initSession)
   const [players, setPlayers] = useState(initialPlayers)
   const [words, setWords] = useState<VanaWordsWord[]>([])
@@ -80,9 +84,22 @@ export function PlayerView({ session: initSession, myPlayer, initialPlayers, asB
   // Usa o estado em tempo real (players) para refletir mudanças de equipa feitas pelo host
   const myPlayerLive = players.find((p) => p.id === myPlayer.id) ?? myPlayer
   const myTeam = myPlayerLive.team as TeamId | null
-  const colors = myTeam ? TEAM_COLORS[myTeam] : null
   const teamLabel = myTeam ? TEAM_LABELS[myTeam] : null
   const isBotMode = !!asBotId
+
+  // Abre a Vista de Arauto automaticamente assim que o host confirma os
+  // Arautos — nem antes (ainda podem trocar durante a roleta) nem depois.
+  useEffect(() => {
+    if (session.status === 'arauto_ready' && myPlayerLive.is_arauto) {
+      if (isBotMode) {
+        // A página "as/[playerId]" decide PlayerView vs ArautoView no servidor
+        // consoante o estado da sessão — um refresh basta para trocar de vista.
+        router.refresh()
+      } else {
+        router.push(`/jogos/vana-words/${session.id}/arauto`)
+      }
+    }
+  }, [session.status, myPlayerLive.is_arauto])
 
   async function handleWordClick(wordId: string) {
     setLoading(true)
@@ -112,21 +129,19 @@ export function PlayerView({ session: initSession, myPlayer, initialPlayers, asB
   // ── Lobby ────────────────────────────────────────────────────
   if (session.status === 'lobby') {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-emerald-950 via-slate-900 to-indigo-950 flex flex-col items-center justify-center p-6 gap-6">
+      <div className={`min-h-screen ${vwSans.className} flex flex-col items-center justify-center p-6 gap-6`} style={VW_SCREEN_STYLE}>
         {isBotMode && <BotBanner name={myPlayer.display_name} />}
         <div className="flex flex-col items-center text-center gap-2">
           <img src="/images/VanaWords.png" alt="VanaWords" className="h-20 w-auto object-contain drop-shadow-2xl" />
-          <p className="text-slate-400">Olá, {myPlayer.display_name}!</p>
+          <p style={{ color: VW.mut }}>Olá, {myPlayer.display_name}!</p>
         </div>
-        <div className="bg-slate-800/60 rounded-2xl p-6 border border-slate-700 text-center">
-          <p className="text-slate-400 text-sm">A aguardar que o host inicie o jogo…</p>
-          <div className="flex justify-center mt-4 gap-1">
-            {[0, 150, 300].map((d) => (
-              <span key={d} className="w-2 h-2 bg-emerald-400 rounded-full animate-bounce" style={{ animationDelay: `${d}ms` }} />
-            ))}
+        <div className="rounded-2xl p-6 border text-center" style={VW_PANEL_STYLE}>
+          <p className="text-sm" style={{ color: VW.mut }}>A aguardar que o host inicie o jogo…</p>
+          <div className="flex justify-center mt-3">
+            <BlipDots className="text-2xl" style={{ color: VW.blue }} />
           </div>
         </div>
-        <p className="text-slate-600 text-xs">{players.length} jogador(es) no lobby</p>
+        <p className="text-xs" style={{ color: VW.mut, opacity: .7 }}>{players.length} jogador(es) no lobby</p>
       </div>
     )
   }
@@ -136,33 +151,31 @@ export function PlayerView({ session: initSession, myPlayer, initialPlayers, asB
     const teamMates = players.filter((p) => p.team === myTeam)
     const otherTeam = myTeam === 'a' ? 'b' : 'a'
     const opponents = players.filter((p) => p.team === otherTeam)
-    const opponentColors = TEAM_COLORS[otherTeam]
     const opponentLabel = TEAM_LABELS[otherTeam]
 
     return (
-      <div className="min-h-screen bg-gradient-to-br from-emerald-950 via-slate-900 to-indigo-950 flex flex-col items-center justify-center p-6 gap-6">
+      <div className={`min-h-screen ${vwSans.className} flex flex-col items-center justify-center p-6 gap-6`} style={VW_SCREEN_STYLE}>
         {isBotMode && <BotBanner name={myPlayer.display_name} />}
         <div className="flex flex-col items-center text-center gap-2">
           <img src="/images/VanaWords.png" alt="VanaWords" className="h-16 w-auto object-contain drop-shadow-2xl" />
-          {myTeam && colors && (
-            <p className={`${colors.text} font-bold text-lg mt-1`}>
-              {myTeam === 'a' ? '🦁' : '🦅'} Estás na Equipa {teamLabel}!
+          {myTeam && (
+            <p className={`${vwSerif.className} font-semibold text-lg mt-1`}>
+              <TeamChip team={myTeam} label={`Estás na Equipa ${teamLabel}!`} />
             </p>
           )}
         </div>
 
-        {myTeam && colors && (
-          <div className={`w-full max-w-xs rounded-2xl p-4 border ${colors.badge}`}>
-            <p className={`text-xs font-bold uppercase tracking-wider mb-2 ${colors.text}`}>
+        {myTeam && (
+          <div className="w-full max-w-xs rounded-2xl p-4 border" style={teamPanelStyle(myTeam)}>
+            <p className="text-xs font-bold uppercase tracking-wider mb-2" style={{ color: myTeam === 'a' ? VW.amber : VW.blue }}>
               A tua equipa
             </p>
             <div className="flex flex-wrap gap-2">
               {teamMates.map((p) => (
                 <span
                   key={p.id}
-                  className={`px-3 py-1.5 rounded-full text-sm font-semibold ${
-                    p.id === myPlayer.id ? 'bg-white text-slate-900' : `${colors.bg}/20 text-white`
-                  }`}
+                  className="px-3 py-1.5 rounded-full text-sm font-semibold"
+                  style={p.id === myPlayer.id ? { background: '#fff', color: '#12131f' } : { background: 'rgba(255,255,255,.08)', color: VW.ink }}
                 >
                   {p.display_name}{p.id === myPlayer.id ? ' (tu)' : ''}
                 </span>
@@ -171,13 +184,13 @@ export function PlayerView({ session: initSession, myPlayer, initialPlayers, asB
           </div>
         )}
 
-        <div className={`w-full max-w-xs rounded-2xl p-4 border ${opponentColors.badge} opacity-70`}>
-          <p className={`text-xs font-bold uppercase tracking-wider mb-2 ${opponentColors.text}`}>
+        <div className="w-full max-w-xs rounded-2xl p-4 border opacity-70" style={teamPanelStyle(otherTeam)}>
+          <p className="text-xs font-bold uppercase tracking-wider mb-2" style={{ color: otherTeam === 'a' ? VW.amber : VW.blue }}>
             Equipa {opponentLabel}
           </p>
           <div className="flex flex-wrap gap-2">
             {opponents.map((p) => (
-              <span key={p.id} className="px-3 py-1.5 rounded-full text-sm font-semibold bg-white/10 text-white/80">
+              <span key={p.id} className="px-3 py-1.5 rounded-full text-sm font-semibold" style={{ background: 'rgba(255,255,255,.06)', color: 'rgba(255,255,255,.8)' }}>
                 {p.display_name}
               </span>
             ))}
@@ -186,13 +199,14 @@ export function PlayerView({ session: initSession, myPlayer, initialPlayers, asB
 
         {!isBotMode && (
           myPlayerLive.swap_requested ? (
-            <div className="w-full max-w-xs rounded-2xl p-4 border border-yellow-500/40 bg-yellow-500/10 text-center space-y-2">
-              <p className="text-yellow-300 text-sm font-semibold">⏳ Pedido de troca enviado</p>
-              <p className="text-yellow-400/70 text-xs">O host vai decidir se trocas de equipa.</p>
+            <div className="w-full max-w-xs rounded-2xl p-4 border text-center space-y-2" style={{ background: 'rgba(216,178,95,.1)', borderColor: 'rgba(216,178,95,.4)' }}>
+              <p className="text-sm font-semibold" style={{ color: VW.gold }}>⏳ Pedido de troca enviado</p>
+              <p className="text-xs" style={{ color: VW.gold, opacity: .7 }}>O host vai decidir se trocas de equipa.</p>
               <button
                 onClick={() => handleSwapRequest(false)}
                 disabled={swapLoading}
-                className="text-xs text-yellow-300/80 underline disabled:opacity-50"
+                className="text-xs underline disabled:opacity-50"
+                style={{ color: VW.gold, opacity: .8 }}
               >
                 Cancelar pedido
               </button>
@@ -201,14 +215,15 @@ export function PlayerView({ session: initSession, myPlayer, initialPlayers, asB
             <button
               onClick={() => handleSwapRequest(true)}
               disabled={swapLoading}
-              className="px-4 py-2.5 rounded-xl bg-slate-800/60 border border-slate-700 hover:bg-slate-700/60 text-slate-300 text-sm font-semibold transition-colors disabled:opacity-50"
+              className="px-4 py-2.5 rounded-xl border text-sm font-semibold transition-colors disabled:opacity-50"
+              style={{ ...VW_PANEL_STYLE, color: VW.mut }}
             >
               🔁 Pedir para trocar de equipa
             </button>
           )
         )}
 
-        <p className="text-slate-500 text-sm">A aguardar que o host confirme as equipas…</p>
+        <p className="text-sm" style={{ color: VW.mut }}>A aguardar que o host confirme as equipas…</p>
       </div>
     )
   }
@@ -218,27 +233,27 @@ export function PlayerView({ session: initSession, myPlayer, initialPlayers, asB
     const amArautoNow = myPlayerLive.is_arauto
 
     return (
-      <div className="min-h-screen bg-gradient-to-br from-emerald-950 via-slate-900 to-indigo-950 flex flex-col items-center justify-center p-6 gap-6">
+      <div className={`min-h-screen ${vwSans.className} flex flex-col items-center justify-center p-6 gap-6`} style={VW_SCREEN_STYLE}>
         {isBotMode && <BotBanner name={myPlayer.display_name} />}
 
         {!amArautoNow && (
           <>
             <div className="text-6xl" style={{ animation: 'spin 1s linear infinite' }}>🎰</div>
             <div className="text-center">
-              <h2 className="text-2xl font-black text-white">A Escolher os Arautos…</h2>
-              <p className="text-slate-400 text-sm mt-1">A roleta está a decidir quem guiará cada equipa</p>
+              <h2 className={`${vwSerif.className} text-2xl font-semibold`}>A Escolher os Arautos…</h2>
+              <p className="text-sm mt-1" style={{ color: VW.mut }}>A roleta está a decidir quem guiará cada equipa</p>
             </div>
           </>
         )}
 
         {amArautoNow && (
-          <div className="bg-yellow-500/10 border border-yellow-500/40 rounded-2xl p-4 text-center max-w-xs">
-            <Crown className="w-8 h-8 text-yellow-400 mx-auto mb-2" />
-            <p className="text-yellow-300 font-bold">A roleta escolheu-te como Arauto!</p>
+          <div className="rounded-2xl p-4 text-center max-w-xs border" style={{ background: 'rgba(216,178,95,.1)', borderColor: 'rgba(216,178,95,.4)' }}>
+            <Crown className="w-8 h-8 mx-auto mb-2" style={{ color: VW.gold }} />
+            <p className="font-bold" style={{ color: VW.gold }}>A roleta escolheu-te como Arauto!</p>
 
             {myPlayerLive.arauto_response === 'pending' && (
               <>
-                <p className="text-yellow-400/70 text-xs mt-1">Aceitas guiar a tua equipa?</p>
+                <p className="text-xs mt-1" style={{ color: VW.gold, opacity: .7 }}>Aceitas guiar a tua equipa?</p>
                 <div className="flex items-center justify-center gap-2 mt-3">
                   <button
                     onClick={() => handleArautoResponse(true)}
@@ -255,14 +270,14 @@ export function PlayerView({ session: initSession, myPlayer, initialPlayers, asB
                     Prefiro não
                   </button>
                 </div>
-                <p className="text-yellow-400/50 text-[11px] mt-2">É só uma preferência — o host vê e decide se gira a roleta outra vez.</p>
+                <p className="text-[11px] mt-2" style={{ color: VW.gold, opacity: .5 }}>É só uma preferência — o host vê e decide se gira a roleta outra vez.</p>
               </>
             )}
             {myPlayerLive.arauto_response === 'accepted' && (
               <p className="text-emerald-400 text-xs mt-1 font-semibold">✅ Disseste que aceitas. A aguardar o host…</p>
             )}
             {myPlayerLive.arauto_response === 'declined' && (
-              <p className="text-yellow-400/70 text-xs mt-1 font-semibold">Disseste que preferias não ser. O host pode girar a roleta outra vez.</p>
+              <p className="text-xs mt-1 font-semibold" style={{ color: VW.gold, opacity: .7 }}>Disseste que preferias não ser. O host pode girar a roleta outra vez.</p>
             )}
           </div>
         )}
@@ -277,69 +292,40 @@ export function PlayerView({ session: initSession, myPlayer, initialPlayers, asB
     const amArauto = myPlayerLive.is_arauto
 
     return (
-      <div className="min-h-screen bg-gradient-to-br from-emerald-950 via-slate-900 to-indigo-950 flex flex-col items-center justify-center p-6 gap-6">
+      <div className={`min-h-screen ${vwSans.className} flex flex-col items-center justify-center p-6 gap-6`} style={VW_SCREEN_STYLE}>
         {isBotMode && <BotBanner name={myPlayer.display_name} />}
         <div className="text-center">
-          <h2 className="text-2xl font-black text-white">Os Arautos foram escolhidos!</h2>
-          {myTeam && colors && (
-            <p className={`${colors.text} text-sm mt-1 font-semibold`}>
-              Equipa {myTeam === 'a' ? '🦁' : '🦅'} {teamLabel}
+          <h2 className={`${vwSerif.className} text-2xl font-semibold`}>Os Arautos foram escolhidos!</h2>
+          {myTeam && (
+            <p className="text-sm mt-1 font-semibold">
+              <TeamChip team={myTeam} label={`Equipa ${teamLabel}`} />
             </p>
           )}
         </div>
         <div className="flex gap-4">
-          <div className="bg-slate-800/60 rounded-2xl p-4 border border-amber-500/40 text-center min-w-[130px]">
-            <p className="text-amber-400 text-xs font-bold mb-2">🦁 Arauto Leão</p>
-            <p className="text-white font-bold text-sm">{arautoA?.display_name ?? '—'}</p>
+          <div className="rounded-2xl p-4 border text-center min-w-[130px]" style={teamPanelStyle('a')}>
+            <p className="text-xs font-bold mb-2" style={{ color: VW.amber }}>Arauto Leão</p>
+            <p className="font-bold text-sm">{arautoA?.display_name ?? '—'}</p>
           </div>
-          <div className="bg-slate-800/60 rounded-2xl p-4 border border-blue-500/40 text-center min-w-[130px]">
-            <p className="text-blue-400 text-xs font-bold mb-2">🦅 Arauto Águia</p>
-            <p className="text-white font-bold text-sm">{arautoB?.display_name ?? '—'}</p>
+          <div className="rounded-2xl p-4 border text-center min-w-[130px]" style={teamPanelStyle('b')}>
+            <p className="text-xs font-bold mb-2" style={{ color: VW.blue }}>Arauto Águia</p>
+            <p className="font-bold text-sm">{arautoB?.display_name ?? '—'}</p>
           </div>
         </div>
         {amArauto && (
-          <div className="bg-yellow-500/10 border border-yellow-500/40 rounded-2xl p-4 text-center">
-            <Crown className="w-8 h-8 text-yellow-400 mx-auto mb-2" />
-            <p className="text-yellow-300 font-bold">Foste escolhido Arauto!</p>
-
-            {myPlayerLive.arauto_response === 'pending' && (
-              <>
-                <p className="text-yellow-400/70 text-xs mt-1">Aceitas guiar a tua equipa?</p>
-                <div className="flex items-center justify-center gap-2 mt-3">
-                  <button
-                    onClick={() => handleArautoResponse(true)}
-                    disabled={arautoResponseLoading}
-                    className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-bold disabled:opacity-50"
-                  >
-                    Aceito
-                  </button>
-                  <button
-                    onClick={() => handleArautoResponse(false)}
-                    disabled={arautoResponseLoading}
-                    className="px-4 py-2 rounded-xl bg-slate-700 hover:bg-slate-600 text-white text-sm font-bold disabled:opacity-50"
-                  >
-                    Prefiro não
-                  </button>
-                </div>
-                <p className="text-yellow-400/50 text-[11px] mt-2">É só uma preferência — o host decide.</p>
-              </>
+          <div className="rounded-2xl p-4 text-center border" style={{ background: 'rgba(216,178,95,.1)', borderColor: 'rgba(216,178,95,.4)' }}>
+            <Crown className="w-8 h-8 mx-auto mb-2" style={{ color: VW.gold }} />
+            <p className="font-bold" style={{ color: VW.gold }}>És o Arauto!</p>
+            {myPlayerLive.arauto_response === 'declined' && (
+              <p className="text-xs mt-1" style={{ color: VW.gold, opacity: .7 }}>Pediste para não ser, mas o host decidiu manter-te.</p>
             )}
             {myPlayerLive.arauto_response === 'accepted' && (
-              <p className="text-emerald-400 text-xs mt-1 font-semibold">✅ Disseste que aceitas</p>
+              <p className="text-emerald-400 text-xs mt-1 font-semibold">✅ Aceitaste ser o Arauto</p>
             )}
-            {myPlayerLive.arauto_response === 'declined' && (
-              <p className="text-yellow-400/70 text-xs mt-1 font-semibold">Disseste que preferias não ser. O host pode escolher outro Arauto.</p>
-            )}
-
-            <a
-              href={`/jogos/vana-words/${session.id}/arauto`}
-              className="mt-3 inline-block px-4 py-2 rounded-xl bg-gradient-to-r from-yellow-400 to-amber-500 text-black font-bold text-sm shadow-lg shadow-yellow-900/30 active:scale-95 transition-transform"
-            >
-              Abrir Vista de Arauto
-            </a>
+            <p className="text-xs mt-2" style={{ color: VW.gold, opacity: .5 }}>A abrir a Vista de Arauto…</p>
           </div>
         )}
-        <p className="text-slate-500 text-sm">A aguardar que o host inicie…</p>
+        <p className="text-sm" style={{ color: VW.mut }}>A aguardar que o host inicie…</p>
       </div>
     )
   }
@@ -350,9 +336,7 @@ export function PlayerView({ session: initSession, myPlayer, initialPlayers, asB
     const isMyTurn = myTeam === activeTeam
     const amArauto = myPlayer.is_arauto
     const isHinting = session.current_phase === 'hinting'
-    const activeColors = TEAM_COLORS[activeTeam]
     const activeLabel = TEAM_LABELS[activeTeam]
-    const activeIcon = activeTeam === 'a' ? '🦁' : '🦅'
 
     const canVote = isMyTurn && !amArauto && !isHinting
 
@@ -360,18 +344,18 @@ export function PlayerView({ session: initSession, myPlayer, initialPlayers, asB
     const wordsBRevealed = words.filter((w) => w.team === 'b' && w.is_revealed).length
 
     return (
-      <div className="min-h-screen bg-gradient-to-br from-emerald-950 via-slate-900 to-indigo-950 p-3">
+      <div className={`min-h-screen ${vwSans.className} p-3`} style={VW_SCREEN_STYLE}>
         <div className="max-w-lg mx-auto space-y-4">
           {isBotMode && <BotBanner name={myPlayer.display_name} />}
 
           {/* Badge da equipa */}
-          {myTeam && colors && (
-            <div className={`flex items-center justify-between px-4 py-2 rounded-xl border ${colors.badge}`}>
-              <span className={`font-bold text-sm ${colors.text}`}>
-                {myTeam === 'a' ? '🦁' : '🦅'} Equipa {teamLabel}
+          {myTeam && (
+            <div className="flex items-center justify-between px-4 py-2 rounded-xl border" style={teamPanelStyle(myTeam)}>
+              <span className="font-bold text-sm">
+                <TeamChip team={myTeam} label={`Equipa ${teamLabel}`} />
               </span>
               {amArauto && (
-                <span className="text-yellow-300 text-xs font-bold flex items-center gap-1">
+                <span className="text-xs font-bold flex items-center gap-1" style={{ color: VW.gold }}>
                   <Crown className="w-3 h-3" /> Arauto
                 </span>
               )}
@@ -380,27 +364,30 @@ export function PlayerView({ session: initSession, myPlayer, initialPlayers, asB
 
           {/* Marcador */}
           <div className="grid grid-cols-2 gap-2 text-center">
-            <div className={`bg-slate-800/60 rounded-xl p-2 border ${activeTeam === 'a' ? 'border-amber-500' : 'border-slate-700'}`}>
-              <p className="text-amber-400 text-xs">🦁 Leão</p>
-              <p className="text-white font-bold">{wordsARevealed}/5</p>
+            <div className="rounded-xl p-2 border" style={{ ...VW_PANEL_STYLE, borderColor: activeTeam === 'a' ? VW.amber : VW.pline }}>
+              <p className="text-xs font-bold" style={{ color: VW.amber }}>Leão</p>
+              <p className={`${vwSerif.className} font-semibold`}>{wordsARevealed}/5</p>
             </div>
-            <div className={`bg-slate-800/60 rounded-xl p-2 border ${activeTeam === 'b' ? 'border-blue-500' : 'border-slate-700'}`}>
-              <p className="text-blue-400 text-xs">🦅 Águia</p>
-              <p className="text-white font-bold">{wordsBRevealed}/5</p>
+            <div className="rounded-xl p-2 border" style={{ ...VW_PANEL_STYLE, borderColor: activeTeam === 'b' ? VW.blue : VW.pline }}>
+              <p className="text-xs font-bold" style={{ color: VW.blue }}>Águia</p>
+              <p className={`${vwSerif.className} font-semibold`}>{wordsBRevealed}/5</p>
             </div>
           </div>
 
           {/* Estado do turno */}
-          <div className={`rounded-xl p-3 border ${activeColors.badge} ${canVote ? 'ring-2 ring-emerald-400/60 shadow-lg shadow-emerald-900/30' : ''}`}>
-            <p className={`font-bold text-sm ${activeColors.text}`}>{activeIcon} Vez da Equipa {activeLabel}</p>
+          <div
+            className="rounded-xl p-3 border"
+            style={{ ...teamPanelStyle(activeTeam, { strong: true }), ...(canVote ? VW_SOFT_PULSE : {}) }}
+          >
+            <p className="font-bold text-sm"><TeamChip team={activeTeam} label={`Vez da Equipa ${activeLabel}`} /></p>
             {isHinting ? (
-              <p className="text-slate-400 text-sm mt-0.5">A aguardar dica do Arauto…</p>
+              <p className="text-sm mt-0.5" style={{ color: VW.mut }}>A aguardar dica do Arauto…</p>
             ) : (
               <>
-                <p className="text-white text-lg font-black mt-1">
+                <p className={`${vwSerif.className} text-lg font-semibold mt-1`}>
                   «{session.current_hint}» — {session.current_hint_number}
                 </p>
-                <p className={`text-xs mt-0.5 ${activeColors.text}`}>
+                <p className="text-xs mt-0.5" style={{ color: activeTeam === 'a' ? VW.amber : VW.blue }}>
                   {session.guesses_remaining} tentativa(s) restante(s)
                 </p>
               </>
@@ -421,8 +408,8 @@ export function PlayerView({ session: initSession, myPlayer, initialPlayers, asB
           {error && <p className="text-red-400 text-sm text-center">{error}</p>}
 
           {isMyTurn && amArauto && isHinting && (
-            <div className="bg-yellow-500/10 border border-yellow-500/40 rounded-xl p-3 text-center">
-              <p className="text-yellow-300 font-bold text-sm">É a tua vez de dar a dica!</p>
+            <div className="rounded-xl p-3 text-center border" style={{ background: 'rgba(216,178,95,.1)', borderColor: 'rgba(216,178,95,.4)' }}>
+              <p className="font-bold text-sm" style={{ color: VW.gold }}>É a tua vez de dar a dica!</p>
               <a
                 href={`/jogos/vana-words/${session.id}/arauto`}
                 className="mt-2 inline-block px-4 py-2 rounded-xl bg-gradient-to-r from-yellow-400 to-amber-500 text-black font-bold text-sm shadow-lg shadow-yellow-900/30 active:scale-95 transition-transform"
@@ -432,10 +419,10 @@ export function PlayerView({ session: initSession, myPlayer, initialPlayers, asB
             </div>
           )}
           {!isMyTurn && (
-            <p className="text-slate-500 text-sm text-center">A aguardar a tua vez…</p>
+            <p className="text-sm text-center" style={{ color: VW.mut }}>A aguardar a tua vez…</p>
           )}
           {canVote && (
-            <p className="text-emerald-400 text-xs text-center animate-pulse">
+            <p className="text-xs text-center animate-pulse" style={{ color: VW.blue }}>
               Clica numa palavra para votar · clica de novo para cancelar
             </p>
           )}
@@ -449,24 +436,23 @@ export function PlayerView({ session: initSession, myPlayer, initialPlayers, asB
     const winner = session.winner_team as TeamId | null
     const iWon = winner && myTeam === winner
     const label = winner ? TEAM_LABELS[winner] : null
-    const icon = winner === 'a' ? '🦁' : winner === 'b' ? '🦅' : '🏆'
 
     return (
-      <div className="min-h-screen bg-gradient-to-br from-emerald-950 via-slate-900 to-indigo-950 flex flex-col items-center justify-center p-6 gap-6 text-center">
+      <div className={`min-h-screen ${vwSans.className} flex flex-col items-center justify-center p-6 gap-6 text-center`} style={VW_SCREEN_STYLE}>
         {isBotMode && <BotBanner name={myPlayer.display_name} />}
-        <p className="text-7xl">{iWon ? '🏆' : icon}</p>
-        <h1 className="text-3xl font-black text-white">
+        <p className="text-7xl">{iWon ? '🏆' : winner === 'a' ? '🦁' : winner === 'b' ? '🦅' : '🏆'}</p>
+        <h1 className={`${vwSerif.className} text-3xl font-semibold`}>
           {winner ? `Equipa ${label} venceu!` : 'Jogo terminado!'}
         </h1>
         {iWon ? (
           <p className="text-emerald-400 text-lg font-semibold">Parabéns! A tua equipa ganhou 100 XP e 50 Gold!</p>
         ) : (
-          <p className="text-slate-400">Boa sorte na próxima vez!</p>
+          <p style={{ color: VW.mut }}>Boa sorte na próxima vez!</p>
         )}
         {session.win_reason === 'black_hit' && (
           <p className="text-red-400 text-sm">A palavra preta foi revelada! 💀</p>
         )}
-        <p className="text-slate-500 text-sm -mb-2">Todas as palavras:</p>
+        <p className="text-sm -mb-2" style={{ color: VW.mut }}>Todas as palavras:</p>
         <WordGrid words={words} guesses={[]} players={players} showColors disabled />
       </div>
     )

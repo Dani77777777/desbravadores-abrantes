@@ -5,6 +5,7 @@ import { joinVanaWordsSession } from '@/lib/actions/vana-words'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { LogIn, Play, RotateCcw } from 'lucide-react'
+import { VW, VW_SCREEN_STYLE, vwSans, vwSerif } from './theme'
 
 interface ActiveSession {
   id: string
@@ -55,7 +56,7 @@ export function VanaWordsHome({ userId, canPlay, activeSessions = [] }: VanaWord
 
   if (!userId) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-emerald-950 via-slate-900 to-indigo-950 flex flex-col items-center justify-center p-6 gap-6">
+      <div className={`min-h-screen ${vwSans.className} flex flex-col items-center justify-center p-6 gap-6`} style={VW_SCREEN_STYLE}>
         <img src="/images/VanaWords.png" alt="VanaWords" className="h-24 w-auto object-contain drop-shadow-2xl" />
         <p className="text-slate-400 text-center max-w-xs">Precisas de fazer login para jogar.</p>
         <a
@@ -70,7 +71,7 @@ export function VanaWordsHome({ userId, canPlay, activeSessions = [] }: VanaWord
 
   if (!canPlay) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-emerald-950 via-slate-900 to-indigo-950 flex flex-col items-center justify-center p-6 gap-6 text-center">
+      <div className={`min-h-screen ${vwSans.className} flex flex-col items-center justify-center p-6 gap-6 text-center`} style={VW_SCREEN_STYLE}>
         <img src="/images/VanaWords.png" alt="VanaWords" className="h-24 w-auto object-contain drop-shadow-2xl" />
         <p className="text-slate-400 max-w-sm">
           Este jogo é exclusivo para membros do clube. Faz login com a tua conta para jogar.
@@ -81,14 +82,15 @@ export function VanaWordsHome({ userId, canPlay, activeSessions = [] }: VanaWord
   }
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-gradient-to-br from-emerald-950 via-slate-900 to-indigo-950 flex flex-col items-center justify-center p-6 gap-8">
+    <div className={`relative min-h-screen ${vwSans.className} overflow-hidden flex flex-col items-center justify-center p-6 gap-8`} style={VW_SCREEN_STYLE}>
       {/* Brilhos decorativos de fundo */}
       <div className="pointer-events-none absolute -top-24 -left-24 h-72 w-72 rounded-full bg-emerald-500/20 blur-3xl" />
       <div className="pointer-events-none absolute -bottom-24 -right-24 h-72 w-72 rounded-full bg-indigo-500/20 blur-3xl" />
 
       <div className="relative flex flex-col items-center text-center gap-3">
         <img src="/images/VanaWords.png" alt="VanaWords" className="h-28 w-auto object-contain drop-shadow-2xl" />
-        <p className="text-slate-300/80 font-medium">O jogo das palavras secretas</p>
+        <p className={`${vwSerif.className} text-2xl font-semibold`}>VanaWords</p>
+        <p style={{ color: VW.mut }} className="font-medium">O jogo das palavras secretas</p>
       </div>
 
       <form

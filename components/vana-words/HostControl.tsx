@@ -21,7 +21,9 @@ import {
 import { WordGrid } from './WordGrid'
 import { TeamRoulette } from './TeamRoulette'
 import { HostBotOverlay } from './HostBotOverlay'
-import { TEAM_LABELS, TEAM_COLORS } from '@/types/vana-words'
+import { TeamChip } from './ui'
+import { VW, VW_SCREEN_STYLE, VW_PANEL_STYLE, TEAM_GRADIENT, teamPanelStyle, vwSans, vwSerif } from './theme'
+import { TEAM_LABELS } from '@/types/vana-words'
 import type { VanaWordsSession, VanaWordsPlayer, VanaWordsWord, VanaWordsGuess, TeamId } from '@/types/vana-words'
 import { Users, Crown, RefreshCw, Play, CheckCircle2, Trophy, ArrowRight, Shuffle, MonitorPlay, Bot, Trash2, Minus, Plus, Copy, Check, Maximize2, Eye, EyeOff, X, Repeat } from 'lucide-react'
 
@@ -224,7 +226,7 @@ export function HostControl({ session: initSession, initialPlayers, initialWords
   if (session.status === 'lobby') {
     const bots = players.filter((p) => p.is_bot)
     return wrap(
-      <div className="min-h-screen bg-gradient-to-br from-emerald-950 via-slate-900 to-indigo-950 p-4">
+      <div className={`min-h-screen ${vwSans.className} p-4`} style={VW_SCREEN_STYLE}>
         <div className="max-w-lg mx-auto space-y-6 pt-8">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -242,7 +244,7 @@ export function HostControl({ session: initSession, initialPlayers, initialWords
 
           <div className="bg-slate-800/60 rounded-2xl p-5 border border-slate-700 text-center">
             <p className="text-slate-400 text-sm mb-2">Código de entrada</p>
-            <p className="text-5xl font-black text-white tracking-widest">{session.code}</p>
+            <p className={`${vwSerif.className} text-5xl font-semibold tracking-widest`}>{session.code}</p>
             <p className="text-slate-500 text-xs mt-2">/jogos/vana-words</p>
           </div>
 
@@ -367,11 +369,11 @@ export function HostControl({ session: initSession, initialPlayers, initialWords
   if (session.status === 'team_preview') {
     const swapRequests = players.filter((p) => p.swap_requested)
     return wrap(
-      <div className="min-h-screen bg-gradient-to-br from-emerald-950 via-slate-900 to-indigo-950 p-4">
+      <div className={`min-h-screen ${vwSans.className} p-4`} style={VW_SCREEN_STYLE}>
         <div className="max-w-2xl mx-auto space-y-6 pt-8">
           <div className="text-center">
-            <h1 className="text-2xl font-black text-white">Pré-visualização das Equipas</h1>
-            <p className="text-slate-400 text-sm mt-1">Clica num nome para mudar de equipa</p>
+            <h1 className={`${vwSerif.className} text-2xl font-semibold`}>Pré-visualização das Equipas</h1>
+            <p className="text-sm mt-1" style={{ color: VW.mut }}>Clica num nome para mudar de equipa</p>
           </div>
 
           {swapRequests.length > 0 && (
@@ -408,13 +410,11 @@ export function HostControl({ session: initSession, initialPlayers, initialWords
           <div className="grid grid-cols-2 gap-4">
             {(['a', 'b'] as TeamId[]).map((tid) => {
               const team = tid === 'a' ? teamA : teamB
-              const colors = TEAM_COLORS[tid]
               const label = TEAM_LABELS[tid]
-              const icon = tid === 'a' ? '🦁' : '🦅'
               const otherTeam: TeamId = tid === 'a' ? 'b' : 'a'
               return (
-                <div key={tid} className={`bg-slate-800/60 rounded-2xl p-4 border ${colors.border}`}>
-                  <p className={`${colors.text} font-bold text-sm mb-3`}>{icon} Equipa {label}</p>
+                <div key={tid} className="rounded-2xl p-4 border" style={teamPanelStyle(tid)}>
+                  <p className="font-bold text-sm mb-3"><TeamChip team={tid} label={`Equipa ${label}`} /></p>
                   <div className="space-y-2">
                     {team.map((p) => (
                       <button
@@ -463,10 +463,10 @@ export function HostControl({ session: initSession, initialPlayers, initialWords
   if (session.status === 'arauto_spin') {
     const allDone = rouletteADone && rouletteBDone
     return wrap(
-      <div className="min-h-screen bg-gradient-to-br from-emerald-950 via-slate-900 to-indigo-950 flex flex-col items-center justify-center p-6 gap-8">
+      <div className={`min-h-screen ${vwSans.className} flex flex-col items-center justify-center p-6 gap-8`} style={VW_SCREEN_STYLE}>
         <div className="text-center">
-          <h1 className="text-2xl font-black text-white">A Escolher os Arautos</h1>
-          <p className="text-slate-400 text-sm mt-1">A roleta está a decidir quem guiará cada equipa</p>
+          <h1 className={`${vwSerif.className} text-2xl font-semibold`}>A Escolher os Arautos</h1>
+          <p className="text-sm mt-1" style={{ color: VW.mut }}>A roleta está a decidir quem guiará cada equipa</p>
         </div>
 
         <div className="flex gap-8 flex-wrap justify-center items-start">
@@ -561,10 +561,10 @@ export function HostControl({ session: initSession, initialPlayers, initialWords
   // ── Arauto Ready ───────────────────────────────────────────
   if (session.status === 'arauto_ready') {
     return wrap(
-      <div className="min-h-screen bg-gradient-to-br from-emerald-950 via-slate-900 to-indigo-950 flex flex-col items-center justify-center p-6 gap-6">
+      <div className={`min-h-screen ${vwSans.className} flex flex-col items-center justify-center p-6 gap-6`} style={VW_SCREEN_STYLE}>
         <div className="text-center space-y-2">
-          <h1 className="text-2xl font-black text-white">Arautos Prontos?</h1>
-          <p className="text-slate-400 text-sm">Os Arautos devem ir para o ecrã grande e abrir a vista de Arauto nos seus dispositivos.</p>
+          <h1 className={`${vwSerif.className} text-2xl font-semibold`}>Arautos Prontos?</h1>
+          <p className="text-sm" style={{ color: VW.mut }}>Os Arautos devem ir para o ecrã grande e abrir a vista de Arauto nos seus dispositivos.</p>
         </div>
 
         <div className="grid grid-cols-2 gap-3 sm:gap-6 w-full max-w-sm">
@@ -627,13 +627,11 @@ export function HostControl({ session: initSession, initialPlayers, initialWords
   // ── Playing ────────────────────────────────────────────────
   if (session.status === 'playing') {
     const activeTeam = session.current_team as TeamId
-    const colors = TEAM_COLORS[activeTeam]
     const label = TEAM_LABELS[activeTeam]
-    const icon = activeTeam === 'a' ? '🦁' : '🦅'
     const isHinting = session.current_phase === 'hinting'
 
     return wrap(
-      <div className="min-h-screen bg-gradient-to-br from-emerald-950 via-slate-900 to-indigo-950 p-3">
+      <div className={`min-h-screen ${vwSans.className} p-3`} style={VW_SCREEN_STYLE}>
         <div className="max-w-2xl mx-auto space-y-4">
           {/* Header */}
           <div className="flex items-center justify-between">
@@ -649,26 +647,26 @@ export function HostControl({ session: initSession, initialPlayers, initialWords
 
           {/* Marcador */}
           <div className="grid grid-cols-2 gap-3">
-            <div className={`bg-slate-800/60 rounded-xl p-3 border ${activeTeam === 'a' ? 'border-amber-500' : 'border-slate-700'}`}>
-              <p className="text-amber-400 text-xs font-bold">🦁 Leão</p>
-              <p className="text-white font-bold text-xl">{revealedA} / {wordsA.length}</p>
+            <div className="rounded-xl p-3 border" style={{ ...VW_PANEL_STYLE, borderColor: activeTeam === 'a' ? VW.amber : VW.pline }}>
+              <p className="text-xs font-bold" style={{ color: VW.amber }}>Leão</p>
+              <p className={`${vwSerif.className} font-semibold text-xl`}>{revealedA} / {wordsA.length}</p>
             </div>
-            <div className={`bg-slate-800/60 rounded-xl p-3 border ${activeTeam === 'b' ? 'border-blue-500' : 'border-slate-700'}`}>
-              <p className="text-blue-400 text-xs font-bold">🦅 Águia</p>
-              <p className="text-white font-bold text-xl">{revealedB} / {wordsB.length}</p>
+            <div className="rounded-xl p-3 border" style={{ ...VW_PANEL_STYLE, borderColor: activeTeam === 'b' ? VW.blue : VW.pline }}>
+              <p className="text-xs font-bold" style={{ color: VW.blue }}>Águia</p>
+              <p className={`${vwSerif.className} font-semibold text-xl`}>{revealedB} / {wordsB.length}</p>
             </div>
           </div>
 
           {/* Estado do turno */}
-          <div className={`rounded-xl p-3 border ${colors.badge}`}>
+          <div className="rounded-xl p-3 border" style={teamPanelStyle(activeTeam, { strong: true })}>
             <div className="flex items-center justify-between">
-              <p className={`font-bold ${colors.text}`}>{icon} Equipa {label}</p>
-              <span className={`text-xs px-2 py-0.5 rounded-full ${colors.badge}`}>
+              <p className="font-bold"><TeamChip team={activeTeam} label={`Equipa ${label}`} /></p>
+              <span className="text-xs px-2 py-0.5 rounded-full font-semibold" style={{ color: activeTeam === 'a' ? VW.amber : VW.blue }}>
                 {isHinting ? 'A dar dica' : `${session.guesses_remaining} tentativa(s) restante(s)`}
               </span>
             </div>
             {session.current_hint && (
-              <p className="text-white mt-1 text-lg font-black">
+              <p className={`${vwSerif.className} mt-1 text-lg font-semibold`}>
                 «{session.current_hint}» — {session.current_hint_number}
               </p>
             )}
@@ -676,26 +674,28 @@ export function HostControl({ session: initSession, initialPlayers, initialWords
 
           {/* Dica (fase hinting, host pode submeter em vez do arauto) */}
           {isHinting && (
-            <div className="bg-slate-800/60 rounded-xl p-4 border border-slate-700 space-y-3">
-              <p className="text-slate-300 text-sm font-semibold">Submeter dica (Arauto ou Host)</p>
+            <div className="rounded-xl p-4 border space-y-3" style={VW_PANEL_STYLE}>
+              <p className="text-sm font-semibold" style={{ color: VW.mut }}>Submeter dica (Arauto ou Host)</p>
               <div className="flex gap-2">
                 <input
-                  className="flex-1 min-w-0 bg-slate-700 text-white rounded-lg px-3 py-2 text-sm border border-slate-600 uppercase"
+                  className="flex-1 min-w-0 rounded-lg px-3 py-2 text-sm border uppercase"
+                  style={{ background: '#0b1226', borderColor: VW.pline, color: VW.ink }}
                   placeholder="Palavra-dica"
                   value={hintInput}
                   onChange={(e) => setHintInput(e.target.value)}
                 />
-                <div className="flex shrink-0 items-stretch rounded-lg border border-slate-600 bg-slate-700 overflow-hidden">
+                <div className="flex shrink-0 items-stretch rounded-lg border overflow-hidden" style={{ background: '#0b1226', borderColor: VW.pline }}>
                   <button
                     type="button"
                     onClick={() => setHintNumber((n) => Math.max(1, n - 1))}
                     disabled={hintNumber <= 1}
                     aria-label="Diminuir"
-                    className="px-2.5 flex items-center text-white hover:bg-slate-600 disabled:opacity-30 active:bg-slate-500"
+                    className="px-2.5 flex items-center hover:bg-white/5 disabled:opacity-30"
+                    style={{ color: VW.mut }}
                   >
                     <Minus className="w-4 h-4" />
                   </button>
-                  <span className="w-7 flex items-center justify-center text-sm font-black text-white tabular-nums select-none">
+                  <span className={`${vwSerif.className} w-7 flex items-center justify-center text-sm font-semibold tabular-nums select-none`}>
                     {hintNumber}
                   </span>
                   <button
@@ -703,7 +703,7 @@ export function HostControl({ session: initSession, initialPlayers, initialWords
                     onClick={() => setHintNumber((n) => Math.min(5, n + 1))}
                     disabled={hintNumber >= 5}
                     aria-label="Aumentar"
-                    className="px-2.5 flex items-center text-white hover:bg-slate-600 disabled:opacity-30 active:bg-slate-500"
+                    className="px-2.5 flex items-center hover:bg-white/5 disabled:opacity-30"
                   >
                     <Plus className="w-4 h-4" />
                   </button>
@@ -716,7 +716,8 @@ export function HostControl({ session: initSession, initialPlayers, initialWords
                     return res
                   })}
                   disabled={loading || !hintInput.trim()}
-                  className={`px-4 py-2 shrink-0 rounded-lg font-bold text-sm text-white transition-colors disabled:opacity-40 ${colors.bg}`}
+                  className="px-4 py-2 shrink-0 rounded-lg font-bold text-sm disabled:opacity-40 transition-colors"
+                  style={{ background: TEAM_GRADIENT[activeTeam], color: activeTeam === 'a' ? '#1e1305' : '#f5f9ff' }}
                 >
                   OK
                 </button>
@@ -783,29 +784,28 @@ export function HostControl({ session: initSession, initialPlayers, initialWords
     const winner = session.winner_team as TeamId | null
     const label = winner ? TEAM_LABELS[winner] : null
     const icon = winner === 'a' ? '🦁' : winner === 'b' ? '🦅' : '🏆'
-    const colors = winner ? TEAM_COLORS[winner] : null
 
     return wrap(
-      <div className="min-h-screen bg-gradient-to-br from-emerald-950 via-slate-900 to-indigo-950 flex flex-col items-center justify-center p-6 gap-6">
+      <div className={`min-h-screen ${vwSans.className} flex flex-col items-center justify-center p-6 gap-6`} style={VW_SCREEN_STYLE}>
         <div className="text-center">
           <p className="text-6xl mb-3">{icon}</p>
-          <h1 className="text-3xl font-black text-white">
+          <h1 className={`${vwSerif.className} text-3xl font-semibold`}>
             {winner ? `Equipa ${label} venceu!` : 'Jogo terminado!'}
           </h1>
           {session.win_reason === 'black_hit' && (
             <p className="text-red-400 text-sm mt-1">A palavra preta foi revelada! 💀</p>
           )}
-          {session.win_reason === 'all_found' && (
-            <p className={`${colors?.text} text-sm mt-1`}>Todas as palavras da equipa foram encontradas!</p>
+          {session.win_reason === 'all_found' && winner && (
+            <p className="text-sm mt-1" style={{ color: winner === 'a' ? VW.amber : VW.blue }}>Todas as palavras da equipa foram encontradas!</p>
           )}
         </div>
 
         <div className="grid grid-cols-2 gap-4">
           {(['a', 'b'] as TeamId[]).map((tid) => (
-            <div key={tid} className={`bg-slate-800/60 rounded-2xl p-4 border ${tid === winner ? TEAM_COLORS[tid].border : 'border-slate-700'} text-center`}>
-              <p className={`font-bold ${TEAM_COLORS[tid].text} mb-2`}>{tid === 'a' ? '🦁' : '🦅'} {TEAM_LABELS[tid]}</p>
+            <div key={tid} className="rounded-2xl p-4 border text-center" style={tid === winner ? teamPanelStyle(tid) : VW_PANEL_STYLE}>
+              <p className="font-bold mb-2"><TeamChip team={tid} label={TEAM_LABELS[tid]} /></p>
               {players.filter((p) => p.team === tid).map((p) => (
-                <p key={p.id} className="text-white/80 text-sm">{p.display_name}</p>
+                <p key={p.id} className="text-sm" style={{ color: 'rgba(238,241,248,.8)' }}>{p.display_name}</p>
               ))}
             </div>
           ))}
