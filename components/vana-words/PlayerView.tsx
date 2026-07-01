@@ -25,7 +25,6 @@ export function PlayerView({ session: initSession, myPlayer, initialPlayers, asB
   const [players, setPlayers] = useState(initialPlayers)
   const [words, setWords] = useState<VanaWordsWord[]>([])
   const [guesses, setGuesses] = useState<VanaWordsGuess[]>([])
-  const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [swapLoading, setSwapLoading] = useState(false)
   const [arautoResponseLoading, setArautoResponseLoading] = useState(false)
@@ -102,14 +101,24 @@ export function PlayerView({ session: initSession, myPlayer, initialPlayers, asB
   }, [session.status, myPlayerLive.is_arauto])
 
   async function handleWordClick(wordId: string) {
-    setLoading(true)
     setError(null)
+    // Feedback optimista: mostra a seleção já, sem esperar pelo servidor
+    const alreadySelected = guesses.some((g) => g.word_id === wordId && g.player_id === effectivePlayerId)
+    setGuesses((gs) => alreadySelected
+      ? gs.filter((g) => !(g.word_id === wordId && g.player_id === effectivePlayerId))
+      : [...gs, {
+          id: `optimistic-${wordId}-${effectivePlayerId}`,
+          session_id: session.id,
+          word_id: wordId,
+          player_id: effectivePlayerId,
+          created_at: new Date().toISOString(),
+        }])
+
     // Passa asBotId quando em modo de impersonação
     const res = await toggleGuess(session.id, wordId, asBotId)
     if (res?.error) setError(res.error)
-    // Atualiza logo a grelha sem depender só do realtime (que pode falhar p/ DELETE)
+    // Reconcilia com o servidor (cobre erros e corridas com o realtime, que pode falhar p/ DELETE)
     await fetchGuesses()
-    setLoading(false)
   }
 
   async function handleSwapRequest(requested: boolean) {
@@ -402,7 +411,7 @@ export function PlayerView({ session: initSession, myPlayer, initialPlayers, asB
             myPlayerId={effectivePlayerId}
             showColors={false}
             onWordClick={canVote ? handleWordClick : undefined}
-            disabled={!canVote || loading}
+            disabled={!canVote}
           />
 
           {error && <p className="text-red-400 text-sm text-center">{error}</p>}
