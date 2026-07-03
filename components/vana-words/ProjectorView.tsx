@@ -388,7 +388,8 @@ export function ProjectorView({ session: initSession, initialPlayers }: Projecto
           <div className="flex flex-wrap items-center justify-center gap-8">
             <div className="rounded-3xl px-12 py-6 text-center border" style={VW_PANEL_STYLE}>
               <p className="text-sm uppercase tracking-widest mb-1" style={{ color: VW.mut }}>Código</p>
-              <p className={`${vwSerif.className} text-7xl font-semibold tracking-[0.3em]`}>{session.code}</p>
+              {/* Mesma fonte do ecrã "Entrar no Jogo" — evita confundir letras */}
+              <p className="text-7xl font-black tracking-[0.3em]">{session.code}</p>
             </div>
             {joinUrl && (
               <div className="bg-white rounded-3xl p-6 shadow-2xl">
