@@ -265,9 +265,13 @@ export function ProjectorView({ session: initSession, initialPlayers }: Projecto
 
   // URL curto para o QR (/j/CODIGO → redireciona para o jogo): menos caracteres
   // = QR menos denso = leitura fácil à distância no projetor.
-  const joinUrl = typeof window !== 'undefined'
-    ? `${window.location.origin}/j/${session.code}`
-    : ''
+  // Calculado só no cliente via estado: se fosse derivado de `window` durante o
+  // render, o SVG hidratava com o path do valor vazio do SSR e nunca era
+  // corrigido (o React não repara atributos divergentes na hidratação).
+  const [joinUrl, setJoinUrl] = useState('')
+  useEffect(() => {
+    setJoinUrl(`${window.location.origin}/j/${session.code}`)
+  }, [session.code])
 
   // Recebe comandos do host (ampliar QR Code)
   useEffect(() => {
@@ -386,9 +390,11 @@ export function ProjectorView({ session: initSession, initialPlayers }: Projecto
               <p className="text-sm uppercase tracking-widest mb-1" style={{ color: VW.mut }}>Código</p>
               <p className={`${vwSerif.className} text-7xl font-semibold tracking-[0.3em]`}>{session.code}</p>
             </div>
-            <div className="bg-white rounded-3xl p-6 shadow-2xl">
-              <QRCodeSVG value={joinUrl} size={300} />
-            </div>
+            {joinUrl && (
+              <div className="bg-white rounded-3xl p-6 shadow-2xl">
+                <QRCodeSVG value={joinUrl} size={300} />
+              </div>
+            )}
           </div>
         )}
 
@@ -461,7 +467,7 @@ export function ProjectorView({ session: initSession, initialPlayers }: Projecto
         )}
 
         {/* QR Code ampliado (controlado pelo host) */}
-        {qrZoomed && !isPreview && (
+        {qrZoomed && !isPreview && joinUrl && (
           <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-6 animate-in fade-in duration-300">
             <div className="bg-white rounded-3xl p-10 shadow-2xl animate-in zoom-in-95 duration-500">
               <QRCodeSVG value={joinUrl} size={500} />
