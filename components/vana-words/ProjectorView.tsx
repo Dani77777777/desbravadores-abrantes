@@ -107,7 +107,7 @@ export function ProjectorView({ session: initSession, initialPlayers }: Projecto
     sfxHintRef.current = make(sound('sfx-hint-trumpet.mp3'), 'sfx-hint')
     sfxCorrectRef.current = make(sound('sfx-word-correct.mp3'), 'sfx-correct')
     sfxWrongRef.current = make(sound('sfx-word-wrong.mp3'), 'sfx-wrong')
-    sfxBlackRef.current = make(vqSound('theend.mp3'), 'sfx-black')
+    sfxBlackRef.current = make(sound('sfx-black-word.mp3'), 'sfx-black')
     sfxArautoRef.current = make(sound('sfx-arauto-chosen.mp3'), 'sfx-arauto')
     sfxEarningRef.current = make(vqSound('earning points.mp3'), 'sfx-earning')
     ;[sfxVoteRef, sfxHintRef, sfxCorrectRef, sfxWrongRef, sfxBlackRef, sfxArautoRef, sfxEarningRef].forEach((r) => {
