@@ -243,7 +243,7 @@ export function HostControl({ session: initSession, initialPlayers, initialWords
     <button
       onClick={() => setMusicEnabled((v) => !v)}
       title={musicEnabled ? 'Música do projetor ligada (clica para desligar)' : 'Música do projetor desligada (clica para ligar)'}
-      className={`fixed bottom-4 right-4 z-50 rounded-full p-3.5 shadow-lg transition-colors ${
+      className={`fixed top-4 right-4 z-50 rounded-full p-3.5 shadow-lg transition-colors ${
         musicEnabled
           ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-900/50'
           : 'bg-slate-700 hover:bg-slate-600 text-slate-300 shadow-black/40'
