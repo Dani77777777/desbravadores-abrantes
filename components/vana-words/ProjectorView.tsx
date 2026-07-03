@@ -238,6 +238,31 @@ export function ProjectorView({ session: initSession, initialPlayers }: Projecto
     prevRewardsRef.current = session.rewards_awarded
   }, [session.rewards_awarded])
 
+  // Overlay para desbloquear áudio — renderizado fora da árvore de cada estado
+  // (DOM directo via useEffect para sobreviver a qualquer return)
+  useEffect(() => {
+    if (audioUnlocked || typeof document === 'undefined') return
+
+    const overlay = document.createElement('div')
+    overlay.setAttribute('id', 'vw-audio-unlock')
+    overlay.style.cssText = 'position:fixed;inset:0;z-index:100;background:rgba(0,0,0,0.7);backdrop-filter:blur(8px);display:flex;align-items:center;justify-content:center;cursor:pointer;animation:vwFade 0.3s ease-out'
+    overlay.innerHTML = `
+      <style>@keyframes vwFade{from{opacity:0}to{opacity:1}}</style>
+      <div style="background:rgba(255,255,255,0.1);border:2px solid rgba(255,255,255,0.2);border-radius:24px;padding:32px 40px;text-align:center;box-shadow:0 25px 50px -12px rgba(0,0,0,0.5);max-width:28rem;margin:0 16px">
+        <div style="font-size:3rem;margin-bottom:12px">🔊</div>
+        <p style="color:white;font-size:1.5rem;font-weight:900;margin:0">Clica para activar o áudio</p>
+        <p style="color:#7dd3fc;font-size:0.875rem;margin-top:8px">Os browsers exigem uma interacção antes de tocar música</p>
+      </div>
+    `
+    const handler = () => setAudioUnlocked(true)
+    overlay.addEventListener('click', handler)
+    document.body.appendChild(overlay)
+    return () => {
+      overlay.removeEventListener('click', handler)
+      overlay.remove()
+    }
+  }, [audioUnlocked])
+
   const joinUrl = typeof window !== 'undefined'
     ? `${window.location.origin}/jogos/vana-words?code=${session.code}`
     : ''
