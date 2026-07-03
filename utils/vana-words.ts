@@ -134,7 +134,8 @@ export function selectArauto(
   return teamPlayers[teamPlayers.length - 1]
 }
 
-// Geração de código de sessão único (4 letras maiúsculas)
+// Geração de código de sessão único (4 caracteres, sem 0/O nem 1/I ambíguos)
 export function generateCode(): string {
-  return Math.random().toString(36).slice(2, 6).toUpperCase()
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
+  return Array.from({ length: 4 }, () => chars[Math.floor(Math.random() * chars.length)]).join('')
 }

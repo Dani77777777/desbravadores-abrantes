@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { QRCodeSVG } from 'qrcode.react'
 import { createClient } from '@/utils/supabase/client'
 import { WordGrid } from './WordGrid'
@@ -15,14 +15,228 @@ interface ProjectorViewProps {
   initialPlayers: VanaWordsPlayer[]
 }
 
+// ── Áudio (música por estado + SFX) — mesmo padrão do VanaQuest ──
+const SOUNDS = '/sounds/VanaWords - soundboard'
+const VQ_SOUNDS = '/sounds/VanaQuest - soundboard'
+const sound = (file: string) => encodeURI(`${SOUNDS}/${file}`)
+const vqSound = (file: string) => encodeURI(`${VQ_SOUNDS}/${file}`)
+
+function trackForState(status: string, phase: string | null): string {
+  switch (status) {
+    case 'lobby':
+      return sound('VanaWords - Lobby Theme.mp3')
+    case 'team_preview':
+      return sound('VanaWords - Gathering Banners.mp3')
+    case 'arauto_spin':
+      return sound('VanaWords - The Choosing.mp3')
+    case 'arauto_ready':
+      return sound('VanaWords - Heralds Rise.mp3')
+    case 'playing':
+      return phase === 'hinting'
+        ? sound('VanaWords - The Arauto Thinks.mp3')
+        : sound('VanaWords - Whispered Words.mp3')
+    case 'finished':
+      // Fanfare toca 1× e depois transita para Victory Feast (loop) no 'ended'
+      return sound('VanaWords - Victory Fanfare.mp3')
+    default:
+      return ''
+  }
+}
+
 export function ProjectorView({ session: initSession, initialPlayers }: ProjectorViewProps) {
   const [session, setSession] = useState(initSession)
   const [players, setPlayers] = useState(initialPlayers)
   const [words, setWords] = useState<VanaWordsWord[]>([])
   const [guesses, setGuesses] = useState<VanaWordsGuess[]>([])
   const [qrZoomed, setQrZoomed] = useState(false)
+  const [musicEnabled, setMusicEnabled] = useState(true)
+  const [audioUnlocked, setAudioUnlocked] = useState(false)
+
+  const musicRef = useRef<HTMLAudioElement | null>(null)
+  const currentTrackRef = useRef('')
+  const sfxVoteRef = useRef<HTMLAudioElement | null>(null)
+  const sfxHintRef = useRef<HTMLAudioElement | null>(null)
+  const sfxCorrectRef = useRef<HTMLAudioElement | null>(null)
+  const sfxWrongRef = useRef<HTMLAudioElement | null>(null)
+  const sfxBlackRef = useRef<HTMLAudioElement | null>(null)
+  const sfxArautoRef = useRef<HTMLAudioElement | null>(null)
+  const sfxEarningRef = useRef<HTMLAudioElement | null>(null)
 
   const supabase = createClient()
+
+  // Helper para tocar SFX (sempre — não depende de musicEnabled)
+  function playSfx(ref: React.RefObject<HTMLAudioElement | null>) {
+    const el = ref.current
+    if (!el) return
+    try {
+      el.currentTime = 0
+      el.play().catch(() => {})
+    } catch {}
+  }
+
+  // Fanfare de vitória acaba → Victory Feast em loop
+  function handleMusicEnded() {
+    const el = musicRef.current
+    if (!el) return
+    const current = decodeURIComponent(currentTrackRef.current || '')
+    if (current.includes('Victory Fanfare')) {
+      const feast = sound('VanaWords - Victory Feast.mp3')
+      currentTrackRef.current = feast
+      el.src = feast
+      el.loop = true
+      el.volume = 0.5
+      el.play().catch(() => {})
+    }
+  }
+
+  // Criar elementos <audio> uma vez (sobrevivem a re-renders entre estados)
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const make = (src: string, label: string) => {
+      const a = new Audio()
+      a.src = src
+      a.preload = 'auto'
+      a.addEventListener('error', () => {
+        console.warn(`[VW] Failed to load ${label}:`, src, a.error)
+      })
+      return a
+    }
+    musicRef.current = make('', 'music')
+    musicRef.current.addEventListener('ended', handleMusicEnded)
+    sfxVoteRef.current = make(vqSound('player-answered.mp3'), 'sfx-vote')
+    sfxHintRef.current = make(sound('sfx-hint-trumpet.mp3'), 'sfx-hint')
+    sfxCorrectRef.current = make(sound('sfx-word-correct.mp3'), 'sfx-correct')
+    sfxWrongRef.current = make(sound('sfx-word-wrong.mp3'), 'sfx-wrong')
+    sfxBlackRef.current = make(vqSound('theend.mp3'), 'sfx-black')
+    sfxArautoRef.current = make(sound('sfx-arauto-chosen.mp3'), 'sfx-arauto')
+    sfxEarningRef.current = make(vqSound('earning points.mp3'), 'sfx-earning')
+    ;[sfxVoteRef, sfxHintRef, sfxCorrectRef, sfxWrongRef, sfxBlackRef, sfxArautoRef, sfxEarningRef].forEach((r) => {
+      if (r.current) r.current.volume = 0.7
+    })
+    return () => {
+      musicRef.current?.pause()
+      musicRef.current?.removeEventListener('ended', handleMusicEnded)
+      musicRef.current = null
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Desbloquear áudio na primeira interacção (necessário para autoplay)
+  useEffect(() => {
+    if (audioUnlocked) return
+    const unlock = () => {
+      setAudioUnlocked(true)
+      const el = musicRef.current
+      if (el && musicEnabled) {
+        const next = trackForState(session.status, session.current_phase)
+        if (next) {
+          currentTrackRef.current = next
+          el.src = next
+          el.loop = session.status !== 'finished'
+          el.volume = 0.5
+          el.play().catch(() => {})
+        }
+      }
+    }
+    window.addEventListener('click', unlock, { once: true })
+    window.addEventListener('keydown', unlock, { once: true })
+    window.addEventListener('touchstart', unlock, { once: true })
+    return () => {
+      window.removeEventListener('click', unlock)
+      window.removeEventListener('keydown', unlock)
+      window.removeEventListener('touchstart', unlock)
+    }
+  }, [audioUnlocked, musicEnabled, session.status, session.current_phase])
+
+  // Mudar de música conforme estado/fase e musicEnabled
+  useEffect(() => {
+    const el = musicRef.current
+    if (!el) return
+
+    if (!musicEnabled || !audioUnlocked) {
+      el.pause()
+      return
+    }
+
+    const next = trackForState(session.status, session.current_phase)
+    if (!next) {
+      el.pause()
+      currentTrackRef.current = ''
+      return
+    }
+    // Se a Feast já está a tocar no 'finished', não recomeçar a Fanfare
+    const playingFeast = decodeURIComponent(currentTrackRef.current || '').includes('Victory Feast')
+    if (session.status === 'finished' && playingFeast) {
+      if (el.paused) el.play().catch(() => {})
+      return
+    }
+    if (currentTrackRef.current !== next) {
+      currentTrackRef.current = next
+      el.src = next
+      el.loop = session.status !== 'finished'
+      el.volume = 0.5
+      el.play().catch((err) => console.warn('[VW] Music play error:', err, 'src:', next))
+    } else if (el.paused) {
+      el.play().catch(() => {})
+    }
+  }, [session.status, session.current_phase, musicEnabled, audioUnlocked])
+
+  // SFX: trompete do Arauto quando a dica chega (hinting → guessing)
+  const prevPhaseRef = useRef<string | null>(initSession.current_phase)
+  useEffect(() => {
+    if (session.status === 'playing' && prevPhaseRef.current === 'hinting' && session.current_phase === 'guessing') {
+      playSfx(sfxHintRef)
+    }
+    prevPhaseRef.current = session.current_phase
+  }, [session.current_phase, session.status])
+
+  // Equipa que está (ou esteve) a adivinhar — mantém-se até haver nova dica,
+  // para classificar reveals que chegam depois do turno já ter mudado.
+  const guessingTeamRef = useRef<TeamId | null>(null)
+  useEffect(() => {
+    if (session.current_phase === 'guessing' && session.current_team) {
+      guessingTeamRef.current = session.current_team as TeamId
+    }
+  }, [session.current_phase, session.current_team])
+
+  // SFX: palavra revelada (certa / errada / preta)
+  const revealedRef = useRef<Set<string> | null>(null)
+  useEffect(() => {
+    const revealedNow = new Set(words.filter((w) => w.is_revealed).map((w) => w.id))
+    if (revealedRef.current === null) {
+      // Primeira carga: registar sem tocar (evita rajada de sons ao abrir a página)
+      if (words.length > 0) revealedRef.current = revealedNow
+      return
+    }
+    const prev = revealedRef.current
+    const newOnes = words.filter((w) => w.is_revealed && !prev.has(w.id))
+    revealedRef.current = revealedNow
+    if (!newOnes.length) return
+    const guessing = guessingTeamRef.current
+    if (newOnes.some((w) => w.team === 'black')) playSfx(sfxBlackRef)
+    else if (newOnes.some((w) => w.team === 'neutral' || (w.team && guessing && w.team !== guessing))) playSfx(sfxWrongRef)
+    else playSfx(sfxCorrectRef)
+  }, [words])
+
+  // SFX: novo voto de um jogador
+  const knownGuessesRef = useRef<Set<string> | null>(null)
+  useEffect(() => {
+    const now = new Set(guesses.map((g) => g.id))
+    if (knownGuessesRef.current === null) {
+      knownGuessesRef.current = now
+      return
+    }
+    const prev = knownGuessesRef.current
+    knownGuessesRef.current = now
+    if (guesses.some((g) => !prev.has(g.id))) playSfx(sfxVoteRef)
+  }, [guesses])
+
+  // SFX: XP e Gold atribuídos
+  const prevRewardsRef = useRef(initSession.rewards_awarded)
+  useEffect(() => {
+    if (!prevRewardsRef.current && session.rewards_awarded) playSfx(sfxEarningRef)
+    prevRewardsRef.current = session.rewards_awarded
+  }, [session.rewards_awarded])
 
   const joinUrl = typeof window !== 'undefined'
     ? `${window.location.origin}/jogos/vana-words?code=${session.code}`
@@ -33,6 +247,7 @@ export function ProjectorView({ session: initSession, initialPlayers }: Projecto
     const ch = supabase.channel(`vanawords-present-${session.id}`, { config: { broadcast: { self: false } } })
     ch.on('broadcast', { event: 'cmd' }, ({ payload }) => {
       if (typeof payload?.qrZoomed === 'boolean') setQrZoomed(payload.qrZoomed)
+      if (typeof payload?.musicEnabled === 'boolean') setMusicEnabled(payload.musicEnabled)
     })
     ch.subscribe()
     return () => { supabase.removeChannel(ch) }
@@ -107,7 +322,7 @@ export function ProjectorView({ session: initSession, initialPlayers }: Projecto
               team="a"
               candidates={teamA}
               winner={arautoA}
-              onDone={() => {}}
+              onDone={() => playSfx(sfxArautoRef)}
               instant={session.arauto_reveal_a === 'instant'}
             />
           )}
@@ -117,7 +332,7 @@ export function ProjectorView({ session: initSession, initialPlayers }: Projecto
               team="b"
               candidates={teamB}
               winner={arautoB}
-              onDone={() => {}}
+              onDone={() => playSfx(sfxArautoRef)}
               instant={session.arauto_reveal_b === 'instant'}
             />
           )}

@@ -44,7 +44,7 @@ export default async function VanaWordsControlPage({
     .from('vanawords_words')
     .select('*')
     .eq('session_id', sessionId)
-    .order('position')
+    .order('grid_pos')
 
   return (
     <>

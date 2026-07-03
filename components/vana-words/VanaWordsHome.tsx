@@ -60,7 +60,7 @@ export function VanaWordsHome({ userId, canPlay, activeSessions = [] }: VanaWord
         <img src="/images/VanaWords.png" alt="VanaWords" className="h-24 w-auto object-contain drop-shadow-2xl" />
         <p className="text-slate-400 text-center max-w-xs">Precisas de fazer login para jogar.</p>
         <a
-          href="/login?redirect=/jogos/vana-words"
+          href="/login?next=/jogos/vana-words"
           className="px-6 py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold flex items-center gap-2"
         >
           <LogIn className="w-4 h-4" /> Fazer Login
@@ -76,7 +76,7 @@ export function VanaWordsHome({ userId, canPlay, activeSessions = [] }: VanaWord
         <p className="text-slate-400 max-w-sm">
           Este jogo é exclusivo para membros do clube. Faz login com a tua conta para jogar.
         </p>
-        <a href="/login?redirect=/jogos/vana-words" className="text-emerald-400 underline text-sm">Fazer Login →</a>
+        <a href="/login?next=/jogos/vana-words" className="text-emerald-400 underline text-sm">Fazer Login →</a>
       </div>
     )
   }

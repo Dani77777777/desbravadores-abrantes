@@ -346,7 +346,7 @@ export function PlayerView({ session: initSession, myPlayer, initialPlayers, asB
   if (session.status === 'playing') {
     const activeTeam = session.current_team as TeamId
     const isMyTurn = myTeam === activeTeam
-    const amArauto = myPlayer.is_arauto
+    const amArauto = myPlayerLive.is_arauto
     const isHinting = session.current_phase === 'hinting'
     const activeLabel = TEAM_LABELS[activeTeam]
 

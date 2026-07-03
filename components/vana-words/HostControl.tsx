@@ -25,7 +25,7 @@ import { TeamChip } from './ui'
 import { VW, VW_SCREEN_STYLE, VW_PANEL_STYLE, TEAM_GRADIENT, teamPanelStyle, vwSans, vwSerif } from './theme'
 import { TEAM_LABELS } from '@/types/vana-words'
 import type { VanaWordsSession, VanaWordsPlayer, VanaWordsWord, VanaWordsGuess, TeamId } from '@/types/vana-words'
-import { Users, Crown, RefreshCw, Play, CheckCircle2, Trophy, ArrowRight, Shuffle, MonitorPlay, Bot, Trash2, Minus, Plus, Copy, Check, Maximize2, Eye, EyeOff, X, Repeat } from 'lucide-react'
+import { Users, Crown, RefreshCw, Play, CheckCircle2, Trophy, ArrowRight, Shuffle, MonitorPlay, Bot, Trash2, Minus, Plus, Copy, Check, Maximize2, Eye, EyeOff, X, Repeat, Volume2, VolumeX } from 'lucide-react'
 
 interface HostControlProps {
   session: VanaWordsSession
@@ -51,6 +51,7 @@ export function HostControl({ session: initSession, initialPlayers, initialWords
   const [qrZoomed, setQrZoomed] = useState(false)
   const [boardHidden, setBoardHidden] = useState(false)
   const [arautoPicker, setArautoPicker] = useState<TeamId | null>(null)
+  const [musicEnabled, setMusicEnabled] = useState(true)
 
   const router = useRouter()
   const supabase = createClient()
@@ -228,11 +229,30 @@ export function HostControl({ session: initSession, initialPlayers, initialWords
     broadcastRef.current?.send({ type: 'broadcast', event: 'cmd', payload: { qrZoomed } })
   }, [qrZoomed])
 
+  // Sincroniza música ligada/desligada com o projetor (os SFX tocam sempre)
+  useEffect(() => {
+    broadcastRef.current?.send({ type: 'broadcast', event: 'cmd', payload: { musicEnabled } })
+  }, [musicEnabled])
+
   // FAB de impersonação de bots — visível em todas as fases das sessões de teste
   const overlay = session.is_test_session
     ? <HostBotOverlay sessionId={session.id} players={players} />
     : null
-  const wrap = (node: React.ReactNode) => <>{node}{overlay}</>
+  // Toggle da música do projetor — visível em todas as fases
+  const musicToggle = (
+    <button
+      onClick={() => setMusicEnabled((v) => !v)}
+      title={musicEnabled ? 'Música do projetor ligada (clica para desligar)' : 'Música do projetor desligada (clica para ligar)'}
+      className={`fixed bottom-4 right-4 z-50 rounded-full p-3.5 shadow-lg transition-colors ${
+        musicEnabled
+          ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-900/50'
+          : 'bg-slate-700 hover:bg-slate-600 text-slate-300 shadow-black/40'
+      }`}
+    >
+      {musicEnabled ? <Volume2 className="w-5 h-5" /> : <VolumeX className="w-5 h-5" />}
+    </button>
+  )
+  const wrap = (node: React.ReactNode) => <>{node}{overlay}{musicToggle}</>
 
   // ── Lobby ──────────────────────────────────────────────────
   if (session.status === 'lobby') {

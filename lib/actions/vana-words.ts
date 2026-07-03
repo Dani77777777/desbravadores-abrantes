@@ -68,11 +68,10 @@ export async function joinVanaWordsSession(
     .maybeSingle()
 
   if (!session) return { sessionId: '', error: 'Código inválido.' }
-  if (session.status !== 'lobby') return { sessionId: '', error: 'A sessão já começou.' }
 
   const service = createServiceClient()
 
-  // Verificar se já está na sessão
+  // Se já está na sessão, deixa reconectar mesmo com o jogo a decorrer
   const { data: existing } = await service
     .from('vanawords_players')
     .select('id')
@@ -80,15 +79,17 @@ export async function joinVanaWordsSession(
     .eq('user_id', user.id)
     .maybeSingle()
 
-  if (!existing) {
-    await service.from('vanawords_players').insert({
-      session_id: session.id,
-      user_id: user.id,
-      display_name: profile.full_name ?? user.email ?? 'Jogador',
-      avatar_url: profile.avatar_url,
-      section: profile.section,
-    })
-  }
+  if (existing) return { sessionId: session.id }
+
+  if (session.status !== 'lobby') return { sessionId: '', error: 'A sessão já começou.' }
+
+  await service.from('vanawords_players').insert({
+    session_id: session.id,
+    user_id: user.id,
+    display_name: profile.full_name ?? user.email ?? 'Jogador',
+    avatar_url: profile.avatar_url,
+    section: profile.section,
+  })
 
   return { sessionId: session.id }
 }
@@ -447,6 +448,14 @@ export async function startVanaWordsGame(
     board_version: (session.board_version ?? 0) + 1,
   }).eq('id', sessionId)
 
+  // Abrir o 1.º turno — sem isto o histórico do primeiro turno perdia-se
+  // (confirmWord/passTurn só actualizam o turno mais recente).
+  await service.from('vanawords_turns').insert({
+    session_id: sessionId,
+    team: 'a',
+    turn_order: 1,
+  })
+
   return {}
 }
 
@@ -515,6 +524,21 @@ export async function submitHint(
     // Regra do Codenames: a equipa tem direito a uma tentativa extra (N + 1)
     guesses_remaining: safeNumber + 1,
   }).eq('id', sessionId)
+
+  // Registar a dica no turno actual (histórico)
+  const { data: lastTurn } = await service
+    .from('vanawords_turns')
+    .select('turn_order')
+    .eq('session_id', sessionId)
+    .order('turn_order', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+  if (lastTurn) {
+    await service.from('vanawords_turns')
+      .update({ hint_word: clean.toUpperCase(), hint_number: safeNumber })
+      .eq('session_id', sessionId)
+      .eq('turn_order', lastTurn.turn_order)
+  }
 
   // Limpar palpites anteriores
   await service.from('vanawords_guesses').delete().eq('session_id', sessionId)
@@ -853,38 +877,17 @@ export async function awardVanaWordsPoints(sessionId: string): Promise<{ error?:
     .not('user_id', 'is', null)
 
   if (winners && winners.length > 0) {
-    const logs = winners.map((p) => ({
-      user_id: p.user_id!,
-      xp: 100,
-      gold: 50,
-      source: 'vanawords' as const,
-      description: 'Vitória no VanaWords',
-    }))
-
-    await service.from('points_log').insert(
-      logs.map((l) => ({
-        user_id: l.user_id,
-        xp_change: l.xp,
-        gold_change: l.gold,
-        source: l.source,
-        description: l.description,
+    const { error: logError } = await service.from('points_log').insert(
+      winners.map((p) => ({
+        target_user_id: p.user_id!,
+        awarded_by_user_id: user.id,
+        amount_xp: 100,
+        amount_gold: 50,
+        description: 'Vitória no VanaWords',
       }))
     )
-
-    // Actualizar totais no perfil
-    for (const winner of winners) {
-      const { data: prof } = await service
-        .from('profiles')
-        .select('total_xp, total_gold')
-        .eq('id', winner.user_id!)
-        .single()
-      if (prof) {
-        await service.from('profiles').update({
-          total_xp: (prof.total_xp ?? 0) + 100,
-          total_gold: (prof.total_gold ?? 0) + 50,
-        }).eq('id', winner.user_id!)
-      }
-    }
+    if (logError) return { error: logError.message }
+    // O gatilho on_points_log_change recalcula total_xp/current_gold nos perfis
   }
 
   await service
