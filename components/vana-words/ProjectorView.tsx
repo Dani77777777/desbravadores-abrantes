@@ -384,8 +384,8 @@ export function ProjectorView({ session: initSession, initialPlayers }: Projecto
               <p className="text-sm uppercase tracking-widest mb-1" style={{ color: VW.mut }}>Código</p>
               <p className={`${vwSerif.className} text-7xl font-semibold tracking-[0.3em]`}>{session.code}</p>
             </div>
-            <div className="bg-white rounded-3xl p-5 shadow-2xl">
-              <QRCodeSVG value={joinUrl} size={180} />
+            <div className="bg-white rounded-3xl p-6 shadow-2xl">
+              <QRCodeSVG value={joinUrl} size={300} />
             </div>
           </div>
         )}
