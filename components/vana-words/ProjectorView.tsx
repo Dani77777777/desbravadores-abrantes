@@ -263,8 +263,10 @@ export function ProjectorView({ session: initSession, initialPlayers }: Projecto
     }
   }, [audioUnlocked])
 
+  // URL curto para o QR (/j/CODIGO → redireciona para o jogo): menos caracteres
+  // = QR menos denso = leitura fácil à distância no projetor.
   const joinUrl = typeof window !== 'undefined'
-    ? `${window.location.origin}/jogos/vana-words?code=${session.code}`
+    ? `${window.location.origin}/j/${session.code}`
     : ''
 
   // Recebe comandos do host (ampliar QR Code)
