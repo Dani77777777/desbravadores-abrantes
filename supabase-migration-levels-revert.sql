@@ -1,12 +1,14 @@
 -- ============================================
--- NÍVEIS COMEÇAM NO 0 — Desbravadores Abrantes
+-- REVERTER NÍVEIS PARA "COMEÇA NO 1" — Desbravadores Abrantes
 -- ============================================
--- Antes: Nível = floor(XP/1000) + 1 (toda a gente nascia no Nível 1).
--- Agora: Nível = floor(XP/1000) — milhares de XP COMPLETOS.
---   0–999 XP => Nível 0 · 1000–1999 => Nível 1 · 2000–2999 => Nível 2 …
--- Um artigo com min_level = N passa a exigir N×1000 XP.
--- (Correr depois de supabase-migration-store-v2-euros.sql; substitui apenas
---  o process_purchase — o resto da loja não muda.)
+-- Anula a migração "levels-start-zero" (que já foi corrida).
+-- Convenção final: Nível = floor(XP/1000) + 1 — todo o membro registado
+-- nasce no Nível 1 e sobe a cada 1000 XP.
+--   0–999 XP => Nível 1 · 1000–1999 => Nível 2 · 2000–2999 => Nível 3 …
+--
+-- BÓNUS mantido: min_level = 1 passa a significar "só membros registados"
+-- (qualquer nível) — convidados sem conta não podem comprar esses artigos.
+-- min_level = 0 continua a ser livre para todos, incluindo convidados.
 -- ============================================
 
 CREATE OR REPLACE FUNCTION public.process_purchase(
@@ -47,7 +49,8 @@ BEGIN
 
   -- 2. Comprador
   IF v_user_id IS NULL THEN
-    -- Convidado: precisa de nome, não tem Gold, não desbloqueia níveis.
+    -- Convidado: precisa de nome, não tem Gold, e artigos com nível mínimo
+    -- (mesmo Nível 1) são exclusivos de membros registados.
     IF v_buyer_name IS NULL THEN
       RAISE EXCEPTION 'Indica o teu nome para comprar sem conta.';
     END IF;
@@ -61,8 +64,8 @@ BEGIN
     SELECT current_gold, total_xp INTO v_user_gold, v_user_xp
     FROM public.profiles WHERE id = v_user_id;
 
-    -- Nível = milhares de XP completos (começa no 0; 1000 XP => Nível 1).
-    IF COALESCE(v_product.min_level, 0) > 0 AND floor(v_user_xp / 1000) < v_product.min_level THEN
+    -- Membros começam no Nível 1 (floor(XP/1000)+1); min_level 1 = "só membros".
+    IF COALESCE(v_product.min_level, 0) > 0 AND (floor(v_user_xp / 1000) + 1) < v_product.min_level THEN
       RAISE EXCEPTION 'Nível insuficiente. Precisas de Nível %!', v_product.min_level;
     END IF;
 

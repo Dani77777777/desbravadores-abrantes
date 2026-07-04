@@ -296,8 +296,10 @@ export function ProductManagement({ products, profile, members, events, goldRate
                   <Input type="number" min={0} value={minLevel} onChange={e => setMinLevel(Number(e.target.value))} />
                   <p className="text-[10px] text-indigo-500/90">
                     {minLevel > 0
-                      ? `${econ.atOrAboveLevel(minLevel)} de ${econ.goldN} membros já têm o nível ${minLevel}+ (${minLevel * 1000} XP)`
-                      : 'Disponível para todos os níveis'}
+                      ? minLevel === 1
+                        ? 'Só membros registados (qualquer nível) — convidados não podem comprar'
+                        : `${econ.atOrAboveLevel(minLevel)} de ${econ.goldN} membros já têm o nível ${minLevel}+ (${(minLevel - 1) * 1000} XP)`
+                      : 'Disponível para todos, incluindo convidados sem conta'}
                   </p>
                 </div>
                 <div className="space-y-2 col-span-2">

@@ -38,9 +38,10 @@ export interface StoreEconomy {
 
 const LEVEL_CAP = 5
 
-// Nível = milhares de XP COMPLETOS (começa no Nível 0; 1000 XP => Nível 1).
-// Igual em toda a app e no RPC process_purchase da base de dados.
-export const levelOf = (xp: number) => Math.floor((xp || 0) / 1000)
+// Nível = floor(XP/1000) + 1 — toda a gente registada começa no Nível 1.
+// Assim, um artigo com min_level = 1 significa "qualquer membro registado"
+// (convidados não têm nível). Igual em toda a app e no RPC process_purchase.
+export const levelOf = (xp: number) => Math.floor((xp || 0) / 1000) + 1
 
 // ---------------------------------------------------------------------------
 // Loja V2 — preços fixos em € + Gold como desconto a taxa dinâmica.
@@ -117,10 +118,9 @@ export function computeStoreEconomy(members: any[], events: any[]): StoreEconomy
   // Level distribution → informs the "nível mínimo" of an item.
   const memberLevels = members.map(m => levelOf(m.total_xp))
   const atOrAboveLevel = (lvl: number) => memberLevels.filter(l => l >= lvl).length
-  // Buckets 0 .. (CAP-1)+ — o nível 0 existe: é quem ainda não completou 1000 XP.
   const levelBuckets: LevelBucket[] = Array.from({ length: LEVEL_CAP }, (_, i) => {
-    const lvl = i
-    const isLast = i === LEVEL_CAP - 1
+    const lvl = i + 1
+    const isLast = lvl === LEVEL_CAP
     const count = memberLevels.filter(l => (isLast ? l >= lvl : l === lvl)).length
     return { lvl, label: isLast ? `${lvl}+` : `${lvl}`, count, atOrAbove: atOrAboveLevel(lvl) }
   })
