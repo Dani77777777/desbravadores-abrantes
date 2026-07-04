@@ -295,8 +295,8 @@ export function ProductManagement({ products, profile, members, events, goldRate
                   <Label className="flex items-center gap-1.5"><Layers className="w-3.5 h-3.5 text-indigo-500" /> Nível Mínimo (0 = Livre)</Label>
                   <Input type="number" min={0} value={minLevel} onChange={e => setMinLevel(Number(e.target.value))} />
                   <p className="text-[10px] text-indigo-500/90">
-                    {minLevel > 1
-                      ? `${econ.atOrAboveLevel(minLevel)} de ${econ.goldN} membros já têm o nível ${minLevel}+`
+                    {minLevel > 0
+                      ? `${econ.atOrAboveLevel(minLevel)} de ${econ.goldN} membros já têm o nível ${minLevel}+ (${minLevel * 1000} XP)`
                       : 'Disponível para todos os níveis'}
                   </p>
                 </div>
@@ -367,7 +367,7 @@ export function ProductManagement({ products, profile, members, events, goldRate
                       {product.restrictions && product.restrictions.length > 0 && (
                         <span className="text-gray-400 font-bold truncate">• {product.restrictions.join(', ')}</span>
                       )}
-                      {product.min_level > 1 && (
+                      {product.min_level > 0 && (
                         <span className="text-indigo-600 font-bold">• Nível {product.min_level}+</span>
                       )}
                     </div>

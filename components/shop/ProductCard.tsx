@@ -23,8 +23,9 @@ export function ProductCard({ product, userProfile, goldRate }: ProductCardProps
   const isOutOfStock = isDigital ? digitalKeysCount <= 0 : product.stock <= 0
 
   // Níveis continuam a contar: artigos com nível mínimo são exclusivos de membros.
-  const userLevel = userProfile ? Math.floor((userProfile.total_xp || 0) / 1000) + 1 : 0
-  const requiresLevel = product.min_level > 1
+  // Nível = milhares de XP completos (começa no 0).
+  const userLevel = userProfile ? Math.floor((userProfile.total_xp || 0) / 1000) : 0
+  const requiresLevel = product.min_level > 0
   const hasLevel = !requiresLevel || (userProfile !== null && userLevel >= product.min_level)
   const levelReason = !hasLevel
     ? (userProfile ? `Nível ${product.min_level} necessário` : `Só membros Nível ${product.min_level}+`)

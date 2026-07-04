@@ -180,14 +180,15 @@ BEGIN
     IF v_discount > 0 THEN
       RAISE EXCEPTION 'Apenas membros registados podem usar Gold como desconto.';
     END IF;
-    IF COALESCE(v_product.min_level, 0) > 1 THEN
+    IF COALESCE(v_product.min_level, 0) > 0 THEN
       RAISE EXCEPTION 'Este artigo é exclusivo para membros de Nível %+. Regista-te e participa!', v_product.min_level;
     END IF;
   ELSE
     SELECT current_gold, total_xp INTO v_user_gold, v_user_xp
     FROM public.profiles WHERE id = v_user_id;
 
-    IF COALESCE(v_product.min_level, 0) > 1 AND (floor(v_user_xp / 1000) + 1) < v_product.min_level THEN
+    -- Nível = milhares de XP completos (começa no 0; 1000 XP => Nível 1).
+    IF COALESCE(v_product.min_level, 0) > 0 AND floor(v_user_xp / 1000) < v_product.min_level THEN
       RAISE EXCEPTION 'Nível insuficiente. Precisas de Nível %!', v_product.min_level;
     END IF;
 

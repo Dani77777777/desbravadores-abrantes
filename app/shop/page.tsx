@@ -67,7 +67,7 @@ export default async function ShopPage() {
                 </div>
                 <div>
                   <p className="text-[10px] text-indigo-800 font-black uppercase">O teu Nível</p>
-                  <p className="text-xl font-black text-indigo-900">{Math.floor((profile.total_xp || 0) / 1000) + 1}</p>
+                  <p className="text-xl font-black text-indigo-900">{Math.floor((profile.total_xp || 0) / 1000)}</p>
                 </div>
               </div>
 

@@ -302,7 +302,7 @@ export function OverviewPanel({ profile, members, events, purchases, rateInfo }:
               <div className="flex items-start gap-1.5 text-[10px] text-gray-400 leading-relaxed pt-0.5">
                 <ShieldCheck className="w-3 h-3 mt-0.5 shrink-0 text-indigo-400" />
                 <span>
-                  Cada nível = 1000 XP. Pôr um artigo a <span className="font-bold text-indigo-500">Nível 3+</span> deixa-o disponível para {levelBuckets[2]?.atOrAbove ?? 0} membro(s).
+                  Nível = milhares de XP completos (1000 XP ⇒ Nível 1). Pôr um artigo a <span className="font-bold text-indigo-500">Nível 2+</span> deixa-o disponível para {levelBuckets[2]?.atOrAbove ?? 0} membro(s).
                 </span>
               </div>
             </div>

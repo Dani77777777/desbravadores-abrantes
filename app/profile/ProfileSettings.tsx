@@ -224,7 +224,7 @@ export default function ProfileSettings({ profile, user, userEmail, purchases }:
               <div className="flex justify-between items-center">
                 <span className="text-sm text-gray-600">Nível:</span>
                 <span className="font-bold text-blue-700 text-lg">
-                  {Math.floor(profile.total_xp / 1000) + 1}
+                  {Math.floor(profile.total_xp / 1000)}
                 </span>
               </div>
               <div className="pt-2">
