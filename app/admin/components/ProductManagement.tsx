@@ -14,13 +14,14 @@ import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
 import { Plus, Edit, Trash2, Key, Image as ImageIcon, Package, Check, ShoppingBag, Upload, Loader2, X, Coins, Layers } from 'lucide-react'
 import { DigitalKeyManager } from './DigitalKeyManager'
-import { computeStoreEconomy } from '@/lib/store-economy'
+import { computeStoreEconomy, formatEur, goldCostFor } from '@/lib/store-economy'
 
 interface ProductManagementProps {
   products: any[]
   profile: any
   members: any[]
   events: any[]
+  goldRate: number
 }
 
 const SECTION_OPTIONS = [
@@ -31,7 +32,7 @@ const SECTION_OPTIONS = [
   { value: 'embaixadores', label: 'Embaixadores' },
 ]
 
-export function ProductManagement({ products, profile, members, events }: ProductManagementProps) {
+export function ProductManagement({ products, profile, members, events, goldRate }: ProductManagementProps) {
   const supabase = createClient()
   const router = useRouter()
   const [isDialogOpen, setIsDialogOpen] = useState(false)
@@ -41,7 +42,8 @@ export function ProductManagement({ products, profile, members, events }: Produc
   // Form State
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
-  const [price, setPrice] = useState(0)
+  const [priceEur, setPriceEur] = useState(0)
+  const [maxDiscount, setMaxDiscount] = useState(0)
   const [type, setType] = useState<'physical' | 'digital'>('physical')
   const [stock, setStock] = useState(0)
   const [imageUrl, setImageUrl] = useState('')
@@ -86,7 +88,8 @@ export function ProductManagement({ products, profile, members, events }: Produc
   const resetForm = () => {
     setName('')
     setDescription('')
-    setPrice(0)
+    setPriceEur(0)
+    setMaxDiscount(0)
     setType('physical')
     setStock(0)
     setImageUrl('')
@@ -99,7 +102,8 @@ export function ProductManagement({ products, profile, members, events }: Produc
     setEditingProduct(product)
     setName(product.name)
     setDescription(product.description || '')
-    setPrice(product.price)
+    setPriceEur(Number(product.price_eur) || 0)
+    setMaxDiscount(product.max_discount_percent || 0)
     setType(product.type)
     setStock(product.stock)
     setImageUrl(product.image_url || '')
@@ -115,7 +119,8 @@ export function ProductManagement({ products, profile, members, events }: Produc
       const productData = {
         name,
         description,
-        price,
+        price_eur: priceEur,
+        max_discount_percent: maxDiscount,
         type,
         stock: type === 'digital' ? 0 : stock,
         image_url: imageUrl || null,
@@ -193,8 +198,12 @@ export function ProductManagement({ products, profile, members, events }: Produc
                   <Textarea value={description} onChange={e => setDescription(e.target.value)} placeholder="Breve descrição do produto..." />
                 </div>
                 <div className="space-y-2 text-indigo-700">
-                  <Label>Preço (Gold)</Label>
-                  <Input type="number" min={0} value={price} onChange={e => setPrice(Number(e.target.value))} required />
+                  <Label>Preço (€) — fixo</Label>
+                  <Input type="number" min={0} step={0.01} value={priceEur} onChange={e => setPriceEur(Number(e.target.value))} required />
+                </div>
+                <div className="space-y-2 text-yellow-700">
+                  <Label>Desconto máx. com Gold (%)</Label>
+                  <Input type="number" min={0} max={100} value={maxDiscount} onChange={e => setMaxDiscount(Math.max(0, Math.min(100, Number(e.target.value))))} />
                 </div>
                 <div className="space-y-2">
                   <Label>Tipo</Label>
@@ -214,39 +223,31 @@ export function ProductManagement({ products, profile, members, events }: Produc
                     <Input type="number" min={0} value={stock} onChange={e => setStock(Number(e.target.value))} />
                   </div>
                 )}
-                {/* Reactive pricing guide — built from real club data */}
+                {/* Guia do desconto — mostra o impacto real do Gold ao preço/percentagem atuais */}
                 <div className="col-span-2 rounded-xl border border-blue-100 bg-blue-50/40 p-3 space-y-2.5">
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-xs font-bold text-gray-700 flex items-center gap-1.5">
-                      <Coins className="w-3.5 h-3.5 text-amber-500" /> Guia de preço justo
+                      <Coins className="w-3.5 h-3.5 text-amber-500" /> Guia do desconto Gold
                     </span>
-                    <span className="text-[10px] text-gray-400">{econ.goldN} membros · saldo atual</span>
+                    <span className="text-[10px] text-gray-400">Taxa atual: 1 € ≈ {goldRate} 🪙</span>
                   </div>
-                  {price > 0 ? (
-                    <p className="text-[11px] text-gray-600 leading-relaxed">
-                      A <span className="font-black text-amber-600">{price.toLocaleString()} 🪙</span>:{' '}
-                      <span className="font-bold text-gray-800">{econ.affordCount(price)} de {econ.goldN}</span> membros
-                      {' '}({econ.goldN > 0 ? Math.round((econ.affordCount(price) / econ.goldN) * 100) : 0}%) conseguem comprar agora
-                      {econ.weeksToSave(price) ? <> · ≈ <span className="font-bold text-gray-800">{econ.weeksToSave(price)} sem.</span> a poupar</> : null}
+                  {priceEur > 0 && maxDiscount > 0 ? (() => {
+                    const maxDiscEur = Math.round(priceEur * maxDiscount) / 100
+                    const goldNeeded = goldCostFor(maxDiscEur, goldRate)
+                    const canFull = econ.affordCount(goldNeeded)
+                    return (
+                      <p className="text-[11px] text-gray-600 leading-relaxed">
+                        Desconto máximo: <span className="font-black text-amber-600">−{formatEur(maxDiscEur)}</span>
+                        {' '}(custa <span className="font-bold text-gray-800">{goldNeeded.toLocaleString()} 🪙</span>) ·
+                        preço final mínimo <span className="font-bold text-gray-800">{formatEur(priceEur - maxDiscEur)}</span> ·
+                        {' '}<span className="font-bold text-gray-800">{canFull} de {econ.goldN}</span> membros têm Gold para o desconto total.
+                      </p>
+                    )
+                  })() : (
+                    <p className="text-[11px] text-gray-400">
+                      Define o preço em € e a % de desconto máximo. A taxa Gold→€ é dinâmica: sobe quando há muito Gold em circulação no clube.
                     </p>
-                  ) : (
-                    <p className="text-[11px] text-gray-400">Define um preço — ou escolhe uma faixa sugerida abaixo.</p>
                   )}
-                  <div className="flex flex-wrap gap-1.5">
-                    {econ.priceTiers.map(tier => (
-                      <button
-                        key={tier.key}
-                        type="button"
-                        onClick={() => setPrice(tier.value)}
-                        className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-[11px] font-bold transition-colors ${price === tier.value ? 'border-blue-400 bg-blue-100 text-blue-800' : 'border-gray-200 bg-white text-gray-600 hover:border-blue-300'}`}
-                      >
-                        <span className={`w-2 h-2 rounded-full ${tier.dot}`} />
-                        {tier.label}
-                        <span className="text-gray-300">·</span>
-                        <span className={tier.text}>{tier.value.toLocaleString()} 🪙</span>
-                      </button>
-                    ))}
-                  </div>
                 </div>
 
                 {/* Image: upload to Supabase Storage or paste a URL */}
@@ -294,9 +295,11 @@ export function ProductManagement({ products, profile, members, events }: Produc
                   <Label className="flex items-center gap-1.5"><Layers className="w-3.5 h-3.5 text-indigo-500" /> Nível Mínimo (0 = Livre)</Label>
                   <Input type="number" min={0} value={minLevel} onChange={e => setMinLevel(Number(e.target.value))} />
                   <p className="text-[10px] text-indigo-500/90">
-                    {minLevel > 1
-                      ? `${econ.atOrAboveLevel(minLevel)} de ${econ.goldN} membros já têm o nível ${minLevel}+`
-                      : 'Disponível para todos os níveis'}
+                    {minLevel > 0
+                      ? minLevel === 1
+                        ? 'Só membros registados (qualquer nível) — convidados não podem comprar'
+                        : `${econ.atOrAboveLevel(minLevel)} de ${econ.goldN} membros já têm o nível ${minLevel}+ (${(minLevel - 1) * 1000} XP)`
+                      : 'Disponível para todos, incluindo convidados sem conta'}
                   </p>
                 </div>
                 <div className="space-y-2 col-span-2">
@@ -353,8 +356,11 @@ export function ProductManagement({ products, profile, members, events }: Produc
                     </div>
                     <div className="flex items-center gap-3 text-xs">
                       <span className="font-black text-blue-900 flex items-center gap-1">
-                         {product.price} 🪙
+                         {formatEur(Number(product.price_eur) || 0)}
                       </span>
+                      {(product.max_discount_percent || 0) > 0 && (
+                        <span className="font-bold text-yellow-700">• Gold até −{product.max_discount_percent}%</span>
+                      )}
                       {product.type === 'physical' && (
                         <span className={`font-bold flex items-center gap-1 ${product.stock > 0 ? 'text-green-600' : 'text-red-600'}`}>
                           • Stock: {product.stock}
@@ -363,7 +369,7 @@ export function ProductManagement({ products, profile, members, events }: Produc
                       {product.restrictions && product.restrictions.length > 0 && (
                         <span className="text-gray-400 font-bold truncate">• {product.restrictions.join(', ')}</span>
                       )}
-                      {product.min_level > 1 && (
+                      {product.min_level > 0 && (
                         <span className="text-indigo-600 font-bold">• Nível {product.min_level}+</span>
                       )}
                     </div>

@@ -112,6 +112,12 @@ export function Navbar({ user, profile }: NavbarProps) {
                     <Gamepad2 className="w-4 h-4" /> Jogos
                   </Link>
                   <Link
+                    href="/shop"
+                    className="hover:bg-blue-800 px-3 py-2 rounded-md text-sm font-medium transition-colors flex items-center gap-1 text-white"
+                  >
+                    <ShoppingBag className="w-4 h-4" /> Loja
+                  </Link>
+                  <Link
                     href="/leaderboard"
                     className="hover:bg-blue-800 px-3 py-2 rounded-md text-sm font-medium transition-colors flex items-center gap-1 text-white"
                   >
@@ -258,7 +264,7 @@ export function Navbar({ user, profile }: NavbarProps) {
                     <div className="p-2 bg-blue-700/50 rounded-lg text-blue-300">
                       <ShoppingBag className="w-5 h-5" />
                     </div>
-                    <span>Loja de Gold</span>
+                    <span>Loja</span>
                   </Link>
                   <Link
                     href="/jogos"
@@ -294,6 +300,16 @@ export function Navbar({ user, profile }: NavbarProps) {
                       <Gamepad2 className="w-5 h-5" />
                     </div>
                     <span>Jogos</span>
+                  </Link>
+                  <Link
+                    href="/shop"
+                    className="flex items-center gap-4 px-5 py-4 rounded-2xl hover:bg-blue-800/40 text-gray-100 font-semibold transition-all border border-transparent hover:border-blue-700/50"
+                    onClick={() => setIsOpen(false)}
+                  >
+                    <div className="p-2 bg-blue-700/50 rounded-lg text-blue-300">
+                      <ShoppingBag className="w-5 h-5" />
+                    </div>
+                    <span>Loja</span>
                   </Link>
                   <Link
                     href="/leaderboard"

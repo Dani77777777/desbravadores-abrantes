@@ -38,8 +38,46 @@ export interface StoreEconomy {
 
 const LEVEL_CAP = 5
 
-// Nível = 1000 XP por nível (igual à loja e ao perfil).
+// Nível = floor(XP/1000) + 1 — toda a gente registada começa no Nível 1.
+// Assim, um artigo com min_level = 1 significa "qualquer membro registado"
+// (convidados não têm nível). Igual em toda a app e no RPC process_purchase.
 export const levelOf = (xp: number) => Math.floor((xp || 0) / 1000) + 1
+
+// ---------------------------------------------------------------------------
+// Loja V2 — preços fixos em € + Gold como desconto a taxa dinâmica.
+// A taxa (gold por €) vem do RPC get_gold_rate_info e sobe/desce com o Gold
+// total em circulação no clube.
+// ---------------------------------------------------------------------------
+
+export interface GoldRateInfo {
+  gold_per_euro: number
+  total_gold: number
+  base_gold_per_euro: number
+  reference_total_gold: number
+  multiplier: number
+}
+
+export const formatEur = (value: number) =>
+  new Intl.NumberFormat('pt-PT', { style: 'currency', currency: 'EUR' }).format(value || 0)
+
+// Desconto máximo em € de um artigo (preço fixo × % máxima), em cêntimos certos.
+export const maxDiscountEur = (product: { price_eur?: number; max_discount_percent?: number }) =>
+  Math.round((product.price_eur || 0) * (product.max_discount_percent || 0)) / 100
+
+// Quanto Gold custa um desconto em € à taxa atual (arredondado para cima, como no servidor).
+export const goldCostFor = (discountEur: number, goldPerEuro: number) =>
+  Math.ceil((discountEur || 0) * (goldPerEuro || 1))
+
+// Máximo que ESTE utilizador consegue descontar: limitado pelo artigo e pelo seu Gold.
+export const userMaxDiscountEur = (
+  product: { price_eur?: number; max_discount_percent?: number },
+  userGold: number,
+  goldPerEuro: number,
+) => {
+  const productMax = maxDiscountEur(product)
+  const affordable = Math.floor(((userGold || 0) / (goldPerEuro || 1)) * 100) / 100
+  return Math.max(0, Math.min(productMax, affordable))
+}
 
 export function computeStoreEconomy(members: any[], events: any[]): StoreEconomy {
   // Gold distribution (current balances) → suggests fair price points.

@@ -7,7 +7,7 @@ import { createClient } from '@/utils/supabase/client'
 import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
-import { computeStoreEconomy } from '@/lib/store-economy'
+import { computeStoreEconomy, formatEur, type GoldRateInfo } from '@/lib/store-economy'
 import {
   Users,
   ShieldCheck,
@@ -25,7 +25,8 @@ import {
   Wallet,
   Gauge,
   Layers,
-  Clock
+  Clock,
+  Banknote
 } from 'lucide-react'
 
 interface OverviewPanelProps {
@@ -33,6 +34,7 @@ interface OverviewPanelProps {
   members: any[]
   events: any[]
   purchases: any[]
+  rateInfo: GoldRateInfo | null
 }
 
 const SECTION_LABELS: Record<string, string> = {
@@ -51,7 +53,7 @@ const SECTION_COLORS: Record<string, string> = {
   embaixadores: 'bg-rose-100 text-rose-700',
 }
 
-export function OverviewPanel({ profile, members, events, purchases }: OverviewPanelProps) {
+export function OverviewPanel({ profile, members, events, purchases, rateInfo }: OverviewPanelProps) {
   const supabase = createClient()
   const router = useRouter()
   const [loading, setLoading] = useState<string | null>(null)
@@ -107,38 +109,58 @@ export function OverviewPanel({ profile, members, events, purchases }: OverviewP
     .sort((a, b) => new Date(a.start_at).getTime() - new Date(b.start_at).getTime())
     .slice(0, 3)
 
-  // 6. Pending Deliveries (Physical and Pending status)
-  const pendingDeliveries = purchases
-    .filter(p => p.store_products?.type === 'physical' && p.status === 'pending')
-    .slice(0, 5)
+  // 6. Encomendas pendentes (por pagar e pagas-por-entregar, físicas e digitais)
+  const pendingOrders = purchases.filter(p => p.status === 'pending')
+  const unpaidOrders = pendingOrders.filter(p => !p.paid_at)
+  const paidUndelivered = pendingOrders.filter(p => p.paid_at)
+  const pendingList = [...unpaidOrders, ...paidUndelivered].slice(0, 5)
 
-  // 7. Shop pricing & level guide ──────────────────────────────────────────────
+  // 7. Economia da loja ────────────────────────────────────────────────────────
   const {
-    goldN, avgGold, medianGold, richestGold,
-    avgGoldPerEvent, monthlyIncome,
-    affordCount, weeksToSave, priceTiers,
+    goldN, avgGold, avgGoldPerEvent, monthlyIncome,
+    affordCount, priceTiers,
     levelBuckets, maxBucket,
   } = computeStoreEconomy(members, events)
 
-  // Demand so far (gold already spent in the store).
-  const validPurchases = purchases.filter(p => p.status !== 'cancelled' && p.status !== 'rejected')
-  const goldSpent = validPurchases.reduce((acc, p) => acc + (p.store_products?.price || 0), 0)
-  const itemsSold = validPurchases.length
+  const goldRate = rateInfo?.gold_per_euro || 100
 
-  const handleDeliver = async (purchaseId: string) => {
+  // Dinheiro: por cobrar (encomendas por pagar) e já recebido (pagas, não reembolsadas).
+  const validPurchases = purchases.filter(p => p.status !== 'refunded')
+  const cashToCollect = unpaidOrders.reduce((acc, p) => acc + Number(p.amount_due_eur || 0), 0)
+  const cashCollected = validPurchases.filter(p => p.paid_at).reduce((acc, p) => acc + Number(p.amount_due_eur || 0), 0)
+  const discountsGiven = validPurchases.reduce((acc, p) => acc + Number(p.discount_eur || 0), 0)
+  const goldSpent = validPurchases.reduce((acc, p) => acc + (p.gold_spent || 0), 0)
+  const itemsSold = validPurchases.length
+  const deliveredCount = purchases.filter(p => p.status === 'delivered').length
+
+  const handlePayAndDeliver = async (purchaseId: string) => {
     setLoading(purchaseId)
     try {
-      const { error } = await supabase
-        .from('store_purchases')
-        .update({ status: 'delivered', updated_at: new Date().toISOString() })
-        .eq('id', purchaseId)
-      
+      // Atalho do overview: confirma pagamento e entrega num só passo.
+      const { error } = await supabase.rpc('mark_purchase_paid', { p_purchase_id: purchaseId, p_deliver: true })
+
       if (error) throw error
-      
+
+      toast.success('Pagamento e entrega confirmados!')
+      router.refresh()
+    } catch (error: any) {
+      toast.error(error.message || 'Erro ao confirmar a encomenda.')
+    } finally {
+      setLoading(null)
+    }
+  }
+
+  const handleDeliverOnly = async (purchaseId: string) => {
+    setLoading(purchaseId)
+    try {
+      const { error } = await supabase.rpc('mark_purchase_delivered', { p_purchase_id: purchaseId })
+
+      if (error) throw error
+
       toast.success('Artigo marcado como entregue!')
       router.refresh()
     } catch (error: any) {
-      toast.error('Erro ao marcar entrega.')
+      toast.error(error.message || 'Erro ao marcar entrega.')
     } finally {
       setLoading(null)
     }
@@ -174,66 +196,84 @@ export function OverviewPanel({ profile, members, events, purchases }: OverviewP
         />
       </div>
 
-      {/* Shop pricing & level guide */}
+      {/* Shop economy & level guide */}
       <Card className="border-blue-100">
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between gap-2">
             <CardTitle className="text-base sm:text-lg flex items-center gap-2">
               <Tag className="w-5 h-5 text-blue-600" />
-              Loja · Guia de Preços &amp; Níveis
+              Loja · Economia &amp; Níveis
             </CardTitle>
             <a href="/admin?tab=store" className="text-[10px] font-bold text-blue-600 hover:underline shrink-0 flex items-center gap-0.5">
               Gerir loja <ChevronRight className="w-3 h-3" />
             </a>
           </div>
           <CardDescription className="text-xs">
-            Valores reais do clube para definires preços e níveis mínimos justos para cada artigo.
+            Preços fixos em € · o Gold dá desconto a uma taxa que sobe e desce com o Gold em circulação.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-5">
           {/* Mini stats */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-            <EconomyStat icon={<Wallet className="w-4 h-4" />} label="Ouro médio" value={avgGold} sub="por membro" color="amber" />
-            <EconomyStat icon={<BarChart3 className="w-4 h-4" />} label="Mediana" value={medianGold} sub="metade tem menos" color="blue" />
-            <EconomyStat icon={<TrendingUp className="w-4 h-4" />} label="Mais rico" value={richestGold} sub="saldo máximo" color="rose" />
             <EconomyStat
               icon={<Gauge className="w-4 h-4" />}
-              label="Ganho / mês"
-              value={monthlyIncome || avgGoldPerEvent}
-              sub={monthlyIncome > 0 ? 'se presente em tudo' : '≈ por evento'}
+              label="Taxa Gold"
+              value={`1 € ≈ ${goldRate.toLocaleString()} 🪙`}
+              sub={`multiplicador ×${rateInfo?.multiplier ?? 1} · ${(Number(rateInfo?.total_gold) || 0).toLocaleString()} 🪙 em circulação`}
+              color="amber"
+            />
+            <EconomyStat
+              icon={<Banknote className="w-4 h-4" />}
+              label="Por cobrar"
+              value={formatEur(cashToCollect)}
+              sub={`${unpaidOrders.length} encomenda(s) por pagar`}
+              color="rose"
+            />
+            <EconomyStat
+              icon={<Wallet className="w-4 h-4" />}
+              label="Recebido"
+              value={formatEur(cashCollected)}
+              sub="em vendas já pagas"
               color="emerald"
+            />
+            <EconomyStat
+              icon={<Coins className="w-4 h-4" />}
+              label="Descontos dados"
+              value={formatEur(discountsGiven)}
+              sub={`${goldSpent.toLocaleString()} 🪙 queimados`}
+              color="blue"
             />
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-            {/* Price tiers */}
+            {/* Discount power tiers */}
             <div className="space-y-2.5">
               <div className="flex items-center gap-2">
                 <Coins className="w-4 h-4 text-amber-500" />
-                <h4 className="text-xs font-bold text-gray-700 uppercase tracking-wide">Faixas de preço sugeridas</h4>
+                <h4 className="text-xs font-bold text-gray-700 uppercase tracking-wide">Poder de desconto dos membros</h4>
               </div>
               <div className="space-y-2">
                 {priceTiers.map(tier => {
                   const reach = goldN > 0 ? Math.round((affordCount(tier.value) / goldN) * 100) : 0
-                  const weeks = weeksToSave(tier.value)
+                  const eurValue = tier.value / goldRate
                   return (
                     <div key={tier.key} className="flex items-center gap-3 p-2.5 rounded-lg border border-gray-100 bg-white">
                       <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${tier.dot}`} />
                       <div className="min-w-0 flex-1">
-                        <p className="text-xs font-bold text-gray-800">{tier.label}</p>
+                        <p className="text-xs font-bold text-gray-800">{tier.label} · {tier.value.toLocaleString()} 🪙</p>
                         <p className="text-[10px] text-gray-400">
-                          {reach}% conseguem comprar{weeks ? ` · ≈ ${weeks} sem. a poupar` : ''}
+                          {reach}% têm este saldo ou mais
                         </p>
                       </div>
                       <span className={`text-sm font-black shrink-0 ${tier.text} flex items-center gap-1`}>
-                        {tier.value.toLocaleString()} 🪙
+                        ≈ −{formatEur(eurValue)}
                       </span>
                     </div>
                   )
                 })}
               </div>
               <p className="text-[10px] text-gray-400 leading-relaxed pt-0.5">
-                Um artigo ao preço de cada faixa fica ao alcance da percentagem indicada de membros, ao saldo atual.
+                Quanto cada faixa de saldo consegue descontar à taxa atual. Ouro médio: <span className="font-bold text-gray-600">{avgGold.toLocaleString()} 🪙</span> (≈ −{formatEur(avgGold / goldRate)}) · ganho ≈ <span className="font-bold text-gray-600">{(monthlyIncome || avgGoldPerEvent).toLocaleString()} 🪙/mês</span>. Usa isto para calibrar a % de desconto máximo dos artigos.
               </p>
             </div>
 
@@ -262,25 +302,29 @@ export function OverviewPanel({ profile, members, events, purchases }: OverviewP
               <div className="flex items-start gap-1.5 text-[10px] text-gray-400 leading-relaxed pt-0.5">
                 <ShieldCheck className="w-3 h-3 mt-0.5 shrink-0 text-indigo-400" />
                 <span>
-                  Cada nível = 1000 XP. Pôr um artigo a <span className="font-bold text-indigo-500">Nível 3+</span> deixa-o disponível para {levelBuckets[2]?.atOrAbove ?? 0} membro(s).
+                  Cada nível = 1000 XP (membros começam no Nível 1; Nível 1 = só registados). Pôr um artigo a <span className="font-bold text-indigo-500">Nível 3+</span> deixa-o disponível para {levelBuckets[2]?.atOrAbove ?? 0} membro(s).
                 </span>
               </div>
             </div>
           </div>
 
-          {/* Demand footer */}
+          {/* Orders footer */}
           <div className="flex flex-wrap items-center gap-x-6 gap-y-1 pt-3 border-t border-gray-100 text-[11px] text-gray-500">
             <span className="flex items-center gap-1.5">
-              <Coins className="w-3.5 h-3.5 text-amber-500" />
-              <span className="font-bold text-gray-700">{goldSpent.toLocaleString()}</span> ouro já gasto na loja
+              <Banknote className="w-3.5 h-3.5 text-rose-500" />
+              <span className="font-bold text-gray-700">{unpaidOrders.length}</span> por pagar
             </span>
             <span className="flex items-center gap-1.5">
-              <Package className="w-3.5 h-3.5 text-blue-500" />
-              <span className="font-bold text-gray-700">{itemsSold}</span> artigos vendidos
+              <Clock className="w-3.5 h-3.5 text-blue-500" />
+              <span className="font-bold text-gray-700">{paidUndelivered.length}</span> pagas, por entregar
             </span>
             <span className="flex items-center gap-1.5">
-              <Clock className="w-3.5 h-3.5 text-emerald-500" />
-              <span className="font-bold text-gray-700">{avgGoldPerEvent}</span> ouro / evento (média)
+              <Check className="w-3.5 h-3.5 text-emerald-500" />
+              <span className="font-bold text-gray-700">{deliveredCount}</span> entregues
+            </span>
+            <span className="flex items-center gap-1.5">
+              <Package className="w-3.5 h-3.5 text-gray-400" />
+              <span className="font-bold text-gray-700">{itemsSold}</span> vendas no total
             </span>
           </div>
         </CardContent>
@@ -418,50 +462,84 @@ export function OverviewPanel({ profile, members, events, purchases }: OverviewP
             </CardContent>
           </Card>
 
-          {/* Pending Deliveries Widget */}
+          {/* Pending Orders Widget */}
           <Card>
             <CardHeader className="pb-3 text-left">
               <div className="flex items-center justify-between">
                 <CardTitle className="text-lg flex items-center gap-2">
                   <Package className="w-5 h-5 text-orange-500" />
-                  Entregas Pendentes
+                  Encomendas Pendentes
                 </CardTitle>
-                <Badge variant="outline" className="text-[10px] bg-orange-50 text-orange-700 border-orange-200">
-                  {purchases.filter(p => p.store_products?.type === 'physical' && p.status === 'pending').length} Pedidos
-                </Badge>
+                <div className="flex items-center gap-1.5">
+                  {unpaidOrders.length > 0 && (
+                    <Badge variant="outline" className="text-[10px] bg-rose-50 text-rose-700 border-rose-200">
+                      {unpaidOrders.length} por pagar
+                    </Badge>
+                  )}
+                  {paidUndelivered.length > 0 && (
+                    <Badge variant="outline" className="text-[10px] bg-blue-50 text-blue-700 border-blue-200">
+                      {paidUndelivered.length} por entregar
+                    </Badge>
+                  )}
+                </div>
               </div>
             </CardHeader>
             <CardContent>
-              {pendingDeliveries.length === 0 ? (
-                <p className="text-sm text-gray-400 text-center py-4">Não há entregas físicas pendentes. 🙌</p>
+              {pendingList.length === 0 ? (
+                <p className="text-sm text-gray-400 text-center py-4">Não há encomendas pendentes. 🙌</p>
               ) : (
                 <div className="divide-y divide-gray-100">
-                  {pendingDeliveries.map(p => (
-                    <div key={p.id} className="py-3 flex items-center justify-between gap-4">
-                      <div className="flex items-center gap-3 min-w-0">
-                        <div className="w-8 h-8 rounded-lg bg-orange-50 flex items-center justify-center text-orange-600 shrink-0">
-                          <Package className="w-4 h-4" />
+                  {pendingList.map(p => {
+                    const isPaid = !!p.paid_at
+                    const buyer = p.profiles?.full_name || p.buyer_name || 'Desconhecido'
+                    const buyerSub = p.profiles
+                      ? SECTION_LABELS[p.profiles?.section] || p.profiles?.section
+                      : 'Convidado'
+                    return (
+                      <div key={p.id} className="py-3 flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${isPaid ? 'bg-blue-50 text-blue-600' : 'bg-rose-50 text-rose-600'}`}>
+                            {isPaid ? <Package className="w-4 h-4" /> : <Banknote className="w-4 h-4" />}
+                          </div>
+                          <div className="min-w-0 text-left">
+                            <p className="text-xs font-bold text-gray-800 truncate">{p.store_products?.name}</p>
+                            <p className="text-[10px] text-gray-500 truncate">
+                              {buyer} • {buyerSub}
+                              {Number(p.amount_due_eur) > 0 && (
+                                <span className={`ml-1 font-black ${isPaid ? 'text-gray-400' : 'text-rose-600'}`}>
+                                  {isPaid ? 'pago' : formatEur(Number(p.amount_due_eur))}
+                                </span>
+                              )}
+                            </p>
+                          </div>
                         </div>
-                        <div className="min-w-0 text-left">
-                          <p className="text-xs font-bold text-gray-800 truncate">{p.store_products?.name}</p>
-                          <p className="text-[10px] text-gray-500 truncate">
-                            {p.profiles?.full_name} • {SECTION_LABELS[p.profiles?.section] || p.profiles?.section}
-                          </p>
-                        </div>
+                        {isPaid ? (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-8 px-2 text-[10px] font-black uppercase text-green-600 hover:text-green-700 hover:bg-green-50 shrink-0 gap-1.5"
+                            onClick={() => handleDeliverOnly(p.id)}
+                            disabled={loading === p.id}
+                          >
+                            <Check className="w-3.5 h-3.5" />
+                            {loading === p.id ? '...' : 'Entregar'}
+                          </Button>
+                        ) : (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-8 px-2 text-[10px] font-black uppercase text-blue-700 hover:text-blue-800 hover:bg-blue-50 shrink-0 gap-1.5"
+                            onClick={() => handlePayAndDeliver(p.id)}
+                            disabled={loading === p.id}
+                          >
+                            <Check className="w-3.5 h-3.5" />
+                            {loading === p.id ? '...' : 'Pago + Entregue'}
+                          </Button>
+                        )}
                       </div>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="h-8 px-2 text-[10px] font-black uppercase text-green-600 hover:text-green-700 hover:bg-green-50 shrink-0 gap-1.5"
-                        onClick={() => handleDeliver(p.id)}
-                        disabled={loading === p.id}
-                      >
-                        <Check className="w-3.5 h-3.5" />
-                        {loading === p.id ? '...' : 'Entregar'}
-                      </Button>
-                    </div>
-                  ))}
-                  {purchases.filter(p => p.store_products?.type === 'physical' && p.status === 'pending').length > 5 && (
+                    )
+                  })}
+                  {pendingOrders.length > 5 && (
                     <div className="pt-2 text-center">
                       <a href="/admin?tab=store" className="text-[10px] font-bold text-blue-600 hover:underline px-2 py-1">
                         Ver todas as encomendas...
@@ -566,7 +644,7 @@ export function OverviewPanel({ profile, members, events, purchases }: OverviewP
   )
 }
 
-function EconomyStat({ icon, label, value, sub, color }: { icon: React.ReactNode, label: string, value: number, sub?: string, color: 'blue' | 'emerald' | 'rose' | 'amber' }) {
+function EconomyStat({ icon, label, value, sub, color }: { icon: React.ReactNode, label: string, value: number | string, sub?: string, color: 'blue' | 'emerald' | 'rose' | 'amber' }) {
   const colors = {
     blue: 'bg-blue-50 text-blue-600 border-blue-100',
     emerald: 'bg-emerald-50 text-emerald-600 border-emerald-100',
@@ -579,8 +657,8 @@ function EconomyStat({ icon, label, value, sub, color }: { icon: React.ReactNode
         <div className={`p-1.5 rounded-lg border ${colors[color]} shrink-0`}>{icon}</div>
         <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wide leading-tight">{label}</span>
       </div>
-      <p className="text-lg sm:text-xl font-black text-gray-900 flex items-center gap-1">
-        {value.toLocaleString()} <span className="text-xs">🪙</span>
+      <p className="text-lg sm:text-xl font-black text-gray-900 truncate">
+        {typeof value === 'number' ? value.toLocaleString() : value}
       </p>
       {sub && <p className="text-[10px] text-gray-400 truncate">{sub}</p>}
     </div>
