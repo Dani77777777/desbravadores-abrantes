@@ -39,6 +39,19 @@ export function optionFontSize(longestText: string): string {
   return 'clamp(1rem, 1.6vw, 1.5rem)'
 }
 
+/**
+ * Multiplicador de pontos por streak — cresce com a sequência de respostas
+ * certas, para recompensar quem se mantém numa streak longa:
+ * 3-4 seguidas ×2 · 5-6 ×3 · 7-9 ×4 · 10+ ×5 (máximo).
+ */
+export function streakMultiplier(streak: number): number {
+  if (streak >= 10) return 5
+  if (streak >= 7) return 4
+  if (streak >= 5) return 3
+  if (streak >= 3) return 2
+  return 1
+}
+
 export function calcPoints(
   timeSeconds: number,
   elapsedMs: number,
@@ -49,12 +62,33 @@ export function calcPoints(
   const speedPoints = Math.max(0, maxPoints * (1 - elapsedMs / (timeSeconds * 1000)))
   const roundedSpeed = Math.round(speedPoints * 1000) / 1000
 
-  let streakMultiplier = 1
-  if (streak >= 5) streakMultiplier = 3
-  else if (streak >= 3) streakMultiplier = 2
+  const multiplier = streakMultiplier(streak)
 
-  const streakBonus = Math.round(roundedSpeed * (streakMultiplier - 1) * 1000) / 1000
+  const streakBonus = Math.round(roundedSpeed * (multiplier - 1) * 1000) / 1000
   const finalPoints = Math.round((roundedSpeed + streakBonus) * 1000) / 1000
 
   return { speedPoints: roundedSpeed, streakBonus, finalPoints }
+}
+
+/** Limites máximos de prémios por sessão de VanaQuest. */
+export const MAX_SESSION_GOLD = 500
+export const MAX_SESSION_XP = 1000 // = MAX_SESSION_GOLD * 2 (XP é sempre gold × 2)
+
+/**
+ * Converte os pontos do jogo em Gold/XP, com limite máximo por sessão.
+ *
+ * Gold = round(pontos), XP = gold × 2. Se o melhor jogador da sessão
+ * ultrapassar o limite (500 gold / 1000 XP), ele recebe exatamente o máximo
+ * e todos os outros são reduzidos na mesma proporção — mantém a
+ * classificação relativa sem prémios exorbitantes.
+ */
+export function calcSessionRewards(
+  totalPoints: number,
+  topPoints: number
+): { gold: number; xp: number } {
+  const pts = Math.max(0, totalPoints)
+  const top = Math.max(pts, topPoints)
+  const scale = Math.round(top) > MAX_SESSION_GOLD ? MAX_SESSION_GOLD / top : 1
+  const gold = Math.round(pts * scale)
+  return { gold, xp: gold * 2 }
 }

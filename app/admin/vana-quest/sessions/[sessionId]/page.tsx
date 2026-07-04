@@ -10,6 +10,7 @@ import { PlayerAvatar } from '@/components/vana-quest/PlayerAvatar'
 import { DeleteSessionButton } from '@/components/vana-quest/DeleteSessionButton'
 import { AwardSessionButton } from '@/components/vana-quest/AwardSessionButton'
 import { isAdminRole } from '@/utils/permissions'
+import { calcSessionRewards, MAX_SESSION_GOLD, MAX_SESSION_XP } from '@/utils/vana-quest'
 
 const OPTION_COLORS: Record<string, string> = {
   A: 'bg-red-500', B: 'bg-blue-500', C: 'bg-yellow-400', D: 'bg-green-500',
@@ -222,6 +223,11 @@ export default async function SessionDetailPage({
             <p className="text-sm text-gray-400 italic">Sem participantes.</p>
           ) : (
             <div className="space-y-1.5">
+              {Math.round(Number(participants[0]?.total_points) || 0) > MAX_SESSION_GOLD && (
+                <p className="text-xs text-gray-500 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                  Prémios ajustados ao limite da sessão (máx. {MAX_SESSION_GOLD}🪙 / {MAX_SESSION_XP}⭐) — o 1.º recebe o máximo e os restantes são escalados na mesma proporção.
+                </p>
+              )}
               {participants.map((p, i) => {
                 const recipient = (p.recipient as any)?.full_name
                 const linkedUser = (p.user as any)?.full_name
@@ -263,12 +269,18 @@ export default async function SessionDetailPage({
                       <p className="font-black text-gray-900 tabular-nums">{Number(p.total_points).toFixed(2)}</p>
                       <p className="text-[10px] text-gray-400 uppercase tracking-wider">pts</p>
                     </div>
-                    {session.status === 'finished' && Number(p.total_points) > 0 && (
-                      <div className="hidden sm:block text-right text-xs text-gray-500 border-l pl-3 ml-1">
-                        <p>+{Math.round(Number(p.total_points))} 🪙</p>
-                        <p>+{Math.round(Number(p.total_points)) * 2} ⭐</p>
-                      </div>
-                    )}
+                    {session.status === 'finished' && Number(p.total_points) > 0 && (() => {
+                      const { gold, xp } = calcSessionRewards(
+                        Number(p.total_points) || 0,
+                        Number(participants[0]?.total_points) || 0
+                      )
+                      return (
+                        <div className="hidden sm:block text-right text-xs text-gray-500 border-l pl-3 ml-1">
+                          <p>+{gold} 🪙</p>
+                          <p>+{xp} ⭐</p>
+                        </div>
+                      )
+                    })()}
                   </div>
                 )
               })}
