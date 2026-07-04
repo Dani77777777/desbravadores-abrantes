@@ -26,7 +26,7 @@ export function OrderManagement({ initialPurchases, profile }: OrderManagementPr
   const router = useRouter()
   const [loading, setLoading] = useState<string | null>(null)
 
-  const runAction = async (purchaseId: string, action: () => Promise<{ error: any }>, successMsg: string) => {
+  const runAction = async (purchaseId: string, action: () => PromiseLike<{ error: any }>, successMsg: string) => {
     setLoading(purchaseId)
     try {
       const { error } = await action()
