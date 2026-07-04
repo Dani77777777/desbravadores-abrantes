@@ -239,6 +239,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
             members={members || []}
             events={events || []}
             purchases={purchases || []}
+            rateInfo={storeRateInfo}
           />
         )}
 
