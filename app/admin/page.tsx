@@ -127,7 +127,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
       .from('store_purchases')
       .select(`
         *,
-        profiles:user_id(full_name, section),
+        profiles:user_id(full_name, section, avatar_url),
         store_products:product_id(name, type, price_eur, max_discount_percent)
       `)
       .order('created_at', { ascending: false })

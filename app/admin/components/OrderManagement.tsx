@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge'
 import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
 import { CheckCircle2, RotateCcw, Clock, Check, Banknote, Key, UserX, Coins } from 'lucide-react'
-import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { formatEur } from '@/lib/store-economy'
 
 interface OrderManagementProps {
@@ -84,6 +84,7 @@ export function OrderManagement({ initialPurchases, profile }: OrderManagementPr
           <div className="flex flex-col lg:flex-row lg:items-center gap-4">
             <div className="flex items-center gap-3 flex-1 min-w-0">
               <Avatar className={`h-10 w-10 border-2 shadow-sm shrink-0 ${tone === 'orange' ? 'border-orange-100' : 'border-blue-100'}`}>
+                <AvatarImage src={order.profiles?.avatar_url || undefined} alt={buyerName(order)} className="object-cover" />
                 <AvatarFallback className={`font-bold uppercase ${tone === 'orange' ? 'bg-orange-100 text-orange-700' : 'bg-blue-100 text-blue-700'}`}>
                   {buyerName(order).charAt(0)}
                 </AvatarFallback>
