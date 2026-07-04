@@ -123,11 +123,14 @@ export interface Database {
           name: string
           description: string | null
           price: number
+          price_eur: number
+          max_discount_percent: number
           type: 'physical' | 'digital'
           stock: number
           image_url: string | null
           restrictions: Json
           is_active: boolean
+          min_level: number
           created_at: string
           updated_at: string
         }
@@ -135,12 +138,15 @@ export interface Database {
           id?: string
           name: string
           description?: string | null
-          price: number
+          price?: number
+          price_eur?: number
+          max_discount_percent?: number
           type: 'physical' | 'digital'
           stock?: number
           image_url?: string | null
           restrictions?: Json
           is_active?: boolean
+          min_level?: number
           created_at?: string
           updated_at?: string
         }
@@ -149,12 +155,41 @@ export interface Database {
           name?: string
           description?: string | null
           price?: number
+          price_eur?: number
+          max_discount_percent?: number
           type?: 'physical' | 'digital'
           stock?: number
           image_url?: string | null
           restrictions?: Json
           is_active?: boolean
+          min_level?: number
           created_at?: string
+          updated_at?: string
+        }
+      }
+      store_settings: {
+        Row: {
+          id: boolean
+          base_gold_per_euro: number
+          reference_total_gold: number
+          min_rate_multiplier: number
+          max_rate_multiplier: number
+          updated_at: string
+        }
+        Insert: {
+          id?: boolean
+          base_gold_per_euro?: number
+          reference_total_gold?: number
+          min_rate_multiplier?: number
+          max_rate_multiplier?: number
+          updated_at?: string
+        }
+        Update: {
+          id?: boolean
+          base_gold_per_euro?: number
+          reference_total_gold?: number
+          min_rate_multiplier?: number
+          max_rate_multiplier?: number
           updated_at?: string
         }
       }
@@ -184,34 +219,64 @@ export interface Database {
       store_purchases: {
         Row: {
           id: string
-          user_id: string
+          user_id: string | null
+          buyer_name: string | null
           product_id: string
           status: 'pending' | 'delivered' | 'refunded'
           digital_key_delivered: string | null
+          price_eur: number
+          discount_eur: number
+          amount_due_eur: number
+          gold_spent: number
+          gold_rate: number | null
+          paid_at: string | null
+          delivered_at: string | null
           created_at: string
           updated_at: string
         }
         Insert: {
           id?: string
-          user_id: string
+          user_id?: string | null
+          buyer_name?: string | null
           product_id: string
           status?: 'pending' | 'delivered' | 'refunded'
           digital_key_delivered?: string | null
+          price_eur?: number
+          discount_eur?: number
+          amount_due_eur?: number
+          gold_spent?: number
+          gold_rate?: number | null
+          paid_at?: string | null
+          delivered_at?: string | null
           created_at?: string
           updated_at?: string
         }
         Update: {
           id?: string
-          user_id?: string
+          user_id?: string | null
+          buyer_name?: string | null
           product_id?: string
           status?: 'pending' | 'delivered' | 'refunded'
           digital_key_delivered?: string | null
+          price_eur?: number
+          discount_eur?: number
+          amount_due_eur?: number
+          gold_spent?: number
+          gold_rate?: number | null
+          paid_at?: string | null
+          delivered_at?: string | null
           created_at?: string
           updated_at?: string
         }
       }
     }
     Views: {
+      digital_key_stock: {
+        Row: {
+          product_id: string
+          available: number
+        }
+      }
       leaderboard: {
         Row: {
           id: string
@@ -228,12 +293,24 @@ export interface Database {
     }
     Functions: {
       process_purchase: {
-        Args: { p_product_id: string }
+        Args: { p_product_id: string; p_discount_eur?: number; p_buyer_name?: string | null }
         Returns: Json
       }
       refund_purchase: {
         Args: { p_purchase_id: string }
         Returns: undefined
+      }
+      mark_purchase_paid: {
+        Args: { p_purchase_id: string; p_deliver?: boolean }
+        Returns: undefined
+      }
+      mark_purchase_delivered: {
+        Args: { p_purchase_id: string }
+        Returns: undefined
+      }
+      get_gold_rate_info: {
+        Args: Record<string, never>
+        Returns: Json
       }
     }
     Enums: {

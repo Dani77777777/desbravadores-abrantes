@@ -120,22 +120,20 @@ export function OverviewPanel({ profile, members, events, purchases }: OverviewP
     levelBuckets, maxBucket,
   } = computeStoreEconomy(members, events)
 
-  // Demand so far (gold already spent in the store).
-  const validPurchases = purchases.filter(p => p.status !== 'cancelled' && p.status !== 'rejected')
-  const goldSpent = validPurchases.reduce((acc, p) => acc + (p.store_products?.price || 0), 0)
+  // Demand so far (gold already spent on store discounts).
+  const validPurchases = purchases.filter(p => p.status !== 'refunded')
+  const goldSpent = validPurchases.reduce((acc, p) => acc + (p.gold_spent || 0), 0)
   const itemsSold = validPurchases.length
 
   const handleDeliver = async (purchaseId: string) => {
     setLoading(purchaseId)
     try {
-      const { error } = await supabase
-        .from('store_purchases')
-        .update({ status: 'delivered', updated_at: new Date().toISOString() })
-        .eq('id', purchaseId)
-      
+      // Atalho do overview: confirma pagamento e entrega num só passo.
+      const { error } = await supabase.rpc('mark_purchase_paid', { p_purchase_id: purchaseId, p_deliver: true })
+
       if (error) throw error
-      
-      toast.success('Artigo marcado como entregue!')
+
+      toast.success('Pagamento e entrega confirmados!')
       router.refresh()
     } catch (error: any) {
       toast.error('Erro ao marcar entrega.')
@@ -210,7 +208,7 @@ export function OverviewPanel({ profile, members, events, purchases }: OverviewP
             <div className="space-y-2.5">
               <div className="flex items-center gap-2">
                 <Coins className="w-4 h-4 text-amber-500" />
-                <h4 className="text-xs font-bold text-gray-700 uppercase tracking-wide">Faixas de preço sugeridas</h4>
+                <h4 className="text-xs font-bold text-gray-700 uppercase tracking-wide">Saldos de Gold (poder de desconto)</h4>
               </div>
               <div className="space-y-2">
                 {priceTiers.map(tier => {
@@ -222,7 +220,7 @@ export function OverviewPanel({ profile, members, events, purchases }: OverviewP
                       <div className="min-w-0 flex-1">
                         <p className="text-xs font-bold text-gray-800">{tier.label}</p>
                         <p className="text-[10px] text-gray-400">
-                          {reach}% conseguem comprar{weeks ? ` · ≈ ${weeks} sem. a poupar` : ''}
+                          {reach}% têm este saldo{weeks ? ` · ≈ ${weeks} sem. a poupar` : ''}
                         </p>
                       </div>
                       <span className={`text-sm font-black shrink-0 ${tier.text} flex items-center gap-1`}>
@@ -233,7 +231,7 @@ export function OverviewPanel({ profile, members, events, purchases }: OverviewP
                 })}
               </div>
               <p className="text-[10px] text-gray-400 leading-relaxed pt-0.5">
-                Um artigo ao preço de cada faixa fica ao alcance da percentagem indicada de membros, ao saldo atual.
+                Os preços agora são em € e o Gold serve para descontos. Usa estas faixas para calibrar a % de desconto máximo dos artigos.
               </p>
             </div>
 
@@ -272,7 +270,7 @@ export function OverviewPanel({ profile, members, events, purchases }: OverviewP
           <div className="flex flex-wrap items-center gap-x-6 gap-y-1 pt-3 border-t border-gray-100 text-[11px] text-gray-500">
             <span className="flex items-center gap-1.5">
               <Coins className="w-3.5 h-3.5 text-amber-500" />
-              <span className="font-bold text-gray-700">{goldSpent.toLocaleString()}</span> ouro já gasto na loja
+              <span className="font-bold text-gray-700">{goldSpent.toLocaleString()}</span> ouro gasto em descontos
             </span>
             <span className="flex items-center gap-1.5">
               <Package className="w-3.5 h-3.5 text-blue-500" />

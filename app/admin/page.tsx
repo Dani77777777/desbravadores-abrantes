@@ -116,6 +116,8 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
   // Fetch Store Data
   let products = []
   let purchases = []
+  let storeRateInfo = null
+  let storeSettings = null
 
   if (effRole === 'coordenador') {
     const { data: storeProducts } = await supabase.from('store_products').select('*').order('created_at', { ascending: false })
@@ -126,10 +128,17 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
       .select(`
         *,
         profiles:user_id(full_name, section),
-        store_products:product_id(name, type, price)
+        store_products:product_id(name, type, price_eur, max_discount_percent)
       `)
       .order('created_at', { ascending: false })
     purchases = storePurchases || []
+
+    const [{ data: rateData }, { data: settingsData }] = await Promise.all([
+      supabase.rpc('get_gold_rate_info'),
+      supabase.from('store_settings').select('*').eq('id', true).maybeSingle(),
+    ])
+    storeRateInfo = rateData || null
+    storeSettings = settingsData || null
   }
 
   // Fetch Surveys (coord-only tab; load all surveys with options + responses)
@@ -303,6 +312,8 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
             initialPurchases={purchases}
             members={members || []}
             events={events || []}
+            rateInfo={storeRateInfo}
+            settings={storeSettings}
           />
         )}
       </main>
