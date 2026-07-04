@@ -364,9 +364,9 @@ export function EventPanel({ profile, members, events }: EventPanelProps) {
 
                 return (
                   <div key={event.id} className="p-4 border rounded-xl hover:shadow-md transition-shadow bg-white flex flex-col md:flex-row md:items-center justify-between gap-4">
-                    <div className="space-y-1 flex-1">
-                      <div className="flex items-center gap-2">
-                        <h3 className="font-bold text-gray-900">{event.title}</h3>
+                    <div className="space-y-1 flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h3 className="font-bold text-gray-900 break-words">{event.title}</h3>
                         <Badge variant="outline" className="text-[10px]">
                           {event.target_section ? SECTION_LABELS[event.target_section] : 'Todos'}
                         </Badge>
@@ -465,12 +465,12 @@ export function EventPanel({ profile, members, events }: EventPanelProps) {
             <CardContent className="space-y-2">
               {pastEvents.length === 0 && <p className="text-xs text-gray-400 text-center py-4">Nenhum evento passado.</p>}
               {pastEvents.map(event => (
-                <div key={event.id} className="flex items-center justify-between p-3 border rounded-lg bg-gray-50 opacity-75">
-                  <div>
-                    <p className="text-sm font-medium">{event.title}</p>
+                <div key={event.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 border rounded-lg bg-gray-50 opacity-75">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium truncate">{event.title}</p>
                     <p className="text-[10px] text-gray-500">{new Date(event.start_at).toLocaleDateString('pt-PT')}</p>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <Button
                       variant="ghost"
                       size="sm"
