@@ -137,6 +137,18 @@ export function HostControl({ session: initSession, initialPlayers, initialWords
   async function doReroll(team: TeamId, opts?: { playerId?: string; instant?: boolean }) {
     setError(null)
     setLoading(true)
+    const revealKey = team === 'a' ? 'arauto_reveal_a' : 'arauto_reveal_b'
+    if (opts?.instant && opts.playerId) {
+      // Escolha instantânea: reflecte já localmente o modo de revelação E o
+      // novo arauto no mesmo render — a roleta remonta directamente no
+      // vencedor, sem girar enquanto espera pelo servidor.
+      setSession((s) => ({ ...s, [revealKey]: 'instant' }))
+      setPlayers((ps) => ps.map((p) => p.team === team
+        ? { ...p, is_arauto: p.id === opts.playerId, arauto_response: p.id === opts.playerId ? 'pending' : p.arauto_response }
+        : p))
+    } else {
+      setSession((s) => ({ ...s, [revealKey]: 'spin' }))
+    }
     if (team === 'a') setRouletteADone(false); else setRouletteBDone(false)
     const res = await rerollArauto(session.id, team, opts)
     if (res?.error) {
@@ -144,7 +156,7 @@ export function HostControl({ session: initSession, initialPlayers, initialWords
       if (team === 'a') setRouletteADone(true); else setRouletteBDone(true)
     }
     setArautoPicker(null)
-    await fetchPlayers()
+    await Promise.all([fetchPlayers(), fetchSession()])
     setLoading(false)
   }
 

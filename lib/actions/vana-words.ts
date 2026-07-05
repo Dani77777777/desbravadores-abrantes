@@ -362,13 +362,16 @@ export async function rerollArauto(
     newArauto = selectArauto(candidates as PlayerForTeam[], recentArautos)
   }
 
-  if (currentArauto) await service.from('vanawords_players').update({ is_arauto: false }).eq('id', currentArauto.id)
-  await service.from('vanawords_players').update({ is_arauto: true, arauto_response: 'pending' }).eq('id', newArauto.id)
-
+  // Gravar o modo de revelação ANTES de trocar o arauto: os clientes remontam
+  // a roleta assim que o arauto muda, e se a sessão ainda tivesse o modo
+  // antigo ('spin') a roleta girava uns instantes antes do 'instant' chegar.
   if (session.status === 'arauto_spin') {
     const revealCol = team === 'a' ? 'arauto_reveal_a' : 'arauto_reveal_b'
     await service.from('vanawords_sessions').update({ [revealCol]: opts?.instant ? 'instant' : 'spin' }).eq('id', sessionId)
   }
+
+  if (currentArauto) await service.from('vanawords_players').update({ is_arauto: false }).eq('id', currentArauto.id)
+  await service.from('vanawords_players').update({ is_arauto: true, arauto_response: 'pending' }).eq('id', newArauto.id)
 
   return {}
 }

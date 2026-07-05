@@ -28,6 +28,7 @@ export function TeamRoulette({ team, candidates, winner, onDone, onFinale, final
 
   useEffect(() => {
     if (instant) {
+      if (intervalRef.current) clearInterval(intervalRef.current)
       setCurrent(winner)
       setDone(true)
       onFinale?.()
@@ -35,6 +36,9 @@ export function TeamRoulette({ team, candidates, winner, onDone, onFinale, final
       return () => clearTimeout(t)
     }
     if (!autoStart) return
+    // Já terminou (ex.: revelação instantânea) e o `instant` voltou a false
+    // por dados atrasados da sessão — não voltar a girar a roleta.
+    if (done) return
     startSpin()
     return () => { if (intervalRef.current) clearInterval(intervalRef.current) }
   }, [instant])
