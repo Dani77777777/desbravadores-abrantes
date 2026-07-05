@@ -4,9 +4,12 @@ import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { deleteVanaWordsSession } from '@/lib/actions/vana-words'
+import { AwardVanaWordsButton } from '@/components/vana-words/AwardVanaWordsButton'
+import { TEAM_LABELS } from '@/types/vana-words'
+import type { TeamId } from '@/types/vana-words'
 import {
   ExternalLink, Users, Clock, Trash2, FlaskConical, Monitor,
-  Loader2, AlertTriangle, X,
+  Loader2, AlertTriangle, X, FileSearch,
 } from 'lucide-react'
 
 interface SessionRow {
@@ -14,6 +17,8 @@ interface SessionRow {
   code: string
   status: string
   is_test_session: boolean
+  rewards_awarded: boolean
+  winner_team: TeamId | null
   created_at: string
   vanawords_players?: { count: number }[]
 }
@@ -109,6 +114,18 @@ export function SessionsClient({ sessions }: { sessions: SessionRow[] }) {
                           <FlaskConical className="w-3 h-3" /> TESTE
                         </span>
                       )}
+                      {s.status === 'finished' && s.winner_team && (
+                        <span className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${
+                          s.winner_team === 'a' ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700'
+                        }`}>
+                          {s.winner_team === 'a' ? '🦁' : '🦅'} {TEAM_LABELS[s.winner_team]} venceu
+                        </span>
+                      )}
+                      {s.status === 'finished' && s.winner_team && !s.rewards_awarded && (
+                        <span className="rounded-full bg-yellow-100 px-2 py-0.5 text-[10px] font-bold text-yellow-700">
+                          ⚠️ Pontos por atribuir
+                        </span>
+                      )}
                     </div>
                     <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-slate-400">
                       <span className="flex items-center gap-1"><Users className="w-3 h-3" /> {playerCount}</span>
@@ -132,12 +149,20 @@ export function SessionsClient({ sessions }: { sessions: SessionRow[] }) {
                   </Link>
                 )}
                 <Link
-                  href={`/jogos/vana-words/${s.id}/present`}
-                  target="_blank"
+                  href={`/admin/vana-words/sessions/${s.id}`}
                   className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-slate-100 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-200"
                 >
-                  <Monitor className="w-3.5 h-3.5" /> Projetor
+                  <FileSearch className="w-3.5 h-3.5" /> Detalhes
                 </Link>
+                {isActive && (
+                  <Link
+                    href={`/jogos/vana-words/${s.id}/present`}
+                    target="_blank"
+                    className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-slate-100 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-200"
+                  >
+                    <Monitor className="w-3.5 h-3.5" /> Projetor
+                  </Link>
+                )}
                 {canDelete && (
                   <button
                     onClick={() => { setConfirmId(s.id); setError(null) }}
@@ -148,6 +173,18 @@ export function SessionsClient({ sessions }: { sessions: SessionRow[] }) {
                   </button>
                 )}
               </div>
+
+              {/* Atribuir pontos em atraso, direto da lista */}
+              {s.status === 'finished' && s.winner_team && !s.rewards_awarded && (
+                <div className="mt-2">
+                  <AwardVanaWordsButton
+                    sessionId={s.id}
+                    alreadyAwarded={false}
+                    winnerTeam={s.winner_team}
+                    compact
+                  />
+                </div>
+              )}
 
               {/* Overlay de confirmação */}
               {confirming && (

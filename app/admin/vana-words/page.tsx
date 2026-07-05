@@ -86,7 +86,7 @@ export default async function VanaWordsAdminPage() {
         {/* ── Sessões ─────────────────────────────────────────── */}
         <section className="space-y-4">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <h2 className="font-semibold text-gray-700 text-lg">Sessões</h2>
+            <h2 className="font-semibold text-gray-700 text-lg">Sessões recentes</h2>
             <div className="flex gap-2 sm:gap-3">
               <form action={handleCreate} className="flex-1 sm:flex-none">
                 <button
