@@ -405,35 +405,38 @@ export function ProjectorView({ session: initSession, initialPlayers }: Projecto
 
   if (session.status === 'lobby' || session.status === 'team_preview') {
     const isPreview = session.status === 'team_preview'
+    // Dimensões em px proporcionais à altura do ecrã (QR não pode usar clamp de CSS)
+    const qrSize = viewportH ? Math.round(Math.min(280, Math.max(160, viewportH * 0.3))) : 260
+    const qrZoomSize = viewportH ? Math.round(Math.min(500, viewportH * 0.55)) : 500
     return (
-      <div className={`min-h-screen ${vwSans.className} flex flex-col items-center px-8 py-12 gap-8`} style={VW_SCREEN_STYLE}>
-        <div className="flex flex-col items-center text-center">
-          <img src="/images/VanaWords.png" alt="VanaWords" className="h-32 w-auto object-contain drop-shadow-2xl" />
-          <p className="text-slate-400 text-lg mt-2">
+      <div className={`h-[100dvh] overflow-hidden ${vwSans.className} flex flex-col items-center px-8 py-[clamp(1rem,3vh,3rem)] gap-[clamp(0.75rem,2.2vh,2rem)]`} style={VW_SCREEN_STYLE}>
+        <div className="flex flex-col items-center text-center shrink-0">
+          <img src="/images/VanaWords.png" alt="VanaWords" className="h-[clamp(4rem,13vh,8rem)] w-auto object-contain drop-shadow-2xl" />
+          <p className="text-slate-400 text-[clamp(0.875rem,1.8vh,1.125rem)] mt-2">
             {isPreview ? 'A organizar as equipas…' : 'Junta-te ao jogo!'}
           </p>
         </div>
 
         {/* Código de entrada + QR Code em destaque */}
         {!isPreview && (
-          <div className="flex flex-wrap items-center justify-center gap-8">
-            <div className="rounded-3xl px-12 py-6 text-center border" style={VW_PANEL_STYLE}>
-              <p className="text-sm uppercase tracking-widest mb-1" style={{ color: VW.mut }}>Código</p>
+          <div className="flex flex-wrap items-center justify-center gap-[clamp(1rem,3vw,2rem)] shrink-0">
+            <div className="rounded-3xl px-[clamp(1.5rem,4vw,3rem)] py-[clamp(0.75rem,2vh,1.5rem)] text-center border" style={VW_PANEL_STYLE}>
+              <p className="text-[clamp(0.7rem,1.4vh,0.875rem)] uppercase tracking-widest mb-1" style={{ color: VW.mut }}>Código</p>
               {/* Mesma fonte do ecrã "Entrar no Jogo" — evita confundir letras */}
-              <p className="text-7xl font-black tracking-[0.3em]">{session.code}</p>
+              <p className="text-[clamp(2.5rem,8vh,4.5rem)] font-black tracking-[0.3em]">{session.code}</p>
             </div>
             {joinUrl && (
-              <div className="bg-white rounded-3xl p-6 shadow-2xl">
-                <QRCodeSVG value={joinUrl} size={300} />
+              <div className="bg-white rounded-3xl p-[clamp(0.75rem,1.6vh,1.5rem)] shadow-2xl">
+                <QRCodeSVG value={joinUrl} size={qrSize} />
               </div>
             )}
           </div>
         )}
 
         {/* Contador */}
-        <div className="flex items-center gap-2 text-emerald-300 text-2xl font-bold">
-          <span className="text-4xl">{players.length}</span>
-          <span className="text-slate-400 text-lg font-normal">
+        <div className="flex items-center gap-2 text-emerald-300 text-[clamp(1.125rem,2.4vh,1.5rem)] font-bold shrink-0">
+          <span className="text-[clamp(1.5rem,3.6vh,2.25rem)]">{players.length}</span>
+          <span className="text-slate-400 text-[clamp(0.875rem,1.8vh,1.125rem)] font-normal">
             {players.length === 1 ? 'jogador na sala' : 'jogadores na sala'}
           </span>
         </div>
@@ -446,7 +449,7 @@ export function ProjectorView({ session: initSession, initialPlayers }: Projecto
             <span className="inline-block w-4 h-4 bg-emerald-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
           </div>
         ) : isPreview ? (
-          <div className="grid grid-cols-2 gap-8 max-w-5xl w-full">
+          <div className="grid grid-cols-2 gap-8 max-w-5xl w-full flex-1 min-h-0 overflow-y-auto content-start">
             {(['a', 'b'] as const).map((tid) => {
               const teamPlayers = players.filter((p) => p.team === tid)
               return (
@@ -479,7 +482,7 @@ export function ProjectorView({ session: initSession, initialPlayers }: Projecto
             })}
           </div>
         ) : (
-          <div className="flex flex-wrap justify-center gap-3 max-w-4xl">
+          <div className="flex flex-wrap justify-center gap-3 max-w-4xl flex-1 min-h-0 overflow-y-auto content-start">
             {players.map((p) => (
               <div
                 key={p.id}
@@ -501,10 +504,10 @@ export function ProjectorView({ session: initSession, initialPlayers }: Projecto
         {/* QR Code ampliado (controlado pelo host) */}
         {qrZoomed && !isPreview && joinUrl && (
           <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-6 animate-in fade-in duration-300">
-            <div className="bg-white rounded-3xl p-10 shadow-2xl animate-in zoom-in-95 duration-500">
-              <QRCodeSVG value={joinUrl} size={500} />
-              <p className="text-center mt-6 text-5xl font-black text-gray-900 tracking-widest">{session.code}</p>
-              <p className="text-center text-gray-500 text-lg mt-2">Lê o código ou usa o código de entrada</p>
+            <div className="bg-white rounded-3xl p-[clamp(1.25rem,4vh,2.5rem)] shadow-2xl animate-in zoom-in-95 duration-500">
+              <QRCodeSVG value={joinUrl} size={qrZoomSize} />
+              <p className="text-center mt-[clamp(0.75rem,2vh,1.5rem)] text-[clamp(1.75rem,5vh,3rem)] font-black text-gray-900 tracking-widest">{session.code}</p>
+              <p className="text-center text-gray-500 text-[clamp(0.875rem,1.8vh,1.125rem)] mt-2">Lê o código ou usa o código de entrada</p>
             </div>
           </div>
         )}
