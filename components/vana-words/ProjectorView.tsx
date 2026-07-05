@@ -273,6 +273,16 @@ export function ProjectorView({ session: initSession, initialPlayers }: Projecto
     setJoinUrl(`${window.location.origin}/j/${session.code}`)
   }, [session.code])
 
+  // Altura do viewport — dimensiona elementos com tamanho em px (avatares)
+  // para o ecrã de jogo caber sempre, em qualquer resolução/zoom.
+  const [viewportH, setViewportH] = useState(0)
+  useEffect(() => {
+    const update = () => setViewportH(window.innerHeight)
+    update()
+    window.addEventListener('resize', update)
+    return () => window.removeEventListener('resize', update)
+  }, [])
+
   // Recebe comandos do host (ampliar QR Code)
   useEffect(() => {
     const ch = supabase.channel(`vanawords-present-${session.id}`, { config: { broadcast: { self: false } } })
@@ -340,6 +350,23 @@ export function ProjectorView({ session: initSession, initialPlayers }: Projecto
   const activeTeam = session.current_team as TeamId | null
   const isHinting = session.current_phase === 'hinting'
 
+  // Avanço do SFX do Arauto = duração do próprio áudio, para o som começar
+  // durante a desaceleração da roleta e terminar quando a escolha é revelada.
+  const arautoSfxLeadMs = () => {
+    const d = sfxArautoRef.current?.duration
+    return d && isFinite(d) && d > 0 ? d * 1000 : 1500
+  }
+  // As duas roletas acabam quase juntas — não reiniciar o som se já está a tocar
+  // (senão o segundo onFinale voltava a atrasá-lo).
+  const playArautoSfx = () => {
+    const el = sfxArautoRef.current
+    if (!el || (!el.paused && !el.ended)) return
+    try {
+      el.currentTime = 0
+      el.play().catch(() => {})
+    } catch {}
+  }
+
   if (session.status === 'arauto_spin') {
     return (
       <div className={`min-h-screen ${vwSans.className} flex flex-col items-center justify-center gap-10 p-8`} style={VW_SCREEN_STYLE}>
@@ -353,7 +380,9 @@ export function ProjectorView({ session: initSession, initialPlayers }: Projecto
               team="a"
               candidates={teamA}
               winner={arautoA}
-              onDone={() => playSfx(sfxArautoRef)}
+              onDone={() => {}}
+              onFinale={playArautoSfx}
+              finaleLeadMs={arautoSfxLeadMs}
               instant={session.arauto_reveal_a === 'instant'}
             />
           )}
@@ -363,7 +392,9 @@ export function ProjectorView({ session: initSession, initialPlayers }: Projecto
               team="b"
               candidates={teamB}
               winner={arautoB}
-              onDone={() => playSfx(sfxArautoRef)}
+              onDone={() => {}}
+              onFinale={playArautoSfx}
+              finaleLeadMs={arautoSfxLeadMs}
               instant={session.arauto_reveal_b === 'instant'}
             />
           )}
@@ -503,34 +534,35 @@ export function ProjectorView({ session: initSession, initialPlayers }: Projecto
   if (session.status === 'playing' || session.status === 'finished') {
     const isFinished = session.status === 'finished'
     const winner = session.winner_team as TeamId | null
+    const avatarSize = viewportH ? Math.max(30, Math.min(46, Math.round(viewportH * 0.05))) : 46
 
     return (
-      <div className={`min-h-screen ${vwSans.className} p-6 flex flex-col gap-4`} style={VW_SCREEN_STYLE}>
+      <div className={`h-[100dvh] overflow-hidden ${vwSans.className} p-[clamp(0.625rem,1.6vh,1.5rem)] flex flex-col gap-[clamp(0.5rem,1.2vh,1rem)]`} style={VW_SCREEN_STYLE}>
         {/* Top bar */}
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between shrink-0">
           <div className="flex items-center gap-4">
-            <img src="/images/VanaWords.png" alt="VanaWords" className="h-16 w-auto object-contain rounded-2xl" />
+            <img src="/images/VanaWords.png" alt="VanaWords" className="h-[clamp(2.25rem,6vh,4rem)] w-auto object-contain rounded-2xl" />
             <div>
-              <div className={`${vwSerif.className} text-3xl font-semibold`}>VanaWords</div>
-              <div className="text-sm" style={{ color: VW.mut }}>Clube de Desbravadores de Abrantes</div>
+              <div className={`${vwSerif.className} text-[clamp(1.125rem,2.8vh,1.875rem)] font-semibold`}>VanaWords</div>
+              <div className="text-[clamp(0.65rem,1.4vh,0.875rem)]" style={{ color: VW.mut }}>Clube de Desbravadores de Abrantes</div>
             </div>
           </div>
 
           {/* Marcador */}
-          <div className="flex gap-4">
-            <div className="rounded-2xl px-6 py-4 border min-w-[170px]" style={{ ...VW_PANEL_STYLE, borderColor: activeTeam === 'a' && !isFinished ? VW.amber : VW.pline }}>
-              <p className="font-bold text-lg"><TeamChip team="a" /></p>
-              <p className={`${vwSerif.className} text-4xl font-semibold mt-0.5`}>
-                {wordsAFound} <span className="text-2xl" style={{ color: VW.mut }}>/ {totalA}</span>
+          <div className="flex gap-[clamp(0.5rem,1vw,1rem)]">
+            <div className="rounded-2xl px-[clamp(0.75rem,1.5vw,1.5rem)] py-[clamp(0.375rem,1vh,1rem)] border min-w-[clamp(110px,11vw,170px)]" style={{ ...VW_PANEL_STYLE, borderColor: activeTeam === 'a' && !isFinished ? VW.amber : VW.pline }}>
+              <p className="font-bold text-[clamp(0.8rem,1.8vh,1.125rem)]"><TeamChip team="a" /></p>
+              <p className={`${vwSerif.className} text-[clamp(1.375rem,3.6vh,2.25rem)] font-semibold mt-0.5`}>
+                {wordsAFound} <span className="text-[clamp(0.9rem,2.4vh,1.5rem)]" style={{ color: VW.mut }}>/ {totalA}</span>
               </p>
             </div>
             <div
-              className="rounded-2xl px-6 py-4 border min-w-[170px]"
+              className="rounded-2xl px-[clamp(0.75rem,1.5vw,1.5rem)] py-[clamp(0.375rem,1vh,1rem)] border min-w-[clamp(110px,11vw,170px)]"
               style={{ ...VW_PANEL_STYLE, borderColor: activeTeam === 'b' && !isFinished ? 'rgba(63,140,255,.5)' : VW.pline, ...(activeTeam === 'b' && !isFinished ? VW_SOFT_PULSE : {}) }}
             >
-              <p className="font-bold text-lg"><TeamChip team="b" /></p>
-              <p className={`${vwSerif.className} text-4xl font-semibold mt-0.5`}>
-                {wordsBFound} <span className="text-2xl" style={{ color: VW.mut }}>/ {totalB}</span>
+              <p className="font-bold text-[clamp(0.8rem,1.8vh,1.125rem)]"><TeamChip team="b" /></p>
+              <p className={`${vwSerif.className} text-[clamp(1.375rem,3.6vh,2.25rem)] font-semibold mt-0.5`}>
+                {wordsBFound} <span className="text-[clamp(0.9rem,2.4vh,1.5rem)]" style={{ color: VW.mut }}>/ {totalB}</span>
               </p>
             </div>
           </div>
@@ -538,31 +570,31 @@ export function ProjectorView({ session: initSession, initialPlayers }: Projecto
 
         {/* Dica activa */}
         {!isFinished && activeTeam && (
-          <div className="rounded-2xl px-8 py-5 border flex items-center gap-4" style={teamPanelStyle(activeTeam, { strong: true })}>
+          <div className="rounded-2xl px-[clamp(1rem,2vw,2rem)] py-[clamp(0.5rem,1.3vh,1.25rem)] border flex items-center gap-4 shrink-0" style={teamPanelStyle(activeTeam, { strong: true })}>
             <span className="w-4 h-4 rounded-[5px] shrink-0" style={{ background: TEAM_GRADIENT[activeTeam] }} />
             <div className="flex-1">
-              <p className={`${vwSerif.className} text-2xl font-semibold flex items-center gap-2`}>
+              <p className={`${vwSerif.className} text-[clamp(1rem,2.5vh,1.5rem)] font-semibold flex items-center gap-2`}>
                 Vez da equipa {TEAM_LABELS[activeTeam]}
                 {isHinting && (
-                  <span className="text-lg font-normal flex items-center gap-1" style={{ color: VW.mut }}>
+                  <span className="text-[clamp(0.8rem,1.9vh,1.125rem)] font-normal flex items-center gap-1" style={{ color: VW.mut }}>
                     o arauto está a dar a dica<BlipDots className="ml-1" />
                   </span>
                 )}
               </p>
               {!isHinting && session.current_hint && (
-                <p className={`${vwSerif.className} text-5xl font-semibold tracking-wide mt-2`}>
+                <p className={`${vwSerif.className} text-[clamp(1.5rem,4.4vh,3rem)] font-semibold tracking-wide mt-1`}>
                   «{session.current_hint}»
-                  <span className="ml-4 text-3xl" style={{ color: VW.mut }}>×{session.current_hint_number}</span>
+                  <span className="ml-4 text-[clamp(1rem,2.9vh,1.875rem)]" style={{ color: VW.mut }}>×{session.current_hint_number}</span>
                 </p>
               )}
             </div>
             {!isHinting ? (
-              <p className={`${vwSerif.className} text-4xl font-semibold`} style={{ color: activeTeam === 'a' ? VW.amber : VW.blue }}>
+              <p className={`${vwSerif.className} text-[clamp(1.25rem,3.5vh,2.25rem)] font-semibold`} style={{ color: activeTeam === 'a' ? VW.amber : VW.blue }}>
                 {session.guesses_remaining} restante(s)
               </p>
             ) : (
               <span
-                className="text-sm font-bold uppercase tracking-widest rounded-full px-4 py-2 border"
+                className="text-[clamp(0.65rem,1.4vh,0.875rem)] font-bold uppercase tracking-widest rounded-full px-4 py-2 border"
                 style={{ color: activeTeam === 'a' ? VW.amber : VW.blue, borderColor: activeTeam === 'a' ? 'rgba(245,166,35,.5)' : 'rgba(63,140,255,.5)' }}
               >
                 A jogar
@@ -571,8 +603,8 @@ export function ProjectorView({ session: initSession, initialPlayers }: Projecto
           </div>
         )}
 
-        {/* Grelha */}
-        <div className="flex-1 flex flex-col justify-center">
+        {/* Grelha — flex-1 + min-h-0 para a grelha esticar/encolher e caber sempre no ecrã */}
+        <div className="flex-1 min-h-0 flex flex-col">
           <WordGrid
             words={words}
             guesses={guesses}
@@ -584,7 +616,7 @@ export function ProjectorView({ session: initSession, initialPlayers }: Projecto
         </div>
 
         {/* Equipas e Arautos em baixo */}
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-2 gap-4 shrink-0">
           {(['a', 'b'] as TeamId[]).map((tid) => {
             const team = tid === 'a' ? teamA : teamB
             const arauto = tid === 'a' ? arautoA : arautoB
@@ -593,18 +625,18 @@ export function ProjectorView({ session: initSession, initialPlayers }: Projecto
             const visible = ordered.slice(0, 4)
             const overflow = ordered.length - visible.length
             return (
-              <div key={tid} className="rounded-2xl p-4 border flex items-center gap-6" style={isWinner ? teamPanelStyle(tid, { strong: true }) : VW_PANEL_STYLE}>
-                <div className="min-w-[170px]">
-                  <p className={`${vwSerif.className} text-xl font-semibold`} style={{ color: tid === 'a' ? VW.amber : VW.blue }}>
+              <div key={tid} className="rounded-2xl px-4 py-[clamp(0.375rem,1vh,1rem)] border flex items-center gap-6" style={isWinner ? teamPanelStyle(tid, { strong: true }) : VW_PANEL_STYLE}>
+                <div className="min-w-[clamp(120px,12vw,170px)]">
+                  <p className={`${vwSerif.className} text-[clamp(0.9rem,2.1vh,1.25rem)] font-semibold`} style={{ color: tid === 'a' ? VW.amber : VW.blue }}>
                     Equipa {TEAM_LABELS[tid]}{isWinner && ' 🏆'}
                   </p>
-                  <p className="text-sm mt-0.5" style={{ color: VW.mut }}>Arauto: {arauto?.display_name ?? '—'}</p>
+                  <p className="text-[clamp(0.7rem,1.5vh,0.875rem)] mt-0.5" style={{ color: VW.mut }}>Arauto: {arauto?.display_name ?? '—'}</p>
                 </div>
                 <div className="flex gap-3 items-center ml-auto flex-wrap">
                   {visible.map((p) => (
-                    <Avatar key={p.id} initials={initials(p.display_name)} team={tid} isArauto={p.id === arauto?.id} avatarUrl={p.avatar_url} />
+                    <Avatar key={p.id} size={avatarSize} initials={initials(p.display_name)} team={tid} isArauto={p.id === arauto?.id} avatarUrl={p.avatar_url} />
                   ))}
-                  {overflow > 0 && <OverflowAvatar count={overflow} />}
+                  {overflow > 0 && <OverflowAvatar size={avatarSize} count={overflow} />}
                 </div>
               </div>
             )

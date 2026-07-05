@@ -58,7 +58,7 @@ export function WordGrid({
   }, [words])
 
   return (
-    <div className={`grid grid-cols-5 ${vwSans.className} ${large ? 'gap-3 lg:gap-4' : 'gap-1.5 sm:gap-2'}`}>
+    <div className={`grid grid-cols-5 ${vwSans.className} ${large ? 'grid-rows-5 flex-1 min-h-0 gap-[clamp(0.375rem,1.2vh,1rem)]' : 'gap-1.5 sm:gap-2'}`}>
       {sorted.map((word) => {
         const guessers = guessMap.get(word.id) ?? []
         const isSelected = guesses.some((g) => g.word_id === word.id && g.player_id === myPlayerId)
@@ -104,7 +104,7 @@ export function WordGrid({
             className={`
               relative rounded-lg border border-white/[.07] flex flex-col items-center justify-center text-center select-none
               ${large
-                ? 'rounded-2xl px-2 py-5 lg:py-8 min-h-[5.5rem] lg:min-h-[7rem]'
+                ? 'rounded-2xl px-2 py-1 min-h-0'
                 : 'px-0.5 py-2 sm:p-2 min-h-[3.25rem] sm:min-h-[4rem]'}
               ${interactive ? 'transition-all duration-150 cursor-pointer hover:brightness-110' : 'cursor-default'}
             `}
@@ -112,7 +112,7 @@ export function WordGrid({
             <span
               style={textStyle}
               className={`break-words hyphens-auto w-full tracking-wide ${large
-                ? 'text-xl lg:text-3xl'
+                ? 'leading-tight text-[clamp(0.875rem,1vw+1.6vh,1.875rem)]'
                 : 'text-[10px] leading-tight sm:text-sm'}`}
             >
               {word.word}
@@ -121,27 +121,27 @@ export function WordGrid({
             {/* Ponto indicador de palpite no canto (leitura rápida, do mockup) */}
             {guessers.length > 0 && !word.is_revealed && (
               <span
-                className={`absolute rounded-full ${large ? 'top-2 left-2 w-4 h-4' : 'top-1 left-1 w-2.5 h-2.5'}`}
+                className={`absolute rounded-full ${large ? 'top-1.5 left-1.5 w-[clamp(0.625rem,1.4vh,1rem)] h-[clamp(0.625rem,1.4vh,1rem)]' : 'top-1 left-1 w-2.5 h-2.5'}`}
                 style={{ background: VW.blue, boxShadow: '0 0 0 2px rgba(255,255,255,.85)' }}
               />
             )}
 
             {/* Nomes de quem votou */}
             {guessers.length > 0 && !word.is_revealed && (
-              <div className={`absolute left-0 right-0 flex justify-center gap-0.5 flex-wrap px-1 ${large ? 'bottom-2' : 'bottom-1'}`}>
+              <div className="absolute left-0 right-0 bottom-1 flex justify-center gap-0.5 flex-wrap px-1">
                 {guessers.slice(0, 4).map((p) => (
                   <span
                     key={p.id}
                     style={{ background: p.team === 'a' ? 'rgba(245,166,35,.85)' : 'rgba(63,140,255,.85)' }}
                     className={`rounded px-1 font-semibold truncate text-white
-                      ${large ? 'text-sm max-w-[5rem]' : 'text-[9px] max-w-[2rem]'}`}
+                      ${large ? 'text-[clamp(0.6rem,1.4vh,0.875rem)] max-w-[5rem]' : 'text-[9px] max-w-[2rem]'}`}
                     title={p.display_name}
                   >
                     {p.display_name.split(' ')[0]}
                   </span>
                 ))}
                 {guessers.length > 4 && (
-                  <span className={`text-white/60 ${large ? 'text-sm' : 'text-[9px]'}`}>+{guessers.length - 4}</span>
+                  <span className={`text-white/60 ${large ? 'text-[clamp(0.6rem,1.4vh,0.875rem)]' : 'text-[9px]'}`}>+{guessers.length - 4}</span>
                 )}
               </div>
             )}
@@ -151,7 +151,7 @@ export function WordGrid({
               <span className="absolute top-1 right-1.5 text-[11px] font-black" style={{ color: 'rgba(0,0,0,.55)' }}>✓</span>
             )}
             {word.is_revealed && !isKey && (
-              <span className={`opacity-70 ${large ? 'text-2xl mt-1' : 'text-[10px] mt-0.5'}`}>
+              <span className={`opacity-70 ${large ? 'text-[clamp(0.875rem,2.2vh,1.5rem)] mt-0.5' : 'text-[10px] mt-0.5'}`}>
                 {team === 'a' ? '🦁' : team === 'b' ? '🦅' : team === 'black' ? '💀' : '—'}
               </span>
             )}

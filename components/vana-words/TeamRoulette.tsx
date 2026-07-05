@@ -10,21 +10,27 @@ interface TeamRouletteProps {
   candidates: VanaWordsPlayer[]
   winner: VanaWordsPlayer
   onDone: () => void
+  /** Disparado `finaleLeadMs()` antes da roleta parar — para o SFX acabar em sintonia com a revelação */
+  onFinale?: () => void
+  /** Avanço em ms do onFinale (função para ler a duração do áudio só quando é preciso) */
+  finaleLeadMs?: () => number
   autoStart?: boolean
   /** true → mostra logo o vencedor, sem animação de roleta */
   instant?: boolean
 }
 
-export function TeamRoulette({ team, candidates, winner, onDone, autoStart = true, instant = false }: TeamRouletteProps) {
+export function TeamRoulette({ team, candidates, winner, onDone, onFinale, finaleLeadMs, autoStart = true, instant = false }: TeamRouletteProps) {
   const [current, setCurrent] = useState(instant ? winner : candidates[0])
   const [spinning, setSpinning] = useState(false)
   const [done, setDone] = useState(instant)
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const finaleFiredRef = useRef(false)
 
   useEffect(() => {
     if (instant) {
       setCurrent(winner)
       setDone(true)
+      onFinale?.()
       const t = setTimeout(onDone, 300)
       return () => clearTimeout(t)
     }
@@ -36,6 +42,7 @@ export function TeamRoulette({ team, candidates, winner, onDone, autoStart = tru
   function startSpin() {
     setSpinning(true)
     setDone(false)
+    finaleFiredRef.current = false
 
     let idx = 0
     let delay = 80
@@ -52,6 +59,11 @@ export function TeamRoulette({ team, candidates, winner, onDone, autoStart = tru
         delay = Math.max(60, delay - 2)
       } else {
         delay = Math.min(400, delay + 20)
+      }
+
+      if (!finaleFiredRef.current && onFinale && elapsed >= totalTime - (finaleLeadMs?.() ?? 1200)) {
+        finaleFiredRef.current = true
+        onFinale()
       }
 
       if (elapsed >= totalTime) {

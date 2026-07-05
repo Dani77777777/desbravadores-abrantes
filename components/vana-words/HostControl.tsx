@@ -614,14 +614,6 @@ export function HostControl({ session: initSession, initialPlayers, initialWords
                 {arauto?.arauto_response === 'pending' && (
                   <p className="text-slate-500 text-[11px]">⏳ A aguardar resposta</p>
                 )}
-                <button
-                  onClick={() => setArautoPicker(arautoPicker === tid ? null : tid)}
-                  className="text-slate-400 hover:text-white text-[11px] underline disabled:opacity-40"
-                  disabled={loading || (tid === 'a' ? teamA.length : teamB.length) < 2}
-                >
-                  Escolher outro
-                </button>
-                {arautoPicker === tid && <div className="pt-1">{renderArautoPicker(tid)}</div>}
               </div>
             )
           )}
