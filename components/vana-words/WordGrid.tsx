@@ -54,6 +54,17 @@ export function WordGrid({
     }
     if (newlyRevealed.length > 0) {
       setJustRevealedIds((s) => new Set([...s, ...newlyRevealed]))
+      // Retirar a animação depois de terminar: com fill 'both', o último
+      // keyframe (opacity 1) sobrepunha-se para sempre ao opacity .45 da
+      // grelha-chave — as palavras reveladas ao vivo nunca ficavam esbatidas
+      // (só após refresh, onde a animação não corre).
+      setTimeout(() => {
+        setJustRevealedIds((s) => {
+          const next = new Set(s)
+          for (const id of newlyRevealed) next.delete(id)
+          return next
+        })
+      }, 700)
     }
   }, [words])
 
@@ -80,6 +91,8 @@ export function WordGrid({
             boxShadow: isKey ? 'inset 0 0 0 2px rgba(255,255,255,.4)' : glow,
             opacity: isKey ? 0.45 : 1,
             animation: animate ? 'vw-popReveal .55s cubic-bezier(.2,.9,.3,1.2) both' : undefined,
+            // Esbate suavemente quando a animação de reveal é retirada
+            transition: 'opacity .4s ease',
           }
           textStyle = { color: pal.text, fontWeight: 800 }
         } else if (isKey && pal) {
