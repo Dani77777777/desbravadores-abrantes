@@ -21,11 +21,12 @@ import {
 import { WordGrid } from './WordGrid'
 import { TeamRoulette } from './TeamRoulette'
 import { HostBotOverlay } from './HostBotOverlay'
+import { WinnersShareCard } from './WinnersShareCard'
 import { TeamChip } from './ui'
 import { VW, VW_SCREEN_STYLE, VW_PANEL_STYLE, TEAM_GRADIENT, teamPanelStyle, vwSans, vwSerif } from './theme'
 import { TEAM_LABELS } from '@/types/vana-words'
 import type { VanaWordsSession, VanaWordsPlayer, VanaWordsWord, VanaWordsGuess, TeamId } from '@/types/vana-words'
-import { Users, Crown, RefreshCw, Play, CheckCircle2, Trophy, ArrowRight, Shuffle, MonitorPlay, Bot, Trash2, Minus, Plus, Copy, Check, Maximize2, Eye, EyeOff, X, Repeat, Volume2, VolumeX } from 'lucide-react'
+import { Users, Crown, RefreshCw, Play, CheckCircle2, Trophy, ArrowRight, Shuffle, MonitorPlay, Bot, Trash2, Minus, Plus, Copy, Check, Maximize2, Eye, EyeOff, X, Repeat, Volume2, VolumeX, Share2, Download } from 'lucide-react'
 
 interface HostControlProps {
   session: VanaWordsSession
@@ -52,6 +53,9 @@ export function HostControl({ session: initSession, initialPlayers, initialWords
   const [boardHidden, setBoardHidden] = useState(false)
   const [arautoPicker, setArautoPicker] = useState<TeamId | null>(null)
   const [musicEnabled, setMusicEnabled] = useState(true)
+  const [sharing, setSharing] = useState(false)
+  const [shareToast, setShareToast] = useState<string | null>(null)
+  const winnersCardRef = useRef<HTMLDivElement | null>(null)
 
   const router = useRouter()
   const supabase = createClient()
@@ -193,6 +197,74 @@ export function HostControl({ session: initSession, initialPlayers, initialWords
         </button>
       </div>
     )
+  }
+
+  // Gera a imagem da equipa vencedora e partilha (Web Share API) ou transfere
+  // — mesmo padrão do pódio do VanaQuest.
+  async function handleShareWinners() {
+    if (sharing) return
+    setSharing(true)
+    setShareToast(null)
+    try {
+      const { toPng } = await import('html-to-image')
+      const node = winnersCardRef.current
+      if (!node) throw new Error('Card não pronto')
+
+      const dataUrl = await toPng(node, {
+        pixelRatio: 2,
+        cacheBust: true,
+        backgroundColor: '#0a1022',
+      })
+
+      const winner = session.winner_team as TeamId | null
+      if (!winner) throw new Error('Sem equipa vencedora')
+      const label = TEAM_LABELS[winner]
+      const emoji = winner === 'a' ? '🦁' : '🦅'
+      const winners = players.filter((p) => p.team === winner)
+      const arauto = winners.find((p) => p.is_arauto)
+      const fileName = `vanawords-equipa-${label.toLowerCase()}-${Date.now()}.png`
+
+      // Mensagem apropriada para acompanhar a imagem
+      const today = new Date().toLocaleDateString('pt-PT', { day: 'numeric', month: 'long', year: 'numeric' })
+      const names = winners.map((p) => p.display_name.split(' ')[0])
+      const namesText = names.length > 1
+        ? `${names.slice(0, -1).join(', ')} e ${names[names.length - 1]}`
+        : names[0] ?? ''
+      const reason = session.win_reason === 'black_hit'
+        ? 'A equipa adversária revelou a palavra preta 💀'
+        : 'Encontraram todas as palavras da equipa!'
+      const text = `🔠 VanaWords — ${today}\n\n${emoji} A Equipa ${label} venceu! 🏆\n${reason}\n${arauto ? `👑 Arauto: ${arauto.display_name.split(' ')[0]}\n` : ''}🎉 Parabéns a ${namesText}!\n\nNão jogaste? Junta-te ao próximo VanaWords e ajuda a tua equipa a brilhar! 🌟`
+
+      // Tentar Web Share API (mobile)
+      try {
+        const res = await fetch(dataUrl)
+        const blob = await res.blob()
+        const file = new File([blob], fileName, { type: 'image/png' })
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+          await navigator.share({
+            files: [file],
+            title: `🏆 VanaWords — Equipa ${label} venceu!`,
+            text,
+          })
+          setShareToast('Partilhado!')
+          return
+        }
+      } catch {
+        // ignora, faz download
+      }
+
+      // Fallback: download
+      const link = document.createElement('a')
+      link.href = dataUrl
+      link.download = fileName
+      link.click()
+      setShareToast('Imagem transferida!')
+    } catch {
+      setShareToast('Erro ao gerar imagem')
+    } finally {
+      setSharing(false)
+      setTimeout(() => setShareToast(null), 3000)
+    }
   }
 
   const wordsA = words.filter((w) => w.team === 'a')
@@ -856,6 +928,22 @@ export function HostControl({ session: initSession, initialPlayers, initialWords
           </p>
         )}
 
+        {/* Partilhar imagem da equipa vencedora */}
+        {winner && (
+          <button
+            onClick={handleShareWinners}
+            disabled={sharing}
+            className="w-full max-w-sm py-3 rounded-2xl bg-white/10 hover:bg-white/15 disabled:opacity-50 border border-white/15 text-white font-bold flex items-center justify-center gap-2 transition-all"
+          >
+            {sharing ? 'A gerar imagem…' : <><Share2 className="w-4 h-4" /> Partilhar vitória</>}
+          </button>
+        )}
+        {shareToast && (
+          <div className="bg-blue-500/20 border border-blue-400/30 rounded-2xl px-4 py-3 text-blue-200 font-semibold text-center text-sm flex items-center justify-center gap-2">
+            <Download className="w-4 h-4" /> {shareToast}
+          </div>
+        )}
+
         {/* Apagar a sessão depois de terminada */}
         {!confirmDelete ? (
           <button
@@ -887,6 +975,21 @@ export function HostControl({ session: initSession, initialPlayers, initialWords
                 <Trash2 className="w-4 h-4" /> {loading ? 'A apagar…' : 'Apagar'}
               </button>
             </div>
+          </div>
+        )}
+
+        {/* Card escondido para captura (off-screen mas renderizado) */}
+        {winner && (
+          <div
+            style={{ position: 'fixed', left: '-99999px', top: 0, pointerEvents: 'none' }}
+            aria-hidden="true"
+          >
+            <WinnersShareCard
+              ref={winnersCardRef}
+              winners={players.filter((p) => p.team === winner)}
+              team={winner}
+              winReason={session.win_reason}
+            />
           </div>
         )}
       </div>
