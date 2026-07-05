@@ -23,6 +23,7 @@ import { TeamRoulette } from './TeamRoulette'
 import { HostBotOverlay } from './HostBotOverlay'
 import { WinnersShareCard } from './WinnersShareCard'
 import { TeamChip } from './ui'
+import { shortDisplayNames } from '@/utils/vana-words'
 import { VW, VW_SCREEN_STYLE, VW_PANEL_STYLE, TEAM_GRADIENT, teamPanelStyle, vwSans, vwSerif } from './theme'
 import { TEAM_LABELS } from '@/types/vana-words'
 import type { VanaWordsSession, VanaWordsPlayer, VanaWordsWord, VanaWordsGuess, TeamId } from '@/types/vana-words'
@@ -224,16 +225,18 @@ export function HostControl({ session: initSession, initialPlayers, initialWords
       const arauto = winners.find((p) => p.is_arauto)
       const fileName = `vanawords-equipa-${label.toLowerCase()}-${Date.now()}.png`
 
-      // Mensagem apropriada para acompanhar a imagem
+      // Mensagem apropriada para acompanhar a imagem. Nomes desambiguados:
+      // primeiro nome, ou "Primeiro Último" se houver homónimos na sessão.
+      const shortNames = shortDisplayNames(players)
       const today = new Date().toLocaleDateString('pt-PT', { day: 'numeric', month: 'long', year: 'numeric' })
-      const names = winners.map((p) => p.display_name.split(' ')[0])
+      const names = winners.map((p) => shortNames.get(p.id) ?? p.display_name)
       const namesText = names.length > 1
         ? `${names.slice(0, -1).join(', ')} e ${names[names.length - 1]}`
         : names[0] ?? ''
       const reason = session.win_reason === 'black_hit'
         ? 'A equipa adversária revelou a palavra preta 💀'
         : 'Encontraram todas as palavras da equipa!'
-      const text = `🔠 VanaWords — ${today}\n\n${emoji} A Equipa ${label} venceu! 🏆\n${reason}\n${arauto ? `👑 Arauto: ${arauto.display_name.split(' ')[0]}\n` : ''}🎉 Parabéns a ${namesText}!\n\nNão jogaste? Junta-te ao próximo VanaWords e ajuda a tua equipa a brilhar! 🌟`
+      const text = `🔠 VanaWords — ${today}\n\n${emoji} A Equipa ${label} venceu! 🏆\n${reason}\n${arauto ? `👑 Arauto: ${shortNames.get(arauto.id) ?? arauto.display_name}\n` : ''}🎉 Parabéns a ${namesText}!\n\nNão jogaste? Junta-te ao próximo VanaWords e ajuda a tua equipa a brilhar! 🌟`
 
       // Tentar Web Share API (mobile)
       try {
@@ -987,6 +990,7 @@ export function HostControl({ session: initSession, initialPlayers, initialWords
             <WinnersShareCard
               ref={winnersCardRef}
               winners={players.filter((p) => p.team === winner)}
+              allPlayers={players}
               team={winner}
               winReason={session.win_reason}
             />

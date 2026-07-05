@@ -918,11 +918,25 @@ export async function addVanaWordsBot(
   if (!session.is_test_session) return { error: 'Sessão não é de teste.' }
   if (session.status !== 'lobby') return { error: 'Só podes adicionar bots no lobby.' }
 
+  const name = displayName.trim()
+  if (!name) return { error: 'Nome inválido.' }
+
+  // Nomes duplicados baralham a impersonação, os votos e a partilha — recusar
+  // se já existir qualquer jogador (bot ou não) com o mesmo nome na sessão.
+  const { data: existing } = await service
+    .from('vanawords_players')
+    .select('display_name')
+    .eq('session_id', sessionId)
+  const duplicated = (existing ?? []).some(
+    (p) => p.display_name.trim().toLocaleLowerCase('pt-PT') === name.toLocaleLowerCase('pt-PT')
+  )
+  if (duplicated) return { error: `Já existe um jogador chamado "${name}" nesta sessão.` }
+
   const { data: bot, error } = await service
     .from('vanawords_players')
     .insert({
       session_id: sessionId,
-      display_name: displayName,
+      display_name: name,
       is_bot: true,
     })
     .select('id')

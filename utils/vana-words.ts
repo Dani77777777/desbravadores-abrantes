@@ -27,6 +27,27 @@ export const WORD_LIST = [
 // Remove duplicates that snuck in
 const UNIQUE_WORDS = [...new Set(WORD_LIST)]
 
+// ── Nomes curtos sem ambiguidade ─────────────────────────────
+// Primeiro nome de cada jogador; se houver outro jogador na sessão (qualquer
+// equipa) com o mesmo primeiro nome, usa "Primeiro Último" para os distinguir.
+export function shortDisplayNames(
+  players: { id: string; display_name: string }[],
+): Map<string, string> {
+  const firstNameCount = new Map<string, number>()
+  for (const p of players) {
+    const first = p.display_name.trim().split(/\s+/)[0]?.toLocaleLowerCase('pt-PT') ?? ''
+    firstNameCount.set(first, (firstNameCount.get(first) ?? 0) + 1)
+  }
+  const result = new Map<string, string>()
+  for (const p of players) {
+    const parts = p.display_name.trim().split(/\s+/)
+    const first = parts[0] ?? ''
+    const duplicated = (firstNameCount.get(first.toLocaleLowerCase('pt-PT')) ?? 0) > 1
+    result.set(p.id, duplicated && parts.length > 1 ? `${first} ${parts[parts.length - 1]}` : first)
+  }
+  return result
+}
+
 // ── Geração da grelha 5×5 ────────────────────────────────────
 export interface WordAssignment {
   word: string

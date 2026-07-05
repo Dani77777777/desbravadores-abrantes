@@ -3,12 +3,15 @@
 import { forwardRef } from 'react'
 import { VW, VW_SCREEN_STYLE, TEAM_GRADIENT, vwSans, vwSerif } from './theme'
 import { initials } from './ui'
+import { shortDisplayNames } from '@/utils/vana-words'
 import { TEAM_LABELS } from '@/types/vana-words'
 import type { VanaWordsPlayer, TeamId } from '@/types/vana-words'
 
 interface Props {
   /** Jogadores da equipa vencedora (o Arauto é destacado via is_arauto) */
   winners: VanaWordsPlayer[]
+  /** Todos os jogadores da sessão — para desambiguar primeiros nomes repetidos */
+  allPlayers?: VanaWordsPlayer[]
   team: TeamId
   winReason?: string | null
 }
@@ -21,11 +24,13 @@ interface Props {
  *  - Pronto para ser capturado por html-to-image
  */
 export const WinnersShareCard = forwardRef<HTMLDivElement, Props>(
-  ({ winners, team, winReason }, ref) => {
+  ({ winners, allPlayers, team, winReason }, ref) => {
     const label = TEAM_LABELS[team]
     const emoji = team === 'a' ? '🦁' : '🦅'
     const accent = team === 'a' ? VW.amber : VW.blue
     const rgb = team === 'a' ? '245,166,35' : '63,140,255'
+    // Primeiro nome, ou "Primeiro Último" quando há homónimos na sessão
+    const shortNames = shortDisplayNames(allPlayers ?? winners)
     // Com equipas grandes, encolhe os avatares para caber tudo no card
     const av = winners.length > 8 ? 100 : winners.length > 5 ? 116 : 132
 
@@ -128,7 +133,7 @@ export const WinnersShareCard = forwardRef<HTMLDivElement, Props>(
                   className="font-black text-center leading-tight"
                   style={{ color: VW.ink, fontSize: '1.25rem', marginTop: '10px', maxWidth: `${av + 42}px`, textShadow: '0 2px 6px rgba(0,0,0,.5)' }}
                 >
-                  {p.display_name.split(' ')[0]}
+                  {shortNames.get(p.id) ?? p.display_name}
                 </p>
                 {p.is_arauto && (
                   <p className="font-bold uppercase" style={{ color: VW.gold, fontSize: '0.8rem', letterSpacing: '0.15em' }}>
