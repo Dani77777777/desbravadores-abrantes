@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { createClient } from '@/utils/supabase/client'
 import { submitHint } from '@/lib/actions/vana-words'
 import { WordGrid } from './WordGrid'
@@ -26,6 +26,14 @@ export function ArautoView({ session: initSession, myPlayer, initialPlayers }: A
   const [error, setError] = useState<string | null>(null)
   const [submitted, setSubmitted] = useState(false)
 
+  // Guardas contra respostas obsoletas: um poll iniciado antes da dica ser
+  // aceite pelo servidor ainda traz current_phase='hinting' e, se for aplicado,
+  // faz o formulário reaparecer depois do "Dica enviada".
+  const pendingHint = useRef(false)
+  const hintConfirmedAt = useRef(0)
+  const sessionSeq = useRef(0)
+  const guessesSeq = useRef(0)
+
   const supabase = createClient()
 
   const fetchWords = useCallback(async () => {
@@ -35,37 +43,41 @@ export function ArautoView({ session: initSession, myPlayer, initialPlayers }: A
     if (data) setWords(data as VanaWordsWord[])
   }, [session.id, session.status])
 
+  const applySession = useCallback((next: VanaWordsSession, startedAt: number) => {
+    if (pendingHint.current || startedAt < hintConfirmedAt.current) return
+    setSession((s) => ({ ...s, ...next }))
+    if (next.current_phase === 'hinting') setSubmitted(false)
+  }, [])
+
+  const fetchSession = useCallback(async () => {
+    const seq = ++sessionSeq.current
+    const startedAt = Date.now()
+    const { data } = await supabase.from('vanawords_sessions').select('*').eq('id', session.id).maybeSingle()
+    if (!data || seq !== sessionSeq.current) return
+    applySession(data as VanaWordsSession, startedAt)
+  }, [session.id, applySession])
+
+  const fetchGuesses = useCallback(async () => {
+    const seq = ++guessesSeq.current
+    const { data } = await supabase.from('vanawords_guesses').select('*').eq('session_id', session.id)
+    if (data && seq === guessesSeq.current) setGuesses(data as VanaWordsGuess[])
+  }, [session.id])
+
   useEffect(() => {
     fetchWords()
-    supabase.from('vanawords_guesses').select('*').eq('session_id', session.id)
-      .then(({ data }) => { if (data) setGuesses(data as VanaWordsGuess[]) })
+    fetchGuesses()
 
     const chan = supabase.channel(`vanawords-arauto-${session.id}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'vanawords_sessions', filter: `id=eq.${session.id}` },
-        (payload) => {
-          const next = payload.new as VanaWordsSession
-          setSession((s) => ({ ...s, ...next }))
-          // Reset submitted when phase changes back to hinting
-          if (next.current_phase === 'hinting') setSubmitted(false)
-        })
+        (payload) => { applySession(payload.new as VanaWordsSession, Date.now()) })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'vanawords_guesses', filter: `session_id=eq.${session.id}` },
-        () => {
-          supabase.from('vanawords_guesses').select('*').eq('session_id', session.id)
-            .then(({ data }) => { if (data) setGuesses(data as VanaWordsGuess[]) })
-        })
+        () => { fetchGuesses() })
       .subscribe()
 
     // Reforço: sondagem periódica caso o realtime falhe (fase do turno / fim do jogo)
     const poll = setInterval(() => {
-      supabase.from('vanawords_sessions').select('*').eq('id', session.id).maybeSingle()
-        .then(({ data }) => {
-          if (!data) return
-          const next = data as VanaWordsSession
-          setSession((s) => ({ ...s, ...next }))
-          if (next.current_phase === 'hinting') setSubmitted(false)
-        })
-      supabase.from('vanawords_guesses').select('*').eq('session_id', session.id)
-        .then(({ data }) => { if (data) setGuesses(data as VanaWordsGuess[]) })
+      fetchSession()
+      fetchGuesses()
       // Refetch directo das palavras: não depender só do board_version mudar
       // no estado da sessão para descobrir que o host revelou uma palavra.
       fetchWords()
@@ -83,17 +95,28 @@ export function ArautoView({ session: initSession, myPlayer, initialPlayers }: A
 
   async function handleSubmitHint() {
     const hint = hintInput.trim()
-    if (!hint) return
+    if (!hint || pendingHint.current) return
     setError(null)
     // Feedback imediato: mostra "dica enviada" já, sem esperar pelo servidor
     setSubmitted(true)
     setHintInput('')
+    pendingHint.current = true
     const res = await submitHint(session.id, hint, hintNumber)
+    pendingHint.current = false
     if (res.error) {
       // Reverte o optimismo se o servidor recusar a dica
       setError(res.error)
       setSubmitted(false)
       setHintInput(hint)
+    } else {
+      hintConfirmedAt.current = Date.now()
+      // Reflecte já a fase de palpites sem esperar pelo realtime/poll
+      setSession((s) => ({
+        ...s,
+        current_phase: 'guessing',
+        current_hint: hint.toUpperCase(),
+        current_hint_number: hintNumber,
+      }))
     }
   }
 

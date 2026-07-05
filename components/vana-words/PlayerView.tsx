@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/utils/supabase/client'
 import { toggleGuess, requestVanaWordsSwap, respondArautoChoice } from '@/lib/actions/vana-words'
@@ -29,6 +29,16 @@ export function PlayerView({ session: initSession, myPlayer, initialPlayers, asB
   const [swapLoading, setSwapLoading] = useState(false)
   const [arautoResponseLoading, setArautoResponseLoading] = useState(false)
 
+  // Guardas contra respostas obsoletas: um poll de palpites iniciado antes do
+  // toggle ser gravado no servidor ainda não traz a marca nova e, se for
+  // aplicado depois, apaga a seleção optimista do jogador.
+  const pendingToggles = useRef(0)
+  const pendingWords = useRef<Set<string>>(new Set())
+  const toggleConfirmedAt = useRef(0)
+  const sessionSeq = useRef(0)
+  const guessesSeq = useRef(0)
+  const playersSeq = useRef(0)
+
   const supabase = createClient()
 
   const fetchWords = useCallback(async () => {
@@ -37,18 +47,24 @@ export function PlayerView({ session: initSession, myPlayer, initialPlayers, asB
   }, [session.id])
 
   const fetchGuesses = useCallback(async () => {
+    const seq = ++guessesSeq.current
+    const startedAt = Date.now()
     const { data } = await supabase.from('vanawords_guesses').select('*').eq('session_id', session.id)
-    if (data) setGuesses(data as VanaWordsGuess[])
+    if (!data || seq !== guessesSeq.current) return
+    if (pendingToggles.current > 0 || startedAt < toggleConfirmedAt.current) return
+    setGuesses(data as VanaWordsGuess[])
   }, [session.id])
 
   const fetchSession = useCallback(async () => {
+    const seq = ++sessionSeq.current
     const { data } = await supabase.from('vanawords_sessions').select('*').eq('id', session.id).maybeSingle()
-    if (data) setSession((s) => ({ ...s, ...(data as VanaWordsSession) }))
+    if (data && seq === sessionSeq.current) setSession((s) => ({ ...s, ...(data as VanaWordsSession) }))
   }, [session.id])
 
   const fetchPlayers = useCallback(async () => {
+    const seq = ++playersSeq.current
     const { data } = await supabase.from('vanawords_players').select('*').eq('session_id', session.id)
-    if (data) setPlayers(data as VanaWordsPlayer[])
+    if (data && seq === playersSeq.current) setPlayers(data as VanaWordsPlayer[])
   }, [session.id])
 
   useEffect(() => {
@@ -104,6 +120,9 @@ export function PlayerView({ session: initSession, myPlayer, initialPlayers, asB
   }, [session.status, myPlayerLive.is_arauto])
 
   async function handleWordClick(wordId: string) {
+    // Ignora cliques repetidos na mesma palavra enquanto o toggle está em curso
+    // (dois inserts em corrida criavam palpites duplicados impossíveis de desmarcar)
+    if (pendingWords.current.has(wordId)) return
     setError(null)
     // Feedback optimista: mostra a seleção já, sem esperar pelo servidor
     const alreadySelected = guesses.some((g) => g.word_id === wordId && g.player_id === effectivePlayerId)
@@ -117,8 +136,13 @@ export function PlayerView({ session: initSession, myPlayer, initialPlayers, asB
           created_at: new Date().toISOString(),
         }])
 
+    pendingWords.current.add(wordId)
+    pendingToggles.current++
     // Passa asBotId quando em modo de impersonação
     const res = await toggleGuess(session.id, wordId, asBotId)
+    pendingToggles.current--
+    pendingWords.current.delete(wordId)
+    toggleConfirmedAt.current = Date.now()
     if (res?.error) setError(res.error)
     // Reconcilia com o servidor (cobre erros e corridas com o realtime, que pode falhar p/ DELETE)
     await fetchGuesses()

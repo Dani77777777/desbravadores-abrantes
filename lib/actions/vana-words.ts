@@ -597,15 +597,19 @@ export async function toggleGuess(
     playerId = me.id
   }
 
+  // Lista (não maybeSingle): se alguma corrida tiver criado palpites
+  // duplicados, maybeSingle devolvia erro e o toggle inseria em vez de
+  // remover — a palavra ficava impossível de desmarcar.
   const { data: existing } = await service
     .from('vanawords_guesses')
     .select('id')
     .eq('word_id', wordId)
     .eq('player_id', playerId)
-    .maybeSingle()
 
-  if (existing) {
-    await service.from('vanawords_guesses').delete().eq('id', existing.id)
+  if (existing && existing.length > 0) {
+    await service.from('vanawords_guesses').delete()
+      .eq('word_id', wordId)
+      .eq('player_id', playerId)
   } else {
     await service.from('vanawords_guesses').insert({
       session_id: sessionId,
