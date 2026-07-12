@@ -14,6 +14,7 @@ import { Button } from '@/components/ui/button'
 import { User, Trophy, Coins, Megaphone, ScanLine, History, ListChecks, CheckCircle2, Clock, CalendarDays } from 'lucide-react'
 
 import { LandingPage } from '@/components/landing/LandingPage'
+import { getJAEvents, filterJAEventsForSection } from '@/utils/ja-agenda'
 
 const SECTION_COLORS = {
   rebentos: 'bg-emerald-600',
@@ -74,6 +75,15 @@ export default async function Dashboard() {
     .order('start_at', { ascending: true })
 
   if (!profile) return <div>Perfil não encontrado.</div>
+
+  // Eventos públicos da Juventude Adventista (cache de 6h; [] se o site falhar).
+  // Filtrados pela secção pessoal do membro, independentemente do cargo;
+  // eventos sem secção reconhecida (ou perfis sem secção) aparecem sempre.
+  const jaEvents = filterJAEventsForSection(await getJAEvents(), profile.section)
+
+  const allEvents = [...(events || []), ...jaEvents].sort(
+    (a, b) => new Date(a.start_at).getTime() - new Date(b.start_at).getTime()
+  )
 
   // Fetch tasks for this user (global ones + their section's tasks)
   const { data: tasks } = await supabase
@@ -228,7 +238,7 @@ export default async function Dashboard() {
 
             {/* Events Agenda & Calendar Section */}
             <div>
-                <EventDashboard events={events || []} profile={profile} surveys={surveys || []} userId={user.id} />
+                <EventDashboard events={allEvents} profile={profile} surveys={surveys || []} userId={user.id} />
             </div>
         </div>
 
