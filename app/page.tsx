@@ -8,6 +8,7 @@ import { GoldTransferDialog } from '@/components/profile/GoldTransferDialog'
 
 // ... lines 7-9 ...
 import { TaskCompleteButton } from '@/components/tasks/TaskCompleteButton'
+import { AnnouncementsFeed } from '@/components/dashboard/AnnouncementsFeed'
 import { EventDashboard } from '@/components/events/EventDashboard'
 import { Button } from '@/components/ui/button'
 // ... (adding import at top) ...
@@ -66,6 +67,16 @@ export default async function Dashboard() {
   const { data: announcements } = await announcementsQuery
     .order('created_at', { ascending: false })
     .limit(10)
+
+  // Só os avisos das últimas 3 semanas aparecem por defeito;
+  // os mais antigos ficam atrás de um botão "Ver avisos antigos"
+  const threeWeeksAgo = Date.now() - 21 * 24 * 60 * 60 * 1000
+  const recentAnnouncements = (announcements || []).filter(
+    a => new Date(a.created_at).getTime() >= threeWeeksAgo
+  )
+  const olderAnnouncements = (announcements || []).filter(
+    a => new Date(a.created_at).getTime() < threeWeeksAgo
+  )
 
   // Fetch Events
   const { data: events } = await supabase
@@ -206,34 +217,7 @@ export default async function Dashboard() {
                 <h2 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
                     <Megaphone className="w-5 h-5 text-blue-700" /> Avisos e Novidades
                 </h2>
-                <div className="space-y-4">
-                    {announcements && announcements.length > 0 ? (
-                        announcements.map((announcement) => (
-                            <Card key={announcement.id} className="border-none shadow-sm overflow-hidden">
-                                <div className="h-1 bg-blue-600 w-full opacity-20" />
-                                <CardContent className="p-5">
-                                    <div className="flex justify-between items-start mb-2">
-                                        <h3 className="font-bold text-gray-900 transition-colors">
-                                            {announcement.title}
-                                        </h3>
-                                        <span className="text-[10px] text-gray-400 font-medium whitespace-nowrap">
-                                            {new Date(announcement.created_at).toLocaleDateString('pt-PT')}
-                                        </span>
-                                    </div>
-                                    <p className="text-sm text-gray-600 leading-relaxed line-clamp-3">
-                                        {announcement.message}
-                                    </p>
-                                </CardContent>
-                            </Card>
-                        ))
-                    ) : (
-                        <Card className="border-dashed border-2 bg-transparent shadow-none">
-                            <CardContent className="py-10 text-center">
-                                <p className="text-gray-500 italic">Nenhum aviso de momento.</p>
-                            </CardContent>
-                        </Card>
-                    )}
-                </div>
+                <AnnouncementsFeed recent={recentAnnouncements} older={olderAnnouncements} />
             </div>
 
             {/* Events Agenda & Calendar Section */}
