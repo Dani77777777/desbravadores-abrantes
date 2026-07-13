@@ -55,6 +55,17 @@ export default async function GamesHubPage() {
       requiresAuth: true,
     },
     {
+      id: 'vana-sketch',
+      title: 'VanaSketch',
+      description: 'Pictionary bíblico! Um desenha no telemóvel, o desenho aparece no projetor e os outros adivinham.',
+      icon: <img src="/images/VanaSketch.png" alt="VanaSketch" className="w-12 h-12 object-contain" />,
+      href: '/jogos/vana-sketch',
+      loginHref: '/login?redirect=/jogos/vana-sketch',
+      color: 'from-pink-500 via-rose-600 to-indigo-800',
+      status: 'Disponível',
+      requiresAuth: true,
+    },
+    {
       id: 'em-breve',
       title: 'Em Breve...',
       description: 'Mais desafios estão a ser preparados pelos teus líderes!',

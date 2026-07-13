@@ -1,0 +1,377 @@
+'use client'
+
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { useRouter } from 'next/navigation'
+import Link from 'next/link'
+import { createClient } from '@/utils/supabase/client'
+import {
+  startVanaSketchGame,
+  chooseSketchWord,
+  endSketchRound,
+  nextSketchRound,
+  awardVanaSketchPoints,
+  deleteVanaSketchSession,
+} from '@/lib/actions/vana-sketch'
+import type { VanaSketchSession, VanaSketchPlayer, VanaSketchGuess } from '@/types/vana-sketch'
+import { useSketchSession, useSketchPlayers, useSketchGuesses } from './useSketchSession'
+import { CanvasViewer } from './CanvasViewer'
+import { SketchAvatar, CountdownBadge, useCountdown } from './ui'
+import { VS, VS_SCREEN_STYLE, vsHand, vsSans } from './theme'
+import {
+  Play, MonitorPlay, SkipForward, ArrowRight, Trophy, Trash2, Dices, Eye, Users, Flag,
+} from 'lucide-react'
+
+interface HostControlProps {
+  session: VanaSketchSession
+  initialPlayers: VanaSketchPlayer[]
+}
+
+export function HostControl({ session: initialSession, initialPlayers }: HostControlProps) {
+  const [session, setSession] = useState<VanaSketchSession>(initialSession)
+  const [players, setPlayers] = useState<VanaSketchPlayer[]>(initialPlayers)
+  const [guesses, setGuesses] = useState<VanaSketchGuess[]>([])
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const router = useRouter()
+
+  useSketchSession(session.id, (row) => setSession(row as VanaSketchSession))
+  useSketchPlayers(session.id, (rows) => setPlayers(rows as VanaSketchPlayer[]))
+  useSketchGuesses(session.id, session.round_number, (rows) => setGuesses(rows as VanaSketchGuess[]))
+
+  const drawer = players.find((p) => p.id === session.drawer_player_id)
+  const sorted = useMemo(() => [...players].sort((a, b) => b.score - a.score), [players])
+
+  // Definições do jogo (lobby)
+  const [roundsPerPlayer, setRoundsPerPlayer] = useState(1)
+  const [drawSeconds, setDrawSeconds] = useState(90)
+
+  // Palavra secreta visível ao host
+  const [secretWord, setSecretWord] = useState<string | null>(null)
+  useEffect(() => {
+    setSecretWord(null)
+    if (session.status !== 'playing' || session.phase === 'round_end') return
+    let cancelled = false
+    const supabase = createClient()
+    const load = async () => {
+      const { data } = await supabase.rpc('get_vanasketch_drawer_info', { p_session_id: session.id })
+      if (!cancelled && data && data.length > 0) setSecretWord(data[0].word)
+    }
+    load()
+    const t = setInterval(load, 3000)
+    return () => { cancelled = true; clearInterval(t) }
+  }, [session.id, session.round_number, session.phase, session.status])
+
+  // Watchdog do relógio: quando o tempo acaba, o host fecha a ronda
+  const timeoutFiredRef = useRef<string | null>(null)
+  const left = useCountdown(session.round_ends_at)
+  useEffect(() => {
+    if (session.status !== 'playing' || session.phase !== 'drawing') return
+    if (left !== 0 || !session.round_ends_at) return
+    const key = `${session.round_number}`
+    if (timeoutFiredRef.current === key) return
+    timeoutFiredRef.current = key
+    endSketchRound(session.id, 'timeout').then((res) => {
+      // Se o servidor recusar (ex.: relógio do host adiantado), tenta de novo
+      if (res?.error) {
+        setTimeout(() => {
+          if (timeoutFiredRef.current === key) timeoutFiredRef.current = null
+        }, 2000)
+      }
+    })
+  }, [left, session])
+
+  async function run(fn: () => Promise<{ error?: string } | void>) {
+    setBusy(true)
+    setError(null)
+    const res = await fn()
+    if (res && 'error' in res && res.error) setError(res.error)
+    setBusy(false)
+  }
+
+  const correctCount = guesses.filter((g) => g.is_correct).length
+
+  return (
+    <div className={`min-h-screen ${vsSans.className}`} style={VS_SCREEN_STYLE}>
+      <div className="mx-auto flex min-h-screen w-full max-w-3xl flex-col gap-4 p-4">
+        {/* Cabeçalho */}
+        <header className="flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <img src="/images/VanaSketch.png" alt="VanaSketch" className="h-10 w-10 object-contain" />
+            <div>
+              <p className={`${vsHand.className} text-2xl font-bold leading-none`}>VanaSketch — Controlo</p>
+              <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: VS.mut }}>
+                Código <span className="font-mono text-white">{session.code}</span>
+                {session.status === 'playing' && ` · Ronda ${session.round_number}/${session.total_rounds}`}
+              </p>
+            </div>
+          </div>
+          <Link
+            href={`/jogos/vana-sketch/${session.id}/present`}
+            target="_blank"
+            className="flex items-center gap-2 rounded-xl border px-3 py-2 text-sm font-bold hover:bg-white/10"
+            style={{ borderColor: VS.pline }}
+          >
+            <MonitorPlay className="h-4 w-4" style={{ color: VS.amber }} /> Projetor
+          </Link>
+        </header>
+
+        {error && (
+          <p className="rounded-xl border border-red-400/40 bg-red-500/10 px-4 py-2 text-sm font-semibold text-red-300">
+            {error}
+          </p>
+        )}
+
+        {/* ── Lobby ─────────────────────────────────────────── */}
+        {session.status === 'lobby' && (
+          <>
+            <section className="rounded-2xl border p-4" style={{ background: VS.panel, borderColor: VS.pline }}>
+              <p className="mb-3 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider" style={{ color: VS.mut }}>
+                <Users className="h-3.5 w-3.5" /> Jogadores ({players.length})
+              </p>
+              {players.length === 0 ? (
+                <p className="text-sm" style={{ color: VS.mut }}>
+                  Partilha o código <span className="font-mono font-black text-white">{session.code}</span> — os jogadores entram em Jogos → VanaSketch.
+                </p>
+              ) : (
+                <div className="flex flex-wrap gap-2">
+                  {players.map((p) => (
+                    <div key={p.id} className="flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 py-1 pl-1 pr-3">
+                      <SketchAvatar name={p.display_name} avatarUrl={p.avatar_url} size={26} />
+                      <span className="text-xs font-semibold">{p.display_name.split(' ')[0]}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
+
+            <section className="space-y-4 rounded-2xl border p-4" style={{ background: VS.panel, borderColor: VS.pline }}>
+              <div>
+                <p className="mb-2 text-xs font-bold uppercase tracking-wider" style={{ color: VS.mut }}>Voltas (cada um desenha…)</p>
+                <div className="flex gap-2">
+                  {[1, 2, 3].map((n) => (
+                    <button
+                      key={n}
+                      type="button"
+                      onClick={() => setRoundsPerPlayer(n)}
+                      className="flex-1 rounded-xl border py-2.5 font-bold transition-colors"
+                      style={{
+                        borderColor: roundsPerPlayer === n ? VS.pink : VS.pline,
+                        background: roundsPerPlayer === n ? 'rgba(255,93,162,.15)' : 'transparent',
+                      }}
+                    >
+                      {n}×
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <p className="mb-2 text-xs font-bold uppercase tracking-wider" style={{ color: VS.mut }}>Tempo para desenhar</p>
+                <div className="flex gap-2">
+                  {[60, 90, 120].map((s) => (
+                    <button
+                      key={s}
+                      type="button"
+                      onClick={() => setDrawSeconds(s)}
+                      className="flex-1 rounded-xl border py-2.5 font-bold transition-colors"
+                      style={{
+                        borderColor: drawSeconds === s ? VS.pink : VS.pline,
+                        background: drawSeconds === s ? 'rgba(255,93,162,.15)' : 'transparent',
+                      }}
+                    >
+                      {s}s
+                    </button>
+                  ))}
+                </div>
+              </div>
+              {players.length > 0 && (
+                <p className="text-xs" style={{ color: VS.mut }}>
+                  {players.length} jogador{players.length !== 1 ? 'es' : ''} × {roundsPerPlayer} = {players.length * roundsPerPlayer} ronda{players.length * roundsPerPlayer !== 1 ? 's' : ''}
+                  {' '}(~{Math.round((players.length * roundsPerPlayer * (drawSeconds + 25)) / 60)} min)
+                </p>
+              )}
+            </section>
+
+            <button
+              type="button"
+              disabled={busy || players.length < 2}
+              onClick={() => run(() => startVanaSketchGame(session.id, { roundsPerPlayer, drawSeconds }))}
+              className="flex items-center justify-center gap-2 rounded-2xl py-4 text-lg font-black text-white shadow-lg disabled:opacity-40"
+              style={{ background: 'linear-gradient(160deg,#ff8fc0,#ff5da2)' }}
+            >
+              <Play className="h-5 w-5" /> Começar o Jogo
+            </button>
+            {players.length < 2 && (
+              <p className="text-center text-xs" style={{ color: VS.mut }}>São precisos pelo menos 2 jogadores.</p>
+            )}
+
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => run(async () => {
+                const res = await deleteVanaSketchSession(session.id)
+                if (!res.error) router.push('/admin/vana-sketch')
+                return res
+              })}
+              className="flex items-center justify-center gap-2 rounded-xl border border-red-400/30 py-2.5 text-sm font-semibold text-red-300 hover:bg-red-500/10"
+            >
+              <Trash2 className="h-4 w-4" /> Apagar sessão
+            </button>
+          </>
+        )}
+
+        {/* ── A decorrer ────────────────────────────────────── */}
+        {session.status === 'playing' && (
+          <>
+            <section className="flex items-center justify-between rounded-2xl border px-4 py-3" style={{ background: VS.panel, borderColor: VS.pline }}>
+              <div className="flex items-center gap-3">
+                {drawer && <SketchAvatar name={drawer.display_name} avatarUrl={drawer.avatar_url} size={40} highlight />}
+                <div>
+                  <p className="text-[11px] font-bold uppercase tracking-wider" style={{ color: VS.mut }}>A desenhar</p>
+                  <p className="font-bold leading-tight">{drawer?.display_name ?? '…'}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="rounded-xl border px-3 py-1.5 text-right" style={{ borderColor: VS.pline }}>
+                  <p className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider" style={{ color: VS.mut }}>
+                    <Eye className="h-3 w-3" /> Palavra
+                  </p>
+                  <p className={`${vsHand.className} text-2xl font-bold leading-none`} style={{ color: VS.pink }}>
+                    {session.phase === 'round_end' ? session.revealed_word : secretWord ?? '…'}
+                  </p>
+                </div>
+                {session.phase === 'drawing' && <CountdownBadge endsAt={session.round_ends_at} />}
+              </div>
+            </section>
+
+            {session.phase === 'choosing' && (
+              <section className="space-y-3 rounded-2xl border p-4 text-center" style={{ background: VS.panel, borderColor: VS.pline }}>
+                <p style={{ color: VS.mut }}>
+                  {drawer?.display_name.split(' ')[0] ?? 'O desenhador'} está a escolher a palavra…
+                </p>
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => run(() => chooseSketchWord(session.id, -1))}
+                  className="mx-auto flex items-center gap-2 rounded-xl border px-4 py-2 text-sm font-bold hover:bg-white/10"
+                  style={{ borderColor: VS.pline }}
+                >
+                  <Dices className="h-4 w-4" style={{ color: VS.amber }} /> Escolher aleatória (se demorar)
+                </button>
+              </section>
+            )}
+
+            {(session.phase === 'drawing' || session.phase === 'round_end') && (
+              <CanvasViewer
+                sessionId={session.id}
+                roundNumber={session.round_number}
+                canvasVersion={session.canvas_version}
+                className="rounded-2xl border-4 border-white/20 shadow-2xl"
+              />
+            )}
+
+            {session.phase === 'drawing' && (
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-sm font-semibold" style={{ color: VS.mut }}>
+                  {correctCount} de {Math.max(0, players.length - 1)} acertaram
+                </p>
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => run(() => endSketchRound(session.id, 'skipped'))}
+                  className="flex items-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-bold hover:bg-white/10"
+                  style={{ borderColor: VS.pline }}
+                >
+                  <SkipForward className="h-4 w-4" /> Terminar ronda já
+                </button>
+              </div>
+            )}
+
+            {session.phase === 'round_end' && (
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => run(() => nextSketchRound(session.id))}
+                className="flex items-center justify-center gap-2 rounded-2xl py-4 text-lg font-black text-white shadow-lg disabled:opacity-40"
+                style={{ background: 'linear-gradient(160deg,#ff8fc0,#ff5da2)' }}
+              >
+                {session.round_number >= session.total_rounds ? (
+                  <><Flag className="h-5 w-5" /> Terminar o Jogo</>
+                ) : (
+                  <><ArrowRight className="h-5 w-5" /> Próxima Ronda ({session.round_number + 1}/{session.total_rounds})</>
+                )}
+              </button>
+            )}
+
+            {/* Placar compacto */}
+            <section className="rounded-2xl border" style={{ background: VS.panel, borderColor: VS.pline }}>
+              <p className="border-b px-4 py-2 text-xs font-bold uppercase tracking-wider" style={{ color: VS.mut, borderColor: VS.pline }}>Placar</p>
+              <div className="max-h-56 space-y-0.5 overflow-y-auto p-2">
+                {sorted.map((p, i) => (
+                  <div key={p.id} className="flex items-center gap-2 rounded-lg px-2 py-1 text-sm">
+                    <span className="w-5 text-center font-black" style={{ color: VS.mut }}>{i + 1}</span>
+                    <span className="min-w-0 flex-1 truncate font-semibold">{p.display_name}</span>
+                    <span className="font-black tabular-nums" style={{ color: VS.amber }}>{p.score}</span>
+                  </div>
+                ))}
+              </div>
+            </section>
+          </>
+        )}
+
+        {/* ── Terminado ─────────────────────────────────────── */}
+        {session.status === 'finished' && (
+          <>
+            <section className="rounded-2xl border p-4" style={{ background: VS.panel, borderColor: VS.pline }}>
+              <p className="mb-3 flex items-center gap-2 text-lg font-black">
+                <Trophy className="h-5 w-5" style={{ color: VS.amber }} /> Resultado final
+              </p>
+              <div className="space-y-1.5">
+                {sorted.map((p, i) => (
+                  <div key={p.id} className="flex items-center gap-2.5 text-sm">
+                    <span className="w-7 text-center text-lg">{['🥇', '🥈', '🥉'][i] ?? `${i + 1}º`}</span>
+                    <SketchAvatar name={p.display_name} avatarUrl={p.avatar_url} size={28} />
+                    <span className="min-w-0 flex-1 truncate font-bold">{p.display_name}</span>
+                    <span className="font-black tabular-nums" style={{ color: VS.amber }}>{p.score}</span>
+                  </div>
+                ))}
+              </div>
+            </section>
+
+            {!session.rewards_awarded ? (
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => run(async () => {
+                  const res = await awardVanaSketchPoints(session.id)
+                  if (!res.error) setSession((s) => ({ ...s, rewards_awarded: true }))
+                  return res
+                })}
+                className="flex items-center justify-center gap-2 rounded-2xl py-4 text-lg font-black text-white shadow-lg disabled:opacity-40"
+                style={{ background: 'linear-gradient(160deg,#ffc65b,#f0951b)' }}
+              >
+                <Trophy className="h-5 w-5" /> Atribuir XP e Gold
+              </button>
+            ) : (
+              <p className="rounded-xl border border-emerald-400/40 bg-emerald-500/10 px-4 py-3 text-center text-sm font-bold text-emerald-300">
+                ✓ Recompensas atribuídas
+              </p>
+            )}
+
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => run(async () => {
+                const res = await deleteVanaSketchSession(session.id)
+                if (!res.error) router.push('/admin/vana-sketch')
+                return res
+              })}
+              className="flex items-center justify-center gap-2 rounded-xl border border-red-400/30 py-2.5 text-sm font-semibold text-red-300 hover:bg-red-500/10"
+            >
+              <Trash2 className="h-4 w-4" /> Apagar sessão
+            </button>
+          </>
+        )}
+      </div>
+    </div>
+  )
+}
