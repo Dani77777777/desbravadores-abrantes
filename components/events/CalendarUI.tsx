@@ -37,10 +37,12 @@ export function CalendarUI({ events, onSelectDate, selectedDate }: CalendarUIPro
     const isToday = date.toDateString() === new Date().toDateString()
     const isSelected = selectedDate?.toDateString() === date.toDateString()
     
-    const hasEvents = events.some(e => {
+    const dayEvents = events.filter(e => {
       const eventDate = new Date(e.start_at)
       return eventDate.toDateString() === date.toDateString()
     })
+    const hasClubEvents = dayEvents.some(e => e.source !== 'ja')
+    const hasJAEvents = dayEvents.some(e => e.source === 'ja')
 
     days.push(
       <button
@@ -51,8 +53,11 @@ export function CalendarUI({ events, onSelectDate, selectedDate }: CalendarUIPro
         `}
       >
         <span className="text-sm">{d}</span>
-        {hasEvents && !isSelected && (
-          <div className="absolute bottom-1.5 w-1 h-1 bg-blue-500 rounded-full" />
+        {!isSelected && (hasClubEvents || hasJAEvents) && (
+          <div className="absolute bottom-1.5 flex items-center gap-0.5">
+            {hasClubEvents && <div className="w-1 h-1 bg-blue-500 rounded-full" />}
+            {hasJAEvents && <div className="w-1 h-1 bg-amber-500 rounded-full" />}
+          </div>
         )}
       </button>
     )

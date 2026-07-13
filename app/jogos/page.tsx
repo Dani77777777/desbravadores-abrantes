@@ -44,6 +44,17 @@ export default async function GamesHubPage() {
       requiresAuth: false,
     },
     {
+      id: 'vana-words',
+      title: 'VanaWords',
+      description: 'Jogo de palavras secretas ao estilo Codenames! Guia a tua equipa com dicas e descobre as palavras certas.',
+      icon: <img src="/images/VanaWords.png" alt="VanaWords" className="w-12 h-12 object-contain" />,
+      href: '/jogos/vana-words',
+      loginHref: '/login?redirect=/jogos/vana-words',
+      color: 'from-emerald-600 via-teal-700 to-indigo-800',
+      status: 'Disponível',
+      requiresAuth: true,
+    },
+    {
       id: 'vana-camp',
       title: 'VanaCamp: Infiltrados',
       description: 'Jogo de dedução e aventura do clube. Descobre quem sabota o acampamento antes que seja tarde.',
@@ -124,9 +135,8 @@ export default async function GamesHubPage() {
                 <CardHeader className="flex-1">
                   <div className="flex justify-between items-start">
                     <CardTitle className="text-2xl font-bold">{game.title}</CardTitle>
-                    <span className={`text-[10px] font-bold px-2 py-1 rounded-full uppercase ${
-                      isAvailable ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
-                    }`}>
+                    <span className={`text-[10px] font-bold px-2 py-1 rounded-full uppercase ${isAvailable ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
+                      }`}>
                       {game.status}
                     </span>
                   </div>

@@ -6,6 +6,7 @@ import { submitAnswer, setRewardsRecipient, skipRewards } from '@/lib/actions/va
 import { CheckCircle2, XCircle, Trophy, Zap, Flame, Users, ArrowUp, Crown } from 'lucide-react'
 import { PlayerAvatar } from './PlayerAvatar'
 import { useLiveSession } from './useLiveSession'
+import { calcSessionRewards, streakMultiplier, MAX_SESSION_GOLD, MAX_SESSION_XP } from '@/utils/vana-quest'
 
 const OPTION_COLORS = [
   'bg-red-500 active:bg-red-700',
@@ -84,6 +85,8 @@ export function PlayerScreen({ sessionId, userId, userProfile, initialSession, q
   const [kicked, setKicked] = useState(false)
   // Posição na classificação (rank) + pontos para subir
   const [rankInfo, setRankInfo] = useState<{ rank: number; total: number; pointsToNext: number | null }>({ rank: 0, total: 0, pointsToNext: null })
+  // Pontos do 1.º classificado — define a escala do limite de prémios (500🪙/1000⭐)
+  const [topPoints, setTopPoints] = useState(0)
 
   const isGuest = !userId
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -204,6 +207,7 @@ export function PlayerScreen({ sessionId, userId, userProfile, initialSession, q
       .order('total_points', { ascending: false })
       .then(({ data }) => {
         if (!data) return
+        setTopPoints(Number(data[0]?.total_points) || 0)
         const idx = data.findIndex((p) => p.id === participantId)
         if (idx === -1) return
         const me = Number(data[idx].total_points) || 0
@@ -412,9 +416,9 @@ export function PlayerScreen({ sessionId, userId, userProfile, initialSession, q
     m.full_name.toLowerCase().includes(donationSearch.toLowerCase())
   )
 
-  // Calculated rewards (rounded half-up)
-  const goldEarned = Math.round(totalPoints)
-  const xpEarned = goldEarned * 2
+  // Calculated rewards (rounded half-up, com limite por sessão — ver calcSessionRewards)
+  const { gold: goldEarned, xp: xpEarned } = calcSessionRewards(totalPoints, topPoints)
+  const rewardsCapped = Math.round(Math.max(totalPoints, topPoints)) > MAX_SESSION_GOLD
 
   // ── EXPULSO PELO HOST ──────────────────────────────────────────
   if (kicked) {
@@ -555,8 +559,8 @@ export function PlayerScreen({ sessionId, userId, userProfile, initialSession, q
         <div className="flex items-center justify-between text-xs">
           <div className="flex items-center gap-2">
             {streak >= 3 && (
-              <span className={`flex items-center gap-1 font-black px-2.5 py-1 rounded-full text-white ${streak >= 5 ? 'bg-orange-500' : 'bg-amber-500'}`}>
-                <Flame className="w-3 h-3" /> ×{streak >= 5 ? 3 : 2}
+              <span className={`flex items-center gap-1 font-black px-2.5 py-1 rounded-full text-white ${streak >= 7 ? 'bg-red-500' : streak >= 5 ? 'bg-orange-500' : 'bg-amber-500'}`}>
+                <Flame className="w-3 h-3" /> ×{streakMultiplier(streak)}
               </span>
             )}
             {currentQuestion.points_multiplier > 1 && (
@@ -748,6 +752,9 @@ export function PlayerScreen({ sessionId, userId, userProfile, initialSession, q
               <div className="text-center">
                 <p className="text-sky-200 text-sm">Podes enviar ao teu Desbravador:</p>
                 <p className="text-yellow-400 font-black text-2xl mt-1">{goldEarned} 🪙 + {xpEarned} ⭐ XP</p>
+                {rewardsCapped && (
+                  <p className="text-sky-300/70 text-[11px] mt-1">Prémios ajustados ao limite da sessão (máx. {MAX_SESSION_GOLD} 🪙 / {MAX_SESSION_XP} ⭐)</p>
+                )}
               </div>
               <input
                 type="text"
@@ -908,6 +915,9 @@ export function PlayerScreen({ sessionId, userId, userProfile, initialSession, q
             <div><p className="text-blue-400 font-black text-2xl">+{xpEarned}</p><p className="text-sky-300 text-xs">⭐ XP</p></div>
             <div><p className="text-green-400 font-black text-2xl">{correctCount}</p><p className="text-sky-300 text-xs">✓</p></div>
           </div>
+          {rewardsCapped && (
+            <p className="text-sky-300/70 text-[11px]">Prémios ajustados ao limite da sessão (máx. {MAX_SESSION_GOLD} 🪙 / {MAX_SESSION_XP} ⭐)</p>
+          )}
         </div>
         <a href="/jogos" className="text-sky-300 underline">Voltar aos jogos</a>
       </div>

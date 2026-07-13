@@ -29,6 +29,12 @@ export default async function ProfilePage() {
       status,
       digital_key_delivered,
       created_at,
+      price_eur,
+      discount_eur,
+      amount_due_eur,
+      gold_spent,
+      paid_at,
+      delivered_at,
       store_products (
         name,
         type,

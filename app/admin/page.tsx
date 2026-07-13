@@ -116,6 +116,8 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
   // Fetch Store Data
   let products = []
   let purchases = []
+  let storeRateInfo = null
+  let storeSettings = null
 
   if (effRole === 'coordenador') {
     const { data: storeProducts } = await supabase.from('store_products').select('*').order('created_at', { ascending: false })
@@ -125,11 +127,18 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
       .from('store_purchases')
       .select(`
         *,
-        profiles:user_id(full_name, section),
-        store_products:product_id(name, type, price)
+        profiles:user_id(full_name, section, avatar_url),
+        store_products:product_id(name, type, price_eur, max_discount_percent)
       `)
       .order('created_at', { ascending: false })
     purchases = storePurchases || []
+
+    const [{ data: rateData }, { data: settingsData }] = await Promise.all([
+      supabase.rpc('get_gold_rate_info'),
+      supabase.from('store_settings').select('*').eq('id', true).maybeSingle(),
+    ])
+    storeRateInfo = rateData || null
+    storeSettings = settingsData || null
   }
 
   // Fetch Surveys (coord-only tab; load all surveys with options + responses)
@@ -195,6 +204,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
             { id: 'surveys', label: 'Inquéritos', icon: ClipboardList, coordOnly: true, count: 0, countColor: 'blue' },
             { id: 'vantur', label: 'Vantur', icon: Gamepad2, coordOnly: true, count: 0, countColor: 'blue', href: '/admin/vantur' },
             { id: 'vana-quest', label: 'VanaQuest', icon: Swords, coordOnly: true, count: 0, countColor: 'blue', href: '/admin/vana-quest' },
+            { id: 'vana-words', label: 'VanaWords', icon: Gamepad2, coordOnly: false, count: 0, countColor: 'blue', href: '/admin/vana-words' },
             { id: 'vana-camp', label: 'VanaCamp', icon: Flame, coordOnly: true, count: 0, countColor: 'orange', href: '/admin/vana-camp' },
             { id: 'store', label: 'Loja', icon: ShoppingBag, coordOnly: true, count: purchases?.filter(p => p.status === 'pending').length || 0, countColor: 'orange' }
           ] as { id: string, label: string, icon: any, coordOnly: boolean, count: number, countColor: string, href?: string }[])
@@ -229,6 +239,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
             members={members || []}
             events={events || []}
             purchases={purchases || []}
+            rateInfo={storeRateInfo}
           />
         )}
 
@@ -302,6 +313,8 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
             initialPurchases={purchases}
             members={members || []}
             events={events || []}
+            rateInfo={storeRateInfo}
+            settings={storeSettings}
           />
         )}
       </main>

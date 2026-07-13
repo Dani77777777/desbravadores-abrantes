@@ -8,12 +8,14 @@ import { GoldTransferDialog } from '@/components/profile/GoldTransferDialog'
 
 // ... lines 7-9 ...
 import { TaskCompleteButton } from '@/components/tasks/TaskCompleteButton'
+import { AnnouncementsFeed } from '@/components/dashboard/AnnouncementsFeed'
 import { EventDashboard } from '@/components/events/EventDashboard'
 import { Button } from '@/components/ui/button'
 // ... (adding import at top) ...
 import { User, Trophy, Coins, Megaphone, ScanLine, History, ListChecks, CheckCircle2, Clock, CalendarDays } from 'lucide-react'
 
 import { LandingPage } from '@/components/landing/LandingPage'
+import { getJAEvents, filterJAEventsForSection } from '@/utils/ja-agenda'
 
 const SECTION_COLORS = {
   rebentos: 'bg-emerald-600',
@@ -66,6 +68,16 @@ export default async function Dashboard() {
     .order('created_at', { ascending: false })
     .limit(10)
 
+  // Só os avisos das últimas 3 semanas aparecem por defeito;
+  // os mais antigos ficam atrás de um botão "Ver avisos antigos"
+  const threeWeeksAgo = Date.now() - 21 * 24 * 60 * 60 * 1000
+  const recentAnnouncements = (announcements || []).filter(
+    a => new Date(a.created_at).getTime() >= threeWeeksAgo
+  )
+  const olderAnnouncements = (announcements || []).filter(
+    a => new Date(a.created_at).getTime() < threeWeeksAgo
+  )
+
   // Fetch Events
   const { data: events } = await supabase
     .from('events')
@@ -74,6 +86,15 @@ export default async function Dashboard() {
     .order('start_at', { ascending: true })
 
   if (!profile) return <div>Perfil não encontrado.</div>
+
+  // Eventos públicos da Juventude Adventista (cache de 6h; [] se o site falhar).
+  // Filtrados pela secção pessoal do membro, independentemente do cargo;
+  // eventos sem secção reconhecida (ou perfis sem secção) aparecem sempre.
+  const jaEvents = filterJAEventsForSection(await getJAEvents(), profile.section)
+
+  const allEvents = [...(events || []), ...jaEvents].sort(
+    (a, b) => new Date(a.start_at).getTime() - new Date(b.start_at).getTime()
+  )
 
   // Fetch tasks for this user (global ones + their section's tasks)
   const { data: tasks } = await supabase
@@ -196,39 +217,12 @@ export default async function Dashboard() {
                 <h2 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
                     <Megaphone className="w-5 h-5 text-blue-700" /> Avisos e Novidades
                 </h2>
-                <div className="space-y-4">
-                    {announcements && announcements.length > 0 ? (
-                        announcements.map((announcement) => (
-                            <Card key={announcement.id} className="border-none shadow-sm overflow-hidden">
-                                <div className="h-1 bg-blue-600 w-full opacity-20" />
-                                <CardContent className="p-5">
-                                    <div className="flex justify-between items-start mb-2">
-                                        <h3 className="font-bold text-gray-900 transition-colors">
-                                            {announcement.title}
-                                        </h3>
-                                        <span className="text-[10px] text-gray-400 font-medium whitespace-nowrap">
-                                            {new Date(announcement.created_at).toLocaleDateString('pt-PT')}
-                                        </span>
-                                    </div>
-                                    <p className="text-sm text-gray-600 leading-relaxed line-clamp-3">
-                                        {announcement.message}
-                                    </p>
-                                </CardContent>
-                            </Card>
-                        ))
-                    ) : (
-                        <Card className="border-dashed border-2 bg-transparent shadow-none">
-                            <CardContent className="py-10 text-center">
-                                <p className="text-gray-500 italic">Nenhum aviso de momento.</p>
-                            </CardContent>
-                        </Card>
-                    )}
-                </div>
+                <AnnouncementsFeed recent={recentAnnouncements} older={olderAnnouncements} />
             </div>
 
             {/* Events Agenda & Calendar Section */}
             <div>
-                <EventDashboard events={events || []} profile={profile} surveys={surveys || []} userId={user.id} />
+                <EventDashboard events={allEvents} profile={profile} surveys={surveys || []} userId={user.id} />
             </div>
         </div>
 

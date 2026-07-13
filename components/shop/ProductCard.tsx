@@ -2,12 +2,14 @@
 
 import { Card, CardContent, CardFooter } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Package, Coins, Eye } from 'lucide-react'
+import { Package, Coins } from 'lucide-react'
 import { PurchaseDialog } from './PurchaseDialog'
+import { formatEur, maxDiscountEur } from '@/lib/store-economy'
 
 interface ProductCardProps {
   product: any
-  userProfile: any
+  userProfile: any | null
+  goldRate: number
 }
 
 const SECTION_LABELS: Record<string, string> = {
@@ -15,23 +17,29 @@ const SECTION_LABELS: Record<string, string> = {
   companheiros: 'Companheiros', embaixadores: 'Embaixadores',
 }
 
-export function ProductCard({ product, userProfile }: ProductCardProps) {
+export function ProductCard({ product, userProfile, goldRate }: ProductCardProps) {
   const isDigital = product.type === 'digital'
-  const digitalKeysCount = product.digital_keys?.[0]?.count || 0
+  const digitalKeysCount = product.available_keys || 0
   const isOutOfStock = isDigital ? digitalKeysCount <= 0 : product.stock <= 0
-  const canAfford = userProfile.current_gold >= product.price
-  
-  const userLevel = Math.floor((userProfile.total_xp || 0) / 1000) + 1
-  const hasLevel = !product.min_level || product.min_level <= 1 || userLevel >= product.min_level
-  const levelReason = !hasLevel ? `Nível ${product.min_level} necessário` : undefined
+
+  // Níveis continuam a contar: artigos com nível mínimo são exclusivos de membros.
+  // Membros registados começam no Nível 1, por isso min_level 1 = "só membros".
+  const userLevel = userProfile ? Math.floor((userProfile.total_xp || 0) / 1000) + 1 : 0
+  const requiresLevel = product.min_level > 0
+  const hasLevel = !requiresLevel || (userProfile !== null && userLevel >= product.min_level)
+  const levelReason = !hasLevel
+    ? (userProfile ? `Nível ${product.min_level} necessário` : `Só membros Nível ${product.min_level}+`)
+    : undefined
+
+  const maxDisc = maxDiscountEur(product)
 
   return (
     <Card className="group overflow-hidden border-none shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col bg-white rounded-3xl">
       <div className="aspect-square relative overflow-hidden bg-gray-50 border-b border-gray-100/50">
         {product.image_url ? (
-          <img 
-            src={product.image_url} 
-            alt={product.name} 
+          <img
+            src={product.image_url}
+            alt={product.name}
             className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
           />
         ) : (
@@ -39,7 +47,7 @@ export function ProductCard({ product, userProfile }: ProductCardProps) {
             <Package className="w-16 h-16" />
           </div>
         )}
-        
+
         {/* Type Badge */}
         <div className="absolute top-3 left-3">
           <Badge className={`font-black text-[10px] uppercase border-none px-3 py-1 ${isDigital ? 'bg-purple-600' : 'bg-blue-600'}`}>
@@ -66,7 +74,7 @@ export function ProductCard({ product, userProfile }: ProductCardProps) {
           </div>
         )}
 
-        {product.min_level > 1 && (
+        {requiresLevel && (
           <div className="absolute top-3 left-3 mt-8">
             <Badge className={`font-black text-[10px] uppercase border-none px-3 py-1 ${hasLevel ? 'bg-indigo-600' : 'bg-red-600 animate-pulse'}`}>
               Nível {product.min_level}+
@@ -81,7 +89,7 @@ export function ProductCard({ product, userProfile }: ProductCardProps) {
              </Badge>
           </div>
         )}
-        
+
         {isOutOfStock && (
           <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px] flex items-center justify-center">
             <Badge className="bg-red-600 text-white font-black px-6 py-2 text-sm border-none shadow-xl">
@@ -98,24 +106,30 @@ export function ProductCard({ product, userProfile }: ProductCardProps) {
         <p className="text-xs text-gray-500 line-clamp-2 min-h-[2rem]">
           {product.description || 'Sem descrição disponível.'}
         </p>
+        {maxDisc > 0 && (
+          <div className="flex items-center gap-1.5 mt-auto">
+            <Coins className="w-3.5 h-3.5 text-yellow-600" />
+            <span className="text-[11px] font-bold text-yellow-700">
+              Até {product.max_discount_percent}% de desconto com Gold (−{formatEur(maxDisc)})
+            </span>
+          </div>
+        )}
       </CardContent>
 
       <CardFooter className="p-5 pt-0 flex items-center justify-between gap-4 border-t border-gray-50 mt-auto">
         <div className="flex flex-col">
           <span className="text-[10px] font-black uppercase text-gray-400">Preço</span>
-          <div className="flex items-center gap-1.5">
-            <Coins className="w-4 h-4 text-yellow-600" />
-            <span className={`text-xl font-black ${canAfford ? 'text-blue-900' : 'text-red-600'}`}>
-              {product.price}
-            </span>
-          </div>
+          <span className="text-xl font-black text-blue-900">
+            {formatEur(product.price_eur)}
+          </span>
         </div>
 
-        <PurchaseDialog 
-          product={product} 
-          userProfile={userProfile} 
-          disabled={isOutOfStock || !canAfford || !hasLevel}
-          reason={levelReason || (!canAfford ? 'Gold insuficiente' : isOutOfStock ? 'Esgotado' : undefined)}
+        <PurchaseDialog
+          product={product}
+          userProfile={userProfile}
+          goldRate={goldRate}
+          disabled={isOutOfStock || !hasLevel}
+          reason={levelReason || (isOutOfStock ? 'Esgotado' : undefined)}
         />
       </CardFooter>
     </Card>

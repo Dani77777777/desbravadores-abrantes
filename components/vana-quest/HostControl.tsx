@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef } from 'react'
 import { createClient } from '@/utils/supabase/client'
 import { nextStage, awardSessionPoints, kickParticipant, leaveSession } from '@/lib/actions/vana-quest'
-import { getIntroSeconds } from '@/utils/vana-quest'
+import { getIntroSeconds, calcSessionRewards, MAX_SESSION_GOLD, MAX_SESSION_XP } from '@/utils/vana-quest'
 import { QRCodeSVG } from 'qrcode.react'
 import {
   Users, ChevronRight, Trophy, Zap, Clock, Maximize2,
@@ -948,15 +948,20 @@ export function HostControl({ sessionId, initialSession, questions, siteUrl }: P
             {participants.length > 0 && (() => {
               const podium = [...participants].sort((a, b) => b.total_points - a.total_points)
               const medals = ['🥇', '🥈', '🥉']
+              const topPoints = Number(podium[0]?.total_points) || 0
               return (
                 <div className="bg-white/10 rounded-3xl p-4 border border-white/10">
                   <p className="text-orange-400 text-[10px] font-black uppercase tracking-widest mb-3 flex items-center gap-1.5">
                     <Trophy className="w-3 h-3" /> Classificação final
                   </p>
+                  {Math.round(topPoints) > MAX_SESSION_GOLD && (
+                    <p className="text-sky-300/70 text-[11px] mb-2">
+                      Prémios ajustados ao limite da sessão (máx. {MAX_SESSION_GOLD}🪙 / {MAX_SESSION_XP}⭐) — o 1.º recebe o máximo e os restantes são escalados na mesma proporção.
+                    </p>
+                  )}
                   <div className="space-y-2 max-h-[28rem] overflow-y-auto">
                     {podium.map((p, i) => {
-                      const gold = Math.round(Number(p.total_points))
-                      const xp = gold * 2
+                      const { gold, xp } = calcSessionRewards(Number(p.total_points) || 0, topPoints)
                       return (
                         <div
                           key={p.id}

@@ -3,7 +3,7 @@
 import { createClient } from '@/utils/supabase/server'
 import { createServiceClient } from '@/utils/supabase/service'
 import { revalidatePath } from 'next/cache'
-import { calcPoints } from '@/utils/vana-quest'
+import { calcPoints, calcSessionRewards } from '@/utils/vana-quest'
 
 function generatePin(): string {
   return String(Math.floor(100000 + Math.random() * 900000))
@@ -609,7 +609,9 @@ export async function kickParticipant(
 /**
  * XP/Gold awards são baseados nos pontos totais ganhos no jogo.
  * Arredondamento half-up: 15.5 → 16, 15.4 → 15
- * Gold = round(total_points), XP = gold * 2
+ * Gold = round(total_points), XP = gold * 2 — com limite por sessão
+ * (500 gold / 1000 XP): se o melhor jogador ultrapassar, recebe o máximo
+ * e os restantes são escalados na mesma proporção (ver calcSessionRewards).
  *
  * Protecção: se já foi atribuído antes (points_awarded_at != null), não duplica.
  */
@@ -638,6 +640,10 @@ export async function awardSessionPoints(sessionId: string): Promise<{ ok: boole
 
   if (!participants) return { ok: true }
 
+  // O melhor jogador define a escala: se ultrapassar o limite, todos os
+  // prémios são reduzidos na mesma proporção (fica com exatamente o máximo).
+  const topPoints = Math.max(0, ...participants.map((p) => Number(p.total_points) || 0))
+
   for (const p of participants) {
     const totalPoints = Number(p.total_points) || 0
     if (totalPoints <= 0) continue
@@ -645,8 +651,7 @@ export async function awardSessionPoints(sessionId: string): Promise<{ ok: boole
     const targetUserId = p.is_guest ? p.rewards_recipient_id : p.user_id
     if (!targetUserId) continue
 
-    const gold = Math.round(totalPoints) // half-up by default in JS for positives
-    const xp = gold * 2
+    const { gold, xp } = calcSessionRewards(totalPoints, topPoints)
 
     if (gold > 0 || xp > 0) {
       await service.from('points_log').insert({
