@@ -1,0 +1,422 @@
+/* =============================================
+   VANACÓDIGO — layout inspirado no Vantur, tema claro
+   ============================================= */
+
+.vanacodigo-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  background: #fafaf9;
+  padding: 0.75rem 0.5rem 0.5rem;
+  box-sizing: border-box;
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+/* ---- Header ---- */
+.vanacodigo-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  padding-bottom: 0.6rem;
+}
+
+.vanacodigo-mode-badge {
+  background: #f1f5f9;
+  color: #475569;
+  padding: 0.3rem 1rem;
+  border-radius: 99px;
+  font-weight: 800;
+  font-size: 0.65rem;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  border: 1px solid #e2e8f0;
+}
+
+.vanacodigo-code-badge {
+  background: #ecfdf5;
+  color: #047857;
+  padding: 0.3rem 1rem;
+  border-radius: 99px;
+  font-weight: 800;
+  font-size: 0.65rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  border: 1px solid #a7f3d0;
+}
+
+.vanacodigo-message {
+  background: #1e293b;
+  color: #fff;
+  font-weight: 800;
+  font-size: 0.8rem;
+  padding: 0.45rem 1.25rem;
+  border-radius: 99px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+/* ---- Tentativas restantes ---- */
+.vanacodigo-attempts {
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+  padding: 0.35rem 0;
+}
+
+.vanacodigo-attempt-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #10b981;
+  transition: background 0.3s, transform 0.3s;
+}
+
+.vanacodigo-attempt-dot.used {
+  background: #e2e8f0;
+  transform: scale(0.8);
+}
+
+/* ---- Mensagem codificada + células de resposta ---- */
+.vanacodigo-board {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: flex-end;
+  gap: 1.25rem 1.75rem;
+  padding: 1rem 0.5rem 1.25rem;
+  width: 100%;
+}
+
+.vanacodigo-word {
+  display: flex;
+  gap: 5px;
+  align-items: flex-end;
+}
+
+.vanacodigo-letter-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+/* símbolo codificado por cima da célula */
+.vanacodigo-symbol {
+  min-height: 30px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  font-weight: 900;
+  color: #0f172a;
+  user-select: none;
+}
+
+.vanacodigo-symbol.morse {
+  font-size: 1rem;
+  letter-spacing: 0.1em;
+  writing-mode: vertical-rl;
+  min-height: 64px;
+  align-items: center;
+}
+
+.vanacodigo-symbol.cifra {
+  font-size: 1.35rem;
+  color: #7c3aed;
+}
+
+.vanacodigo-symbol.numeros {
+  font-size: 1.15rem;
+  color: #0369a1;
+}
+
+/* ---- Célula de resposta ---- */
+.vanacodigo-cell {
+  width: 44px;
+  height: 44px;
+  border: 2px solid #d1d5db;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.25rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  border-radius: 6px;
+  color: #1e293b;
+  background: #ffffff;
+  transition: border-color 0.1s, background 0.25s, transform 0.08s;
+  font-family: 'Inter', 'Segoe UI', sans-serif;
+  line-height: 1;
+  user-select: none;
+  cursor: text;
+}
+
+.vanacodigo-cell.filled {
+  border-color: #64748b;
+  animation: vcCellPop 0.08s ease-out;
+}
+
+.vanacodigo-cell.cursor {
+  border-color: #334155;
+  border-width: 3px;
+}
+
+/* letra confirmada (acertada numa tentativa) */
+.vanacodigo-cell.locked {
+  background: #538d4e;
+  border-color: #538d4e;
+  color: #fff;
+  cursor: default;
+}
+
+/* letra revelada como dica */
+.vanacodigo-cell.hint {
+  background: #b59f3b;
+  border-color: #b59f3b;
+  color: #fff;
+  cursor: default;
+}
+
+/* erro na última tentativa */
+.vanacodigo-cell.wrong {
+  background: #fee2e2;
+  border-color: #ef4444;
+  color: #b91c1c;
+  animation: vcShake 0.4s ease;
+}
+
+/* ---- Teclado ---- */
+.vanacodigo-keyboard {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  max-width: 500px;
+  padding: 0.5rem 0.5rem 0.75rem;
+  flex-shrink: 0;
+}
+
+.vanacodigo-keyboard .keyboard-row {
+  display: flex;
+  justify-content: center;
+  gap: 5px;
+}
+
+.vanacodigo-key {
+  background: #d3d6da;
+  border: none;
+  color: #1e293b;
+  font-weight: 800;
+  font-size: clamp(0.75rem, 2vw, 0.9rem);
+  font-family: inherit;
+  min-width: 0;
+  flex: 1;
+  max-width: 42px;
+  height: 58px;
+  border-radius: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.1s, transform 0.08s;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: manipulation;
+}
+
+.vanacodigo-key:active {
+  transform: scale(0.92);
+  filter: brightness(0.9);
+}
+
+.vanacodigo-key.wide {
+  flex: 1.5;
+  max-width: 64px;
+  font-size: clamp(0.6rem, 1.5vw, 0.75rem);
+  background: #bfc3c8;
+  letter-spacing: -0.03em;
+}
+
+/* ---- Botão da tabela de código ---- */
+.vanacodigo-ref-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  color: #334155;
+  font-weight: 700;
+  font-size: 0.8rem;
+  padding: 0.45rem 1.1rem;
+  border-radius: 99px;
+  cursor: pointer;
+  transition: background 0.15s;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+}
+
+.vanacodigo-ref-btn:hover { background: #f8fafc; }
+
+/* ---- Tabela de referência ---- */
+.vanacodigo-ref-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
+  gap: 0.5rem;
+  max-height: 55vh;
+  overflow-y: auto;
+  padding: 0.25rem;
+}
+
+.vanacodigo-ref-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.75rem;
+  padding: 0.4rem 0.25rem;
+}
+
+.vanacodigo-ref-letter {
+  font-weight: 900;
+  color: #0f172a;
+  font-size: 0.95rem;
+}
+
+.vanacodigo-ref-symbol {
+  font-weight: 800;
+  color: #475569;
+  font-size: 0.9rem;
+  letter-spacing: 0.08em;
+}
+
+/* ---- Modal de fim de jogo ---- */
+.vanacodigo-victory-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.5);
+  backdrop-filter: blur(12px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 40;
+  padding: 1.5rem;
+}
+
+.vanacodigo-victory-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 2rem;
+  padding: 3rem 2.5rem;
+  text-align: center;
+  max-width: 420px;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.5rem;
+  box-shadow: 0 25px 50px -12px rgba(0,0,0,0.15);
+}
+
+.vanacodigo-victory-title {
+  font-size: 2.25rem;
+  font-weight: 900;
+  color: #0f172a;
+  letter-spacing: -0.03em;
+}
+
+.vanacodigo-victory-subtitle {
+  color: #64748b;
+  font-weight: 500;
+  font-size: 0.95rem;
+  margin-top: 0.25rem;
+}
+
+.vanacodigo-victory-word-chip {
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  color: #334155;
+  font-weight: 800;
+  padding: 0.4rem 1rem;
+  border-radius: 99px;
+  font-size: 0.9rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.vanacodigo-victory-btn {
+  width: 100%;
+  padding: 1rem;
+  background: #0f172a;
+  color: #fff;
+  font-weight: 900;
+  font-size: 0.95rem;
+  border: none;
+  border-radius: 1rem;
+  cursor: pointer;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  transition: background 0.2s, transform 0.1s;
+}
+
+.vanacodigo-victory-btn:hover  { background: #1e293b; }
+.vanacodigo-victory-btn:active { transform: scale(0.97); }
+
+/* ---- Animações ---- */
+@keyframes vcCellPop {
+  0%   { transform: scale(1.15); }
+  100% { transform: scale(1); }
+}
+
+@keyframes vcShake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-5px); }
+  40% { transform: translateX(5px); }
+  60% { transform: translateX(-4px); }
+  80% { transform: translateX(4px); }
+}
+
+@keyframes vcCelebrate {
+  0%   { transform: translateY(0);     }
+  35%  { transform: translateY(-16px); }
+  60%  { transform: translateY(0);     }
+  80%  { transform: translateY(-6px);  }
+  100% { transform: translateY(0);     }
+}
+
+.vanacodigo-cell.celebrate {
+  animation: vcCelebrate 0.5s ease both;
+  animation-delay: var(--celebrate-delay, 0s);
+}
+
+/* ---- Mobile ---- */
+@media (max-width: 640px) {
+  .vanacodigo-container { padding: 0.4rem 0.2rem 0; }
+
+  .vanacodigo-board {
+    gap: 1rem 1.1rem;
+    padding: 0.75rem 0.25rem 1rem;
+  }
+
+  .vanacodigo-cell {
+    width: 36px;
+    height: 36px;
+    font-size: 1.05rem;
+    border-radius: 5px;
+  }
+
+  .vanacodigo-symbol.morse { min-height: 52px; font-size: 0.85rem; }
+
+  .vanacodigo-keyboard { padding: 0.5rem 0.25rem 0.75rem; gap: 5px; }
+  .vanacodigo-keyboard .keyboard-row { gap: 4px; }
+  .vanacodigo-key { height: 44px; border-radius: 4px; max-width: 36px; }
+  .vanacodigo-key.wide { max-width: 56px; }
+}
+
+@media (max-width: 380px) {
+  .vanacodigo-cell { width: 30px; height: 30px; font-size: 0.9rem; }
+  .vanacodigo-key { height: 40px; max-width: 30px; font-size: 0.65rem; }
+  .vanacodigo-key.wide { max-width: 48px; font-size: 0.55rem; }
+}

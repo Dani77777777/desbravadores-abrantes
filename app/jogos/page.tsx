@@ -55,6 +55,17 @@ export default async function GamesHubPage() {
       requiresAuth: true,
     },
     {
+      id: 'vana-codigo',
+      title: 'VanaCódigo',
+      description: 'Desafio diário de decifração! Morse, Semáforo e Cifras — o código muda todos os dias.',
+      icon: <img src="/images/VanaCodigo.png" alt="VanaCódigo" className="w-12 h-12 object-contain" />,
+      href: '/jogos/vana-codigo',
+      loginHref: '/login?redirect=/jogos/vana-codigo',
+      color: 'from-emerald-500 via-emerald-700 to-slate-800',
+      status: 'Disponível',
+      requiresAuth: true,
+    },
+    {
       id: 'em-breve',
       title: 'Em Breve...',
       description: 'Mais desafios estão a ser preparados pelos teus líderes!',
