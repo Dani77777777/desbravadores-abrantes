@@ -236,6 +236,11 @@ export function EventDashboard({ events, profile, surveys, userId }: EventDashbo
                       Prazo limite: {viewingEvent.deadline_text}
                     </p>
                   )}
+                  {viewingEvent.price && (
+                    <p className="text-sm font-semibold text-amber-900">
+                      Preço: {viewingEvent.price}
+                    </p>
+                  )}
                   <p className="text-xs text-amber-800/80">
                     A inscrição é feita no site da Juventude Adventista com a tua conta pessoal.
                     Se ainda não tens conta, pede ajuda ao teu dirigente.

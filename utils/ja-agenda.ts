@@ -13,7 +13,9 @@ export interface JAEvent {
   description: string
   start_at: string // ISO, dia inteiro (a agenda não publica hora)
   location: string | null
-  deadline_text: string | null // "Prazo limite de inscrição: ..." se existir
+  deadline_text: string | null // prazo de inscrição legível, para mostrar na UI
+  deadline_at: string | null // prazo em ISO (campo "Incrições até" do detalhe)
+  price: string | null // ex.: "0€" ou "0€ até 148€"
   image_url: string | null
   url: string // página pública do evento no site da JA
   sections: string[] // [] = para todos
@@ -68,6 +70,35 @@ export function detectSections(title: string): string[] {
   return SECTION_KEYWORDS.filter((section) => normalized.includes(section))
 }
 
+/** "13-07-2026" → "2026-07-13T00:00:00"; null se o formato não bater. */
+function ddmmyyyyToISO(date: string): string | null {
+  const [day, month, year] = date.trim().split('-').map(Number)
+  if (!day || !month || !year) return null
+  return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}T00:00:00`
+}
+
+export interface JAEventDetail {
+  location: string | null
+  deadline_at: string | null
+  price: string | null
+}
+
+// A página de detalhe tem um bloco estruturado consistente:
+//   <strong>Local:</strong> ... <strong>Incrições até:</strong> dd-mm-yyyy
+//   <strong>Preço:</strong> ...
+// ("Incrições" é typo do site da JA; aceitamos também "Inscrições" caso corrijam.)
+export function parseJAEventDetail(html: string): JAEventDetail {
+  const decoded = decodeEntities(html)
+  const location = decoded.match(/<strong>Local:\s*<\/strong>\s*([^<]+)/)?.[1]?.trim() ?? null
+  const deadlineRaw = decoded.match(/<strong>Ins?crições até:\s*<\/strong>\s*([\d-]+)/)?.[1] ?? null
+  const price = decoded.match(/<strong>Preço:\s*<\/strong>\s*([^<]+)/)?.[1]?.trim() ?? null
+  return {
+    location,
+    deadline_at: deadlineRaw ? ddmmyyyyToISO(deadlineRaw) : null,
+    price,
+  }
+}
+
 export function parseJAAgenda(html: string): JAEvent[] {
   const events: JAEvent[] = []
 
@@ -95,6 +126,8 @@ export function parseJAAgenda(html: string): JAEvent[] {
       location: description.match(/Local:\s*([^\n]+)/)?.[1]?.trim() ?? null,
       deadline_text:
         description.match(/Prazo limite de inscri[çc][ãa]o:\s*([^\n]+)/i)?.[1]?.trim() ?? null,
+      deadline_at: null,
+      price: null,
       image_url: image ? `${JA_BASE}${image}` : null,
       url: `${JA_BASE}/agenda/${jaId}`,
       sections: detectSections(title),
@@ -105,14 +138,51 @@ export function parseJAAgenda(html: string): JAEvent[] {
   return events
 }
 
-/** Vai buscar a agenda da JA com cache de 6h. Se o site falhar, devolve []. */
+/** Junta os campos estruturados do detalhe ao evento vindo da listagem. */
+export function mergeEventDetail(event: JAEvent, detail: JAEventDetail): JAEvent {
+  const deadlineText =
+    event.deadline_text ??
+    (detail.deadline_at
+      ? new Date(detail.deadline_at).toLocaleDateString('pt-PT', { day: 'numeric', month: 'long' })
+      : null)
+  return {
+    ...event,
+    // O campo estruturado é mais completo/fiável que o extraído da descrição.
+    location: detail.location ?? event.location,
+    deadline_at: detail.deadline_at,
+    // O texto da descrição (quando existe) traz extras como o Late Ticket.
+    deadline_text: deadlineText,
+    price: detail.price,
+  }
+}
+
+/**
+ * Vai buscar a agenda da JA e enriquece cada evento com os campos estruturados
+ * da respetiva página de detalhe (Local, Incrições até, Preço). Tudo com cache
+ * de 6h. Se o site falhar, devolve []; se só um detalhe falhar, o evento fica
+ * com os dados da listagem.
+ */
 export async function getJAEvents(): Promise<JAEvent[]> {
   try {
     const res = await fetch(`${JA_BASE}/agenda`, {
       next: { revalidate: REVALIDATE_SECONDS },
     })
     if (!res.ok) return []
-    return parseJAAgenda(await res.text())
+    const events = parseJAAgenda(await res.text())
+
+    return await Promise.all(
+      events.map(async (event) => {
+        try {
+          const detailRes = await fetch(event.url, {
+            next: { revalidate: REVALIDATE_SECONDS },
+          })
+          if (!detailRes.ok) return event
+          return mergeEventDetail(event, parseJAEventDetail(await detailRes.text()))
+        } catch {
+          return event
+        }
+      })
+    )
   } catch {
     // Site da JA em baixo não pode partir o Painel.
     return []
