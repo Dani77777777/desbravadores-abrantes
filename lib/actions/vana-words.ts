@@ -68,6 +68,9 @@ export async function joinVanaWordsSession(
     .maybeSingle()
 
   if (!session) return { sessionId: '', error: 'Código inválido.' }
+  // Sessão terminada = código morto (como no VanaQuest) — sem isto o código
+  // ficava a apontar para a sessão antiga para sempre, mesmo para ex-jogadores
+  if (session.status === 'finished') return { sessionId: '', error: 'Código inválido.' }
 
   const service = createServiceClient()
 
