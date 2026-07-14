@@ -1,6 +1,8 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { QRCodeSVG } from 'qrcode.react'
+import { createClient } from '@/utils/supabase/client'
 import type { VanaSketchSession, VanaSketchPlayer, VanaSketchGuess } from '@/types/vana-sketch'
 import { useSketchSession, useSketchPlayers, useSketchGuesses } from './useSketchSession'
 import { CanvasViewer } from './CanvasViewer'
@@ -21,6 +23,26 @@ export function ProjectorView({ session: initialSession, initialPlayers }: Proje
   useSketchSession(session.id, (row) => setSession(row as VanaSketchSession))
   useSketchPlayers(session.id, (rows) => setPlayers(rows as VanaSketchPlayer[]))
   useSketchGuesses(session.id, session.round_number, (rows) => setGuesses(rows as VanaSketchGuess[]))
+
+  // URL curto para o QR (/j/CODIGO → redireciona para o jogo): menos caracteres
+  // = QR menos denso = leitura fácil à distância no projetor. Calculado só no
+  // cliente (estado) para não divergir na hidratação do SSR.
+  const [joinUrl, setJoinUrl] = useState('')
+  useEffect(() => {
+    setJoinUrl(`${window.location.origin}/j/${session.code}`)
+  }, [session.code])
+
+  // Recebe comandos do host (ampliar QR Code)
+  const [qrZoomed, setQrZoomed] = useState(false)
+  useEffect(() => {
+    const supabase = createClient()
+    const ch = supabase.channel(`vanasketch-present-${session.id}`, { config: { broadcast: { self: false } } })
+    ch.on('broadcast', { event: 'cmd' }, ({ payload }) => {
+      if (typeof payload?.qrZoomed === 'boolean') setQrZoomed(payload.qrZoomed)
+    })
+    ch.subscribe()
+    return () => { supabase.removeChannel(ch) }
+  }, [session.id])
 
   const drawer = players.find((p) => p.id === session.drawer_player_id)
   const playerById = useMemo(() => new Map(players.map((p) => [p.id, p])), [players])
@@ -50,7 +72,7 @@ export function ProjectorView({ session: initialSession, initialPlayers }: Proje
           )}
         </header>
 
-        {session.status === 'lobby' && <ProjectorLobby session={session} players={players} />}
+        {session.status === 'lobby' && <ProjectorLobby session={session} players={players} joinUrl={joinUrl} />}
 
         {session.status === 'playing' && (
           <div className="grid flex-1 grid-cols-1 gap-4 lg:grid-cols-[1fr_360px]">
@@ -102,21 +124,43 @@ export function ProjectorView({ session: initialSession, initialPlayers }: Proje
 
         {session.status === 'finished' && <ProjectorPodium sorted={sorted} />}
       </div>
+
+      {/* QR Code ampliado (controlado pelo host) */}
+      {qrZoomed && session.status !== 'finished' && joinUrl && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-6 backdrop-blur-md animate-in fade-in duration-300">
+          <div className="rounded-3xl bg-white p-[clamp(1.25rem,4vh,2.5rem)] shadow-2xl animate-in zoom-in-95 duration-500">
+            <QRCodeSVG value={joinUrl} size={480} className="h-auto w-full max-h-[55vh]" />
+            <p className="mt-[clamp(0.75rem,2vh,1.5rem)] text-center font-mono text-[clamp(1.75rem,5vh,3rem)] font-black tracking-widest text-gray-900">
+              {session.code}
+            </p>
+            <p className="mt-2 text-center text-[clamp(0.875rem,1.8vh,1.125rem)] text-gray-500">
+              Lê o QR ou usa o código de entrada
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
 
-function ProjectorLobby({ session, players }: { session: VanaSketchSession; players: VanaSketchPlayer[] }) {
+function ProjectorLobby({ session, players, joinUrl }: { session: VanaSketchSession; players: VanaSketchPlayer[]; joinUrl: string }) {
   return (
     <div className="flex flex-1 flex-col items-center justify-center gap-8">
-      <img src="/images/VanaSketch.png" alt="" className="h-40 w-auto object-contain drop-shadow-2xl" />
-      <div className="text-center">
-        <p className="text-sm font-bold uppercase tracking-widest" style={{ color: VS.mut }}>
-          Entra em <span className="text-white">desbravadores-abrantes</span> → Jogos → VanaSketch
-        </p>
-        <p className="mt-3 font-mono text-8xl font-black tracking-[0.3em]" style={{ color: VS.amber }}>
-          {session.code}
-        </p>
+      <img src="/images/VanaSketch.png" alt="" className="h-36 w-auto object-contain drop-shadow-2xl" />
+      <div className="flex flex-wrap items-center justify-center gap-8">
+        <div className="text-center">
+          <p className="text-sm font-bold uppercase tracking-widest" style={{ color: VS.mut }}>
+            Entra em <span className="text-white">desbravadores-abrantes</span> → Jogos → VanaSketch
+          </p>
+          <p className="mt-3 font-mono text-8xl font-black tracking-[0.3em]" style={{ color: VS.amber }}>
+            {session.code}
+          </p>
+        </div>
+        {joinUrl && (
+          <div className="rounded-3xl bg-white p-5 shadow-2xl">
+            <QRCodeSVG value={joinUrl} size={220} />
+          </div>
+        )}
       </div>
       <div className="flex max-w-4xl flex-wrap items-center justify-center gap-3">
         {players.length === 0 ? (

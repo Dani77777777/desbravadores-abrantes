@@ -19,6 +19,7 @@ import { SketchAvatar, CountdownBadge, useCountdown } from './ui'
 import { VS, VS_SCREEN_STYLE, vsHand, vsSans } from './theme'
 import {
   Play, MonitorPlay, SkipForward, ArrowRight, Trophy, Trash2, Dices, Eye, Users, Flag,
+  Copy, Check, Maximize2,
 } from 'lucide-react'
 
 interface HostControlProps {
@@ -44,6 +45,35 @@ export function HostControl({ session: initialSession, initialPlayers }: HostCon
   // Definições do jogo (lobby)
   const [roundsPerPlayer, setRoundsPerPlayer] = useState(1)
   const [drawSeconds, setDrawSeconds] = useState(90)
+
+  // Link de entrada (código já incluído) + cópia
+  const [copied, setCopied] = useState(false)
+  const joinUrl = typeof window !== 'undefined'
+    ? `${window.location.origin}/jogos/vana-sketch?code=${session.code}`
+    : ''
+  async function copyJoinLink() {
+    try {
+      await navigator.clipboard.writeText(joinUrl)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch {}
+  }
+
+  // Canal de broadcast para comandar o projetor (ampliar QR Code)
+  const [qrZoomed, setQrZoomed] = useState(false)
+  const presentChannelRef = useRef<ReturnType<ReturnType<typeof createClient>['channel']> | null>(null)
+  useEffect(() => {
+    const supabase = createClient()
+    const ch = supabase.channel(`vanasketch-present-${session.id}`, { config: { broadcast: { self: false } } })
+    ch.subscribe()
+    presentChannelRef.current = ch
+    return () => { presentChannelRef.current = null; supabase.removeChannel(ch) }
+  }, [session.id])
+
+  // Sincroniza o estado do zoom do QR com o projetor sempre que muda
+  useEffect(() => {
+    presentChannelRef.current?.send({ type: 'broadcast', event: 'cmd', payload: { qrZoomed } })
+  }, [qrZoomed])
 
   // Palavra secreta visível ao host
   const [secretWord, setSecretWord] = useState<string | null>(null)
@@ -143,6 +173,48 @@ export function HostControl({ session: initialSession, initialPlayers }: HostCon
                 </div>
               )}
             </section>
+
+            {/* Copiar link de entrada */}
+            <button
+              type="button"
+              onClick={copyJoinLink}
+              className={`flex w-full items-center gap-3 rounded-2xl border p-4 transition-all active:scale-[0.98] ${
+                copied ? 'border-emerald-400/60 bg-emerald-500/20' : 'hover:bg-white/10'
+              }`}
+              style={!copied ? { background: VS.panel, borderColor: VS.pline } : undefined}
+            >
+              <div className={`shrink-0 rounded-xl p-2.5 ${copied ? 'bg-emerald-400/20' : 'bg-pink-500/15'}`}>
+                {copied ? <Check className="h-5 w-5 text-emerald-300" /> : <Copy className="h-5 w-5" style={{ color: VS.pink }} />}
+              </div>
+              <div className="min-w-0 flex-1 text-left">
+                <p className="text-sm font-bold">{copied ? 'Link copiado!' : 'Copiar link de entrada'}</p>
+                <p className="truncate text-xs" style={{ color: copied ? 'rgba(255,255,255,.7)' : VS.mut }}>
+                  {copied ? 'Cola onde quiseres partilhar' : 'Código já incluído · toca para copiar'}
+                </p>
+              </div>
+            </button>
+
+            {/* Ampliar QR Code no projetor */}
+            <button
+              type="button"
+              onClick={() => setQrZoomed((v) => !v)}
+              className={`flex w-full items-center gap-3 rounded-2xl p-4 transition-all active:scale-[0.98] ${
+                qrZoomed ? 'bg-yellow-400 text-yellow-900' : 'bg-white text-gray-900'
+              }`}
+            >
+              <div className={`shrink-0 rounded-xl p-2.5 ${qrZoomed ? 'bg-yellow-900/10' : 'bg-gray-100'}`}>
+                <Maximize2 className={`h-5 w-5 ${qrZoomed ? 'text-yellow-900' : 'text-gray-700'}`} />
+              </div>
+              <div className="flex-1 text-left">
+                <p className="text-sm font-bold">
+                  {qrZoomed ? 'A mostrar QR Code grande' : 'Ampliar QR Code no projetor'}
+                </p>
+                <p className={`text-xs ${qrZoomed ? 'text-yellow-900/70' : 'text-gray-500'}`}>
+                  {qrZoomed ? 'Toca para fechar' : 'Toca para ampliar no ecrã grande'}
+                </p>
+              </div>
+              {qrZoomed && <span className="h-2 w-2 animate-pulse rounded-full bg-yellow-900" />}
+            </button>
 
             <section className="space-y-4 rounded-2xl border p-4" style={{ background: VS.panel, borderColor: VS.pline }}>
               <div>

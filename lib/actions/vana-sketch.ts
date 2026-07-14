@@ -70,11 +70,12 @@ export async function joinVanaSketchSession(
     .maybeSingle()
 
   if (!session) return { sessionId: '', error: 'Código inválido.' }
-  if (session.status === 'finished') return { sessionId: '', error: 'Essa sessão já terminou.' }
+  // Sessão terminada = código morto (como no VanaQuest) — mesmo para quem jogou
+  if (session.status === 'finished') return { sessionId: '', error: 'Código inválido.' }
 
   const service = createServiceClient()
 
-  // Reconectar se já estiver na sessão
+  // Reconectar se já estiver na sessão — funciona em qualquer fase do jogo
   const { data: existing } = await service
     .from('vanasketch_players')
     .select('id')
