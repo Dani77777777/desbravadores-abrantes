@@ -17,6 +17,7 @@ export interface VanaSketchSession {
   revealed_word: string | null
   round_ends_at: string | null
   canvas_version: number
+  is_test_session: boolean
   rewards_awarded: boolean
   created_at: string
   started_at: string | null
@@ -26,12 +27,13 @@ export interface VanaSketchSession {
 export interface VanaSketchPlayer {
   id: string
   session_id: string
-  user_id: string
+  user_id: string | null // null = bot
   display_name: string
   avatar_url: string | null
   section: string | null
   score: number
   draw_order: number | null
+  is_bot: boolean
   joined_at: string
 }
 

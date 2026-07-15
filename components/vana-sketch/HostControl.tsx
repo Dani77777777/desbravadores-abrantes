@@ -11,15 +11,17 @@ import {
   nextSketchRound,
   awardVanaSketchPoints,
   deleteVanaSketchSession,
+  addVanaSketchBot,
 } from '@/lib/actions/vana-sketch'
 import type { VanaSketchSession, VanaSketchPlayer, VanaSketchGuess } from '@/types/vana-sketch'
 import { useSketchSession, useSketchPlayers, useSketchGuesses } from './useSketchSession'
 import { CanvasViewer } from './CanvasViewer'
+import { HostBotOverlay } from './HostBotOverlay'
 import { SketchAvatar, CountdownBadge, useCountdown } from './ui'
 import { VS, VS_SCREEN_STYLE, vsHand, vsSans } from './theme'
 import {
   Play, MonitorPlay, SkipForward, ArrowRight, Trophy, Trash2, Dices, Eye, Users, Flag,
-  Copy, Check, Maximize2,
+  Copy, Check, Maximize2, Bot, Plus,
 } from 'lucide-react'
 
 interface HostControlProps {
@@ -45,6 +47,21 @@ export function HostControl({ session: initialSession, initialPlayers }: HostCon
   // Definições do jogo (lobby)
   const [roundsPerPlayer, setRoundsPerPlayer] = useState(1)
   const [drawSeconds, setDrawSeconds] = useState(90)
+
+  // Bots (sessões de teste)
+  const [botName, setBotName] = useState('')
+  const [addingBot, setAddingBot] = useState(false)
+  async function addBot() {
+    setAddingBot(true)
+    setError(null)
+    // Sem nome escrito → gera "Bot N"
+    const existing = players.filter((p) => p.is_bot).length
+    const name = botName.trim() || `Bot ${existing + 1}`
+    const res = await addVanaSketchBot(session.id, name)
+    if (res.error) setError(res.error)
+    else setBotName('')
+    setAddingBot(false)
+  }
 
   // Link de entrada (código já incluído) + cópia
   const [copied, setCopied] = useState(false)
@@ -122,6 +139,14 @@ export function HostControl({ session: initialSession, initialPlayers }: HostCon
 
   return (
     <div className={`min-h-screen ${vsSans.className}`} style={VS_SCREEN_STYLE}>
+      {/* FAB de impersonação de bots — visível em todas as fases das sessões de teste */}
+      {session.is_test_session && (
+        <HostBotOverlay
+          sessionId={session.id}
+          players={players}
+          drawerPlayerId={session.drawer_player_id}
+        />
+      )}
       <div className="mx-auto flex min-h-screen w-full max-w-3xl flex-col gap-4 p-4">
         {/* Cabeçalho */}
         <header className="flex items-center justify-between">
@@ -167,9 +192,41 @@ export function HostControl({ session: initialSession, initialPlayers }: HostCon
                   {players.map((p) => (
                     <div key={p.id} className="flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 py-1 pl-1 pr-3">
                       <SketchAvatar name={p.display_name} avatarUrl={p.avatar_url} size={26} />
-                      <span className="text-xs font-semibold">{p.display_name.split(' ')[0]}</span>
+                      <span className="text-xs font-semibold">
+                        {p.is_bot && '🤖 '}{p.display_name.split(' ')[0]}
+                      </span>
                     </div>
                   ))}
+                </div>
+              )}
+
+              {/* Adicionar bots (só sessões de teste) */}
+              {session.is_test_session && (
+                <div className="mt-4 space-y-2 rounded-xl border border-purple-500/40 bg-purple-500/10 p-3">
+                  <p className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-purple-300">
+                    <Bot className="h-3.5 w-3.5" /> Sessão de teste — adicionar bots
+                  </p>
+                  <div className="flex gap-2">
+                    <input
+                      className="min-w-0 flex-1 rounded-xl border border-purple-500/30 bg-slate-900/70 px-3 py-2 text-sm font-semibold text-white placeholder:text-slate-500 focus:border-purple-400 focus:outline-none"
+                      placeholder="Nome do bot (opcional)"
+                      value={botName}
+                      maxLength={30}
+                      onChange={(e) => setBotName(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addBot() } }}
+                    />
+                    <button
+                      type="button"
+                      disabled={addingBot}
+                      onClick={addBot}
+                      className="flex items-center gap-1.5 rounded-xl bg-purple-600 px-3 py-2 text-sm font-bold text-white hover:bg-purple-500 disabled:opacity-50"
+                    >
+                      <Plus className="h-4 w-4" /> Bot
+                    </button>
+                  </div>
+                  <p className="text-[11px] text-purple-300/70">
+                    Jogadores reais também podem entrar com o código. Durante o jogo, usa o painel roxo (canto inferior esquerdo) para jogar como cada bot.
+                  </p>
                 </div>
               )}
             </section>

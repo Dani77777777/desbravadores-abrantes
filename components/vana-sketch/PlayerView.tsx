@@ -15,9 +15,10 @@ interface PlayerViewProps {
   session: VanaSketchSession
   myPlayer: VanaSketchPlayer
   initialPlayers: VanaSketchPlayer[]
+  asBotId?: string // host a jogar como um bot (sessões de teste)
 }
 
-export function PlayerView({ session: initialSession, myPlayer, initialPlayers }: PlayerViewProps) {
+export function PlayerView({ session: initialSession, myPlayer, initialPlayers, asBotId }: PlayerViewProps) {
   const [session, setSession] = useState<VanaSketchSession>(initialSession)
   const [players, setPlayers] = useState<VanaSketchPlayer[]>(initialPlayers)
   const [guesses, setGuesses] = useState<VanaSketchGuess[]>([])
@@ -35,6 +36,11 @@ export function PlayerView({ session: initialSession, myPlayer, initialPlayers }
   return (
     <div className={`min-h-screen ${vsSans.className}`} style={VS_SCREEN_STYLE}>
       <div className="mx-auto flex min-h-screen w-full max-w-lg flex-col gap-4 p-4">
+        {asBotId && (
+          <p className="rounded-xl border border-purple-500/50 bg-purple-500/15 px-3 py-2 text-center text-xs font-bold text-purple-200">
+            🤖 A jogar como {me.display_name} (sessão de teste)
+          </p>
+        )}
         {/* Cabeçalho */}
         <header className="flex items-center justify-between">
           <div className="flex items-center gap-2.5">
@@ -76,6 +82,7 @@ export function PlayerView({ session: initialSession, myPlayer, initialPlayers }
               guesses={guesses}
               playerById={playerById}
               iGuessedCorrect={iGuessedCorrect}
+              asBotId={asBotId}
             />
           )
         )}
@@ -221,11 +228,13 @@ function GuesserView({
   guesses,
   playerById,
   iGuessedCorrect,
+  asBotId,
 }: {
   session: VanaSketchSession
   guesses: VanaSketchGuess[]
   playerById: Map<string, VanaSketchPlayer>
   iGuessedCorrect: boolean
+  asBotId?: string
 }) {
   const [guess, setGuess] = useState('')
   const [sending, setSending] = useState(false)
@@ -243,7 +252,7 @@ function GuesserView({
     if (!text || sending) return
     setSending(true)
     setGuess('')
-    const res = await submitSketchGuess(session.id, text)
+    const res = await submitSketchGuess(session.id, text, asBotId)
     if (res.correct) {
       setFlash('correct')
     } else if (!res.error) {
@@ -251,7 +260,7 @@ function GuesserView({
       setTimeout(() => setFlash(null), 600)
     }
     setSending(false)
-  }, [guess, sending, session.id])
+  }, [guess, sending, session.id, asBotId])
 
   return (
     <div className="flex flex-1 flex-col gap-3">

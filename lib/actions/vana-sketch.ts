@@ -15,7 +15,7 @@ import { effectiveRole } from '@/utils/permissions'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 // ── Criar sessão (admin/host) ─────────────────────────────────
-export async function createVanaSketchSession(): Promise<string> {
+export async function createVanaSketchSession(isTest = false): Promise<string> {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
@@ -37,7 +37,7 @@ export async function createVanaSketchSession(): Promise<string> {
 
   const { data: session, error } = await service
     .from('vanasketch_sessions')
-    .insert({ host_id: user.id, code })
+    .insert({ host_id: user.id, code, is_test_session: isTest })
     .select('id')
     .single()
 
@@ -285,10 +285,11 @@ export async function chooseSketchWord(
   return {}
 }
 
-// ── Palpite ───────────────────────────────────────────────────
+// ── Palpite (suporta impersonação de bot pelo host) ───────────
 export async function submitSketchGuess(
   sessionId: string,
   guessText: string,
+  asBotId?: string, // host a palpitar como um bot em sessão de teste
 ): Promise<{ correct?: boolean; error?: string }> {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -300,7 +301,7 @@ export async function submitSketchGuess(
   const service = createServiceClient()
   const { data: session } = await service
     .from('vanasketch_sessions')
-    .select('status, phase, round_number, drawer_player_id, round_ends_at, draw_seconds')
+    .select('host_id, status, phase, round_number, drawer_player_id, round_ends_at, draw_seconds, is_test_session')
     .eq('id', sessionId)
     .maybeSingle()
 
@@ -308,13 +309,31 @@ export async function submitSketchGuess(
     return { error: 'Não é altura de palpitar.' }
   }
 
-  const { data: me } = await service
-    .from('vanasketch_players')
-    .select('id, score')
-    .eq('session_id', sessionId)
-    .eq('user_id', user.id)
-    .maybeSingle()
-  if (!me) return { error: 'Não estás nesta sessão.' }
+  let me: { id: string; score: number }
+  if (asBotId) {
+    // Modo impersonação: apenas host de sessão de teste
+    if (session.host_id !== user.id || !session.is_test_session) {
+      return { error: 'Sem permissão para impersonar bots.' }
+    }
+    const { data: bot } = await service
+      .from('vanasketch_players')
+      .select('id, score')
+      .eq('id', asBotId)
+      .eq('session_id', sessionId)
+      .eq('is_bot', true)
+      .maybeSingle()
+    if (!bot) return { error: 'Bot não encontrado.' }
+    me = bot
+  } else {
+    const { data: real } = await service
+      .from('vanasketch_players')
+      .select('id, score')
+      .eq('session_id', sessionId)
+      .eq('user_id', user.id)
+      .maybeSingle()
+    if (!real) return { error: 'Não estás nesta sessão.' }
+    me = real
+  }
   if (me.id === session.drawer_player_id) return { error: 'O desenhador não palpita 😉' }
 
   // Já acertou nesta ronda?
@@ -507,6 +526,8 @@ export async function awardVanaSketchPoints(sessionId: string): Promise<{ error?
   if (session.status !== 'finished') return { error: 'O jogo ainda não terminou.' }
   if (session.rewards_awarded) return { error: 'Pontos já atribuídos.' }
 
+  // Bots (user_id null) não recebem recompensas, mas contam para o pódio —
+  // por isso o índice é calculado sobre a lista completa ordenada.
   const { data: players } = await service
     .from('vanasketch_players')
     .select('user_id, score')
@@ -514,22 +535,26 @@ export async function awardVanaSketchPoints(sessionId: string): Promise<{ error?
     .order('score', { ascending: false })
 
   if (players && players.length > 0) {
-    const rewards = players.map((p, i) => {
-      const [xp, gold] =
-        i === 0 ? [100, 50] :
-        i === 1 ? [60, 30] :
-        i === 2 ? [40, 20] :
-        [20, 10]
-      return {
-        target_user_id: p.user_id,
-        awarded_by_user_id: user.id,
-        amount_xp: xp,
-        amount_gold: gold,
-        description: i === 0 ? 'Vencedor do VanaSketch 🎨' : 'Participação no VanaSketch',
-      }
-    })
-    const { error: logError } = await service.from('points_log').insert(rewards)
-    if (logError) return { error: logError.message }
+    const rewards = players
+      .map((p, i) => {
+        const [xp, gold] =
+          i === 0 ? [100, 50] :
+          i === 1 ? [60, 30] :
+          i === 2 ? [40, 20] :
+          [20, 10]
+        return {
+          target_user_id: p.user_id,
+          awarded_by_user_id: user.id,
+          amount_xp: xp,
+          amount_gold: gold,
+          description: i === 0 ? 'Vencedor do VanaSketch 🎨' : 'Participação no VanaSketch',
+        }
+      })
+      .filter((r): r is typeof r & { target_user_id: string } => !!r.target_user_id)
+    if (rewards.length > 0) {
+      const { error: logError } = await service.from('points_log').insert(rewards)
+      if (logError) return { error: logError.message }
+    }
   }
 
   await service
@@ -538,6 +563,71 @@ export async function awardVanaSketchPoints(sessionId: string): Promise<{ error?
     .eq('id', sessionId)
 
   return {}
+}
+
+// ── Adicionar bot (sessões de teste) ─────────────────────────
+export async function addVanaSketchBot(
+  sessionId: string,
+  displayName: string,
+): Promise<{ botId?: string; error?: string }> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Não autenticado' }
+
+  const service = createServiceClient()
+  const { data: session } = await service
+    .from('vanasketch_sessions')
+    .select('host_id, status, is_test_session')
+    .eq('id', sessionId)
+    .maybeSingle()
+
+  if (!session || session.host_id !== user.id) return { error: 'Sem permissão' }
+  if (!session.is_test_session) return { error: 'Sessão não é de teste.' }
+  if (session.status !== 'lobby') return { error: 'Só podes adicionar bots no lobby.' }
+
+  const name = displayName.trim()
+  if (!name) return { error: 'Nome inválido.' }
+
+  // Nomes duplicados baralham a impersonação e o feed — recusar
+  const { data: existing } = await service
+    .from('vanasketch_players')
+    .select('display_name')
+    .eq('session_id', sessionId)
+  const duplicated = (existing ?? []).some(
+    (p) => p.display_name.trim().toLocaleLowerCase('pt-PT') === name.toLocaleLowerCase('pt-PT')
+  )
+  if (duplicated) return { error: `Já existe um jogador chamado "${name}" nesta sessão.` }
+
+  const { data: bot, error } = await service
+    .from('vanasketch_players')
+    .insert({
+      session_id: sessionId,
+      display_name: name,
+      is_bot: true,
+    })
+    .select('id')
+    .single()
+
+  if (error || !bot) return { error: error?.message ?? 'Erro ao criar bot' }
+  return { botId: bot.id }
+}
+
+// ── Buscar bot para impersonação ─────────────────────────────
+export async function getVanaSketchBotForImpersonation(
+  sessionId: string,
+  playerId: string,
+): Promise<{ bot?: { id: string; display_name: string; score: number; draw_order: number | null }; error?: string }> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Não autenticado' }
+
+  const { data, error } = await supabase.rpc('get_vanasketch_bot', {
+    p_session_id: sessionId,
+    p_player_id: playerId,
+  })
+
+  if (error || !data || data.length === 0) return { error: 'Bot não encontrado.' }
+  return { bot: data[0] }
 }
 
 // ── Apagar sessão ─────────────────────────────────────────────

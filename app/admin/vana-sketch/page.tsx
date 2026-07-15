@@ -4,7 +4,7 @@ import { redirect } from 'next/navigation'
 import { Navbar } from '@/components/layout/Navbar'
 import { createVanaSketchSession } from '@/lib/actions/vana-sketch'
 import { effectiveRole } from '@/utils/permissions'
-import { ChevronLeft, Plus, MonitorPlay, Gamepad2, BookOpen } from 'lucide-react'
+import { ChevronLeft, Plus, MonitorPlay, Gamepad2, BookOpen, FlaskConical } from 'lucide-react'
 import Link from 'next/link'
 
 const STATUS_LABEL: Record<string, { label: string; cls: string }> = {
@@ -35,7 +35,13 @@ export default async function VanaSketchAdminPage() {
 
   async function handleCreate() {
     'use server'
-    const id = await createVanaSketchSession()
+    const id = await createVanaSketchSession(false)
+    redirect(`/jogos/vana-sketch/${id}/control`)
+  }
+
+  async function handleCreateTest() {
+    'use server'
+    const id = await createVanaSketchSession(true)
     redirect(`/jogos/vana-sketch/${id}/control`)
   }
 
@@ -54,14 +60,24 @@ export default async function VanaSketchAdminPage() {
         <section className="space-y-4">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <h2 className="font-semibold text-gray-700 text-lg">Sessões recentes</h2>
-            <form action={handleCreate}>
-              <button
-                type="submit"
-                className="flex items-center justify-center gap-2 px-4 py-2 bg-pink-600 hover:bg-pink-700 text-white rounded-xl font-semibold text-sm transition-colors"
-              >
-                <Plus className="w-4 h-4" /> Nova Sessão
-              </button>
-            </form>
+            <div className="flex gap-2 sm:gap-3">
+              <form action={handleCreate} className="flex-1 sm:flex-none">
+                <button
+                  type="submit"
+                  className="flex w-full items-center justify-center gap-2 px-4 py-2 bg-pink-600 hover:bg-pink-700 text-white rounded-xl font-semibold text-sm transition-colors"
+                >
+                  <Plus className="w-4 h-4" /> Nova Sessão
+                </button>
+              </form>
+              <form action={handleCreateTest} className="flex-1 sm:flex-none">
+                <button
+                  type="submit"
+                  className="flex w-full items-center justify-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-semibold text-sm transition-colors"
+                >
+                  <FlaskConical className="w-4 h-4" /> Teste (Bots)
+                </button>
+              </form>
+            </div>
           </div>
 
           <div className="bg-white border rounded-xl px-4 py-3 text-sm text-slate-600 flex items-center gap-2">
@@ -89,6 +105,11 @@ export default async function VanaSketchAdminPage() {
                     <span className={`text-[10px] font-bold px-2 py-1 rounded-full uppercase ${status.cls}`}>
                       {status.label}
                     </span>
+                    {s.is_test_session && (
+                      <span className="text-[10px] font-bold px-2 py-1 rounded-full uppercase bg-purple-100 text-purple-700">
+                        Teste
+                      </span>
+                    )}
                     <span className="text-sm text-slate-500">
                       {playerCount} jogador{playerCount !== 1 ? 'es' : ''}
                       {' · '}{new Date(s.created_at).toLocaleDateString('pt-PT', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
