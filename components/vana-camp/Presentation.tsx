@@ -1,15 +1,16 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import Image from 'next/image'
 import { QRCodeSVG } from 'qrcode.react'
-import { Moon, Sunrise, Sun, Sunset, Vote, Trophy, VenetianMask, Home, Eye, Shield, User, Crown, Users } from 'lucide-react'
+import { Moon, Sunrise, Sun, Sunset, Vote, Trophy, VenetianMask, Home, Eye, Shield, User, Crown, Users, Volume2 } from 'lucide-react'
 import { getDayResult, getDayVoteProgress, getMayorElectionProgress } from '@/lib/actions/vana-camp'
 import { createClient } from '@/utils/supabase/client'
 import { useLiveSession } from './useLiveSession'
 import { usePhaseReload } from './usePhaseReload'
 import { usePhaseCountdown, usePhaseProgress, formatClock } from './usePhaseCountdown'
 import { usePlayerList } from './usePlayerList'
+import { usePresentationAudio, playSfx } from './usePresentationAudio'
 import type {
   VanaCampPlayerPublic,
   VanaCampRole,
@@ -55,26 +56,25 @@ export function Presentation({
   // status='finished', por isso nunca mostra o lado errado por instantes.
   const liveWinner = (live.winner_side as VanaCampSide | null | undefined) ?? winnerSide
 
+  const { audioBlocked } = usePresentationAudio(sessionId, status, liveWinner)
+
+  let screen: React.ReactNode
   if (status === 'lobby') {
-    return <PresentLobby sessionId={sessionId} code={code} joinUrl={joinUrl} />
-  }
-  if (status === 'role_preview') {
-    return <PresentSimple title="A preparar os papéis…" subtitle="O Narrador está a distribuir os papéis aos desbravadores." icon="moon" />
-  }
-  if (status === 'role_reveal') {
-    return <PresentRoleReveal phaseEndsAt={live.phase_ends_at} phasePausedAt={live.phase_paused_at} />
-  }
-  if (status === 'mayor_election') {
-    return (
+    screen = <PresentLobby sessionId={sessionId} code={code} joinUrl={joinUrl} />
+  } else if (status === 'role_preview') {
+    screen = <PresentSimple title="A preparar os papéis…" subtitle="O Narrador está a distribuir os papéis aos desbravadores." icon="moon" />
+  } else if (status === 'role_reveal') {
+    screen = <PresentRoleReveal phaseEndsAt={live.phase_ends_at} phasePausedAt={live.phase_paused_at} />
+  } else if (status === 'mayor_election') {
+    screen = (
       <PresentMayorElection
         sessionId={sessionId}
         phaseEndsAt={live.phase_ends_at}
         phasePausedAt={live.phase_paused_at}
       />
     )
-  }
-  if (status === 'night_infiltrators' || status === 'night_seer' || status === 'night_guardian') {
-    return (
+  } else if (status === 'night_infiltrators' || status === 'night_seer' || status === 'night_guardian') {
+    screen = (
       <PresentNight
         sessionId={sessionId}
         status={status}
@@ -84,9 +84,8 @@ export function Presentation({
         phasePausedAt={live.phase_paused_at}
       />
     )
-  }
-  if (status === 'day_announce') {
-    return (
+  } else if (status === 'day_announce') {
+    screen = (
       <PresentDayAnnounce
         sessionId={sessionId}
         dayNumber={dayNumber}
@@ -94,9 +93,8 @@ export function Presentation({
         phasePausedAt={live.phase_paused_at}
       />
     )
-  }
-  if (status === 'day_discussion') {
-    return (
+  } else if (status === 'day_discussion') {
+    screen = (
       <PresentDayDiscussion
         sessionId={sessionId}
         dayNumber={dayNumber}
@@ -105,9 +103,8 @@ export function Presentation({
         phasePausedAt={live.phase_paused_at}
       />
     )
-  }
-  if (status === 'day_vote') {
-    return (
+  } else if (status === 'day_vote') {
+    screen = (
       <PresentDayVote
         sessionId={sessionId}
         dayNumber={dayNumber}
@@ -115,9 +112,8 @@ export function Presentation({
         phasePausedAt={live.phase_paused_at}
       />
     )
-  }
-  if (status === 'day_result') {
-    return (
+  } else if (status === 'day_result') {
+    screen = (
       <PresentDayResult
         sessionId={sessionId}
         dayNumber={dayNumber}
@@ -125,11 +121,41 @@ export function Presentation({
         phasePausedAt={live.phase_paused_at}
       />
     )
+  } else if (status === 'finished') {
+    screen = <PresentFinished sessionId={sessionId} winnerSide={liveWinner} />
+  } else {
+    screen = <PresentSimple title={`(${status})`} subtitle="Fase ainda por implementar." icon="moon" />
   }
-  if (status === 'finished') {
-    return <PresentFinished sessionId={sessionId} winnerSide={liveWinner} />
-  }
-  return <PresentSimple title={`(${status})`} subtitle="Fase ainda por implementar." icon="moon" />
+
+  return (
+    <>
+      {audioBlocked && <AudioUnlockOverlay />}
+      {screen}
+    </>
+  )
+}
+
+// ════════════════════════════════════════════════════════════════════
+// OVERLAY DE DESBLOQUEIO DE ÁUDIO
+// ════════════════════════════════════════════════════════════════════
+
+/**
+ * Overlay a pedir o primeiro clique quando o browser bloqueia o autoplay
+ * (mesmo padrão do VanaQuest/VanaWords). O clique é apanhado pelo listener
+ * global do usePresentationAudio, que retoma a música e limpa o estado.
+ */
+function AudioUnlockOverlay() {
+  return (
+    <div className="fixed inset-0 z-[100] bg-black/70 backdrop-blur-md flex items-center justify-center cursor-pointer animate-in fade-in duration-300">
+      <div className="bg-stone-900/80 border-2 border-amber-500/40 rounded-3xl px-10 py-8 text-center shadow-2xl max-w-md mx-4">
+        <Volume2 className="w-14 h-14 text-amber-300 mx-auto mb-4 drop-shadow-[0_0_20px_rgba(252,211,77,0.5)]" />
+        <p className="text-amber-100 text-2xl font-black">Clica para ativar o áudio</p>
+        <p className="text-amber-300/70 text-sm mt-2">
+          Os browsers exigem uma interação antes de tocar música
+        </p>
+      </div>
+    </div>
+  )
 }
 
 // ════════════════════════════════════════════════════════════════════
@@ -383,6 +409,8 @@ function PresentDayAnnounce({
 }) {
   const [events, setEvents] = useState<VanaCampEvent[]>([])
   const remaining = usePhaseCountdown(phaseEndsAt, phasePausedAt)
+  const trombetaEndAtRef = useRef(0)
+  const resultSfxPlayedRef = useRef(false)
 
   useEffect(() => {
     const supabase = createClient()
@@ -396,12 +424,25 @@ function PresentDayAnnounce({
       .then(({ data }) => { if (data) setEvents(data as VanaCampEvent[]) })
   }, [sessionId, dayNumber])
 
+  // SFX do resultado da noite — espera pelo fim da trombeta antes de tocar
+  useEffect(() => {
+    if (resultSfxPlayedRef.current || events.length === 0) return
+    resultSfxPlayedRef.current = true
+    const hasDeath = events.some((e) => e.event_type === 'death')
+    const hasSave = events.some((e) => e.event_type === 'save')
+    const name = hasDeath ? 'death-announce' : hasSave ? 'save' : 'peaceful-morning'
+    const delay = Math.max(0, trombetaEndAtRef.current - Date.now()) + 400
+    const t = setTimeout(() => playSfx(name), delay)
+    return () => clearTimeout(t)
+  }, [events])
+
   // Toca trombeta — duração aleatória entre 3 e 7 segundos (uma vez por mounting)
   useEffect(() => {
     const audio = new Audio('/sounds/VanaCamp/trombeta.mp3')
     audio.volume = 0.85
     // 3000–7000 ms (inclusive). Math.random() ∈ [0, 1)
     const durationMs = 3000 + Math.floor(Math.random() * 4001)
+    trombetaEndAtRef.current = Date.now() + durationMs
 
     const playPromise = audio.play()
     let stopTimer: ReturnType<typeof setTimeout> | null = null
@@ -760,10 +801,18 @@ function PresentDayResult({
 }) {
   const remaining = usePhaseCountdown(phaseEndsAt, phasePausedAt)
   const [result, setResult] = useState<Awaited<ReturnType<typeof getDayResult>> | null>(null)
+  const verdictSfxPlayedRef = useRef(false)
 
   useEffect(() => {
     getDayResult(sessionId, dayNumber).then(setResult)
   }, [sessionId, dayNumber])
+
+  // SFX do veredito quando o resultado chega
+  useEffect(() => {
+    if (!result || verdictSfxPlayedRef.current) return
+    verdictSfxPlayedRef.current = true
+    playSfx(result.eliminated ? 'expelled' : 'tie')
+  }, [result])
 
   if (!result) {
     return <PresentSimple title="A apurar votos…" icon="moon" />
