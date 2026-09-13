@@ -1,6 +1,6 @@
 'use client'
 
-import { forwardRef } from 'react'
+import { forwardRef, useState } from 'react'
 import { VW, VW_SCREEN_STYLE, TEAM_GRADIENT, vwSans, vwSerif } from './theme'
 import { initials } from './ui'
 import { shortDisplayNames } from '@/utils/vana-words'
@@ -33,6 +33,8 @@ export const WinnersShareCard = forwardRef<HTMLDivElement, Props>(
     const shortNames = shortDisplayNames(allPlayers ?? winners)
     // Com equipas grandes, encolhe os avatares para caber tudo no card
     const av = winners.length > 8 ? 100 : winners.length > 5 ? 116 : 132
+    // Avatares que falharam a carregar — evita <img> partidas a mancharem a captura (html-to-image)
+    const [brokenAvatars, setBrokenAvatars] = useState<Set<string>>(new Set())
 
     return (
       <div
@@ -99,7 +101,7 @@ export const WinnersShareCard = forwardRef<HTMLDivElement, Props>(
                     style={{
                       width: `${av}px`,
                       height: `${av}px`,
-                      background: p.avatar_url ? '#0b1226' : TEAM_GRADIENT[team],
+                      background: p.avatar_url && !brokenAvatars.has(p.id) ? '#0b1226' : TEAM_GRADIENT[team],
                       color: '#12131f',
                       fontSize: `${Math.round(av * 0.34)}px`,
                       border: '3px solid rgba(255,255,255,.35)',
@@ -108,13 +110,21 @@ export const WinnersShareCard = forwardRef<HTMLDivElement, Props>(
                         : '0 8px 20px rgba(0,0,0,.4)',
                     }}
                   >
-                    {p.avatar_url ? (
+                    {p.avatar_url && !brokenAvatars.has(p.id) ? (
                       <img
                         src={p.avatar_url}
                         alt={p.display_name}
                         className="w-full h-full object-cover"
                         crossOrigin="anonymous"
                         referrerPolicy="no-referrer"
+                        onError={() =>
+                          setBrokenAvatars((prev) => {
+                            if (prev.has(p.id)) return prev
+                            const next = new Set(prev)
+                            next.add(p.id)
+                            return next
+                          })
+                        }
                       />
                     ) : (
                       initials(p.display_name)

@@ -8,6 +8,7 @@ import {
   MonitorPlay, MessageSquareQuote, Grid3X3, FlaskConical,
 } from 'lucide-react'
 import { WordGrid } from '@/components/vana-words/WordGrid'
+import { PlayerAvatar } from '@/components/vana-words/PlayerAvatar'
 import { AwardVanaWordsButton } from '@/components/vana-words/AwardVanaWordsButton'
 import { WinnersShareButton } from '@/components/vana-words/WinnersShareButton'
 import { TEAM_LABELS } from '@/types/vana-words'
@@ -219,13 +220,12 @@ export default async function VanaWordsSessionDetailPage({
                   <div className="space-y-1.5">
                     {team.map((p) => (
                       <div key={p.id} className="flex items-center gap-2.5 py-1.5 border-b last:border-0">
-                        {p.avatar_url ? (
-                          <img src={p.avatar_url} alt="" className="w-8 h-8 rounded-full object-cover" />
-                        ) : (
-                          <span className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white ${tid === 'a' ? 'bg-amber-500' : 'bg-blue-500'}`}>
-                            {p.display_name.charAt(0).toUpperCase()}
-                          </span>
-                        )}
+                        <PlayerAvatar
+                          avatarUrl={p.avatar_url}
+                          name={p.display_name}
+                          className="w-8 h-8 rounded-full object-cover"
+                          fallbackClassName={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white ${tid === 'a' ? 'bg-amber-500' : 'bg-blue-500'}`}
+                        />
                         <span className="flex-1 text-sm font-semibold text-gray-900 truncate">{p.display_name}</span>
                         {p.is_arauto && (
                           <span className="flex items-center gap-1 rounded-full bg-yellow-100 px-2 py-0.5 text-[10px] font-bold text-yellow-700">
