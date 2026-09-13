@@ -9,6 +9,7 @@ import {
 } from 'lucide-react'
 import { WordGrid } from '@/components/vana-words/WordGrid'
 import { AwardVanaWordsButton } from '@/components/vana-words/AwardVanaWordsButton'
+import { WinnersShareButton } from '@/components/vana-words/WinnersShareButton'
 import { TEAM_LABELS } from '@/types/vana-words'
 import type { TeamId, VanaWordsPlayer, VanaWordsTurn } from '@/types/vana-words'
 
@@ -164,6 +165,14 @@ export default async function VanaWordsSessionDetailPage({
                 ? 'A equipa adversária revelou a palavra preta 💀'
                 : 'Encontraram todas as palavras da equipa!'}
             </p>
+            <div className="mt-3 flex items-center gap-3">
+              <WinnersShareButton
+                winners={allPlayers.filter((p) => p.team === winner)}
+                allPlayers={allPlayers}
+                team={winner}
+                winReason={session.win_reason}
+              />
+            </div>
           </div>
         )}
 
