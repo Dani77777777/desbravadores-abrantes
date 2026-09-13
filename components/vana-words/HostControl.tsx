@@ -266,7 +266,8 @@ export function HostControl({ session: initSession, initialPlayers, initialWords
       // Mensagem apropriada para acompanhar a imagem. Nomes desambiguados:
       // primeiro nome, ou "Primeiro Último" se houver homónimos na sessão.
       const shortNames = shortDisplayNames(players)
-      const today = new Date().toLocaleDateString('pt-PT', { day: 'numeric', month: 'long', year: 'numeric' })
+      const gameDate = session.started_at ?? session.created_at
+      const today = new Date(gameDate).toLocaleDateString('pt-PT', { day: 'numeric', month: 'long', year: 'numeric' })
       const names = winners.map((p) => shortNames.get(p.id) ?? p.display_name)
       const namesText = names.length > 1
         ? `${names.slice(0, -1).join(', ')} e ${names[names.length - 1]}`
@@ -1033,6 +1034,7 @@ export function HostControl({ session: initSession, initialPlayers, initialWords
               allPlayers={players}
               team={winner}
               winReason={session.win_reason}
+              gameDate={session.started_at ?? session.created_at}
             />
           </div>
         )}

@@ -14,6 +14,8 @@ interface Props {
   allPlayers?: VanaWordsPlayer[]
   team: TeamId
   winReason?: string | null
+  /** Data em que o jogo aconteceu (ISO string) — por omissão usa a data atual */
+  gameDate?: string | null
 }
 
 /**
@@ -24,8 +26,9 @@ interface Props {
  *  - Pronto para ser capturado por html-to-image
  */
 export const WinnersShareCard = forwardRef<HTMLDivElement, Props>(
-  ({ winners, allPlayers, team, winReason }, ref) => {
+  ({ winners, allPlayers, team, winReason, gameDate }, ref) => {
     const label = TEAM_LABELS[team]
+    const displayDate = gameDate ? new Date(gameDate) : new Date()
     const emoji = team === 'a' ? '🦁' : '🦅'
     const accent = team === 'a' ? VW.amber : VW.blue
     const rgb = team === 'a' ? '245,166,35' : '63,140,255'
@@ -61,7 +64,7 @@ export const WinnersShareCard = forwardRef<HTMLDivElement, Props>(
               ? 'A equipa adversária revelou a palavra preta 💀'
               : 'Encontraram todas as palavras da equipa!'}
             {' · '}
-            {new Date().toLocaleDateString('pt-PT', { day: 'numeric', month: 'long', year: 'numeric' })}
+            {displayDate.toLocaleDateString('pt-PT', { day: 'numeric', month: 'long', year: 'numeric' })}
           </p>
         </div>
 

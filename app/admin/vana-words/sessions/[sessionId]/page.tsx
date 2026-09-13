@@ -172,6 +172,7 @@ export default async function VanaWordsSessionDetailPage({
                 allPlayers={allPlayers}
                 team={winner}
                 winReason={session.win_reason}
+                gameDate={session.started_at ?? session.created_at}
               />
             </div>
           </div>

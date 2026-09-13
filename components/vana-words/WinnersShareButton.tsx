@@ -12,6 +12,8 @@ interface Props {
   allPlayers: VanaWordsPlayer[]
   team: TeamId
   winReason?: string | null
+  /** Data em que o jogo aconteceu (ISO string) — por omissão usa a data atual */
+  gameDate?: string | null
 }
 
 /**
@@ -19,7 +21,7 @@ interface Props {
  * (durante o jogo) como na página de detalhe de sessão (gestão/admin).
  * Encapsula o WinnersShareCard off-screen e toda a lógica de captura.
  */
-export function WinnersShareButton({ winners, allPlayers, team, winReason }: Props) {
+export function WinnersShareButton({ winners, allPlayers, team, winReason, gameDate }: Props) {
   const cardRef = useRef<HTMLDivElement | null>(null)
   const [sharing, setSharing] = useState(false)
   const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null)
@@ -69,7 +71,8 @@ export function WinnersShareButton({ winners, allPlayers, team, winReason }: Pro
       const emoji = team === 'a' ? '🦁' : '🦅'
       const arauto = winners.find((p) => p.is_arauto)
       const shortNames = shortDisplayNames(allPlayers)
-      const today = new Date().toLocaleDateString('pt-PT', { day: 'numeric', month: 'long', year: 'numeric' })
+      const displayDate = gameDate ? new Date(gameDate) : new Date()
+      const today = displayDate.toLocaleDateString('pt-PT', { day: 'numeric', month: 'long', year: 'numeric' })
       const names = winners.map((p) => shortNames.get(p.id) ?? p.display_name)
       const namesText =
         names.length > 1
@@ -156,6 +159,7 @@ export function WinnersShareButton({ winners, allPlayers, team, winReason }: Pro
           allPlayers={allPlayers}
           team={team}
           winReason={winReason}
+          gameDate={gameDate}
         />
       </div>
     </>
