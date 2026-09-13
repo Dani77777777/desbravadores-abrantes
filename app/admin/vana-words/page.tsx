@@ -48,15 +48,17 @@ export default async function VanaWordsAdminPage() {
   async function handleDeleteWord(formData: FormData) {
     'use server'
     const id = formData.get('id') as string
-    await deleteWordFromBank(id)
+    const result = await deleteWordFromBank(id)
     revalidatePath('/admin/vana-words')
+    return result
   }
 
   async function handleAddWord(formData: FormData) {
     'use server'
     const word = formData.get('word') as string
-    await addWordToBank(word)
+    const result = await addWordToBank(word)
     revalidatePath('/admin/vana-words')
+    return result
   }
 
   async function handleBulkAdd(formData: FormData) {
@@ -64,8 +66,9 @@ export default async function VanaWordsAdminPage() {
     const raw = formData.get('words') as string
     // Aceita separadores: vírgula, ponto e vírgula, nova linha
     const words = raw.split(/[,;\n]+/).map((w) => w.trim()).filter(Boolean)
-    await addWordsToBank(words)
+    const result = await addWordsToBank(words)
     revalidatePath('/admin/vana-words')
+    return result
   }
 
   const wordCount = wordBank?.length ?? 0

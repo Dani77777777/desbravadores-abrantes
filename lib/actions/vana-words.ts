@@ -279,7 +279,9 @@ export async function confirmVanaWordsTeams(
   for (const h of recentHistory ?? []) {
     if (h.user_id && !recentArautosMap[h.user_id]) {
       const sess = h.vanawords_sessions as any
-      recentArautosMap[h.user_id] = sess?.created_at ?? new Date().toISOString()
+      // Sem created_at fiável, não assumimos "agora" (penalizaria injustamente
+      // o jogador) — deixamos por preencher, o que o trata como "nunca foi Arauto"
+      if (sess?.created_at) recentArautosMap[h.user_id] = sess.created_at
     }
   }
   const recentArautos = Object.entries(recentArautosMap).map(([user_id, last_at]) => ({ user_id, last_at }))
@@ -358,7 +360,9 @@ export async function rerollArauto(
     for (const h of recentHistory ?? []) {
       if (h.user_id && !recentArautosMap[h.user_id]) {
         const sess = h.vanawords_sessions as any
-        recentArautosMap[h.user_id] = sess?.created_at ?? new Date().toISOString()
+        // Sem created_at fiável, não assumimos "agora" (penalizaria injustamente
+        // o jogador) — deixamos por preencher, o que o trata como "nunca foi Arauto"
+        if (sess?.created_at) recentArautosMap[h.user_id] = sess.created_at
       }
     }
     const recentArautos = Object.entries(recentArautosMap).map(([user_id, last_at]) => ({ user_id, last_at }))
