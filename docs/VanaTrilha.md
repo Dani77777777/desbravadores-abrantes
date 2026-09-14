@@ -11,6 +11,22 @@ Jogo #5 do Centro de Jogos dos Desbravadores de Abrantes.
 
 ---
 
+> ### ✅ Estado da implementação (2026-09-14)
+>
+> Implementado **só o Modo Diário (singleplayer)**. O Modo Evento (secções 2.4, 3.7, 6.4,
+> Fase 2) **foi descartado** por decisão do clube — não construir.
+>
+> Decisões que alteram o texto abaixo:
+> - **Errar** tira 1 vida e troca a pergunta por outra da mesma dificuldade (`reserve_ids`),
+>   para o peão conseguir chegar à casa 8. **Jornada Perfeita** = completa com `mistakes = 0`.
+> - **Tábuas da Lei** no diário: acertar o V/F dá **+1 casa** (não +3); errar não custa nada.
+> - **Milagre**: +2 Gold só pagos se a etapa ficar completa (coluna `bonus_gold`).
+> - `questionIndex` = coluna `turn` (n.º de respostas dadas), usada como trinco otimista.
+> - As opções são baralhadas no servidor por (data, pergunta).
+> - `vanatrilha_daily_questions` só pode ser chamada pelo service role (devolve `correct_index`).
+> - Não há rota `/diario`: o jogo vive em `/jogos/vana-trilha` (como o VANTUR).
+> - Login usa `?next=` (o parâmetro que `app/login` respeita).
+
 ## 0. TL;DR
 
 | | |

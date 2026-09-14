@@ -55,6 +55,17 @@ export default async function GamesHubPage() {
       requiresAuth: true,
     },
     {
+      id: 'vana-trilha',
+      title: 'VanaTrilha',
+      description: 'A Rota da Promessa. Desafio bíblico diário: do Egito à Terra Prometida.',
+      icon: <img src="/images/VanaTrilha.png" alt="VanaTrilha" className="w-12 h-12 object-contain" />,
+      href: '/jogos/vana-trilha',
+      loginHref: '/login?next=/jogos/vana-trilha',
+      color: 'from-amber-500 via-orange-600 to-yellow-500',
+      status: 'Disponível',
+      requiresAuth: true,
+    },
+    {
       id: 'em-breve',
       title: 'Em Breve...',
       description: 'Mais desafios estão a ser preparados pelos teus líderes!',

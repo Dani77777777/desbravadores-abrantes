@@ -44,6 +44,7 @@ export async function updateSession(request: NextRequest) {
     !request.nextUrl.pathname.startsWith('/contacts') &&
     !request.nextUrl.pathname.startsWith('/codes') &&
     !request.nextUrl.pathname.startsWith('/jogos/vana-quest') &&
+    !request.nextUrl.pathname.startsWith('/jogos/vana-trilha/como-jogar') &&
     !request.nextUrl.pathname.startsWith('/embed') &&
     !request.nextUrl.pathname.includes('/present') &&
     request.nextUrl.pathname !== '/jogos'
