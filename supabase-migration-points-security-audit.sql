@@ -194,18 +194,21 @@ SELECT
   -- ajudantes) fora dos fluxos automáticos, ou atribuídos por alguém sem cargo de
   -- gestão (só possível antes desta migração).
   (
-    (y.is_self AND y.category IN ('manual', 'tarefa', 'evento', 'sugestao'))
+    (y.is_self AND y.awarded_by_real_role IS DISTINCT FROM 'coordenador'
+     AND y.category IN ('manual', 'tarefa', 'evento', 'sugestao'))
     OR y.category = 'outro'
   ) AS is_suspicious
 FROM (
   SELECT
     x.id, x.created_at, x.target_user_id, x.target_name, x.target_avatar, x.target_section, x.target_role,
-    x.awarded_by_user_id, x.awarded_by_name, x.awarded_by_role,
+    x.awarded_by_user_id, x.awarded_by_name, x.awarded_by_role, x.awarded_by_real_role,
     x.amount_xp, x.amount_gold, x.description, x.event_id, x.is_self,
-    -- Coordenador (cargo real) a dar pontos a si próprio: permitido, mas destacado.
+    -- Coordenador (cargo real) a dar pontos a si próprio com valor escolhido por ele:
+    -- permitido, mas destacado. Presenças em eventos e tarefas NÃO contam: o valor vem
+    -- das regras do evento/tarefa e é igual para todos (continua a ver-se "O próprio").
     CASE
       WHEN x.is_self AND x.awarded_by_real_role = 'coordenador'
-           AND x.base_category IN ('manual', 'tarefa', 'evento', 'sugestao', 'outro') THEN 'auto'
+           AND x.base_category IN ('manual', 'sugestao', 'outro') THEN 'auto'
       ELSE x.base_category
     END AS category
   FROM (
@@ -227,6 +230,7 @@ FROM (
       pl.event_id,
       (pl.awarded_by_user_id IS NOT NULL AND pl.awarded_by_user_id = pl.target_user_id) AS is_self,
       CASE
+        WHEN pl.description ILIKE 'Reset de pontos%'                  THEN 'reset'   -- RPC reset_all_points
         WHEN pl.event_id IS NOT NULL                                  THEN 'evento'
         WHEN pl.description ILIKE 'Tarefa concluída%'                 THEN 'tarefa'
         WHEN pl.description ILIKE 'Resgate de código%'
@@ -281,11 +285,14 @@ BEGIN
     RAISE EXCEPTION 'Apenas a coordenação pode ver a auditoria.';
   END IF;
 
-  WITH m AS (
+  WITH m_all AS (
     SELECT * FROM public.points_audit
     WHERE (p_from IS NULL OR created_at >= p_from)
       AND (p_to IS NULL OR created_at < p_to)
-  )
+  ),
+  -- Resets de época não contam como "XP retirado" nem nos tops (distorceriam tudo);
+  -- continuam visíveis na origem "Reset de época" e na tabela.
+  m AS (SELECT * FROM m_all WHERE category <> 'reset')
   SELECT json_build_object(
     'totals', (
       SELECT json_build_object(
@@ -307,7 +314,7 @@ BEGIN
                COALESCE(-SUM(amount_xp)  FILTER (WHERE amount_xp < 0), 0)   AS xp_out,
                COALESCE(SUM(amount_gold) FILTER (WHERE amount_gold > 0), 0) AS gold_in,
                COALESCE(-SUM(amount_gold) FILTER (WHERE amount_gold < 0), 0) AS gold_out
-        FROM m GROUP BY category
+        FROM m_all GROUP BY category
       ) c
     ), '[]'::json),
     'top_receivers', COALESCE((

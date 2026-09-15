@@ -9,11 +9,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import {
   AlertOctagon, AlertTriangle, ArrowDownRight, ArrowUpRight, Bot, CalendarCheck, ChevronLeft, ChevronRight,
   ClipboardList, Coins, Download, Gamepad2, Hand, History, ListChecks, MessageSquare, QrCode, Repeat,
-  Search, ShieldCheck, ShoppingBag, Trophy, Users, Wrench, X,
+  RotateCcw, Search, ShieldCheck, ShoppingBag, Trophy, Users, Wrench, X,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { SECTION_LABELS } from '@/utils/permissions'
 import { ROLE_LABELS } from './member-constants'
+import { PointsResetCard } from './PointsResetCard'
 
 const PAGE_SIZE = 50
 const LARGE_THRESHOLD = 500
@@ -40,6 +41,7 @@ const CATEGORIES: Record<string, { label: string; icon: any }> = {
   loja:          { label: 'Loja',              icon: ShoppingBag },
   transferencia: { label: 'Transferências',    icon: Repeat },
   jogo:          { label: 'Jogos',             icon: Gamepad2 },
+  reset:         { label: 'Reset de época',    icon: RotateCcw },
   outro:         { label: 'Sem origem clara',  icon: Bot },
 }
 
@@ -167,7 +169,7 @@ export function AuditPanel({ members }: { members: any[] }) {
     }
     run()
     return () => { cancelled = true }
-  }, [filters, page, view]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [filters, page, view, overviewKey]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const fixTotals = async () => {
     setFixing(true)
@@ -485,6 +487,8 @@ export function AuditPanel({ members }: { members: any[] }) {
           </div>
         )}
       </div>
+
+      <PointsResetCard onDone={() => { setPage(0); setOverviewKey((k) => k + 1) }} />
     </div>
   )
 }
