@@ -12,12 +12,13 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
-  AlertTriangle, ArrowRight, Coins, KeyRound, MinusCircle, PlusCircle, Shield, Trash2, Trophy, UserCog, Wallet,
+  AlertTriangle, ArrowRight, Coins, GraduationCap, History, KeyRound, MinusCircle, PlusCircle, Shield, Trash2, Trophy, UserCog, Wallet,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { triggerResetPassword } from '../actions'
 import { SECTION_LABELS, helperLabel } from '@/utils/permissions'
 import { ROLE_LABELS, SECTION_DOT } from './member-constants'
+import type { SectionSuggestion } from './SectionSuggestions'
 
 const PRESETS = [5, 10, 25, 50, 100]
 
@@ -27,11 +28,12 @@ interface ManageMemberDialogProps {
   onOpenChange: (open: boolean) => void
   adminProfile: any
   currentUserRole: string
+  suggestion?: SectionSuggestion | null
   onRequestDelete: (member: any) => void
 }
 
 export function ManageMemberDialog({
-  member, open, onOpenChange, adminProfile, currentUserRole, onRequestDelete,
+  member, open, onOpenChange, adminProfile, currentUserRole, suggestion, onRequestDelete,
 }: ManageMemberDialogProps) {
   const router = useRouter()
   const supabase = createClient()
@@ -51,6 +53,9 @@ export function ManageMemberDialog({
   const [savingRole, setSavingRole] = useState(false)
   const [confirmReset, setConfirmReset] = useState(false)
   const [sendingReset, setSendingReset] = useState(false)
+  const [resetInvestiture, setResetInvestiture] = useState(true)
+  const [notifyMember, setNotifyMember] = useState(true)
+  const [sectionHistory, setSectionHistory] = useState<any[]>([])
 
   // Repõe o formulário sempre que se abre para um membro.
   useEffect(() => {
@@ -64,7 +69,24 @@ export function ManageMemberDialog({
     setTempSection(member.section)
     setTempLeadership(member.leadership_section || 'none')
     setConfirmReset(false)
+    setResetInvestiture(true)
+    setNotifyMember(true)
+    setSectionHistory([])
   }, [open, member?.id]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Histórico de classes (só a coordenação gere classes).
+  useEffect(() => {
+    if (!open || !member || !isCoordenador) return
+    let cancelled = false
+    supabase
+      .from('section_changes')
+      .select('id, from_section, to_section, reason, investiture_reset, created_at, changer:profiles!section_changes_changed_by_fkey(full_name)')
+      .eq('user_id', member.id)
+      .order('created_at', { ascending: false })
+      .limit(5)
+      .then(({ data }) => { if (!cancelled) setSectionHistory(data || []) })
+    return () => { cancelled = true }
+  }, [open, member?.id, isCoordenador]) // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!member) return null
 
@@ -75,10 +97,11 @@ export function ManageMemberDialog({
   const nextXP = (member.total_xp ?? 0) + deltaXP
   const nextGold = (member.current_gold ?? 0) + deltaGold
 
-  const roleChanged =
+  const sectionChanged = tempSection !== member.section
+  const onlyRoleChanged =
     tempRole !== member.role ||
-    tempSection !== member.section ||
     (tempRole === 'dirigente' ? tempLeadership : 'none') !== (member.leadership_section || 'none')
+  const roleChanged = sectionChanged || onlyRoleChanged
 
   const handlePoints = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -106,16 +129,26 @@ export function ManageMemberDialog({
   const handleRole = async () => {
     setSavingRole(true)
     try {
-      const { error } = await supabase
-        .from('profiles')
-        .update({
-          role: tempRole,
-          section: tempSection,
-          leadership_section: tempRole === 'dirigente' && tempLeadership !== 'none' ? tempLeadership : null,
+      if (sectionChanged) {
+        const { error } = await supabase.rpc('change_member_section', {
+          p_member_id: member.id,
+          p_section: tempSection,
+          p_reset_investiture: resetInvestiture,
+          p_notify: notifyMember,
         })
-        .eq('id', member.id)
-      if (error) throw error
-      toast.success('Cargo atualizado!')
+        if (error) throw error
+      }
+      if (onlyRoleChanged) {
+        const { error } = await supabase
+          .from('profiles')
+          .update({
+            role: tempRole,
+            leadership_section: tempRole === 'dirigente' && tempLeadership !== 'none' ? tempLeadership : null,
+          })
+          .eq('id', member.id)
+        if (error) throw error
+      }
+      toast.success(sectionChanged ? `${member.full_name} passou para os ${SECTION_LABELS[tempSection]}.` : 'Cargo atualizado!')
       onOpenChange(false)
       router.refresh()
     } catch (error: any) {
@@ -311,12 +344,55 @@ export function ManageMemberDialog({
                     <SelectTrigger className="w-full bg-white"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       {Object.entries(SECTION_LABELS).map(([val, label]) => (
-                        <SelectItem key={val} value={val}>{label}</SelectItem>
+                        <SelectItem key={val} value={val}>
+                          <span className={`h-2 w-2 rounded-full ${SECTION_DOT[val]}`} /> {label}
+                        </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
               </div>
+
+              {suggestion && tempSection !== suggestion.suggested_section && (
+                <div className="flex items-center gap-2 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs text-indigo-900">
+                  <GraduationCap className="w-4 h-4 shrink-0" />
+                  <span className="flex-1">
+                    Pela idade ({suggestion.age} anos) devia estar nos <strong>{SECTION_LABELS[suggestion.suggested_section]}</strong>.
+                  </span>
+                  <button type="button" onClick={() => setTempSection(suggestion.suggested_section)} className="font-semibold text-indigo-700 hover:underline">
+                    Usar
+                  </button>
+                </div>
+              )}
+
+              {sectionChanged && (
+                <div className="rounded-xl border border-blue-200 bg-blue-50/60 p-3 space-y-2.5 animate-in fade-in slide-in-from-top-1 duration-200">
+                  <p className="flex items-center gap-2 text-sm font-semibold text-blue-950">
+                    <span className="inline-flex items-center gap-1.5"><span className={`h-2 w-2 rounded-full ${SECTION_DOT[member.section]}`} />{SECTION_LABELS[member.section]}</span>
+                    <ArrowRight className="w-4 h-4 text-blue-400" />
+                    <span className="inline-flex items-center gap-1.5"><span className={`h-2 w-2 rounded-full ${SECTION_DOT[tempSection]}`} />{SECTION_LABELS[tempSection]}</span>
+                  </p>
+                  <ul className="text-xs text-blue-900/80 space-y-1 list-disc pl-4">
+                    <li>Passa a ver as tarefas e eventos dos {SECTION_LABELS[tempSection]}.</li>
+                    <li>Os comunicados que já recebeu continuam visíveis; os novos da classe antiga deixam de chegar.</li>
+                    <li>XP, ouro e histórico de pontos mantêm-se.</li>
+                  </ul>
+                  <div className="flex flex-col gap-1.5 pt-1 text-xs text-slate-700">
+                    {member.is_invested && (
+                      <label className="inline-flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" checked={resetInvestiture} onChange={(e) => setResetInvestiture(e.target.checked)} className="h-4 w-4 accent-blue-700" />
+                        Reiniciar investidura (terá de ser investido na nova classe)
+                      </label>
+                    )}
+                    {tempRole === 'desbravador' && (
+                      <label className="inline-flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" checked={notifyMember} onChange={(e) => setNotifyMember(e.target.checked)} className="h-4 w-4 accent-blue-700" />
+                        Enviar comunicado ao membro a avisar da mudança
+                      </label>
+                    )}
+                  </div>
+                </div>
+              )}
 
               {tempRole === 'dirigente' && (
                 <div className="space-y-1.5">
@@ -341,8 +417,31 @@ export function ManageMemberDialog({
               )}
 
               <Button onClick={handleRole} disabled={!roleChanged || savingRole} className="w-full h-11 font-bold bg-blue-800 hover:bg-blue-900">
-                {savingRole ? 'A guardar...' : 'Guardar cargo'}
+                {savingRole ? 'A guardar...' : sectionChanged ? `Mudar para ${SECTION_LABELS[tempSection]}` : 'Guardar cargo'}
               </Button>
+
+              {sectionHistory.length > 0 && (
+                <div className="pt-2 border-t space-y-2">
+                  <p className="flex items-center gap-1.5 text-[10px] uppercase font-bold text-slate-500 tracking-wider">
+                    <History className="w-3 h-3" /> Histórico de classes
+                  </p>
+                  <ul className="space-y-1.5">
+                    {sectionHistory.map((h) => (
+                      <li key={h.id} className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-slate-600">
+                        <span className="text-slate-400 tabular-nums">{new Date(h.created_at).toLocaleDateString('pt-PT')}</span>
+                        <span className="font-medium text-slate-800">
+                          {h.from_section ? SECTION_LABELS[h.from_section] : '—'} → {SECTION_LABELS[h.to_section]}
+                        </span>
+                        <span className="text-slate-400">
+                          {h.reason === 'idade' ? 'pela idade' : h.reason === 'onboarding' ? 'no registo' : 'manual'}
+                          {h.changer?.full_name ? ` · ${h.changer.full_name}` : ''}
+                          {h.investiture_reset ? ' · investidura reiniciada' : ''}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             </TabsContent>
           )}
 

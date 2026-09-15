@@ -15,6 +15,7 @@ import { useRouter } from 'next/navigation'
 import { HelperManager } from './HelperManager'
 import { ManageMemberDialog } from './ManageMemberDialog'
 import { DeleteMemberDialog } from './DeleteMemberDialog'
+import { SectionSuggestions, type SectionSuggestion } from './SectionSuggestions'
 import { SECTION_LABELS, helperLabel } from '@/utils/permissions'
 import { ROLE_LABELS, SECTION_DOT, SECTION_RING } from './member-constants'
 
@@ -23,12 +24,13 @@ interface MemberListProps {
   currentUserRole: string
   adminProfile: any
   clubMembers?: any[]
+  sectionSuggestions?: SectionSuggestion[]
 }
 
 type SortKey = 'name' | 'xp' | 'gold'
 type StatusFilter = 'all' | 'invested' | 'pending'
 
-export function MemberList({ members, currentUserRole, adminProfile, clubMembers = [] }: MemberListProps) {
+export function MemberList({ members, currentUserRole, adminProfile, clubMembers = [], sectionSuggestions = [] }: MemberListProps) {
   const canAssignHelpers = currentUserRole === 'coordenador' || currentUserRole === 'dirigente'
   const router = useRouter()
   const supabase = createClient()
@@ -83,10 +85,10 @@ export function MemberList({ members, currentUserRole, adminProfile, clubMembers
   const handleToggleInvested = async (member: any) => {
     const next = !isInvested(member)
     setInvestedOverride((prev) => ({ ...prev, [member.id]: next }))
-    const { error } = await supabase.from('profiles').update({ is_invested: next }).eq('id', member.id)
+    const { error } = await supabase.rpc('set_member_invested', { p_member_id: member.id, p_invested: next })
     if (error) {
       setInvestedOverride((prev) => ({ ...prev, [member.id]: !next }))
-      toast.error('Erro ao atualizar investidura.')
+      toast.error(error.message || 'Erro ao atualizar investidura.')
       return
     }
     toast.success(next ? `${member.full_name} marcado como investido.` : `Investidura de ${member.full_name} removida.`)
@@ -104,6 +106,8 @@ export function MemberList({ members, currentUserRole, adminProfile, clubMembers
       {canAssignHelpers && (
         <HelperManager adminProfile={adminProfile} clubMembers={clubMembers} />
       )}
+
+      {currentUserRole === 'coordenador' && <SectionSuggestions suggestions={sectionSuggestions} />}
 
       {/* Barra de filtros */}
       <div className="space-y-3">
@@ -288,6 +292,7 @@ export function MemberList({ members, currentUserRole, adminProfile, clubMembers
         onOpenChange={(open) => !open && setManageId(null)}
         adminProfile={adminProfile}
         currentUserRole={currentUserRole}
+        suggestion={sectionSuggestions.find((s) => s.id === managedMember?.id) ?? null}
         onRequestDelete={(m) => {
           setManageId(null)
           setDeleteTarget(m)

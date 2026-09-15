@@ -87,6 +87,20 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
     .order('created_at', { ascending: false })
     .limit(20)
 
+  // Destinatários e estado de leitura dos comunicados enviados
+  const sentIds = (sentAnnouncements || []).map((a) => a.id)
+  const { data: sentRecipients } = sentIds.length
+    ? await supabase
+        .from('announcement_recipients')
+        .select('announcement_id, user_id, read_at')
+        .in('announcement_id', sentIds)
+    : { data: [] as any[] }
+
+  // Membros cuja idade sugere outra classe (só a coordenação recebe linhas)
+  const { data: sectionSuggestions } = effRole === 'coordenador'
+    ? await supabase.rpc('list_section_suggestions')
+    : { data: [] as any[] }
+
   // Fetch suggestions
   let suggestionsQuery = supabase
     .from('suggestions')
@@ -257,6 +271,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
                 currentUserRole={profile.role}
                 adminProfile={profile}
                 clubMembers={clubMembers}
+                sectionSuggestions={sectionSuggestions || []}
               />
             </CardContent>
           </Card>
@@ -286,6 +301,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
             profile={effProfile}
             members={members || []}
             sentAnnouncements={sentAnnouncements || []}
+            sentRecipients={sentRecipients || []}
           />
         )}
 
