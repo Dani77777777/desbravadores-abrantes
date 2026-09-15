@@ -11,7 +11,8 @@ import { EventPanel } from './components/EventPanel'
 import { StorePanel } from './components/StorePanel'
 import { QrPanel } from './components/QrPanel'
 import { SurveyPanel } from './components/SurveyPanel'
-import { Users, ListChecks, Megaphone, MessageSquare, LayoutDashboard, CalendarDays, ShoppingBag, QrCode, Gamepad2, Swords, ClipboardList } from 'lucide-react'
+import { AuditPanel } from './components/AuditPanel'
+import { Users, ListChecks, Megaphone, MessageSquare, LayoutDashboard, CalendarDays, ShoppingBag, QrCode, Gamepad2, Swords, ClipboardList, ScrollText } from 'lucide-react'
 import { effectiveRole, effectiveLeadershipSection, isHelper, helperLabel } from '@/utils/permissions'
 
 export default async function AdminPage({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
@@ -182,6 +183,11 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
   if (isDirigente && coordOnlyTabs.includes(activeTab)) {
     redirect('/admin?tab=members')
   }
+  // Auditoria: só coordenadores REAIS (ajudantes de coordenação não se auditam a si próprios)
+  const isRealCoordenador = profile.role === 'coordenador'
+  if (activeTab === 'audit' && !isRealCoordenador) {
+    redirect(`/admin?tab=${defaultTab}`)
+  }
 
   const SECTION_LABELS: Record<string, string> = {
     rebentos: 'Rebentos', ticoes: 'Tições', exploradores: 'Exploradores',
@@ -219,9 +225,10 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
             { id: 'vantur', label: 'Vantur', icon: Gamepad2, coordOnly: true, count: 0, countColor: 'blue', href: '/admin/vantur' },
             { id: 'vana-quest', label: 'VanaQuest', icon: Swords, coordOnly: true, count: 0, countColor: 'blue', href: '/admin/vana-quest' },
             { id: 'vana-words', label: 'VanaWords', icon: Gamepad2, coordOnly: false, count: 0, countColor: 'blue', href: '/admin/vana-words' },
-            { id: 'store', label: 'Loja', icon: ShoppingBag, coordOnly: true, count: purchases?.filter(p => p.status === 'pending').length || 0, countColor: 'orange' }
-          ] as { id: string, label: string, icon: any, coordOnly: boolean, count: number, countColor: string, href?: string }[])
-            .filter(tab => !tab.coordOnly || isCoordenador)
+            { id: 'store', label: 'Loja', icon: ShoppingBag, coordOnly: true, count: purchases?.filter(p => p.status === 'pending').length || 0, countColor: 'orange' },
+            { id: 'audit', label: 'Auditoria', icon: ScrollText, coordOnly: true, realCoordOnly: true, count: 0, countColor: 'blue' }
+          ] as { id: string, label: string, icon: any, coordOnly: boolean, realCoordOnly?: boolean, count: number, countColor: string, href?: string }[])
+            .filter(tab => (!tab.coordOnly || isCoordenador) && (!tab.realCoordOnly || isRealCoordenador))
             .map((tab) => (
               <a
                 key={tab.id}
@@ -318,6 +325,10 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
         )}
 
         {/* Surveys tab */}
+        {activeTab === 'audit' && isRealCoordenador && (
+          <AuditPanel members={members || []} />
+        )}
+
         {activeTab === 'surveys' && isCoordenador && (
           <SurveyPanel profile={effProfile} surveys={surveys} />
         )}

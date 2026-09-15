@@ -39,6 +39,9 @@ export function ManageMemberDialog({
   const supabase = createClient()
   const isCoordenador = currentUserRole === 'coordenador'
   const isSelf = member?.id === adminProfile?.id
+  // Só o coordenador REAL pode dar pontos a si próprio (fica destacado na Auditoria).
+  const isRealCoordenador = adminProfile?.role === 'coordenador' && !adminProfile?.helper_role
+  const selfAwardBlocked = isSelf && !isRealCoordenador
   const canDelete = isCoordenador && !isSelf && member?.role !== 'coordenador'
 
   const [tab, setTab] = useState('points')
@@ -313,9 +316,22 @@ export function ManageMemberDialog({
                 </div>
               )}
 
+              {selfAwardBlocked && (
+                <p className="flex items-start gap-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-3">
+                  <AlertTriangle className="w-4 h-4 shrink-0" />
+                  Não podes atribuir pontos a ti próprio. Pede a um coordenador.
+                </p>
+              )}
+              {isSelf && !selfAwardBlocked && (
+                <p className="flex items-start gap-2 text-xs text-blue-800 bg-blue-50 border border-blue-200 rounded-lg p-3">
+                  <Shield className="w-4 h-4 shrink-0" />
+                  Estás a dar pontos a ti próprio. É permitido à coordenação, mas fica registado na Auditoria como auto-atribuição.
+                </p>
+              )}
+
               <Button
                 type="submit"
-                disabled={!hasPoints || savingPoints}
+                disabled={!hasPoints || savingPoints || selfAwardBlocked}
                 className={`w-full h-11 font-bold ${isPenalty ? 'bg-red-600 hover:bg-red-700' : 'bg-blue-800 hover:bg-blue-900'}`}
               >
                 {savingPoints ? 'A processar...' : isPenalty ? 'Aplicar penalização' : 'Atribuir prémio'}
