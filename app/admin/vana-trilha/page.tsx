@@ -8,6 +8,7 @@ import { getTodayStats, listQuestions } from '@/lib/actions/vana-trilha'
 import { getStation, VANATRILHA_STATIONS } from '@/types/vana-trilha'
 import { DIFFICULTY_LABEL } from '@/utils/vana-trilha-labels'
 import QuestionBankClient from './QuestionBankClient'
+import { GameAvailabilityBanner } from '../components/GameAvailabilityBanner'
 
 export const dynamic = 'force-dynamic'
 
@@ -44,10 +45,10 @@ export default async function VanaTrilhaAdminPage() {
         <div className="flex flex-col justify-between gap-4 md:flex-row md:items-end">
           <div className="space-y-3">
             <Link
-              href="/admin"
+              href="/admin?tab=games"
               className="group inline-flex items-center gap-2 font-medium text-gray-500 transition-colors hover:text-amber-700"
             >
-              <ChevronLeft className="h-5 w-5 transition-transform group-hover:-translate-x-1" /> Voltar à Gestão
+              <ChevronLeft className="h-5 w-5 transition-transform group-hover:-translate-x-1" /> Voltar aos Jogos
             </Link>
             <div className="flex items-center gap-4">
               <img src="/images/VanaTrilha.png" alt="" className="h-14 w-14 object-contain" />
@@ -73,6 +74,8 @@ export default async function VanaTrilhaAdminPage() {
             </Link>
           </div>
         </div>
+
+        <GameAvailabilityBanner gameId="vana-trilha" />
 
         {error && (
           <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">

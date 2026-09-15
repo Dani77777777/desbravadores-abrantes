@@ -11,6 +11,7 @@ import {
   type PlayerForTeam,
 } from '@/utils/vana-words'
 import type { TeamId } from '@/types/vana-words'
+import { gameUnavailableError } from '@/utils/game-access'
 
 // ── Criar sessão (admin/host) ─────────────────────────────────
 export async function createVanaWordsSession(isTest = false): Promise<string> {
@@ -50,6 +51,9 @@ export async function joinVanaWordsSession(
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { sessionId: '', error: 'Precisas de fazer login para jogar.' }
+
+  const unavailable = await gameUnavailableError('vana-words')
+  if (unavailable) return { sessionId: '', error: unavailable }
 
   const { data: profile } = await supabase
     .from('profiles')

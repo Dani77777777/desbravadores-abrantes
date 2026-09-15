@@ -8,6 +8,7 @@ import { ChevronLeft, Plus, FlaskConical, BookOpen } from 'lucide-react'
 import Link from 'next/link'
 import { WordBankClient } from './WordBankClient'
 import { SessionsClient } from './SessionsClient'
+import { GameAvailabilityBanner } from '../components/GameAvailabilityBanner'
 
 export default async function VanaWordsAdminPage() {
   const supabase = await createClient()
@@ -80,11 +81,13 @@ export default async function VanaWordsAdminPage() {
 
       <main className="max-w-5xl mx-auto px-4 py-8 space-y-10">
         <div className="flex items-center gap-3">
-          <Link href="/admin" className="text-slate-500 hover:text-slate-700">
+          <Link href="/admin?tab=games" className="text-slate-500 hover:text-slate-700" title="Voltar aos Jogos">
             <ChevronLeft className="w-5 h-5" />
           </Link>
           <h1 className="text-2xl font-bold text-gray-900">VanaWords — Admin</h1>
         </div>
+
+        <GameAvailabilityBanner gameId="vana-words" />
 
         {/* ── Sessões ─────────────────────────────────────────── */}
         <section className="space-y-4">

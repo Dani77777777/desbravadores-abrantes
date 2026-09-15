@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { createClient } from '@/utils/supabase/server'
 import { createServiceClient } from '@/utils/supabase/service'
 import { isAdminRole } from '@/utils/permissions'
+import { gameUnavailableError } from '@/utils/game-access'
 import {
   lisbonDateString,
   stationOfDay,
@@ -277,6 +278,9 @@ export async function startDailyRun(): Promise<{
 }> {
   try {
     const { user } = await requireUser()
+    const unavailable = await gameUnavailableError('vana-trilha')
+    if (unavailable) return { error: unavailable }
+
     const runDate = lisbonDateString()
     const station = stationOfDay(runDate)
 

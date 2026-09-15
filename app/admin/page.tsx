@@ -12,8 +12,10 @@ import { StorePanel } from './components/StorePanel'
 import { QrPanel } from './components/QrPanel'
 import { SurveyPanel } from './components/SurveyPanel'
 import { AuditPanel } from './components/AuditPanel'
-import { Users, ListChecks, Megaphone, MessageSquare, LayoutDashboard, CalendarDays, ShoppingBag, QrCode, Gamepad2, Swords, ClipboardList, ScrollText, Footprints } from 'lucide-react'
+import { GamesPanel } from './components/GamesPanel'
+import { Users, ListChecks, Megaphone, MessageSquare, LayoutDashboard, CalendarDays, ShoppingBag, QrCode, Gamepad2, ClipboardList, ScrollText } from 'lucide-react'
 import { effectiveRole, effectiveLeadershipSection, isHelper, helperLabel } from '@/utils/permissions'
+import { fetchGameSettings } from '@/utils/games'
 
 export default async function AdminPage({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
   const supabase = await createClient()
@@ -189,6 +191,9 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
     redirect(`/admin?tab=${defaultTab}`)
   }
 
+  // Disponibilidade dos jogos (aba "Jogos")
+  const gameSettings = activeTab === 'games' ? await fetchGameSettings(supabase) : null
+
   const SECTION_LABELS: Record<string, string> = {
     rebentos: 'Rebentos', ticoes: 'Tições', exploradores: 'Exploradores',
     companheiros: 'Companheiros', embaixadores: 'Embaixadores',
@@ -222,10 +227,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
             { id: 'suggestions', label: 'Sugestões', icon: MessageSquare, coordOnly: false, count: suggestions?.filter(s => !s.is_read).length || 0, countColor: 'red' },
             { id: 'qr', label: 'Questões / QR', icon: QrCode, coordOnly: true, count: 0, countColor: 'blue' },
             { id: 'surveys', label: 'Inquéritos', icon: ClipboardList, coordOnly: true, count: 0, countColor: 'blue' },
-            { id: 'vantur', label: 'Vantur', icon: Gamepad2, coordOnly: true, count: 0, countColor: 'blue', href: '/admin/vantur' },
-            { id: 'vana-quest', label: 'VanaQuest', icon: Swords, coordOnly: true, count: 0, countColor: 'blue', href: '/admin/vana-quest' },
-            { id: 'vana-words', label: 'VanaWords', icon: Gamepad2, coordOnly: false, count: 0, countColor: 'blue', href: '/admin/vana-words' },
-            { id: 'vana-trilha', label: 'VanaTrilha', icon: Footprints, coordOnly: false, count: 0, countColor: 'blue', href: '/admin/vana-trilha' },
+            { id: 'games', label: 'Jogos', icon: Gamepad2, coordOnly: false, count: 0, countColor: 'blue' },
             { id: 'store', label: 'Loja', icon: ShoppingBag, coordOnly: true, count: purchases?.filter(p => p.status === 'pending').length || 0, countColor: 'orange' },
             { id: 'audit', label: 'Auditoria', icon: ScrollText, coordOnly: true, realCoordOnly: true, count: 0, countColor: 'blue' }
           ] as { id: string, label: string, icon: any, coordOnly: boolean, realCoordOnly?: boolean, count: number, countColor: string, href?: string }[])
@@ -323,7 +325,16 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
           <QrPanel profile={effProfile} />
         )}
 
-        {/* Surveys tab */}
+        {/* Games tab */}
+        {activeTab === 'games' && gameSettings && (
+          <GamesPanel
+            initialSettings={gameSettings}
+            canEdit={isCoordenador}
+            isCoordenador={isCoordenador}
+          />
+        )}
+
+        {/* Audit tab */}
         {activeTab === 'audit' && isRealCoordenador && (
           <AuditPanel members={members || []} />
         )}

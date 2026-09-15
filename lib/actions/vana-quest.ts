@@ -4,6 +4,7 @@ import { createClient } from '@/utils/supabase/server'
 import { createServiceClient } from '@/utils/supabase/service'
 import { revalidatePath } from 'next/cache'
 import { calcPoints, calcSessionRewards } from '@/utils/vana-quest'
+import { gameUnavailableError } from '@/utils/game-access'
 
 function generatePin(): string {
   return String(Math.floor(100000 + Math.random() * 900000))
@@ -158,6 +159,9 @@ export async function joinSession(
   userId: string | null,
   clientAvatarUrl?: string | null
 ): Promise<{ participantId: string; sessionId: string; questTitle: string } | { error: string }> {
+  const unavailable = await gameUnavailableError('vana-quest')
+  if (unavailable) return { error: unavailable }
+
   const supabase = createServiceClient()
 
   const { data: session, error: sessionError } = await supabase
