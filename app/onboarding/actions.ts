@@ -34,7 +34,7 @@ export async function updateProfile(data: {
         avatar_url: data.avatarUrl || null,
         birth_date: data.birthDate,
         role: 'desbravador',
-        section: 'rebentos', // Default, will be calculated later
+        section: 'rebentos', // Substituída pela classe da idade no trigger on_profile_lifecycle
         total_xp: 0,
         current_gold: 0,
         is_invested: false

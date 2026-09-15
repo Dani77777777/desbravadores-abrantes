@@ -90,14 +90,11 @@ export function TaskPanel({ profile, tasks, completions }: TaskPanelProps) {
     if (!selectedCompletion) return
     setAwarding(true)
     try {
-      // 1. Mark completion as awarded
-      const { error: compError } = await supabase
-        .from('task_completions')
-        .update({ points_awarded: true, awarded_by_user_id: profile.id })
-        .eq('id', selectedCompletion.id)
-      if (compError) throw compError
+      if (selectedCompletion.user_id === profile.id && !(profile.role === 'coordenador' && !profile.helper_role)) {
+        throw new Error('Não podes atribuir pontos a ti próprio.')
+      }
 
-      // 2. Insert into points_log
+      // 1. Insert into points_log (primeiro: se a BD recusar, a conclusão não fica marcada)
       const { error: logError } = await supabase.from('points_log').insert({
         target_user_id: selectedCompletion.user_id,
         awarded_by_user_id: profile.id,
@@ -106,6 +103,13 @@ export function TaskPanel({ profile, tasks, completions }: TaskPanelProps) {
         description: `Tarefa concluída: ${selectedCompletion.tasks.title}`,
       })
       if (logError) throw logError
+
+      // 2. Mark completion as awarded
+      const { error: compError } = await supabase
+        .from('task_completions')
+        .update({ points_awarded: true, awarded_by_user_id: profile.id })
+        .eq('id', selectedCompletion.id)
+      if (compError) throw compError
 
       toast.success(`Pontos atribuídos a ${selectedCompletion.profiles.full_name}!`)
       setAwardOpen(false)

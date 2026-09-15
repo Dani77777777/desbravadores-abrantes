@@ -1,6 +1,7 @@
 'use server'
 
 import { createClient } from '@/utils/supabase/server'
+import { createServiceClient } from '@/utils/supabase/service'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { normalizeText } from '../../utils/text-normalization'
@@ -76,7 +77,7 @@ export async function redeemCode(code: string) {
 
       // Atribuir pontos (XP e Gold) via points_log
       if (qrCode.xp_reward > 0 || qrCode.gold_reward > 0) {
-        const { error: logError } = await supabase
+        const { error: logError } = await createServiceClient() // pontos só pelo servidor (RLS não deixa o membro inserir)
           .from('points_log')
           .insert({
             target_user_id: user.id,
@@ -120,6 +121,7 @@ export async function claimManualReward(qrCodeId: string) {
       .single()
 
     if (qrError || !qrCode) return { error: 'Código não encontrado' }
+    if (qrCode.is_question) return { error: 'Esta recompensa exige responder à questão.' }
 
     // 2. Verificar se já resgatou
     const { data: existingScan } = await supabase
@@ -135,8 +137,15 @@ export async function claimManualReward(qrCodeId: string) {
 
     // 3. Registar ou atualizar scan
     if (existingScan) {
-      const { error: updateError } = await supabase.from('qr_scans').update({ points_awarded: true }).eq('id', existingScan.id)
+      // Condicional em points_awarded=false: dois pedidos em simultâneo não dão pontos a dobrar.
+      const { data: updated, error: updateError } = await createServiceClient()
+        .from('qr_scans')
+        .update({ points_awarded: true })
+        .eq('id', existingScan.id)
+        .eq('points_awarded', false)
+        .select('id')
       if (updateError) return { error: 'Erro ao atualizar recompensa.' }
+      if (!updated?.length) return { error: 'Já reclamaste esta recompensa.' }
     } else {
       // Verificar limite global antes de inserir
       if (qrCode.max_uses_global !== null) {
@@ -166,7 +175,7 @@ export async function claimManualReward(qrCodeId: string) {
 
     // 4. Atribuir pontos
     if (qrCode.xp_reward > 0 || qrCode.gold_reward > 0) {
-      const { error: pointsError } = await supabase.from('points_log').insert({
+      const { error: pointsError } = await createServiceClient().from('points_log').insert({
         target_user_id: user.id,
         amount_xp: qrCode.xp_reward,
         amount_gold: qrCode.gold_reward,
@@ -240,11 +249,14 @@ export async function submitQuestAnswer(qrCodeId: string, answer: string) {
 
     // 5. Registar ou atualizar scan como ganho
     if (existingScan) {
-      const { error: updateError } = await supabase
+      const { data: updated, error: updateError } = await createServiceClient()
         .from('qr_scans')
         .update({ points_awarded: true })
         .eq('id', existingScan.id)
+        .eq('points_awarded', false)
+        .select('id')
       if (updateError) return { error: 'Erro ao atualizar recompensa.' }
+      if (!updated?.length) return { error: 'Já respondeste corretamente e recebeste a recompensa.' }
     } else {
       const { error: insertError } = await supabase
         .from('qr_scans')
@@ -261,7 +273,7 @@ export async function submitQuestAnswer(qrCodeId: string, answer: string) {
 
     // 6. Atribuir pontos
     if (qrCode.xp_reward > 0 || qrCode.gold_reward > 0) {
-      const { error: pointsError } = await supabase.from('points_log').insert({
+      const { error: pointsError } = await createServiceClient().from('points_log').insert({
         target_user_id: user.id,
         amount_xp: qrCode.xp_reward,
         amount_gold: qrCode.gold_reward,
