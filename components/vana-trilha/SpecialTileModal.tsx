@@ -2,6 +2,7 @@
 
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { VANATRILHA_MILAGRE_GOLD, type VanaTrilhaTile } from '@/types/vana-trilha'
+import BibleReference from './BibleReference'
 
 interface Props {
   tile: VanaTrilhaTile | null
@@ -66,7 +67,10 @@ export default function SpecialTileModal({ tile, onClose }: Props) {
               <DialogDescription className="text-center text-base font-medium text-slate-700">{content.text}</DialogDescription>
               <blockquote className="rounded-2xl bg-slate-50 px-4 py-3 text-center text-sm italic text-slate-600">
                 «{content.verse}»
-                <span className="mt-1 block text-xs font-bold not-italic text-slate-500">{content.reference}</span>
+                <BibleReference
+                  reference={content.reference}
+                  className="mx-auto mt-1 block w-fit text-xs font-bold not-italic text-slate-500"
+                />
               </blockquote>
               <button
                 type="button"

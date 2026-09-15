@@ -3,6 +3,7 @@
 import { useEffect, useRef } from 'react'
 import { ArrowRight, BookOpen, HeartCrack, PartyPopper, ShieldCheck, Sparkles } from 'lucide-react'
 import type { VanaTrilhaAnswerResult } from '@/types/vana-trilha'
+import BibleReference from './BibleReference'
 import './VanaTrilha.css'
 
 interface Props {
@@ -82,8 +83,10 @@ export default function AnswerFeedback({ result, onContinue }: Props) {
       <div className="mt-3 rounded-2xl bg-white p-3">
         <p className="text-sm leading-relaxed text-slate-700">{result.explanation}</p>
         {result.reference && (
-          <p className="mt-2 flex items-center gap-1.5 text-xs font-bold text-amber-700">
-            <BookOpen className="h-3.5 w-3.5" /> {result.reference}
+          <p className="mt-2 text-xs font-bold text-amber-700">
+            <BibleReference reference={result.reference} className="inline-flex items-center gap-1.5">
+              <BookOpen className="h-3.5 w-3.5" /> {result.reference}
+            </BibleReference>
           </p>
         )}
       </div>

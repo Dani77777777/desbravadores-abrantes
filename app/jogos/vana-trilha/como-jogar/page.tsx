@@ -4,6 +4,7 @@ import { ChevronDown, ChevronLeft, Play } from 'lucide-react'
 import { createClient } from '@/utils/supabase/server'
 import { Navbar } from '@/components/layout/Navbar'
 import TrailDemo from '@/components/vana-trilha/TrailDemo'
+import BibleReference from '@/components/vana-trilha/BibleReference'
 import {
   FAQ,
   HowToPlaySteps,
@@ -179,7 +180,7 @@ export default async function VanaTrilhaHowToPlayPage() {
                   </span>
                   <span className="min-w-0">
                     <span className="block text-sm font-bold leading-tight text-slate-900">{s.name}</span>
-                    <span className="block text-xs text-slate-500">{s.reference}</span>
+                    <BibleReference reference={s.reference} className="block text-xs text-slate-500" />
                   </span>
                 </li>
               )

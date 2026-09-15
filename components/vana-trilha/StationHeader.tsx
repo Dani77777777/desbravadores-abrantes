@@ -1,5 +1,6 @@
 import { STATION_THEME } from '@/utils/vana-trilha-labels'
 import type { VanaTrilhaStation } from '@/types/vana-trilha'
+import BibleReference from './BibleReference'
 
 interface Props {
   station: VanaTrilhaStation
@@ -20,14 +21,17 @@ export default function StationHeader({ station, showVerse = true, className = '
         <div className="min-w-0 flex-1">
           <p className="truncate text-lg font-black leading-tight sm:text-xl">{station.name}</p>
           <p className="truncate text-xs font-semibold opacity-90 sm:text-sm">
-            {station.subtitle} · {station.reference}
+            {station.subtitle} · <BibleReference reference={station.reference} />
           </p>
         </div>
       </div>
       {showVerse && (
         <blockquote className="border-t border-white/20 bg-black/10 px-4 py-3 text-sm italic leading-snug sm:px-5">
           «{station.verse}»
-          <span className="mt-1 block text-xs font-bold not-italic opacity-80">{station.verse_reference}</span>
+          <BibleReference
+            reference={station.verse_reference}
+            className="mt-1 block w-fit text-xs font-bold not-italic opacity-80"
+          />
         </blockquote>
       )}
     </div>
