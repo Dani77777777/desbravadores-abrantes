@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { toast } from 'sonner'
-import { Check, ChevronRight, ExternalLink, Gamepad2, Info, Lock } from 'lucide-react'
+import { Check, ChevronRight, ExternalLink, EyeOff, Gamepad2, Info, Lock } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Switch } from '@/components/ui/switch'
 import { updateGameSetting } from '@/lib/actions/games'
@@ -12,6 +12,7 @@ import {
   GAME_ROLES,
   GAME_ROLE_LABELS,
   gameAvailabilitySummary,
+  isOpenToEveryone,
   type GameAvailabilityTone,
   type GameRole,
   type GameSetting,
@@ -44,7 +45,11 @@ export function GamesPanel({
     setSettings((s) => ({ ...s, [gameId]: next }))
     setSaving(gameId)
     try {
-      const res = await updateGameSetting(gameId, { enabled: next.enabled, allowed_roles: next.allowed_roles })
+      const res = await updateGameSetting(gameId, {
+        enabled: next.enabled,
+        allowed_roles: next.allowed_roles,
+        hidden: next.hidden,
+      })
       if (res.error || !res.setting) {
         setSettings((s) => ({ ...s, [gameId]: previous }))
         toast.error(res.error || 'Não foi possível guardar.')
@@ -52,7 +57,8 @@ export function GamesPanel({
       }
       setSettings((s) => ({ ...s, [gameId]: res.setting! }))
       const title = GAMES.find((g) => g.id === gameId)?.title ?? gameId
-      toast.success(`${title}: ${gameAvailabilitySummary(res.setting).label}`)
+      const summary = gameAvailabilitySummary(res.setting)
+      toast.success(`${title}: ${summary.label}${summary.hidden ? ' (escondido)' : ''}`)
     } catch {
       setSettings((s) => ({ ...s, [gameId]: previous }))
       toast.error('Não foi possível guardar.')
@@ -80,8 +86,9 @@ export function GamesPanel({
             <Gamepad2 className="h-5 w-5 text-blue-700" /> Jogos
           </CardTitle>
           <CardDescription>
-            Gere cada jogo e escolhe quem pode jogar. Um jogo indisponível continua a aparecer no Centro de Jogos e na
-            página inicial, marcado como &quot;Indisponível&quot;, e ninguém consegue entrar nele.
+            Gere cada jogo e escolhe quem pode jogar. Quem não pode jogar vê o jogo marcado como
+            &quot;Indisponível&quot; no Centro de Jogos e na página inicial — ou nem o vê, se o esconderes (ideal para
+            preparar surpresas).
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -119,6 +126,11 @@ export function GamesPanel({
                     <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${TONE_CLASSES[summary.tone]}`}>
                       {summary.label}
                     </span>
+                    {summary.hidden && (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-slate-800 px-2 py-0.5 text-[10px] font-bold uppercase text-white">
+                        <EyeOff className="h-3 w-3" /> Escondido
+                      </span>
+                    )}
                   </div>
                   <p className="line-clamp-2 text-sm text-gray-500">{game.description}</p>
                 </div>
@@ -163,6 +175,27 @@ export function GamesPanel({
                           )
                         })}
                       </div>
+                    </div>
+
+                    <div className="flex items-center justify-between gap-3 border-t border-gray-200/70 pt-3">
+                      <label htmlFor={`game-hidden-${game.id}`} className={`min-w-0 ${isOpenToEveryone(setting) ? 'opacity-40' : ''}`}>
+                        <span className="flex items-center gap-1.5 text-sm font-bold text-gray-800">
+                          <EyeOff className="h-4 w-4" /> Esconder de quem não pode jogar
+                        </span>
+                        <span className="block text-xs text-gray-500">
+                          {isOpenToEveryone(setting)
+                            ? 'Só faz sentido quando o jogo não está aberto a todos.'
+                            : setting.hidden
+                              ? 'Não aparece nos jogos nem na página inicial; o link direto dá página não encontrada.'
+                              : 'Em vez de aparecer como "Indisponível", o jogo desaparece.'}
+                        </span>
+                      </label>
+                      <Switch
+                        id={`game-hidden-${game.id}`}
+                        checked={setting.hidden && !isOpenToEveryone(setting)}
+                        disabled={isSaving || isOpenToEveryone(setting)}
+                        onCheckedChange={(hidden) => save(game.id, { ...setting, hidden })}
+                      />
                     </div>
                   </>
                 ) : (

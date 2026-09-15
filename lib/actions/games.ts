@@ -3,17 +3,22 @@
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/utils/supabase/server'
 import { effectiveRole } from '@/utils/permissions'
-import { GAME_ROLES, getGame, normalizeGameSetting, type GameRole, type GameSetting } from '@/utils/games'
+import { GAME_ROLES, getGame, isOpenToEveryone, normalizeGameSetting, type GameRole, type GameSetting } from '@/utils/games'
 
-/** Ativa/desativa um jogo e define quem pode entrar. Só a coordenação (RLS garante o mesmo). */
+/** Ativa/desativa um jogo, define quem pode entrar e se fica escondido. Só a coordenação (RLS garante o mesmo). */
 export async function updateGameSetting(
   gameId: string,
-  input: { enabled: boolean; allowed_roles: string[] },
+  input: { enabled: boolean; allowed_roles: string[]; hidden: boolean },
 ): Promise<{ setting?: GameSetting; error?: string }> {
   if (!getGame(gameId)) return { error: 'Jogo desconhecido.' }
 
   const roles = GAME_ROLES.filter((r) => input.allowed_roles.includes(r)) as GameRole[]
   if (roles.length === 0) return { error: 'Escolhe pelo menos um grupo. Para bloquear todos, desativa o jogo.' }
+
+  const enabled = !!input.enabled
+  // Aberto a todos não há de quem esconder: limpa a opção para não voltar a esconder
+  // o jogo de surpresa numa restrição futura.
+  const hidden = !!input.hidden && !isOpenToEveryone({ game_id: gameId, enabled, allowed_roles: roles, hidden: false })
 
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -33,19 +38,20 @@ export async function updateGameSetting(
     .upsert(
       {
         game_id: gameId,
-        enabled: !!input.enabled,
+        enabled,
         allowed_roles: roles,
+        hidden,
         updated_by: user.id,
         updated_at: new Date().toISOString(),
       },
       { onConflict: 'game_id' },
     )
-    .select('game_id, enabled, allowed_roles')
+    .select('*')
     .single()
 
   if (error) {
     return {
-      error: error.code === '42P01' || error.code === 'PGRST205'
+      error: ['42P01', '42703', 'PGRST204', 'PGRST205'].includes(error.code)
         ? 'Falta correr supabase-migration-game-settings.sql no Supabase.'
         : error.message,
     }

@@ -5,6 +5,8 @@
 --   • enabled = false            → indisponível para todos
 --   • allowed_roles              → quem pode entrar quando está ativo
 --                                  ('desbravador' também cobre visitantes sem conta)
+--   • hidden = true              → quem não pode entrar nem vê o jogo (surpresas);
+--                                  sem isto, vê-o marcado como "Indisponível"
 -- Jogos sem linha contam como ativos para todos, por isso um jogo novo aparece
 -- disponível até alguém mudar a configuração em Gestão → Jogos.
 --
@@ -12,7 +14,8 @@
 -- Só a coordenação (cargo efetivo, inclui ajudantes de coordenação) altera.
 --
 -- Requer: supabase-migration-helpers.sql (get_my_role() efetivo).
--- Corre no SQL Editor do Supabase. É idempotente.
+-- Corre no SQL Editor do Supabase. É idempotente: se já a tinhas corrido antes de
+-- existir a opção "esconder", corre-a outra vez para acrescentar a coluna `hidden`.
 -- ============================================
 
 CREATE TABLE IF NOT EXISTS public.game_settings (
@@ -26,6 +29,10 @@ CREATE TABLE IF NOT EXISTS public.game_settings (
   CONSTRAINT game_settings_roles_not_empty
     CHECK (cardinality(allowed_roles) > 0)
 );
+
+-- Opção "esconder" (acrescentada depois da primeira versão desta migração)
+ALTER TABLE public.game_settings
+  ADD COLUMN IF NOT EXISTS hidden boolean NOT NULL DEFAULT false;
 
 ALTER TABLE public.game_settings ENABLE ROW LEVEL SECURITY;
 

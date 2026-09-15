@@ -4,7 +4,7 @@ import { Card, CardDescription, CardHeader, CardTitle, CardFooter } from '@/comp
 import { Button } from '@/components/ui/button';
 import { Gamepad2, Sword, Trophy, Lock, LogIn, Ban, Settings } from 'lucide-react';
 import Link from 'next/link';
-import { GAMES, canAccessGame, fetchGameSettings, gameAvailabilitySummary } from '@/utils/games';
+import { GAMES, fetchGameSettings, gameAvailabilitySummary, gameVisibilityFor } from '@/utils/games';
 import { effectiveRole } from '@/utils/permissions';
 
 export default async function GamesHubPage() {
@@ -24,14 +24,17 @@ export default async function GamesHubPage() {
   const role = effectiveRole(profile);
   const canManageGames = role === 'coordenador';
 
-  const games = GAMES.map((game) => {
+  const games = GAMES.flatMap((game) => {
     const setting = settings[game.id];
-    return {
+    const visibility = gameVisibilityFor(setting, role);
+    // Escondido (surpresa): quem não pode jogar nem sabe que o jogo existe.
+    if (visibility === 'hidden') return [];
+    return [{
       ...game,
-      available: canAccessGame(setting, role),
+      available: visibility === 'available',
       // Mostrado a quem pode jogar quando o jogo não está aberto a todos (ex.: "Só liderança")
       restriction: setting.enabled ? gameAvailabilitySummary(setting) : null,
-    };
+    }];
   });
 
   return (
@@ -104,6 +107,7 @@ export default async function GamesHubPage() {
                   {isAvailable && game.restriction && game.restriction.tone !== 'green' && (
                     <p className="text-xs text-amber-700 font-semibold flex items-center gap-1 mt-1">
                       <Lock className="w-3 h-3" /> {game.restriction.label}
+                      {game.restriction.hidden && ' · escondido dos restantes'}
                     </p>
                   )}
                   {needsLogin && (

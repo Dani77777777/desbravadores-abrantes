@@ -4,7 +4,7 @@ import { notFound } from 'next/navigation'
 import { Ban, ChevronLeft, LogIn, Play, Settings } from 'lucide-react'
 import { createClient } from '@/utils/supabase/server'
 import { Navbar } from '@/components/layout/Navbar'
-import { canAccessGame, fetchGameSetting, getGame } from '@/utils/games'
+import { fetchGameSetting, gameVisibilityFor, getGame } from '@/utils/games'
 import { effectiveRole } from '@/utils/permissions'
 
 export const dynamic = 'force-dynamic'
@@ -15,7 +15,8 @@ export const metadata: Metadata = {
 }
 
 // O middleware reescreve para aqui qualquer página de um jogo a que o visitante
-// não tem acesso (o URL original mantém-se no browser).
+// não tem acesso (o URL original mantém-se no browser). Se o jogo estiver escondido
+// para este visitante, responde 404 — não pode revelar que o jogo existe.
 export default async function GameUnavailablePage({ params }: { params: Promise<{ gameId: string }> }) {
   const { gameId } = await params
   const game = getGame(gameId)
@@ -32,8 +33,10 @@ export default async function GameUnavailablePage({ params }: { params: Promise<
 
   const role = effectiveRole(profile)
   const setting = await fetchGameSetting(supabase, game.id)
+  const visibility = gameVisibilityFor(setting, role)
+  if (visibility === 'hidden') notFound()
   // Pode acontecer se o jogo foi reativado entretanto (ou se alguém abriu este URL diretamente).
-  const availableNow = canAccessGame(setting, role)
+  const availableNow = visibility === 'available'
 
   return (
     <div className="min-h-screen bg-stone-50">

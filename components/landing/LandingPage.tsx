@@ -7,10 +7,10 @@ import { Card, CardContent } from '@/components/ui/card'
 import Link from 'next/link'
 import { Navbar } from '@/components/layout/Navbar'
 import { Trophy, Users, Star, ArrowRight, Shield, Heart, Gamepad2 } from 'lucide-react'
-import { GAMES } from '@/utils/games'
+import { GAMES, type GameVisibility } from '@/utils/games'
 
-/** gameAvailability: id do jogo → está disponível para o público (desbravadores/visitantes). */
-export function LandingPage({ gameAvailability = {} }: { gameAvailability?: Record<string, boolean> }) {
+/** gameVisibility: id do jogo → estado para visitantes sem conta (jogos escondidos não aparecem). */
+export function LandingPage({ gameVisibility = {} }: { gameVisibility?: Record<string, GameVisibility> }) {
   const router = useRouter()
 
   useEffect(() => {
@@ -182,8 +182,8 @@ export function LandingPage({ gameAvailability = {} }: { gameAvailability?: Reco
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 max-w-3xl mx-auto mb-10">
-            {GAMES.map((game) => {
-              const available = gameAvailability[game.id] !== false
+            {GAMES.filter((game) => gameVisibility[game.id] !== 'hidden').map((game) => {
+              const available = (gameVisibility[game.id] ?? 'available') === 'available'
 
               return (
                 <div key={game.id} className="rounded-2xl overflow-hidden shadow-md hover:shadow-xl transition-shadow group">

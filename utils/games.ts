@@ -6,6 +6,11 @@
 //
 // A disponibilidade vive na tabela `game_settings` (supabase-migration-game-settings.sql).
 // Um jogo sem linha na tabela (ou se a tabela ainda não existir) conta como ativo para todos.
+//
+// Para cada visitante, um jogo está num de três estados:
+//   • available   → aparece e pode jogar
+//   • unavailable → aparece como "Indisponível" e não entra
+//   • hidden      → nem aparece (surpresas); o link direto dá 404
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 
@@ -109,10 +114,12 @@ export interface GameSetting {
   game_id: string
   enabled: boolean
   allowed_roles: GameRole[]
+  /** Esconder o jogo (em vez de o mostrar como indisponível) a quem não pode jogar. */
+  hidden: boolean
 }
 
 export function defaultGameSetting(gameId: string): GameSetting {
-  return { game_id: gameId, enabled: true, allowed_roles: [...GAME_ROLES] }
+  return { game_id: gameId, enabled: true, allowed_roles: [...GAME_ROLES], hidden: false }
 }
 
 /** Mapa jogo → definição, com o valor por defeito para jogos sem linha na BD. */
@@ -126,15 +133,16 @@ export function buildGameSettingsMap(rows: Partial<GameSetting>[] | null | undef
   return map
 }
 
+// `select('*')`: se faltar uma coluna nova (migração por correr), o resto da configuração continua a valer.
 export async function fetchGameSettings(supabase: SupabaseClient): Promise<Record<string, GameSetting>> {
-  const { data } = await supabase.from('game_settings').select('game_id, enabled, allowed_roles')
+  const { data } = await supabase.from('game_settings').select('*')
   return buildGameSettingsMap(data as Partial<GameSetting>[] | null)
 }
 
 export async function fetchGameSetting(supabase: SupabaseClient, gameId: string): Promise<GameSetting> {
   const { data } = await supabase
     .from('game_settings')
-    .select('game_id, enabled, allowed_roles')
+    .select('*')
     .eq('game_id', gameId)
     .maybeSingle()
   return normalizeGameSetting(gameId, data as Partial<GameSetting> | null)
@@ -143,7 +151,7 @@ export async function fetchGameSetting(supabase: SupabaseClient, gameId: string)
 export function normalizeGameSetting(gameId: string, row: Partial<GameSetting> | null | undefined): GameSetting {
   if (!row) return defaultGameSetting(gameId)
   const roles = (row.allowed_roles ?? []).filter((r): r is GameRole => (GAME_ROLES as readonly string[]).includes(r))
-  return { game_id: gameId, enabled: row.enabled !== false, allowed_roles: roles }
+  return { game_id: gameId, enabled: row.enabled !== false, allowed_roles: roles, hidden: row.hidden === true }
 }
 
 /**
@@ -161,22 +169,36 @@ export function canAccessGame(setting: GameSetting | null | undefined, role: str
   return setting.allowed_roles.includes(gameAudienceOf(role))
 }
 
-/** Disponível ao público geral (desbravadores e visitantes). */
-export function isGamePublic(setting: GameSetting | null | undefined): boolean {
-  return canAccessGame(setting, null)
+export function isOpenToEveryone(setting: GameSetting): boolean {
+  return setting.enabled && GAME_ROLES.every((r) => setting.allowed_roles.includes(r))
+}
+
+export type GameVisibility = 'available' | 'unavailable' | 'hidden'
+
+/** Estado do jogo para um cargo (null = visitante sem conta). */
+export function gameVisibilityFor(setting: GameSetting | null | undefined, role: string | null | undefined): GameVisibility {
+  if (canAccessGame(setting, role)) return 'available'
+  return setting?.hidden ? 'hidden' : 'unavailable'
 }
 
 export type GameAvailabilityTone = 'green' | 'amber' | 'red'
 
-/** Resumo legível da configuração, ex.: "Só liderança", "Desativado". */
-export function gameAvailabilitySummary(setting: GameSetting): { label: string; tone: GameAvailabilityTone } {
-  if (!setting.enabled || setting.allowed_roles.length === 0) return { label: 'Desativado', tone: 'red' }
+/**
+ * Resumo legível da configuração, ex.: "Só liderança", "Desativado".
+ * `hidden` só é true quando há alguém de quem o jogo está escondido.
+ */
+export function gameAvailabilitySummary(setting: GameSetting): { label: string; tone: GameAvailabilityTone; hidden: boolean } {
+  if (!setting.enabled || setting.allowed_roles.length === 0) {
+    return { label: 'Desativado', tone: 'red', hidden: setting.hidden }
+  }
+  if (isOpenToEveryone(setting)) return { label: 'Disponível para todos', tone: 'green', hidden: false }
 
   const has = (r: GameRole) => setting.allowed_roles.includes(r)
-  if (has('desbravador') && has('dirigente') && has('coordenador')) return { label: 'Disponível para todos', tone: 'green' }
-  if (!has('desbravador') && has('dirigente') && has('coordenador')) return { label: 'Só liderança', tone: 'amber' }
+  if (!has('desbravador') && has('dirigente') && has('coordenador')) {
+    return { label: 'Só liderança', tone: 'amber', hidden: setting.hidden }
+  }
 
   const names = GAME_ROLES.filter(has).map((r) => GAME_ROLE_LABELS[r])
   const label = names.length === 1 ? `Só ${names[0].toLowerCase()}` : names.join(' e ')
-  return { label, tone: 'amber' }
+  return { label, tone: 'amber', hidden: setting.hidden }
 }

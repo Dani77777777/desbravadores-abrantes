@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { Lock } from 'lucide-react'
+import { EyeOff, Lock } from 'lucide-react'
 import { createClient } from '@/utils/supabase/server'
 import { fetchGameSetting, gameAvailabilitySummary, getGame } from '@/utils/games'
 
@@ -20,10 +20,12 @@ export async function GameAvailabilityBanner({ gameId }: { gameId: string }) {
       }`}
     >
       <p className="flex items-center gap-2">
-        <Lock className="h-4 w-4 flex-shrink-0" />
+        {summary.hidden ? <EyeOff className="h-4 w-4 flex-shrink-0" /> : <Lock className="h-4 w-4 flex-shrink-0" />}
         <span>
           {isOff ? (
-            <><strong>{title} está desativado.</strong> Ninguém consegue entrar no jogo.</>
+            <><strong>{title} está desativado{summary.hidden ? ' e escondido' : ''}.</strong> Ninguém consegue entrar no jogo.</>
+          ) : summary.hidden ? (
+            <><strong>{title}: {summary.label.toLowerCase()}.</strong> Está escondido dos restantes, que nem o veem.</>
           ) : (
             <><strong>{title}: {summary.label.toLowerCase()}.</strong> Os restantes veem o jogo como indisponível.</>
           )}
