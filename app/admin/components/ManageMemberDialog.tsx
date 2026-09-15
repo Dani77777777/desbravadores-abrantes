@@ -29,11 +29,12 @@ interface ManageMemberDialogProps {
   adminProfile: any
   currentUserRole: string
   suggestion?: SectionSuggestion | null
+  coordinatorCount?: number
   onRequestDelete: (member: any) => void
 }
 
 export function ManageMemberDialog({
-  member, open, onOpenChange, adminProfile, currentUserRole, suggestion, onRequestDelete,
+  member, open, onOpenChange, adminProfile, currentUserRole, suggestion, coordinatorCount = 0, onRequestDelete,
 }: ManageMemberDialogProps) {
   const router = useRouter()
   const supabase = createClient()
@@ -105,6 +106,9 @@ export function ManageMemberDialog({
     tempRole !== member.role ||
     (tempRole === 'dirigente' ? tempLeadership : 'none') !== (member.leadership_section || 'none')
   const roleChanged = sectionChanged || onlyRoleChanged
+  // O clube nunca pode ficar sem coordenador (a BD também o impede).
+  const removesLastCoordinator = member.role === 'coordenador' && tempRole !== 'coordenador' && coordinatorCount <= 1
+  const promotesHelper = !!member.helper_role && tempRole !== 'desbravador'
 
   const handlePoints = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -425,14 +429,26 @@ export function ManageMemberDialog({
                 </div>
               )}
 
-              {isSelf && tempRole !== 'coordenador' && (
+              {removesLastCoordinator ? (
+                <p className="flex items-start gap-2 text-xs text-red-700 bg-red-50 border border-red-200 rounded-lg p-3">
+                  <AlertTriangle className="w-4 h-4 shrink-0" />
+                  {isSelf ? 'És o único coordenador.' : 'Este é o único coordenador.'} Promove primeiro outra pessoa a Coordenador; depois já é possível mudar este cargo.
+                </p>
+              ) : isSelf && member.role === 'coordenador' && tempRole !== 'coordenador' && (
                 <p className="flex items-start gap-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-3">
                   <AlertTriangle className="w-4 h-4 shrink-0" />
-                  Estás a retirar o teu próprio cargo de coordenador. Vais perder acesso a esta área.
+                  Estás a retirar o teu próprio cargo de coordenador. Vais perder acesso a esta área assim que guardares.
                 </p>
               )}
 
-              <Button onClick={handleRole} disabled={!roleChanged || savingRole} className="w-full h-11 font-bold bg-blue-800 hover:bg-blue-900">
+              {promotesHelper && (
+                <p className="flex items-start gap-2 text-xs text-blue-800 bg-blue-50 border border-blue-200 rounded-lg p-3">
+                  <Shield className="w-4 h-4 shrink-0" />
+                  Este membro é {helperLabel(member)}. Ao passar a {ROLE_LABELS[tempRole]}, deixa de ser ajudante e sai do ranking.
+                </p>
+              )}
+
+              <Button onClick={handleRole} disabled={!roleChanged || savingRole || removesLastCoordinator} className="w-full h-11 font-bold bg-blue-800 hover:bg-blue-900">
                 {savingRole ? 'A guardar...' : sectionChanged ? `Mudar para ${SECTION_LABELS[tempSection]}` : 'Guardar cargo'}
               </Button>
 

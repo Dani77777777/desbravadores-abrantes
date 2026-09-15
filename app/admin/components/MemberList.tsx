@@ -293,6 +293,7 @@ export function MemberList({ members, currentUserRole, adminProfile, clubMembers
         adminProfile={adminProfile}
         currentUserRole={currentUserRole}
         suggestion={sectionSuggestions.find((s) => s.id === managedMember?.id) ?? null}
+        coordinatorCount={members.filter((m) => m.role === 'coordenador').length}
         onRequestDelete={(m) => {
           setManageId(null)
           setDeleteTarget(m)

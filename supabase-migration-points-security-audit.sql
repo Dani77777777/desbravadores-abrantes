@@ -237,7 +237,8 @@ FROM (
           OR pl.description ILIKE 'Desconto na Loja%'
           OR pl.description ILIKE 'Reembolso de compra%'              THEN 'loja'
         WHEN pl.description ILIKE 'Transferência%'                    THEN 'transferencia'
-        WHEN pl.description ILIKE 'VanaQuest%'
+        WHEN pl.description ILIKE 'Vantur%'                             -- RPC award_vantur_rewards
+          OR pl.description ILIKE 'Vana%'                               -- VanaQuest, VanaTrilha, ...
           OR pl.description ILIKE '%VanaWords%'                       THEN 'jogo'
         WHEN COALESCE(a.helper_role, a.role)::text IN ('dirigente', 'coordenador') THEN 'manual'
         ELSE 'outro'
