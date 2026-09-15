@@ -6,31 +6,17 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Coins, Trophy, UserCheck, UserX, Shield, AlertTriangle, PlusCircle, MinusCircle, KeyRound } from 'lucide-react'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { ArrowDownUp, Coins, Search, Settings2, Trophy, UserCheck, UserX, Users, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { triggerResetPassword } from '../actions'
 import { HelperManager } from './HelperManager'
-import { helperLabel } from '@/utils/permissions'
+import { ManageMemberDialog } from './ManageMemberDialog'
+import { DeleteMemberDialog } from './DeleteMemberDialog'
+import { SECTION_LABELS, helperLabel } from '@/utils/permissions'
+import { ROLE_LABELS, SECTION_DOT, SECTION_RING } from './member-constants'
 
 interface MemberListProps {
   members: any[]
@@ -39,320 +25,280 @@ interface MemberListProps {
   clubMembers?: any[]
 }
 
-const SECTION_LABELS: Record<string, string> = {
-  rebentos: 'Rebentos',
-  ticoes: 'Tições',
-  exploradores: 'Exploradores',
-  companheiros: 'Companheiros',
-  embaixadores: 'Embaixadores',
-}
+type SortKey = 'name' | 'xp' | 'gold'
+type StatusFilter = 'all' | 'invested' | 'pending'
 
 export function MemberList({ members, currentUserRole, adminProfile, clubMembers = [] }: MemberListProps) {
   const canAssignHelpers = currentUserRole === 'coordenador' || currentUserRole === 'dirigente'
-  const [selectedMember, setSelectedMember] = useState<any>(null)
-  const [pointsOpen, setPointsOpen] = useState(false)
-  const [loading, setLoading] = useState(false)
   const router = useRouter()
   const supabase = createClient()
 
-  // Form State
-  const [amountXP, setAmountXP] = useState(0)
-  const [amountGold, setAmountGold] = useState(0)
-  const [description, setDescription] = useState('')
-  const [tempRole, setTempRole] = useState('')
-  const [tempSection, setTempSection] = useState('')
-  const [tempLeadership, setTempLeadership] = useState('none')
-  const [isPenalty, setIsPenalty] = useState(false)
+  const [search, setSearch] = useState('')
+  const [sectionFilter, setSectionFilter] = useState('all')
+  const [roleFilter, setRoleFilter] = useState('all')
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
+  const [sortBy, setSortBy] = useState<SortKey>('name')
 
-  const handleUpdateMember = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setLoading(true)
+  const [manageId, setManageId] = useState<string | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<any>(null)
+  // Atualização otimista do estado de investidura.
+  const [investedOverride, setInvestedOverride] = useState<Record<string, boolean>>({})
 
-    try {
-      const finalXP = isPenalty ? -Math.abs(amountXP) : Math.abs(amountXP)
-      const finalGold = isPenalty ? -Math.abs(amountGold) : Math.abs(amountGold)
+  const isInvested = (m: any) => investedOverride[m.id] ?? !!m.is_invested
 
-      if (finalXP !== 0 || finalGold !== 0) {
-        const { error: logError } = await supabase
-          .from('points_log')
-          .insert({
-            target_user_id: selectedMember.id,
-            awarded_by_user_id: adminProfile.id,
-            amount_xp: finalXP,
-            amount_gold: finalGold,
-            description: description || (isPenalty ? 'Penalização disciplinar' : 'Prémio de mérito'),
-          })
-        if (logError) throw logError
+  const sectionsPresent = Object.keys(SECTION_LABELS).filter((s) => members.some((m) => m.section === s))
+
+  const investedCount = members.filter(isInvested).length
+  const stats = { total: members.length, invested: investedCount, pending: members.length - investedCount }
+
+  const normalize = (text: string) => text.toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '')
+  const q = normalize(search.trim())
+  const filtered = members
+    .filter((m) => {
+      if (q) {
+        if (!normalize(m.full_name || '').includes(q)) return false
       }
+      if (sectionFilter !== 'all' && m.section !== sectionFilter) return false
+      if (roleFilter !== 'all' && m.role !== roleFilter) return false
+      if (statusFilter === 'invested' && !isInvested(m)) return false
+      if (statusFilter === 'pending' && isInvested(m)) return false
+      return true
+    })
+    .sort((a, b) => {
+      if (sortBy === 'xp') return (b.total_xp ?? 0) - (a.total_xp ?? 0)
+      if (sortBy === 'gold') return (b.current_gold ?? 0) - (a.current_gold ?? 0)
+      return (a.full_name || '').localeCompare(b.full_name || '', 'pt')
+    })
 
-      if (currentUserRole === 'coordenador') {
-          const updateData: any = {
-              role: tempRole,
-              section: tempSection,
-              leadership_section: tempLeadership === 'none' ? null : tempLeadership
-          }
+  const hasFilters = search || sectionFilter !== 'all' || roleFilter !== 'all' || statusFilter !== 'all'
+  const managedMember = members.find((m) => m.id === manageId) ?? null
 
-          const { error: profileError } = await supabase
-            .from('profiles')
-            .update(updateData)
-            .eq('id', selectedMember.id)
-
-          if (profileError) throw profileError
-      }
-
-      toast.success(isPenalty ? `Penalização aplicada!` : `Atualizado com sucesso!`)
-      setPointsOpen(false)
-      setAmountXP(0)
-      setAmountGold(0)
-      setDescription('')
-      setIsPenalty(false)
-      router.refresh()
-    } catch (error: any) {
-      toast.error(error.message || 'Erro ao atualizar membro.')
-    } finally {
-      setLoading(false)
-    }
+  const clearFilters = () => {
+    setSearch('')
+    setSectionFilter('all')
+    setRoleFilter('all')
+    setStatusFilter('all')
   }
 
-  const handleToggleInvested = async (memberId: string, currentStatus: boolean) => {
-    try {
-      const { error } = await supabase
-        .from('profiles')
-        .update({ is_invested: !currentStatus })
-        .eq('id', memberId)
-      if (error) throw error
-      toast.success('Estado de investidura atualizado!')
-      router.refresh()
-    } catch (error) {
-      toast.error('Erro ao atualizar estado.')
+  const handleToggleInvested = async (member: any) => {
+    const next = !isInvested(member)
+    setInvestedOverride((prev) => ({ ...prev, [member.id]: next }))
+    const { error } = await supabase.from('profiles').update({ is_invested: next }).eq('id', member.id)
+    if (error) {
+      setInvestedOverride((prev) => ({ ...prev, [member.id]: !next }))
+      toast.error('Erro ao atualizar investidura.')
+      return
     }
+    toast.success(next ? `${member.full_name} marcado como investido.` : `Investidura de ${member.full_name} removida.`)
+    router.refresh()
   }
 
-  const handleResetPassword = async (memberId: string) => {
-    if (!confirm('Tem a certeza que deseja enviar um email de recuperação de password para este membro?')) return
-
-    setLoading(true)
-    try {
-      const result = await triggerResetPassword(memberId)
-      if (result.success) {
-        toast.success('Email de recuperação enviado com sucesso!')
-      }
-    } catch (error: any) {
-      toast.error(error.message || 'Erro ao enviar email de recuperação.')
-    } finally {
-      setLoading(false)
-    }
-  }
+  const statusChips: { id: StatusFilter; label: string; count: number; icon: any; active: string }[] = [
+    { id: 'all', label: 'Todos', count: stats.total, icon: Users, active: 'bg-blue-900 text-white border-blue-900' },
+    { id: 'invested', label: 'Investidos', count: stats.invested, icon: UserCheck, active: 'bg-emerald-600 text-white border-emerald-600' },
+    { id: 'pending', label: 'Por investir', count: stats.pending, icon: UserX, active: 'bg-orange-500 text-white border-orange-500' },
+  ]
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       {canAssignHelpers && (
         <HelperManager adminProfile={adminProfile} clubMembers={clubMembers} />
       )}
-      {members.map((member) => (
-        <div key={member.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-white border rounded-xl shadow-sm hover:shadow-md transition-all gap-4">
-           <div className="flex items-center gap-4 flex-1">
-                <Avatar className="h-12 w-12 border-2 border-slate-100 shrink-0 shadow-sm">
-                    <AvatarImage src={member.avatar_url} className="object-cover" />
-                    <AvatarFallback className="bg-slate-200 text-slate-500 font-bold">{member.full_name?.charAt(0)}</AvatarFallback>
+
+      {/* Barra de filtros */}
+      <div className="space-y-3">
+        <div className="flex flex-col lg:flex-row gap-2">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+            <Input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Pesquisar membro..."
+              className="pl-9 h-10 bg-white"
+            />
+            {search && (
+              <button
+                type="button"
+                onClick={() => setSearch('')}
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded text-slate-400 hover:text-slate-700"
+                aria-label="Limpar pesquisa"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:flex gap-2">
+            {sectionsPresent.length > 1 && (
+              <Select value={sectionFilter} onValueChange={setSectionFilter}>
+                <SelectTrigger className="h-10 w-full lg:w-44 bg-white"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas as classes</SelectItem>
+                  {sectionsPresent.map((s) => (
+                    <SelectItem key={s} value={s}>
+                      <span className={`h-2 w-2 rounded-full ${SECTION_DOT[s]}`} /> {SECTION_LABELS[s]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+            <Select value={roleFilter} onValueChange={setRoleFilter}>
+              <SelectTrigger className="h-10 w-full lg:w-40 bg-white"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos os cargos</SelectItem>
+                {Object.entries(ROLE_LABELS).map(([val, label]) => (
+                  <SelectItem key={val} value={val}>{label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={sortBy} onValueChange={(v) => setSortBy(v as SortKey)}>
+              <SelectTrigger className="h-10 w-full lg:w-40 bg-white col-span-2 sm:col-span-1">
+                <ArrowDownUp className="w-3.5 h-3.5 text-slate-400" /><SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="name">Nome (A-Z)</SelectItem>
+                <SelectItem value="xp">Mais XP</SelectItem>
+                <SelectItem value="gold">Mais ouro</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          {statusChips.map((chip) => (
+            <button
+              key={chip.id}
+              type="button"
+              onClick={() => setStatusFilter(chip.id)}
+              className={`inline-flex items-center gap-1.5 h-8 px-3 rounded-full border text-xs font-semibold transition-colors ${
+                statusFilter === chip.id ? chip.active : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+              }`}
+            >
+              <chip.icon className="w-3.5 h-3.5" /> {chip.label}
+              <span className={`rounded-full px-1.5 text-[10px] ${statusFilter === chip.id ? 'bg-white/25' : 'bg-slate-100'}`}>{chip.count}</span>
+            </button>
+          ))}
+          {hasFilters && (
+            <button type="button" onClick={clearFilters} className="text-xs font-semibold text-slate-500 hover:text-slate-900 underline-offset-2 hover:underline ml-1">
+              Limpar filtros
+            </button>
+          )}
+          <span className="ml-auto text-xs text-slate-400">
+            {filtered.length} de {members.length} membros
+          </span>
+        </div>
+      </div>
+
+      {/* Lista */}
+      <div className="rounded-xl border bg-white divide-y overflow-hidden">
+        {filtered.map((member) => {
+          const invested = isInvested(member)
+          return (
+            <div
+              key={member.id}
+              className="group flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 p-3 sm:px-4 hover:bg-slate-50/80 transition-colors"
+            >
+              <button
+                type="button"
+                onClick={() => setManageId(member.id)}
+                className="flex items-center gap-3 flex-1 min-w-0 text-left"
+              >
+                <Avatar className={`h-11 w-11 shrink-0 ring-2 ring-offset-2 ${SECTION_RING[member.section] || 'ring-slate-200'}`}>
+                  <AvatarImage src={member.avatar_url} className="object-cover" />
+                  <AvatarFallback className="bg-slate-200 text-slate-500 font-bold">{member.full_name?.charAt(0)}</AvatarFallback>
                 </Avatar>
                 <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <h3 className="font-bold text-gray-900 truncate">{member.full_name}</h3>
-                      <div className="flex gap-1.5 flex-wrap">
-                        <Badge variant="secondary" className="text-[10px] h-4 bg-slate-100 text-slate-600 border-none capitalize font-bold leading-none">
-                          {member.role === 'desbravador' ? 'Membro' : member.role}
-                        </Badge>
-                        {member.role === 'dirigente' && member.leadership_section && (
-                          <Badge variant="outline" className="text-[10px] h-4 border-blue-200 text-blue-700 bg-blue-50 font-bold leading-none">
-                            Líder {SECTION_LABELS[member.leadership_section] || member.leadership_section}
-                          </Badge>
-                        )}
-                        {member.helper_role && (
-                          <Badge variant="outline" className="text-[10px] h-4 border-amber-300 text-amber-700 bg-amber-50 font-bold leading-none">
-                            {helperLabel(member)}
-                          </Badge>
-                        )}
-                      </div>
-                    </div>
-                    <div className="text-xs text-gray-500 flex flex-wrap items-center gap-x-3 gap-y-1 mt-1">
-                        <span className="flex items-center gap-1 text-indigo-700 font-bold">
-                            <Trophy className="w-3 h-3" /> {member.total_xp} <span className="text-[10px] text-indigo-400">XP</span>
-                        </span>
-                        <span className="flex items-center gap-1 text-yellow-700 font-bold">
-                            <Coins className="w-3 h-3" /> {member.current_gold} <span className="text-[10px] text-yellow-500/70">Ouro</span>
-                        </span>
-                        <span className="capitalize font-medium text-slate-400 border-l border-slate-200 pl-3">
-                          {SECTION_LABELS[member.section] || member.section}
-                        </span>
-                    </div>
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <h3 className="font-semibold text-slate-900 truncate group-hover:text-blue-800">{member.full_name}</h3>
+                    {member.id === adminProfile?.id && (
+                      <Badge variant="outline" className="text-[10px] h-4 px-1.5 border-slate-300 text-slate-500">Tu</Badge>
+                    )}
+                    {member.role !== 'desbravador' && (
+                      <Badge variant="secondary" className="text-[10px] h-4 px-1.5 bg-slate-100 text-slate-600 border-none font-bold">
+                        {ROLE_LABELS[member.role] || member.role}
+                      </Badge>
+                    )}
+                    {member.role === 'dirigente' && member.leadership_section && (
+                      <Badge variant="outline" className="text-[10px] h-4 px-1.5 border-blue-200 text-blue-700 bg-blue-50 font-bold">
+                        Líder {SECTION_LABELS[member.leadership_section] || member.leadership_section}
+                      </Badge>
+                    )}
+                    {member.helper_role && (
+                      <Badge variant="outline" className="text-[10px] h-4 px-1.5 border-amber-300 text-amber-700 bg-amber-50 font-bold">
+                        {helperLabel(member)}
+                      </Badge>
+                    )}
+                  </div>
+                  <div className="text-xs flex flex-wrap items-center gap-x-3 gap-y-0.5 mt-0.5">
+                    <span className="inline-flex items-center gap-1.5 text-slate-500">
+                      <span className={`h-2 w-2 rounded-full ${SECTION_DOT[member.section] || 'bg-slate-300'}`} />
+                      {SECTION_LABELS[member.section] || member.section}
+                    </span>
+                    <span className="inline-flex items-center gap-1 text-indigo-700 font-semibold tabular-nums">
+                      <Trophy className="w-3 h-3" /> {member.total_xp ?? 0}
+                    </span>
+                    <span className="inline-flex items-center gap-1 text-yellow-700 font-semibold tabular-nums">
+                      <Coins className="w-3 h-3" /> {member.current_gold ?? 0}
+                    </span>
+                  </div>
                 </div>
-           </div>
+              </button>
 
-           <div className="flex items-center justify-between sm:justify-end gap-6 pt-3 sm:pt-0 border-t sm:border-none border-slate-100 w-full sm:w-auto">
-               <div className="flex items-center gap-3">
-                   <Label htmlFor={`invested-${member.id}`} className="text-[10px] uppercase font-bold text-slate-400 cursor-pointer tracking-wider">Investido</Label>
-                   <Switch 
-                        id={`invested-${member.id}`}
-                        checked={member.is_invested}
-                        onCheckedChange={() => handleToggleInvested(member.id, member.is_invested)}
-                        className="data-[state=checked]:bg-blue-800"
-                   />
-               </div>
-               
-                <Dialog open={pointsOpen && selectedMember?.id === member.id} onOpenChange={(open) => {
-                   setPointsOpen(open)
-                   if (open) {
-                       setSelectedMember(member)
-                       setTempRole(member.role)
-                       setTempSection(member.section)
-                       setTempLeadership(member.leadership_section || 'none')
-                       setIsPenalty(false)
-                   }
-                }}>
-                   <DialogTrigger asChild>
-                       <Button size="sm" variant="outline" className="border-blue-600 text-blue-700 hover:bg-blue-50">
-                           Gerir
-                       </Button>
-                   </DialogTrigger>
-                   <DialogContent className="sm:max-w-[450px]">
-                       <DialogHeader>
-                           <DialogTitle>Gerir Membro: {member.full_name}</DialogTitle>
-                           <DialogDescription>
-                               Ajuste os pontos ou altere os cargos deste membro.
-                           </DialogDescription>
-                       </DialogHeader>
-                       
-                       <Tabs defaultValue="reward" value={isPenalty ? "penalty" : "reward"} onValueChange={(v: string) => setIsPenalty(v === "penalty")} className="w-full">
-                         <TabsList className="grid w-full grid-cols-2 h-10">
-                           <TabsTrigger value="reward" className="data-[state=active]:bg-blue-600 data-[state=active]:text-white">
-                             <PlusCircle className="w-4 h-4 mr-2" /> Prémio
-                           </TabsTrigger>
-                           <TabsTrigger value="penalty" className="data-[state=active]:bg-red-600 data-[state=active]:text-white">
-                             <MinusCircle className="w-4 h-4 mr-2" /> Penalização
-                           </TabsTrigger>
-                         </TabsList>
-                       </Tabs>
+              <div className="flex items-center justify-between sm:justify-end gap-4 pl-14 sm:pl-0">
+                <div className="flex items-center gap-2">
+                  <Switch
+                    id={`invested-${member.id}`}
+                    checked={invested}
+                    onCheckedChange={() => handleToggleInvested(member)}
+                    className="data-[state=checked]:bg-emerald-600"
+                  />
+                  <Label
+                    htmlFor={`invested-${member.id}`}
+                    className={`text-xs font-semibold cursor-pointer w-20 ${invested ? 'text-emerald-700' : 'text-slate-400'}`}
+                  >
+                    {invested ? 'Investido' : 'Por investir'}
+                  </Label>
+                </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setManageId(member.id)}
+                  className="border-blue-200 text-blue-800 hover:bg-blue-50 hover:border-blue-400"
+                >
+                  <Settings2 className="w-4 h-4" /> Gerir
+                </Button>
+              </div>
+            </div>
+          )
+        })}
 
-                       <form onSubmit={handleUpdateMember} className="space-y-6 pt-2">
-                           {/* Points Section */}
-                           <div className={`grid grid-cols-2 gap-4 border p-4 rounded-xl transition-colors ${isPenalty ? 'bg-red-50/50 border-red-100' : 'bg-blue-50/50 border-blue-100'}`}>
-                               <div className="space-y-2">
-                                   <Label htmlFor="xp" className="text-xs font-bold flex items-center gap-1">
-                                     {isPenalty ? <><AlertTriangle className="w-3 h-3 text-red-600" /> Retirar XP</> : <><Trophy className="w-3 h-3 text-blue-600" /> Dar XP</>}
-                                   </Label>
-                                   <Input id="xp" type="number" min={0} value={amountXP} onChange={(e) => setAmountXP(Number(e.target.value))} className={`bg-white ${isPenalty ? 'border-red-200 focus-visible:ring-red-500' : 'border-blue-200 focus-visible:ring-blue-500'}`} />
-                               </div>
-                               <div className="space-y-2">
-                                   <Label htmlFor="gold" className="text-xs font-bold flex items-center gap-1">
-                                     {isPenalty ? <><AlertTriangle className="w-3 h-3 text-red-600" /> Retirar Ouro</> : <><Coins className="w-3 h-3 text-yellow-600" /> Dar Ouro</>}
-                                   </Label>
-                                   <Input id="gold" type="number" min={0} value={amountGold} onChange={(e) => setAmountGold(Number(e.target.value))} className={`bg-white ${isPenalty ? 'border-red-200 focus-visible:ring-red-500' : 'border-blue-200 focus-visible:ring-blue-500'}`} />
-                               </div>
-                           </div>
-
-                           {currentUserRole === 'coordenador' && (
-                             <div className="space-y-4 bg-slate-50 p-4 rounded-xl border border-slate-200">
-                                <div className="flex items-center gap-2 mb-1 text-xs font-bold text-slate-600">
-                                   <Shield className="w-3 h-3" /> Painel do Coordenador
-                                </div>
-                                <div className="grid grid-cols-2 gap-3">
-                                  <div className="space-y-1">
-                                    <Label className="text-[10px] uppercase font-bold text-slate-500">Cargo</Label>
-                                    <Select value={tempRole} onValueChange={setTempRole}>
-                                      <SelectTrigger className="h-9 text-xs bg-white"><SelectValue /></SelectTrigger>
-                                      <SelectContent>
-                                        <SelectItem value="desbravador">Membro</SelectItem>
-                                        <SelectItem value="dirigente">Dirigente</SelectItem>
-                                        <SelectItem value="coordenador">Coordenador</SelectItem>
-                                      </SelectContent>
-                                    </Select>
-                                  </div>
-                                  <div className="space-y-1">
-                                    <Label className="text-[10px] uppercase font-bold text-slate-500">Classe Pessoal</Label>
-                                    <Select value={tempSection} onValueChange={setTempSection}>
-                                      <SelectTrigger className="h-9 text-xs bg-white"><SelectValue /></SelectTrigger>
-                                      <SelectContent>
-                                        {Object.entries(SECTION_LABELS).map(([val, label]) => (
-                                          <SelectItem key={val} value={val}>{label}</SelectItem>
-                                        ))}
-                                      </SelectContent>
-                                    </Select>
-                                  </div>
-                                </div>
-                                
-                                {tempRole === 'dirigente' && (
-                                  <div className="space-y-1 mt-2">
-                                    <Label className="text-[10px] uppercase text-blue-700 font-bold">Responsável por (Liderança)</Label>
-                                    <Select value={tempLeadership} onValueChange={setTempLeadership}>
-                                      <SelectTrigger className="h-9 text-xs border-blue-200 bg-white"><SelectValue /></SelectTrigger>
-                                      <SelectContent>
-                                        <SelectItem value="none">Nenhuma</SelectItem>
-                                        {Object.entries(SECTION_LABELS).map(([val, label]) => (
-                                          <SelectItem key={val} value={val}>{label}</SelectItem>
-                                        ))}
-                                      </SelectContent>
-                                    </Select>
-                                  </div>
-                                )}
-                             </div>
-                           )}
-
-                           <div className="space-y-2 px-1">
-                               <Label htmlFor="reason" className="text-xs font-bold text-slate-600 text-[10px] uppercase">Motivo / Explicação</Label>
-                               <Input 
-                                 id="reason" 
-                                 placeholder={isPenalty ? "Ex: Má conduta..." : "Ex: Bom trabalho..."} 
-                                 value={description} 
-                                 onChange={(e) => setDescription(e.target.value)} 
-                                 className="h-9"
-                               />
-                           </div>
-
-                           <div className="pt-2 border-t">
-                               <Button 
-                                 type="button"
-                                 variant="outline"
-                                 className="w-full flex items-center gap-2 text-blue-700 border-blue-200 hover:bg-blue-50"
-                                 onClick={() => handleResetPassword(member.id)}
-                                 disabled={loading}
-                               >
-                                 <KeyRound className="w-4 h-4" /> Enviar Reset Password
-                               </Button>
-                               <p className="text-[10px] text-gray-500 text-center mt-1">
-                                 Um email será enviado para o membro com instruções de recuperação.
-                               </p>
-                           </div>
-                           
-                           <div className="flex flex-col gap-3 pt-2">
-                               <Button 
-                                 type="submit" 
-                                 className={`w-full h-11 text-base font-bold transition-all shadow-md ${isPenalty ? 'bg-red-600 hover:bg-red-700 hover:shadow-red-200' : 'bg-blue-800 hover:bg-blue-900 hover:shadow-blue-200'}`} 
-                                 disabled={loading}
-                               >
-                                   {loading ? 'Processando...' : (isPenalty ? 'Aplicar Penalização' : 'Atribuir Prémio')}
-                               </Button>
-                               {isPenalty && (
-                                 <div className="flex items-center justify-center gap-1.5 p-2 bg-red-50 rounded-lg border border-red-100">
-                                   <AlertTriangle className="w-3.5 h-3.5 text-red-500" />
-                                   <p className="text-[10px] text-red-600 font-bold uppercase tracking-wider">
-                                     Valores serão subtraídos ao saldo do membro
-                                   </p>
-                                 </div>
-                               )}
-                           </div>
-                       </form>
-                   </DialogContent>
-                </Dialog>
-           </div>
-        </div>
-      ))}
-
-      {members.length === 0 && (
-          <div className="text-center py-10 text-gray-500">
-              Nenhum membro encontrado.
+        {filtered.length === 0 && (
+          <div className="flex flex-col items-center justify-center text-center py-12 px-4 text-slate-500">
+            <Users className="w-10 h-10 text-slate-300 mb-2" />
+            <p className="font-medium">{members.length === 0 ? 'Nenhum membro encontrado.' : 'Nenhum membro corresponde aos filtros.'}</p>
+            {hasFilters && (
+              <Button variant="link" size="sm" onClick={clearFilters}>Limpar filtros</Button>
+            )}
           </div>
-      )}
+        )}
+      </div>
+
+      <ManageMemberDialog
+        member={managedMember}
+        open={!!managedMember}
+        onOpenChange={(open) => !open && setManageId(null)}
+        adminProfile={adminProfile}
+        currentUserRole={currentUserRole}
+        onRequestDelete={(m) => {
+          setManageId(null)
+          setDeleteTarget(m)
+        }}
+      />
+
+      <DeleteMemberDialog
+        member={deleteTarget}
+        open={!!deleteTarget}
+        onOpenChange={(open) => !open && setDeleteTarget(null)}
+      />
     </div>
   )
 }

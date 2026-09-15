@@ -249,7 +249,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
           <Card>
             <CardHeader>
               <CardTitle>Membros da Classe</CardTitle>
-              <CardDescription>Gerencie os pontos, XP e investiduras dos desbravadores.</CardDescription>
+              <CardDescription>Pesquisa, filtra e gere pontos, cargos, investiduras e contas dos desbravadores.</CardDescription>
             </CardHeader>
             <CardContent>
               <MemberList

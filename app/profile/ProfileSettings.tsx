@@ -15,6 +15,7 @@ import { createClient } from '@/utils/supabase/client'
 import { useRef } from 'react'
 import Link from 'next/link'
 import { PurchaseHistory } from './PurchaseHistory'
+import { DeleteAccountCard } from './DeleteAccountCard'
 
 interface ProfileSettingsProps {
   profile: {
@@ -390,6 +391,9 @@ export default function ProfileSettings({ profile, user, userEmail, purchases }:
             )}
           </CardContent>
         </Card>
+
+        {/* Delete Account */}
+        <DeleteAccountCard userEmail={userEmail} />
       </div>
     </div>
   )
