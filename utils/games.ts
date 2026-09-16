@@ -79,18 +79,6 @@ export const GAMES: GameDefinition[] = [
     adminCoordOnly: false,
   },
   {
-    id: 'vana-camp',
-    title: 'VanaCamp: Infiltrados',
-    description: 'Jogo de dedução e aventura do clube. Descobre quem sabota o acampamento antes que seja tarde.',
-    image: '/images/VanaCamp.png',
-    href: '/jogos/vana-camp',
-    loginHref: '/login?next=/jogos/vana-camp',
-    adminHref: '/admin/vana-camp',
-    color: 'from-stone-900 via-amber-900 to-orange-600',
-    requiresAuth: true,
-    adminCoordOnly: true,
-  },
-  {
     id: 'vana-trilha',
     title: 'VanaTrilha',
     description: 'A Rota da Promessa. Desafio bíblico diário: do Egito à Terra Prometida.',
@@ -101,6 +89,18 @@ export const GAMES: GameDefinition[] = [
     color: 'from-amber-500 via-orange-600 to-yellow-500',
     requiresAuth: true,
     adminCoordOnly: false,
+  },
+  {
+    id: 'vana-camp',
+    title: 'VanaCamp: Infiltrados',
+    description: 'Jogo de dedução e aventura do clube. Descobre quem sabota o acampamento antes que seja tarde.',
+    image: '/images/VanaCamp.png',
+    href: '/jogos/vana-camp',
+    loginHref: '/login?next=/jogos/vana-camp',
+    adminHref: '/admin/vana-camp',
+    color: 'from-stone-900 via-amber-900 to-orange-600',
+    requiresAuth: true,
+    adminCoordOnly: true,
   },
 ]
 

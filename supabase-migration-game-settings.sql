@@ -58,6 +58,6 @@ INSERT INTO public.game_settings (game_id) VALUES
   ('vantur'),
   ('vana-quest'),
   ('vana-words'),
-  ('vana-camp'),
-  ('vana-trilha')
+  ('vana-trilha'),
+  ('vana-camp')
 ON CONFLICT (game_id) DO NOTHING;
