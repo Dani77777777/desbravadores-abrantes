@@ -14,6 +14,7 @@ import {
   type PlayerSnapshot,
 } from '@/utils/vana-camp'
 import { shortDisplayName } from '@/utils/display-name'
+import { gameUnavailableError } from '@/utils/game-access'
 import {
   VANA_CAMP_DEFAULT_PHASE_SECONDS,
   type VanaCampChatMode,
@@ -325,6 +326,10 @@ export interface JoinResult {
 
 export async function joinSessionByCode(rawCode: string): Promise<JoinResult> {
   const { supabase, user } = await requireUser()
+
+  const unavailable = await gameUnavailableError('vana-camp')
+  if (unavailable) return { error: unavailable }
+
   const code = rawCode.trim().toUpperCase()
   if (!code || code.length !== 6) {
     return { error: 'Código inválido.' }

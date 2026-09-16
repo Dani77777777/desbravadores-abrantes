@@ -1,5 +1,7 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
+import { canAccessGame, fetchGameSetting, findGameByPath, isSpectatorPath } from '@/utils/games'
+import { effectiveRole } from '@/utils/permissions'
 
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({
@@ -33,6 +35,44 @@ export async function updateSession(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser()
 
+  // Copy cookies from supabaseResponse to a redirect/rewrite response
+  const withSessionCookies = (response: NextResponse) => {
+    supabaseResponse.cookies.getAll().forEach(cookie => {
+      response.cookies.set(cookie.name, cookie.value, cookie)
+    })
+    return response
+  }
+
+  const profile = user
+    ? (await supabase
+        .from('profiles')
+        .select('birth_date, role, helper_role')
+        .eq('id', user.id)
+        .single()).data
+    : null
+
+  // 0. Game availability (Gestão → Jogos). Corre antes do login: um jogo
+  // indisponível mostra o aviso em vez de pedir para entrar na conta.
+  const game = findGameByPath(request.nextUrl.pathname)
+  if (game) {
+    const setting = await fetchGameSetting(supabase, game.id)
+    const allowed = isSpectatorPath(request.nextUrl.pathname)
+      ? setting.enabled
+      : canAccessGame(setting, effectiveRole(profile))
+
+    if (!allowed) {
+      // Server actions / pedidos que não são páginas: recusa simples.
+      if (request.method !== 'GET' && request.method !== 'HEAD') {
+        return withSessionCookies(new NextResponse('Jogo indisponível', { status: 403 }))
+      }
+      // Mantém o URL: quando o jogo voltar a estar disponível, basta recarregar.
+      const url = request.nextUrl.clone()
+      url.pathname = `/jogos/indisponivel/${game.id}`
+      url.search = ''
+      return withSessionCookies(NextResponse.rewrite(url))
+    }
+  }
+
   // 1. Protected Routes Protection
   if (
     !user &&
@@ -44,6 +84,8 @@ export async function updateSession(request: NextRequest) {
     !request.nextUrl.pathname.startsWith('/contacts') &&
     !request.nextUrl.pathname.startsWith('/codes') &&
     !request.nextUrl.pathname.startsWith('/jogos/vana-quest') &&
+    !request.nextUrl.pathname.startsWith('/jogos/vana-trilha/como-jogar') &&
+    !request.nextUrl.pathname.startsWith('/jogos/indisponivel') &&
     !request.nextUrl.pathname.startsWith('/embed') &&
     !request.nextUrl.pathname.includes('/present') &&
     request.nextUrl.pathname !== '/jogos'
@@ -55,13 +97,6 @@ export async function updateSession(request: NextRequest) {
 
   // 2. Onboarding Protection
   if (user) {
-    // Check if user has birth_date in profiles
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('birth_date')
-      .eq('id', user.id)
-      .single()
-
     const isOnboarding = request.nextUrl.pathname.startsWith('/onboarding')
   const isResetPassword = request.nextUrl.pathname.startsWith('/login/reset-password')
 
@@ -69,24 +104,14 @@ export async function updateSession(request: NextRequest) {
   if ((!profile || !profile.birth_date) && !isOnboarding && !isResetPassword && !request.nextUrl.pathname.startsWith('/embed')) {
        const url = request.nextUrl.clone()
        url.pathname = '/onboarding'
-       const redirectResponse = NextResponse.redirect(url)
-       // Copy cookies from supabaseResponse to redirectResponse
-       supabaseResponse.cookies.getAll().forEach(cookie => {
-         redirectResponse.cookies.set(cookie.name, cookie.value, cookie)
-       })
-       return redirectResponse
+       return withSessionCookies(NextResponse.redirect(url))
     }
 
     // If birth_date exists and on onboarding, redirect to dashboard
     if (profile?.birth_date && isOnboarding) {
         const url = request.nextUrl.clone()
         url.pathname = '/'
-        const redirectResponse = NextResponse.redirect(url)
-        // Copy cookies from supabaseResponse to redirectResponse
-        supabaseResponse.cookies.getAll().forEach(cookie => {
-          redirectResponse.cookies.set(cookie.name, cookie.value, cookie)
-        })
-        return redirectResponse
+        return withSessionCookies(NextResponse.redirect(url))
     }
   }
 

@@ -11,9 +11,9 @@ interface Word {
 
 interface WordBankClientProps {
   initialWords: Word[]
-  onAddWord: (formData: FormData) => Promise<void>
-  onBulkAdd: (formData: FormData) => Promise<void>
-  onDeleteWord: (formData: FormData) => Promise<void>
+  onAddWord: (formData: FormData) => Promise<{ error?: string }>
+  onBulkAdd: (formData: FormData) => Promise<{ added: number; skipped: number; error?: string }>
+  onDeleteWord: (formData: FormData) => Promise<{ error?: string }>
 }
 
 export function WordBankClient({ initialWords, onAddWord, onBulkAdd, onDeleteWord }: WordBankClientProps) {
@@ -41,7 +41,11 @@ export function WordBankClient({ initialWords, onAddWord, onBulkAdd, onDeleteWor
     const fd = new FormData()
     fd.set('word', clean)
     startTransition(async () => {
-      await onAddWord(fd)
+      const result = await onAddWord(fd)
+      if (result.error) {
+        flash(result.error, false)
+        return
+      }
       setWords((prev) => [...prev, { id: Date.now().toString(), word: clean, created_at: new Date().toISOString() }].sort((a, b) => a.word.localeCompare(b.word)))
       setNewWord('')
       flash(`"${clean}" adicionada!`)
@@ -57,12 +61,16 @@ export function WordBankClient({ initialWords, onAddWord, onBulkAdd, onDeleteWor
     const fd = new FormData()
     fd.set('words', raw)
     startTransition(async () => {
-      await onBulkAdd(fd)
+      const result = await onBulkAdd(fd)
+      if (result.error) {
+        flash(result.error, false)
+        return
+      }
       const added = newOnes.map((w) => ({ id: Math.random().toString(), word: w, created_at: new Date().toISOString() }))
       setWords((prev) => [...prev, ...added].sort((a, b) => a.word.localeCompare(b.word)))
       setBulkText('')
       setShowBulk(false)
-      flash(`${newOnes.length} palavra(s) adicionada(s), ${parsed.length - newOnes.length} ignorada(s).`)
+      flash(`${result.added} palavra(s) adicionada(s), ${result.skipped} ignorada(s).`)
     })
   }
 
@@ -70,7 +78,11 @@ export function WordBankClient({ initialWords, onAddWord, onBulkAdd, onDeleteWor
     const fd = new FormData()
     fd.set('id', word.id)
     startTransition(async () => {
-      await onDeleteWord(fd)
+      const result = await onDeleteWord(fd)
+      if (result.error) {
+        flash(result.error, false)
+        return
+      }
       setWords((prev) => prev.filter((w) => w.id !== word.id))
       flash(`"${word.word}" removida.`)
     })

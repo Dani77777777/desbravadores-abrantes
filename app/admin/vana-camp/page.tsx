@@ -6,6 +6,7 @@ import {
   ChevronLeft, Flame, History, Plus, Trophy, Users, Bot, Eye, VenetianMask, Crown, Sparkles,
 } from 'lucide-react'
 import { DeleteVanaCampSessionButton } from '@/components/vana-camp/DeleteVanaCampSessionButton'
+import { GameAvailabilityBanner } from '../components/GameAvailabilityBanner'
 
 export default async function VanaCampAdminPage() {
   const supabase = await createClient()
@@ -65,10 +66,10 @@ export default async function VanaCampAdminPage() {
       <main className="max-w-5xl mx-auto p-4 md:p-8 space-y-6">
         <header className="space-y-3">
           <Link
-            href="/admin"
+            href="/admin?tab=games"
             className="inline-flex items-center gap-1 text-stone-400 hover:text-amber-200 text-sm transition"
           >
-            <ChevronLeft className="w-4 h-4" /> Admin
+            <ChevronLeft className="w-4 h-4" /> Jogos
           </Link>
           <div className="flex items-center justify-between flex-wrap gap-3">
             <div className="flex items-center gap-3">
@@ -83,6 +84,8 @@ export default async function VanaCampAdminPage() {
             </Link>
           </div>
         </header>
+
+        <GameAvailabilityBanner gameId="vana-camp" />
 
         {/* Stats */}
         <section className="grid grid-cols-2 md:grid-cols-5 gap-2">

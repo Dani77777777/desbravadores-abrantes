@@ -38,44 +38,46 @@ serve(async (req) => {
       target_user_id,
       target_section,
       target_role,
+      audience,
     } = announcement
 
     console.log(`[send-push] Processing announcement: "${title}"`, {
       target_user_id,
       target_section,
       target_role,
+      audience,
     })
+
+    const noRecipients = () =>
+      new Response(JSON.stringify({ sent: 0, reason: 'no matching users' }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
 
     // Build query to find the right subscribers
     let query = supabase
       .from('push_subscriptions')
       .select('endpoint, p256dh, auth, user_id')
 
-    if (target_user_id) {
-      // Personal announcement – only for this user
-      query = query.eq('user_id', target_user_id)
-    } else if (target_section || target_role) {
-      // Find user IDs matching the target criteria
-      let profileQuery = supabase
-        .from('profiles')
-        .select('id')
+    const isGlobal = !target_user_id && !target_section && !target_role && audience !== 'members'
 
-      if (target_section) profileQuery = profileQuery.eq('section', target_section)
-      if (target_role) profileQuery = profileQuery.eq('role', target_role)
+    if (!isGlobal) {
+      // Os destinatários são gravados na BD no momento do envio (announcement_recipients),
+      // com a mesma regra usada pelo Painel — é a fonte de verdade.
+      const { data: recipients, error: recipientsError } = await supabase
+        .from('announcement_recipients')
+        .select('user_id')
+        .eq('announcement_id', id)
+      if (recipientsError) throw recipientsError
 
-      const { data: profiles, error: profileError } = await profileQuery
-      if (profileError) throw profileError
-
-      const userIds = (profiles || []).map((p: { id: string }) => p.id)
-      if (userIds.length === 0) {
-        return new Response(JSON.stringify({ sent: 0, reason: 'no matching users' }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        })
-      }
+      const userIds = (recipients || []).map((r: { user_id: string }) => r.user_id)
+      if (userIds.length === 0) return noRecipients()
 
       query = query.in('user_id', userIds)
     }
-    // If no target is set → send to everyone (global announcement)
+    // Global → todos os subscritores (exceto o autor)
+    else if (announcement.author_id) {
+      query = query.neq('user_id', announcement.author_id)
+    }
 
     const { data: subscriptions, error: subError } = await query
     if (subError) throw subError

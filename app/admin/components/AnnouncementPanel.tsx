@@ -2,181 +2,190 @@
 
 import { useState } from 'react'
 import { createClient } from '@/utils/supabase/client'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
 import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
 import {
-  Megaphone, Users, UserRound, ShieldCheck, BookOpen, Send, Clock, Globe, Trash2, Cake, Sparkles
+  Megaphone, Users, UserRound, ShieldCheck, BookOpen, Send, Clock, Globe, Trash2, Cake, Sparkles,
+  Search, Check, X, Eye, ChevronDown, ChevronUp,
 } from 'lucide-react'
+import { SECTION_LABELS } from '@/utils/permissions'
+import { ROLE_LABELS, SECTION_DOT } from './member-constants'
 
 interface AnnouncementPanelProps {
   profile: any
   members: any[]
   sentAnnouncements: any[]
+  sentRecipients: { announcement_id: string; user_id: string; read_at: string | null }[]
 }
 
-const SECTION_LABELS: Record<string, string> = {
-  rebentos: 'Rebentos',
-  ticoes: 'Tições',
-  exploradores: 'Exploradores',
-  companheiros: 'Companheiros',
-  embaixadores: 'Embaixadores',
+type Audience = 'global' | 'desbravadores' | 'dirigentes' | 'section' | 'section_leaders' | 'members'
+
+const AUDIENCES: Record<Audience, { label: string; hint: string; icon: any; coordOnly: boolean }> = {
+  global:          { label: 'Todo o clube',         hint: 'Desbravadores, dirigentes e coordenação.',        icon: Globe,       coordOnly: true },
+  desbravadores:   { label: 'Desbravadores',        hint: 'Todos os membros (sem dirigentes).',             icon: Users,       coordOnly: true },
+  dirigentes:      { label: 'Dirigentes',           hint: 'Todos os dirigentes e ajudantes de dirigente.',  icon: ShieldCheck, coordOnly: true },
+  section:         { label: 'Uma classe',           hint: 'Membros da classe + os líderes dessa classe.',   icon: BookOpen,    coordOnly: false },
+  section_leaders: { label: 'Líderes de uma classe', hint: 'Só os dirigentes responsáveis pela classe.',    icon: ShieldCheck, coordOnly: true },
+  members:         { label: 'Membros específicos',  hint: 'Escolhe uma ou várias pessoas.',                 icon: UserRound,   coordOnly: false },
 }
 
-type AudienceType =
-  | 'global'               // coord only — todos (tropa e dirigentes)
-  | 'all_desbravadores'    // coord only — todos os desbravadores
-  | 'all_dirigentes'       // coord only — todos os dirigentes
-  | 'dirigente_of_section' // coord only — dirigentes de uma classe
-  | 'specific_section'     // coord only — desbravadores de uma classe
-  | 'my_section_all'       // dirigente — toda a classe
-  | 'specific_member'      // ambos — membro em específico
+const effRole = (m: any) => m.helper_role || m.role
+const effLead = (m: any) => m.helper_section || m.leadership_section
 
-export function AnnouncementPanel({ profile, members, sentAnnouncements }: AnnouncementPanelProps) {
+/** Espelha a regra da BD (resolve_announcement_recipients) para pré-visualizar quem recebe. */
+function previewRecipients(audience: Audience, section: string, memberIds: string[], members: any[], authorId: string) {
+  const others = members.filter((m) => m.id !== authorId)
+  switch (audience) {
+    case 'global': return others
+    case 'desbravadores': return others.filter((m) => m.role === 'desbravador')
+    case 'dirigentes': return others.filter((m) => effRole(m) === 'dirigente')
+    case 'section': return section ? others.filter((m) => m.section === section || (effRole(m) === 'dirigente' && effLead(m) === section)) : []
+    case 'section_leaders': return section ? others.filter((m) => effRole(m) === 'dirigente' && effLead(m) === section) : []
+    case 'members': return members.filter((m) => memberIds.includes(m.id))
+  }
+}
+
+function audienceLabel(a: any) {
+  switch (a.audience) {
+    case 'global': return { text: 'Todo o clube', cls: 'border-sky-200 text-sky-700 bg-sky-50' }
+    case 'desbravadores': return { text: 'Desbravadores', cls: 'border-emerald-200 text-emerald-700 bg-emerald-50' }
+    case 'dirigentes': return { text: 'Dirigentes', cls: 'border-purple-200 text-purple-700 bg-purple-50' }
+    case 'section': return { text: `Classe · ${SECTION_LABELS[a.target_section] || a.target_section}`, cls: 'border-blue-200 text-blue-700 bg-blue-50' }
+    case 'section_leaders': return { text: `Líderes · ${SECTION_LABELS[a.target_section] || a.target_section}`, cls: 'border-violet-200 text-violet-700 bg-violet-50' }
+    case 'member':
+    case 'members': return { text: 'Membros específicos', cls: 'border-amber-200 text-amber-700 bg-amber-50' }
+  }
+  // Comunicados antigos (antes da coluna audience)
+  if (a.target_user_id) return { text: 'Pessoal', cls: 'border-amber-200 text-amber-700 bg-amber-50' }
+  if (a.target_role === 'dirigente') return { text: a.target_section ? `Líderes · ${SECTION_LABELS[a.target_section]}` : 'Dirigentes', cls: 'border-violet-200 text-violet-700 bg-violet-50' }
+  if (a.target_role === 'desbravador') return { text: 'Desbravadores', cls: 'border-emerald-200 text-emerald-700 bg-emerald-50' }
+  if (a.target_section) return { text: `Classe · ${SECTION_LABELS[a.target_section]}`, cls: 'border-blue-200 text-blue-700 bg-blue-50' }
+  return { text: 'Todo o clube', cls: 'border-sky-200 text-sky-700 bg-sky-50' }
+}
+
+export function AnnouncementPanel({ profile, members, sentAnnouncements, sentRecipients }: AnnouncementPanelProps) {
   const supabase = createClient()
   const router = useRouter()
 
   const isCoordenador = profile.role === 'coordenador'
+  const mySection = profile.leadership_section || profile.section
 
   const [title, setTitle] = useState('')
   const [message, setMessage] = useState('')
-  const [audience, setAudience] = useState<AudienceType>(
-    isCoordenador ? 'global' : 'my_section_all'
-  )
-  const [specificSection, setSpecificSection] = useState('')
-  const [specificMemberId, setSpecificMemberId] = useState('')
+  const [audience, setAudience] = useState<Audience>(isCoordenador ? 'global' : 'section')
+  const [section, setSection] = useState<string>(isCoordenador ? '' : mySection)
+  const [memberIds, setMemberIds] = useState<string[]>([])
+  const [memberSearch, setMemberSearch] = useState('')
+  const [memberSectionFilter, setMemberSectionFilter] = useState('all')
+  const [showPreviewList, setShowPreviewList] = useState(false)
   const [sending, setSending] = useState(false)
 
-  const memberOptions = members.filter(m => m.id !== profile.id)
+  const selectableMembers = members.filter((m) => m.id !== profile.id)
+  const memberById = new Map(members.map((m) => [m.id, m]))
+  const recipients = previewRecipients(audience, section, memberIds, members, profile.id)
 
-  // Build the DB payload based on audience
-  const buildPayload = () => {
-    const base = { author_id: profile.id, title: title.trim(), message: message.trim() }
-    switch (audience) {
-      case 'global':
-        return base
-      case 'all_desbravadores':
-        return { ...base, target_role: 'desbravador' }
-      case 'all_dirigentes':
-        return { ...base, target_role: 'dirigente' }
-      case 'dirigente_of_section':
-        return { ...base, target_role: 'dirigente', target_section: specificSection }
-      case 'specific_section':
-        return { ...base, target_section: specificSection }
-      case 'my_section_all':
-        return { ...base, target_section: profile.leadership_section || profile.section }
-      case 'specific_member':
-        return { ...base, target_user_id: specificMemberId }
-    }
+  const chooseAudience = (a: Audience) => {
+    setAudience(a)
+    setShowPreviewList(false)
+    if (!isCoordenador && a === 'section') setSection(mySection)
+  }
+
+  const send = async (params: { title: string; message: string; audience: Audience; section?: string | null; memberIds?: string[] }) => {
+    const { data, error } = await supabase.rpc('send_announcement', {
+      p_title: params.title,
+      p_message: params.message,
+      p_audience: params.audience,
+      p_section: params.section || null,
+      p_member_ids: params.memberIds?.length ? params.memberIds : null,
+    })
+    if (error) throw error
+    return data as { id: string; recipients: number }
   }
 
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!title.trim() || !message.trim()) return toast.error('Preenche o título e a mensagem.')
-    if (['specific_section','dirigente_of_section'].includes(audience) && !specificSection)
-      return toast.error('Escolhe uma classe.')
-    if (audience === 'specific_member' && !specificMemberId)
-      return toast.error('Escolhe um membro.')
+    if ((audience === 'section' || audience === 'section_leaders') && !section) return toast.error('Escolhe uma classe.')
+    if (audience === 'members' && memberIds.length === 0) return toast.error('Escolhe pelo menos um membro.')
 
     setSending(true)
     try {
-      const { error } = await supabase.from('announcements').insert(buildPayload())
-      if (error) throw error
-      toast.success('Comunicado enviado com sucesso! ✉️')
+      const result = await send({ title, message, audience, section, memberIds })
+      toast.success(`Comunicado enviado para ${result.recipients} ${result.recipients === 1 ? 'pessoa' : 'pessoas'}! ✉️`)
       setTitle('')
       setMessage('')
+      setMemberIds([])
       router.refresh()
-    } catch (e: any) {
-      toast.error(e.message || 'Erro ao enviar comunicado.')
+    } catch (err: any) {
+      toast.error(err.message || 'Erro ao enviar comunicado.')
     } finally {
       setSending(false)
     }
   }
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('Tens a certeza que queres apagar este comunicado?')) return
-    try {
-      const { error } = await supabase.from('announcements').delete().eq('id', id)
-      if (error) throw error
-      toast.success('Comunicado apagado.')
-      router.refresh()
-    } catch (e: any) {
-      toast.error('Erro ao apagar comunicado.')
-    }
-  }
-
-  const needsSectionPicker = audience === 'specific_section' || audience === 'dirigente_of_section'
-  const needsMemberPicker = audience === 'specific_member'
-
-  // Birthday logic
+  // ── Aniversários ──
   const today = new Date()
   const todayMonthDay = `${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
-  
-  const birthdayMembers = members.filter(m => {
+  const birthdayMembers = members.filter((m) => {
     if (!m.birth_date) return false
     const bDate = new Date(m.birth_date)
     const bMonthDay = `${String(bDate.getUTCMonth() + 1).padStart(2, '0')}-${String(bDate.getUTCDate()).padStart(2, '0')}`
-    
-    // Filter by class if Dirigente
-    if (profile.role === 'dirigente') {
-      const targetSection = profile.leadership_section || profile.section
-      if (m.section !== targetSection) return false
-    }
-
-    // Check if a birthday message was already sent TODAY for this member
-    const alreadySent = sentAnnouncements.some(a => {
-      const isBirthdayTitle = a.title === `🎈 Parabéns, ${m.full_name}!`
-      const isToday = new Date(a.created_at).toDateString() === today.toDateString()
-      return isBirthdayTitle && isToday
-    })
-
+    if (!isCoordenador && m.section !== mySection) return false
+    const alreadySent = sentAnnouncements.some(
+      (a) => a.title === `🎈 Parabéns, ${m.full_name}!` && new Date(a.created_at).toDateString() === today.toDateString()
+    )
     return bMonthDay === todayMonthDay && !alreadySent
   })
 
-  const handleSendBirthday = async (memberOrAll: any | 'all') => {
+  const handleSendBirthday = async (list: any[]) => {
     setSending(true)
     try {
-      if (memberOrAll === 'all') {
-        const payloads = birthdayMembers.map(m => ({
-          author_id: profile.id,
+      for (const m of list) {
+        await send({
           title: `🎈 Parabéns, ${m.full_name}!`,
           message: `🎈 Parabéns, ${m.full_name}! Que Deus te abençoe em mais um ano de vida! ✨`,
-        }))
-        const { error } = await supabase.from('announcements').insert(payloads)
-        if (error) throw error
-        toast.success(`Parabéns enviados para ${birthdayMembers.length} pessoas! 🎂`)
-      } else {
-        const { error } = await supabase.from('announcements').insert({
-          author_id: profile.id,
-          title: `🎈 Parabéns, ${memberOrAll.full_name}!`,
-          message: `🎈 Parabéns, ${memberOrAll.full_name}! Que Deus te abençoe em mais um ano de vida! ✨`,
+          // A coordenação avisa o clube todo; o dirigente avisa a sua classe.
+          audience: isCoordenador ? 'global' : 'section',
+          section: isCoordenador ? null : mySection,
         })
-        if (error) throw error
-        toast.success(`Parabéns enviados para ${memberOrAll.full_name}! 🎂`)
       }
+      toast.success(list.length === 1 ? `Parabéns enviados para ${list[0].full_name}! 🎂` : `Parabéns enviados para ${list.length} pessoas! 🎂`)
       router.refresh()
-    } catch (e: any) {
+    } catch {
       toast.error('Erro ao enviar parabéns.')
     } finally {
       setSending(false)
     }
   }
 
+  // ── Seletor de membros ──
+  const normalize = (t: string) => t.toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '')
+  const q = normalize(memberSearch.trim())
+  const filteredMembers = selectableMembers.filter((m) => {
+    if (memberSectionFilter !== 'all' && m.section !== memberSectionFilter) return false
+    return !q || normalize(m.full_name || '').includes(q)
+  })
+  const allFilteredSelected = filteredMembers.length > 0 && filteredMembers.every((m) => memberIds.includes(m.id))
+  const toggleMember = (id: string) =>
+    setMemberIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))
+  const toggleAllFiltered = () => {
+    const ids = filteredMembers.map((m) => m.id)
+    setMemberIds((prev) => (allFilteredSelected ? prev.filter((id) => !ids.includes(id)) : Array.from(new Set([...prev, ...ids]))))
+  }
+  const sectionsPresent = Object.keys(SECTION_LABELS).filter((s) => selectableMembers.some((m) => m.section === s))
+
+  const availableAudiences = (Object.keys(AUDIENCES) as Audience[]).filter((a) => isCoordenador || !AUDIENCES[a].coordOnly)
+  const needsSection = audience === 'section' || audience === 'section_leaders'
+
   return (
     <div className="space-y-8">
-      {/* ── Birthday Widget ── */}
+      {/* ── Aniversariantes ── */}
       {birthdayMembers.length > 0 && (
         <Card className="border-2 border-pink-100 bg-pink-50/30 overflow-hidden relative">
           <div className="absolute top-0 right-0 p-4 opacity-10 pointer-events-none">
@@ -188,26 +197,27 @@ export function AnnouncementPanel({ profile, members, sentAnnouncements }: Annou
               Aniversariantes de Hoje ({birthdayMembers.length})
             </CardTitle>
             <CardDescription className="text-pink-600/80">
-              {isCoordenador 
-                ? 'Estes são os membros do clube que fazem anos hoje.' 
-                : `Estes são os membros da classe ${SECTION_LABELS[profile.leadership_section || profile.section]} que fazem anos hoje.`}
+              {isCoordenador
+                ? 'Os parabéns são enviados para todo o clube.'
+                : `Os parabéns são enviados para a classe ${SECTION_LABELS[mySection]}.`}
             </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="flex flex-wrap gap-3">
-              {birthdayMembers.map(m => (
+              {birthdayMembers.map((m) => (
                 <div key={m.id} className="flex items-center gap-3 bg-white p-2 pr-3 rounded-full border border-pink-200 shadow-sm">
-                  <div className="w-8 h-8 rounded-full bg-pink-100 flex items-center justify-center text-pink-600 font-bold text-xs">
-                    {m.full_name.charAt(0).toUpperCase()}
-                  </div>
+                  <Avatar className="w-8 h-8">
+                    <AvatarImage src={m.avatar_url} className="object-cover" />
+                    <AvatarFallback className="bg-pink-100 text-pink-600 font-bold text-xs">{m.full_name.charAt(0).toUpperCase()}</AvatarFallback>
+                  </Avatar>
                   <div className="flex flex-col">
                     <span className="text-sm font-semibold text-gray-800 leading-tight">{m.full_name}</span>
-                    <span className="text-[10px] text-pink-500 font-medium capitalize">{SECTION_LABELS[m.section]}</span>
+                    <span className="text-[10px] text-pink-500 font-medium">{SECTION_LABELS[m.section]}</span>
                   </div>
-                  <Button 
-                    size="sm" 
+                  <Button
+                    size="sm"
                     className="h-7 px-3 bg-pink-500 hover:bg-pink-600 text-[11px] font-bold rounded-full ml-1"
-                    onClick={() => handleSendBirthday(m)}
+                    onClick={() => handleSendBirthday([m])}
                     disabled={sending}
                   >
                     <Sparkles className="w-3 h-3 mr-1" />
@@ -215,13 +225,12 @@ export function AnnouncementPanel({ profile, members, sentAnnouncements }: Annou
                   </Button>
                 </div>
               ))}
-              
               {birthdayMembers.length > 1 && (
-                <Button 
-                  size="sm" 
+                <Button
+                  size="sm"
                   variant="outline"
                   className="h-10 px-4 border-pink-300 text-pink-600 hover:bg-pink-50 rounded-xl font-bold ml-auto"
-                  onClick={() => handleSendBirthday('all')}
+                  onClick={() => handleSendBirthday(birthdayMembers)}
                   disabled={sending}
                 >
                   <Cake className="w-4 h-4 mr-2" />
@@ -233,7 +242,7 @@ export function AnnouncementPanel({ profile, members, sentAnnouncements }: Annou
         </Card>
       )}
 
-      {/* ── Compose ── */}
+      {/* ── Novo comunicado ── */}
       <Card className="border-2 border-blue-100">
         <CardHeader className="pb-4">
           <CardTitle className="flex items-center gap-2 text-gray-800">
@@ -243,172 +252,233 @@ export function AnnouncementPanel({ profile, members, sentAnnouncements }: Annou
             Novo Comunicado
           </CardTitle>
           <CardDescription>
-            {isCoordenador
-              ? 'Envia mensagens para toda a tropa, dirigentes, classes específicas ou membros individuais.'
-              : 'Envia mensagens para a tua classe ou para um desbravador específico.'}
+            Os destinatários ficam fixos no momento do envio: quem mudar de classe depois continua a ver o que recebeu.
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleSend} className="space-y-5">
+          <form onSubmit={handleSend} className="space-y-6">
+            {/* Passo 1: Para quem */}
+            <section className="space-y-3">
+              <StepLabel n={1} label="Para quem?" />
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                {availableAudiences.map((a) => {
+                  const cfg = AUDIENCES[a]
+                  const active = audience === a
+                  const label = !isCoordenador && a === 'section' ? `A minha classe (${SECTION_LABELS[mySection]})` : cfg.label
+                  return (
+                    <button
+                      key={a}
+                      type="button"
+                      onClick={() => chooseAudience(a)}
+                      className={`flex items-start gap-3 p-3 rounded-xl border text-left transition-all ${
+                        active ? 'border-blue-600 bg-blue-50 ring-1 ring-blue-600' : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'
+                      }`}
+                    >
+                      <div className={`p-1.5 rounded-lg shrink-0 ${active ? 'bg-blue-700 text-white' : 'bg-slate-100 text-slate-500'}`}>
+                        <cfg.icon className="w-4 h-4" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className={`text-sm font-semibold ${active ? 'text-blue-900' : 'text-slate-800'}`}>{label}</p>
+                        <p className="text-[11px] text-slate-500 leading-snug">{cfg.hint}</p>
+                      </div>
+                    </button>
+                  )
+                })}
+              </div>
 
-            {/* ── Audience grid ── */}
-            <div className="space-y-2">
-              <Label className="text-xs font-bold uppercase text-slate-500 tracking-wide">Destinatário</Label>
-
-              {isCoordenador && (
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                  <AudienceBtn active={audience==='global'} onClick={()=>setAudience('global')}
-                    icon={<Globe className="w-4 h-4"/>} label="Global (Todos)" color="sky"/>
-                  <AudienceBtn active={audience==='all_desbravadores'} onClick={()=>setAudience('all_desbravadores')}
-                    icon={<Globe className="w-4 h-4"/>} label="Todos os Desbravadores" color="emerald"/>
-                  <AudienceBtn active={audience==='all_dirigentes'} onClick={()=>setAudience('all_dirigentes')}
-                    icon={<ShieldCheck className="w-4 h-4"/>} label="Todos os Dirigentes" color="purple"/>
-                  <AudienceBtn active={audience==='dirigente_of_section'} onClick={()=>setAudience('dirigente_of_section')}
-                    icon={<ShieldCheck className="w-4 h-4"/>} label="Dirigentes de uma Classe" color="violet"/>
-                  <AudienceBtn active={audience==='specific_section'} onClick={()=>setAudience('specific_section')}
-                    icon={<BookOpen className="w-4 h-4"/>} label="Uma Classe" color="blue"/>
-                  <AudienceBtn active={audience==='specific_member'} onClick={()=>setAudience('specific_member')}
-                    icon={<UserRound className="w-4 h-4"/>} label="Membro específico" color="amber"/>
+              {/* Classe */}
+              {needsSection && isCoordenador && (
+                <div className="flex flex-wrap gap-2 animate-in fade-in slide-in-from-top-1 duration-200">
+                  {Object.entries(SECTION_LABELS).map(([val, label]) => (
+                    <button
+                      key={val}
+                      type="button"
+                      onClick={() => setSection(val)}
+                      className={`inline-flex items-center gap-2 h-9 px-3 rounded-full border text-xs font-semibold transition-colors ${
+                        section === val ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                      }`}
+                    >
+                      <span className={`h-2 w-2 rounded-full ${SECTION_DOT[val]}`} /> {label}
+                    </button>
+                  ))}
                 </div>
               )}
 
-              {!isCoordenador && (
-                <div className="grid grid-cols-2 gap-2">
-                  <AudienceBtn active={audience==='my_section_all'} onClick={()=>setAudience('my_section_all')}
-                    icon={<Users className="w-4 h-4"/>} label="Toda a minha classe" color="green"/>
-                  <AudienceBtn active={audience==='specific_member'} onClick={()=>setAudience('specific_member')}
-                    icon={<UserRound className="w-4 h-4"/>} label="Membro específico" color="amber"/>
+              {/* Membros */}
+              {audience === 'members' && (
+                <div className="rounded-xl border bg-white animate-in fade-in slide-in-from-top-1 duration-200">
+                  <div className="p-3 border-b space-y-2">
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                      <Input value={memberSearch} onChange={(e) => setMemberSearch(e.target.value)} placeholder="Pesquisar membro..." className="pl-9 h-9" />
+                    </div>
+                    {sectionsPresent.length > 1 && (
+                      <div className="flex flex-wrap gap-1.5">
+                        {['all', ...sectionsPresent].map((s) => (
+                          <button
+                            key={s}
+                            type="button"
+                            onClick={() => setMemberSectionFilter(s)}
+                            className={`inline-flex items-center gap-1.5 h-7 px-2.5 rounded-full border text-[11px] font-semibold ${
+                              memberSectionFilter === s ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                            }`}
+                          >
+                            {s !== 'all' && <span className={`h-1.5 w-1.5 rounded-full ${SECTION_DOT[s]}`} />}
+                            {s === 'all' ? 'Todas' : SECTION_LABELS[s]}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    <div className="flex items-center justify-between text-xs">
+                      <button type="button" onClick={toggleAllFiltered} className="font-semibold text-blue-700 hover:underline disabled:text-slate-400" disabled={filteredMembers.length === 0}>
+                        {allFilteredSelected ? 'Desmarcar visíveis' : `Selecionar visíveis (${filteredMembers.length})`}
+                      </button>
+                      <span className="text-slate-500">{memberIds.length} selecionado{memberIds.length === 1 ? '' : 's'}</span>
+                    </div>
+                  </div>
+                  <div className="max-h-64 overflow-y-auto divide-y">
+                    {filteredMembers.map((m) => {
+                      const checked = memberIds.includes(m.id)
+                      return (
+                        <button
+                          key={m.id}
+                          type="button"
+                          onClick={() => toggleMember(m.id)}
+                          className={`w-full flex items-center gap-3 px-3 py-2 text-left transition-colors ${checked ? 'bg-blue-50/70' : 'hover:bg-slate-50'}`}
+                        >
+                          <span className={`h-5 w-5 rounded-md border flex items-center justify-center shrink-0 ${checked ? 'bg-blue-700 border-blue-700 text-white' : 'border-slate-300 bg-white'}`}>
+                            {checked && <Check className="w-3.5 h-3.5" />}
+                          </span>
+                          <Avatar className="h-7 w-7">
+                            <AvatarImage src={m.avatar_url} className="object-cover" />
+                            <AvatarFallback className="text-[10px] font-bold bg-slate-200 text-slate-600">{m.full_name?.charAt(0)}</AvatarFallback>
+                          </Avatar>
+                          <span className="flex-1 min-w-0 text-sm text-slate-800 truncate">{m.full_name}</span>
+                          <span className="inline-flex items-center gap-1 text-[11px] text-slate-500 shrink-0">
+                            <span className={`h-1.5 w-1.5 rounded-full ${SECTION_DOT[m.section] || 'bg-slate-300'}`} />
+                            {SECTION_LABELS[m.section]}
+                            {m.role !== 'desbravador' && <span className="text-slate-400">· {ROLE_LABELS[m.role]}</span>}
+                          </span>
+                        </button>
+                      )
+                    })}
+                    {filteredMembers.length === 0 && (
+                      <p className="text-center text-sm text-slate-400 py-6">Nenhum membro encontrado.</p>
+                    )}
+                  </div>
+                  {memberIds.length > 0 && (
+                    <div className="p-3 border-t flex flex-wrap gap-1.5">
+                      {memberIds.map((id) => (
+                        <span key={id} className="inline-flex items-center gap-1 h-7 pl-2.5 pr-1 rounded-full bg-amber-50 border border-amber-200 text-[11px] font-semibold text-amber-800">
+                          {memberById.get(id)?.full_name || 'Membro'}
+                          <button type="button" onClick={() => toggleMember(id)} className="p-0.5 rounded-full hover:bg-amber-200" aria-label="Remover">
+                            <X className="w-3 h-3" />
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
-            </div>
 
-            {/* ── Section picker ── */}
-            {needsSectionPicker && (
-              <div className="space-y-1 animate-in fade-in slide-in-from-top-2 duration-200">
-                <Label className="text-xs font-bold uppercase text-slate-500">
-                  {audience === 'dirigente_of_section' ? 'Classe cuja liderança recebe' : 'Selecionar Classe'}
-                </Label>
-                <Select value={specificSection} onValueChange={setSpecificSection}>
-                  <SelectTrigger className="border-blue-200">
-                    <SelectValue placeholder="Escolhe uma classe..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {Object.entries(SECTION_LABELS).map(([val, label]) => (
-                      <SelectItem key={val} value={val}>{label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {audience === 'dirigente_of_section' && specificSection && (
-                  <p className="text-[10px] text-purple-600 font-medium">
-                    ℹ️ Apenas o dirigente responsável pelos {SECTION_LABELS[specificSection]} receberá este comunicado.
+              {/* Quem vai receber */}
+              <div className="rounded-xl bg-slate-50 border px-3 py-2.5">
+                <button
+                  type="button"
+                  onClick={() => setShowPreviewList((v) => !v)}
+                  disabled={recipients.length === 0}
+                  className="w-full flex items-center gap-2 text-sm text-left"
+                >
+                  <Users className="w-4 h-4 text-slate-500" />
+                  <span className="text-slate-600">
+                    {recipients.length === 0
+                      ? needsSection && !section ? 'Escolhe uma classe para ver quem recebe.' : audience === 'members' ? 'Ainda ninguém selecionado.' : 'Ninguém corresponde a este destinatário.'
+                      : <>Vai chegar a <strong className="text-slate-900">{recipients.length} {recipients.length === 1 ? 'pessoa' : 'pessoas'}</strong></>}
+                  </span>
+                  {recipients.length > 0 && (
+                    <>
+                      <span className="flex -space-x-2 ml-auto">
+                        {recipients.slice(0, 5).map((m) => (
+                          <Avatar key={m.id} className="h-6 w-6 ring-2 ring-slate-50">
+                            <AvatarImage src={m.avatar_url} className="object-cover" />
+                            <AvatarFallback className="text-[9px] font-bold bg-slate-200">{m.full_name?.charAt(0)}</AvatarFallback>
+                          </Avatar>
+                        ))}
+                      </span>
+                      {showPreviewList ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
+                    </>
+                  )}
+                </button>
+                {showPreviewList && recipients.length > 0 && (
+                  <p className="text-xs text-slate-500 mt-2 leading-relaxed">
+                    {recipients.map((m) => m.full_name).join(', ')}
                   </p>
                 )}
               </div>
-            )}
+            </section>
 
-            {/* ── Member picker ── */}
-            {needsMemberPicker && (
-              <div className="space-y-1 animate-in fade-in slide-in-from-top-2 duration-200">
-                <Label className="text-xs font-bold uppercase text-slate-500">Selecionar Membro</Label>
-                <Select value={specificMemberId} onValueChange={setSpecificMemberId}>
-                  <SelectTrigger className="border-amber-200">
-                    <SelectValue placeholder="Escolhe um membro..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {memberOptions.map(m => (
-                      <SelectItem key={m.id} value={m.id}>
-                        <span className="capitalize text-gray-400 text-xs mr-1">[{m.role}]</span>
-                        {m.full_name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+            {/* Passo 2: Mensagem */}
+            <section className="space-y-3">
+              <StepLabel n={2} label="Mensagem" />
+              <div className="space-y-1">
+                <Label htmlFor="ann-title" className="text-xs font-bold uppercase text-slate-500">Título</Label>
+                <Input
+                  id="ann-title"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  placeholder="Ex: Reunião esta sexta — compareçam todos!"
+                  maxLength={80}
+                  required
+                />
+                <p className="text-[10px] text-right text-gray-400">{title.length}/80</p>
               </div>
-            )}
-
-            {/* ── Summary chip ── */}
-            <AudienceSummaryChip
-              audience={audience}
-              specificSection={specificSection}
-              specificMemberId={specificMemberId}
-              memberOptions={memberOptions}
-              leadershipSection={profile.leadership_section || profile.section}
-            />
-
-            {/* ── Title ── */}
-            <div className="space-y-1">
-              <Label className="text-xs font-bold uppercase text-slate-500">Título</Label>
-              <Input
-                value={title}
-                onChange={e => setTitle(e.target.value)}
-                placeholder="Ex: Reunião esta sexta — compareçam todos!"
-                maxLength={80}
-                required
-              />
-              <p className="text-[10px] text-right text-gray-400">{title.length}/80</p>
-            </div>
-
-            {/* ── Message ── */}
-            <div className="space-y-1">
-              <Label className="text-xs font-bold uppercase text-slate-500">Mensagem</Label>
-              <Textarea
-                value={message}
-                onChange={e => setMessage(e.target.value)}
-                placeholder="Escreve aqui o comunicado detalhado..."
-                rows={5}
-                maxLength={600}
-                required
-              />
-              <p className="text-[10px] text-right text-gray-400">{message.length}/600</p>
-            </div>
+              <div className="space-y-1">
+                <Label htmlFor="ann-message" className="text-xs font-bold uppercase text-slate-500">Mensagem</Label>
+                <Textarea
+                  id="ann-message"
+                  value={message}
+                  onChange={(e) => setMessage(e.target.value)}
+                  placeholder="Escreve aqui o comunicado detalhado..."
+                  rows={5}
+                  maxLength={1000}
+                  required
+                />
+                <p className="text-[10px] text-right text-gray-400">{message.length}/1000</p>
+              </div>
+            </section>
 
             <Button
               type="submit"
               className="w-full bg-blue-800 hover:bg-blue-900 h-11 text-base font-bold shadow-md"
-              disabled={sending}
+              disabled={sending || recipients.length === 0 || !title.trim() || !message.trim()}
             >
               <Send className="w-4 h-4 mr-2" />
-              {sending ? 'A enviar...' : 'Enviar Comunicado'}
+              {sending ? 'A enviar...' : recipients.length > 0 ? `Enviar para ${recipients.length} ${recipients.length === 1 ? 'pessoa' : 'pessoas'}` : 'Enviar comunicado'}
             </Button>
           </form>
         </CardContent>
       </Card>
 
-      {/* ── History ── */}
+      {/* ── Enviados ── */}
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-base flex items-center gap-2">
             <Clock className="w-4 h-4 text-gray-500" />
             Enviados ({sentAnnouncements.length})
           </CardTitle>
+          <CardDescription>Vê quem já leu cada comunicado.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
           {sentAnnouncements.length === 0 && (
             <p className="text-center text-gray-400 py-6 text-sm">Ainda não enviaste nenhum comunicado.</p>
           )}
-          {sentAnnouncements.map(a => (
-            <div key={a.id} className="p-4 bg-slate-50 border border-slate-100 rounded-xl">
-              <div className="flex items-start justify-between gap-4">
-                <div className="space-y-1.5 flex-1">
-                  <div className="flex items-start justify-between gap-2">
-                    <p className="font-semibold text-sm text-gray-800">{a.title}</p>
-                    <HistoryBadge a={a} />
-                  </div>
-                  <p className="text-sm text-gray-600 leading-relaxed">{a.message}</p>
-                  <p className="text-[10px] text-gray-400">
-                    {new Date(a.created_at).toLocaleString('pt-PT', { dateStyle: 'short', timeStyle: 'short' })}
-                  </p>
-                </div>
-                <Button 
-                  size="icon" 
-                  variant="ghost" 
-                  className="h-8 w-8 text-gray-400 hover:text-red-600 hover:bg-red-50 shrink-0"
-                  onClick={() => handleDelete(a.id)}
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
+          {sentAnnouncements.map((a) => (
+            <SentAnnouncement
+              key={a.id}
+              announcement={a}
+              recipients={sentRecipients.filter((r) => r.announcement_id === a.id)}
+              memberById={memberById}
+            />
           ))}
         </CardContent>
       </Card>
@@ -416,65 +486,103 @@ export function AnnouncementPanel({ profile, members, sentAnnouncements }: Annou
   )
 }
 
-// ── Helper components ──
+// ── Componentes auxiliares ──
 
-const PALETTE: Record<string, { active: string; inactive: string }> = {
-  sky:      { active: 'bg-sky-600 text-white border-sky-400 shadow-sky-200',         inactive: 'bg-sky-50 text-sky-700 border-sky-100 hover:bg-sky-100' },
-  emerald: { active: 'bg-emerald-600 text-white border-emerald-400 shadow-emerald-200', inactive: 'bg-emerald-50 text-emerald-700 border-emerald-100 hover:bg-emerald-100' },
-  purple:  { active: 'bg-purple-600 text-white border-purple-400 shadow-purple-200',   inactive: 'bg-purple-50 text-purple-700 border-purple-100 hover:bg-purple-100' },
-  violet:  { active: 'bg-violet-600 text-white border-violet-400 shadow-violet-200',   inactive: 'bg-violet-50 text-violet-700 border-violet-100 hover:bg-violet-100' },
-  blue:    { active: 'bg-blue-600 text-white border-blue-400 shadow-blue-200',         inactive: 'bg-blue-50 text-blue-700 border-blue-100 hover:bg-blue-100' },
-  amber:   { active: 'bg-amber-500 text-white border-amber-400 shadow-amber-200',      inactive: 'bg-amber-50 text-amber-700 border-amber-100 hover:bg-amber-100' },
-  green:   { active: 'bg-green-600 text-white border-green-400 shadow-green-200',      inactive: 'bg-green-50 text-green-700 border-green-100 hover:bg-green-100' },
-}
-
-function AudienceBtn({ active, icon, label, onClick, color }: {
-  active: boolean; icon: React.ReactNode; label: string; onClick: () => void; color: string
-}) {
-  const p = PALETTE[color] ?? PALETTE.blue
+function StepLabel({ n, label }: { n: number; label: string }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border text-xs font-bold transition-all shadow-sm ${
-        active ? `${p.active} shadow-md` : p.inactive
-      }`}
-    >
-      {icon}
-      <span className="text-left leading-tight">{label}</span>
-    </button>
-  )
-}
-
-function AudienceSummaryChip({ audience, specificSection, specificMemberId, memberOptions, leadershipSection }: any) {
-  const configs: Record<AudienceType, { icon: string; label: string; color: string }> = {
-    global:              { icon: '🌎', label: 'Todos os Membros (Global)', color: 'text-sky-700 bg-sky-50 border-sky-200' },
-    all_desbravadores:   { icon: '🌍', label: 'Todos os Desbravadores', color: 'text-emerald-700 bg-emerald-50 border-emerald-200' },
-    all_dirigentes:      { icon: '🛡️', label: 'Todos os Dirigentes', color: 'text-purple-700 bg-purple-50 border-purple-200' },
-    dirigente_of_section:{ icon: '🛡️📚', label: `Dirigentes do${specificSection ? `s ${SECTION_LABELS[specificSection]}` : '...'}`, color: 'text-violet-700 bg-violet-50 border-violet-200' },
-    specific_section:    { icon: '📚', label: `Classe: ${SECTION_LABELS[specificSection] ?? '...'}`, color: 'text-blue-700 bg-blue-50 border-blue-200' },
-    my_section_all:      { icon: '⚜️', label: `Classe: ${SECTION_LABELS[leadershipSection] ?? leadershipSection}`, color: 'text-green-700 bg-green-50 border-green-200' },
-    specific_member:     { icon: '👤', label: memberOptions.find((m: any) => m.id === specificMemberId)?.full_name ?? 'Selecionar membro...', color: 'text-amber-700 bg-amber-50 border-amber-200' },
-  }
-  const c = configs[audience as AudienceType]
-  return (
-    <div className={`flex items-center gap-2 text-xs font-semibold px-3 py-2 rounded-lg border w-fit ${c.color}`}>
-      <span>{c.icon}</span>
-      <span>A enviar para: {c.label}</span>
+    <div className="flex items-center gap-2">
+      <span className="h-5 w-5 rounded-full bg-blue-700 text-white text-[11px] font-bold flex items-center justify-center">{n}</span>
+      <span className="text-xs font-bold uppercase text-slate-600 tracking-wide">{label}</span>
     </div>
   )
 }
 
-function HistoryBadge({ a }: { a: any }) {
-  if (a.target_user_id)
-    return <Badge variant="outline" className="text-[10px] shrink-0 border-amber-200 text-amber-700 bg-amber-50">👤 Pessoal</Badge>
-  if (a.target_role === 'dirigente' && a.target_section)
-    return <Badge variant="outline" className="text-[10px] shrink-0 border-violet-200 text-violet-700 bg-violet-50">🛡️📚 Dir. {SECTION_LABELS[a.target_section]}</Badge>
-  if (a.target_role === 'dirigente')
-    return <Badge variant="outline" className="text-[10px] shrink-0 border-purple-200 text-purple-700 bg-purple-50">🛡️ Dirigentes</Badge>
-  if (a.target_role === 'desbravador')
-    return <Badge variant="outline" className="text-[10px] shrink-0 border-emerald-200 text-emerald-700 bg-emerald-50">🌍 Todos</Badge>
-  if (a.target_section)
-    return <Badge variant="outline" className="text-[10px] shrink-0 border-blue-200 text-blue-700 bg-blue-50">📚 {SECTION_LABELS[a.target_section]}</Badge>
-  return <Badge variant="outline" className="text-[10px] shrink-0">🌍 Global</Badge>
+function SentAnnouncement({ announcement: a, recipients, memberById }: {
+  announcement: any
+  recipients: { user_id: string; read_at: string | null }[]
+  memberById: Map<string, any>
+}) {
+  const router = useRouter()
+  const [showReaders, setShowReaders] = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+
+  const total = recipients.length
+  const read = recipients.filter((r) => r.read_at).length
+  const pct = total ? Math.round((read / total) * 100) : 0
+  const badge = audienceLabel(a)
+  const nameOf = (id: string) => memberById.get(id)?.full_name || 'Membro'
+
+  const handleDelete = async () => {
+    setDeleting(true)
+    const { error } = await createClient().from('announcements').delete().eq('id', a.id)
+    setDeleting(false)
+    if (error) return toast.error('Erro ao apagar comunicado.')
+    toast.success('Comunicado apagado.')
+    router.refresh()
+  }
+
+  return (
+    <div className="p-4 bg-slate-50 border border-slate-100 rounded-xl space-y-2">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0 space-y-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="font-semibold text-sm text-gray-800">{a.title}</p>
+            <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${badge.cls}`}>{badge.text}</span>
+          </div>
+          <p className="text-sm text-gray-600 leading-relaxed whitespace-pre-line">{a.message}</p>
+          <p className="text-[10px] text-gray-400">
+            {new Date(a.created_at).toLocaleString('pt-PT', { dateStyle: 'short', timeStyle: 'short' })}
+          </p>
+        </div>
+        {confirmDelete ? (
+          <div className="flex items-center gap-1 shrink-0">
+            <Button size="sm" variant="ghost" className="h-8 text-xs" onClick={() => setConfirmDelete(false)} disabled={deleting}>Cancelar</Button>
+            <Button size="sm" className="h-8 text-xs bg-red-600 hover:bg-red-700" onClick={handleDelete} disabled={deleting}>
+              {deleting ? 'A apagar...' : 'Apagar'}
+            </Button>
+          </div>
+        ) : (
+          <Button
+            size="icon"
+            variant="ghost"
+            className="h-8 w-8 text-gray-400 hover:text-red-600 hover:bg-red-50 shrink-0"
+            onClick={() => setConfirmDelete(true)}
+            aria-label="Apagar comunicado"
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        )}
+      </div>
+
+      {total > 0 && (
+        <div>
+          <button type="button" onClick={() => setShowReaders((v) => !v)} className="w-full flex items-center gap-3 text-xs text-slate-500">
+            <Eye className="w-3.5 h-3.5" />
+            <span className="whitespace-nowrap">Lido por <strong className="text-slate-700">{read}</strong> de {total}</span>
+            <span className="flex-1 h-1.5 rounded-full bg-slate-200 overflow-hidden">
+              <span className="block h-full bg-emerald-500 rounded-full transition-all" style={{ width: `${pct}%` }} />
+            </span>
+            {showReaders ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+          </button>
+          {showReaders && (
+            <div className="grid sm:grid-cols-2 gap-3 mt-3 text-xs">
+              <div>
+                <p className="font-semibold text-emerald-700 mb-1">Leram ({read})</p>
+                <p className="text-slate-600 leading-relaxed">
+                  {recipients.filter((r) => r.read_at).map((r) => nameOf(r.user_id)).join(', ') || '—'}
+                </p>
+              </div>
+              <div>
+                <p className="font-semibold text-slate-500 mb-1">Ainda não leram ({total - read})</p>
+                <p className="text-slate-600 leading-relaxed">
+                  {recipients.filter((r) => !r.read_at).map((r) => nameOf(r.user_id)).join(', ') || '—'}
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
 }

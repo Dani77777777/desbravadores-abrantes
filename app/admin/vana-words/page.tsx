@@ -8,6 +8,7 @@ import { ChevronLeft, Plus, FlaskConical, BookOpen } from 'lucide-react'
 import Link from 'next/link'
 import { WordBankClient } from './WordBankClient'
 import { SessionsClient } from './SessionsClient'
+import { GameAvailabilityBanner } from '../components/GameAvailabilityBanner'
 
 export default async function VanaWordsAdminPage() {
   const supabase = await createClient()
@@ -48,15 +49,17 @@ export default async function VanaWordsAdminPage() {
   async function handleDeleteWord(formData: FormData) {
     'use server'
     const id = formData.get('id') as string
-    await deleteWordFromBank(id)
+    const result = await deleteWordFromBank(id)
     revalidatePath('/admin/vana-words')
+    return result
   }
 
   async function handleAddWord(formData: FormData) {
     'use server'
     const word = formData.get('word') as string
-    await addWordToBank(word)
+    const result = await addWordToBank(word)
     revalidatePath('/admin/vana-words')
+    return result
   }
 
   async function handleBulkAdd(formData: FormData) {
@@ -64,8 +67,9 @@ export default async function VanaWordsAdminPage() {
     const raw = formData.get('words') as string
     // Aceita separadores: vírgula, ponto e vírgula, nova linha
     const words = raw.split(/[,;\n]+/).map((w) => w.trim()).filter(Boolean)
-    await addWordsToBank(words)
+    const result = await addWordsToBank(words)
     revalidatePath('/admin/vana-words')
+    return result
   }
 
   const wordCount = wordBank?.length ?? 0
@@ -77,11 +81,13 @@ export default async function VanaWordsAdminPage() {
 
       <main className="max-w-5xl mx-auto px-4 py-8 space-y-10">
         <div className="flex items-center gap-3">
-          <Link href="/admin" className="text-slate-500 hover:text-slate-700">
+          <Link href="/admin?tab=games" className="text-slate-500 hover:text-slate-700" title="Voltar aos Jogos">
             <ChevronLeft className="w-5 h-5" />
           </Link>
           <h1 className="text-2xl font-bold text-gray-900">VanaWords — Admin</h1>
         </div>
+
+        <GameAvailabilityBanner gameId="vana-words" />
 
         {/* ── Sessões ─────────────────────────────────────────── */}
         <section className="space-y-4">

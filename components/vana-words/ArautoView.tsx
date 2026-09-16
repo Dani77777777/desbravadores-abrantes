@@ -101,7 +101,21 @@ export function ArautoView({ session: initSession, myPlayer, initialPlayers }: A
     setSubmitted(true)
     setHintInput('')
     pendingHint.current = true
-    const res = await submitHint(session.id, hint, hintNumber)
+
+    let res = await submitHint(session.id, hint, hintNumber)
+
+    // Se o servidor devolveu erro de autenticação, faz refresh da sessão e tenta novamente.
+    // Isto acontece quando o cookie de sessão expirou (comum quando há muitos jogadores
+    // em simultâneo e o middleware não conseguiu renovar a tempo).
+    if (res.error === 'Não autenticado') {
+      try {
+        await supabase.auth.refreshSession()
+        res = await submitHint(session.id, hint, hintNumber)
+      } catch {
+        // ignora erro de refresh, o res.error já está definido
+      }
+    }
+
     pendingHint.current = false
     if (res.error) {
       // Reverte o optimismo se o servidor recusar a dica
@@ -119,6 +133,7 @@ export function ArautoView({ session: initSession, myPlayer, initialPlayers }: A
       }))
     }
   }
+
 
   // Antes do jogo começar, o Arauto NÃO vê a grelha — vai ter com o host
   if (session.status === 'arauto_ready') {

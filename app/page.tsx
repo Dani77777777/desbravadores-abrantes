@@ -16,6 +16,7 @@ import { User, Trophy, Coins, Megaphone, ScanLine, History, ListChecks, CheckCir
 
 import { LandingPage } from '@/components/landing/LandingPage'
 import { getJAEvents, filterJAEventsForSection } from '@/utils/ja-agenda'
+import { GAMES, fetchGameSettings, gameVisibilityFor } from '@/utils/games'
 
 const SECTION_COLORS = {
   rebentos: 'bg-emerald-600',
@@ -41,7 +42,9 @@ export default async function Dashboard() {
   } = await supabase.auth.getUser()
 
   if (!user) {
-      return <LandingPage />
+      const gameSettings = await fetchGameSettings(supabase)
+      const gameVisibility = Object.fromEntries(GAMES.map((g) => [g.id, gameVisibilityFor(gameSettings[g.id], null)]))
+      return <LandingPage gameVisibility={gameVisibility} />
   }
 
   const { data: profile } = await supabase
@@ -50,31 +53,28 @@ export default async function Dashboard() {
     .eq('id', user.id)
     .single()
 
-  // Filter announcements based on role hierarchy
-  let announcementsQuery = supabase
-    .from('announcements')
-    .select('*')
-
-  const orFilter = [
-    `and(target_user_id.is.null,target_section.is.null,target_role.is.null)`,
-    `target_user_id.eq.${user.id}`,
-    `and(target_section.eq.${profile.section},target_role.is.null)`,
-    `and(target_section.eq.${profile.section},target_role.eq.${profile.role})`,
-    `and(target_section.is.null,target_role.eq.${profile.role})`,
-  ].join(',')
-  announcementsQuery = announcementsQuery.or(orFilter)
-
-  const { data: announcements } = await announcementsQuery
+  // Caixa de entrada: os destinatários de cada comunicado são gravados no envio
+  // (announcement_recipients), por isso mudar de classe não mistura avisos antigos.
+  const { data: inbox } = await supabase
+    .from('announcement_recipients')
+    .select('read_at, created_at, announcements!inner(id, title, message, created_at, target_user_id, target_section, target_role, audience, author_name)')
+    .eq('user_id', user.id)
     .order('created_at', { ascending: false })
-    .limit(10)
+    .limit(30)
+
+  const announcements = (inbox || []).map((row: any) => ({
+    ...row.announcements,
+    is_read: !!row.read_at,
+  }))
 
   // Só os avisos das últimas 3 semanas aparecem por defeito;
   // os mais antigos ficam atrás de um botão "Ver avisos antigos"
   const threeWeeksAgo = Date.now() - 21 * 24 * 60 * 60 * 1000
-  const recentAnnouncements = (announcements || []).filter(
+  const unreadAnnouncements = announcements.filter(a => !a.is_read).length
+  const recentAnnouncements = announcements.filter(
     a => new Date(a.created_at).getTime() >= threeWeeksAgo
   )
-  const olderAnnouncements = (announcements || []).filter(
+  const olderAnnouncements = announcements.filter(
     a => new Date(a.created_at).getTime() < threeWeeksAgo
   )
 
@@ -216,6 +216,9 @@ export default async function Dashboard() {
             <div className="space-y-4">
                 <h2 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
                     <Megaphone className="w-5 h-5 text-blue-700" /> Avisos e Novidades
+                    {unreadAnnouncements > 0 && (
+                      <Badge className="bg-red-600 text-white ml-1">{unreadAnnouncements} {unreadAnnouncements === 1 ? 'novo' : 'novos'}</Badge>
+                    )}
                 </h2>
                 <AnnouncementsFeed recent={recentAnnouncements} older={olderAnnouncements} />
             </div>

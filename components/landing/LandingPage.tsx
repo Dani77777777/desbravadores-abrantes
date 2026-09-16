@@ -7,8 +7,10 @@ import { Card, CardContent } from '@/components/ui/card'
 import Link from 'next/link'
 import { Navbar } from '@/components/layout/Navbar'
 import { Trophy, Users, Star, ArrowRight, Shield, Heart, Gamepad2 } from 'lucide-react'
+import { GAMES, type GameVisibility } from '@/utils/games'
 
-export function LandingPage() {
+/** gameVisibility: id do jogo → estado para visitantes sem conta (jogos escondidos não aparecem). */
+export function LandingPage({ gameVisibility = {} }: { gameVisibility?: Record<string, GameVisibility> }) {
   const router = useRouter()
 
   useEffect(() => {
@@ -180,37 +182,41 @@ export function LandingPage() {
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 max-w-3xl mx-auto mb-10">
-            {/* Vantur card */}
-            <div className="rounded-2xl overflow-hidden shadow-md hover:shadow-xl transition-shadow group">
-              <div className="h-24 bg-gradient-to-br from-amber-400 to-orange-600 flex items-center justify-center relative overflow-hidden">
-                <div className="bg-white p-3 rounded-2xl shadow-lg transform group-hover:rotate-6 transition-transform z-10">
-                  <img src="/images/vantur.png" alt="Vantur" className="w-10 h-10 object-contain" />
-                </div>
-              </div>
-              <div className="bg-white p-4">
-                <h3 className="font-bold text-stone-900 text-lg">VANTUR</h3>
-                <p className="text-stone-500 text-sm">Advinha palavras bíblicas. Solo, Mix ou Plex!</p>
-                <p className="text-xs text-amber-600 font-semibold mt-2 flex items-center gap-1">
-                  <span>🔒</span> Requer conta
-                </p>
-              </div>
-            </div>
+            {GAMES.filter((game) => gameVisibility[game.id] !== 'hidden').map((game) => {
+              const available = (gameVisibility[game.id] ?? 'available') === 'available'
 
-            {/* VanaQuest card */}
-            <div className="rounded-2xl overflow-hidden shadow-md hover:shadow-xl transition-shadow group">
-              <div className="h-24 bg-gradient-to-br from-blue-700 via-blue-900 to-yellow-500 flex items-center justify-center relative overflow-hidden">
-                <div className="bg-white p-3 rounded-2xl shadow-lg transform group-hover:rotate-6 transition-transform z-10">
-                  <img src="/images/VanaQuest.png" alt="VanaQuest" className="w-10 h-10 object-contain" />
+              return (
+                <div key={game.id} className="rounded-2xl overflow-hidden shadow-md hover:shadow-xl transition-shadow group">
+                  <div className={`h-24 bg-gradient-to-br ${game.color} flex items-center justify-center relative overflow-hidden ${available ? '' : 'grayscale'}`}>
+                    <div className="bg-white p-3 rounded-2xl shadow-lg transform group-hover:rotate-6 transition-transform z-10">
+                      <img src={game.image} alt={game.title} className="w-10 h-10 object-contain" />
+                    </div>
+                    {!available && (
+                      <span className="absolute top-2 right-2 z-20 rounded-full bg-black/40 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white">
+                        Indisponível
+                      </span>
+                    )}
+                  </div>
+                  <div className="bg-white p-4">
+                    <h3 className="font-bold text-stone-900 text-lg">{game.title}</h3>
+                    <p className="text-stone-500 text-sm">{game.description}</p>
+                    {!available ? (
+                      <p className="text-xs text-stone-500 font-semibold mt-2 flex items-center gap-1">
+                        <span>⛔</span> De momento não está disponível
+                      </p>
+                    ) : game.requiresAuth ? (
+                      <p className="text-xs text-amber-600 font-semibold mt-2 flex items-center gap-1">
+                        <span>🔒</span> Requer conta
+                      </p>
+                    ) : (
+                      <p className="text-xs text-green-600 font-semibold mt-2 flex items-center gap-1">
+                        <span>✓</span> Acessível a todos
+                      </p>
+                    )}
+                  </div>
                 </div>
-              </div>
-              <div className="bg-white p-4">
-                <h3 className="font-bold text-stone-900 text-lg">VanaQuest</h3>
-                <p className="text-stone-500 text-sm">Quiz ao vivo estilo Kahoot. Convidados também podem jogar!</p>
-                <p className="text-xs text-green-600 font-semibold mt-2 flex items-center gap-1">
-                  <span>✓</span> Acessível a todos
-                </p>
-              </div>
-            </div>
+              )
+            })}
           </div>
 
           <div className="text-center">
