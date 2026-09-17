@@ -5,7 +5,7 @@ import { QRCodeSVG } from 'qrcode.react'
 import { createClient } from '@/utils/supabase/client'
 import {
   AlertTriangle, Check, CheckCircle2, ChevronRight, Clock, Copy, Eye, Gift,
-  Maximize2, MonitorPlay, Play, Trophy, UserX, Users, XCircle,
+  Maximize2, MonitorPlay, Play, Trophy, UserX, Users, Volume2, VolumeX, XCircle,
 } from 'lucide-react'
 import { PlayerAvatar } from '@/components/vana-quest/PlayerAvatar'
 import { useWakeLock } from '@/components/vana-camp/useWakeLock'
@@ -61,6 +61,7 @@ export function HostControl({ sessionId, initialSession, rounds, siteUrl, server
   const [busy, setBusy] = useState(false)
   const [copied, setCopied] = useState(false)
   const [qrZoomed, setQrZoomed] = useState(false)
+  const [musicEnabled, setMusicEnabled] = useState(true)
   const [kickTarget, setKickTarget] = useState<EspadaPlayer | null>(null)
   const [awarding, setAwarding] = useState(false)
   const [awarded, setAwarded] = useState(!!initialSession.pointsAwardedAt)
@@ -74,7 +75,7 @@ export function HostControl({ sessionId, initialSession, rounds, siteUrl, server
   const joinUrl = `${siteUrl}/jogos/vana-espada?pin=${session.pin}`
   const presentUrl = `${siteUrl}/jogos/vana-espada/${sessionId}/present`
 
-  // ── Canal de comandos para o projetor (ampliar QR) ───────────────
+  // ── Canal de comandos para o projetor (QR ampliado, música) ──────
   useEffect(() => {
     const ch = supabase.channel(`espada-present-${sessionId}`, { config: { broadcast: { self: false } } })
     ch.subscribe()
@@ -85,6 +86,11 @@ export function HostControl({ sessionId, initialSession, rounds, siteUrl, server
   useEffect(() => {
     broadcastRef.current?.send({ type: 'broadcast', event: 'cmd', payload: { qrZoomed } })
   }, [qrZoomed])
+
+  // A música toca no projetor, não aqui: o anfitrião só decide se ela está ligada.
+  useEffect(() => {
+    broadcastRef.current?.send({ type: 'broadcast', event: 'cmd', payload: { musicEnabled } })
+  }, [musicEnabled])
 
   // ── Jogadores (realtime + carregamento inicial) ──────────────────
   useEffect(() => {
@@ -236,14 +242,27 @@ export function HostControl({ sessionId, initialSession, rounds, siteUrl, server
               <p className="font-bold text-sm truncate">VanaEspada · Onde Está?</p>
             </div>
           </div>
-          <a
-            href={presentUrl}
-            target="_blank"
-            rel="noopener"
-            className="hidden sm:flex items-center gap-1.5 bg-white/10 hover:bg-white/20 px-3 py-2 rounded-xl text-xs font-bold transition-colors"
-          >
-            <MonitorPlay className="w-3.5 h-3.5" /> Abrir apresentação
-          </a>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <button
+              onClick={() => setMusicEnabled((v) => !v)}
+              title={musicEnabled ? 'Música ligada (carrega para desligar)' : 'Música desligada (carrega para ligar)'}
+              className={`p-2 rounded-xl transition-colors ${
+                musicEnabled
+                  ? 'bg-green-500/20 text-green-300 hover:bg-green-500/30'
+                  : 'bg-white/10 text-white/50 hover:bg-white/20'
+              }`}
+            >
+              {musicEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
+            </button>
+            <a
+              href={presentUrl}
+              target="_blank"
+              rel="noopener"
+              className="hidden sm:flex items-center gap-1.5 bg-white/10 hover:bg-white/20 px-3 py-2 rounded-xl text-xs font-bold transition-colors"
+            >
+              <MonitorPlay className="w-3.5 h-3.5" /> Abrir apresentação
+            </a>
+          </div>
         </div>
 
         <div className="flex items-center gap-2 mt-3">
