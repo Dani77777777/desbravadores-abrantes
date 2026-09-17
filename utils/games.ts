@@ -91,6 +91,18 @@ export const GAMES: GameDefinition[] = [
     adminCoordOnly: false,
   },
   {
+    id: 'vana-espada',
+    title: 'VanaEspada',
+    description: 'Onde está este versículo? Saca a tua Bíblia e sê o mais rápido do JA!',
+    image: '/images/VanaEspada.png',
+    href: '/jogos/vana-espada',
+    loginHref: '/jogos/vana-espada',
+    adminHref: '/admin/vana-espada',
+    color: 'from-slate-800 via-sky-800 to-amber-400',
+    requiresAuth: false,
+    adminCoordOnly: false,
+  },
+  {
     id: 'vana-camp',
     title: 'VanaCamp: Infiltrados',
     description: 'Jogo de dedução e aventura do clube. Descobre quem sabota o acampamento antes que seja tarde.',

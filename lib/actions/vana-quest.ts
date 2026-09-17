@@ -5,10 +5,7 @@ import { createServiceClient } from '@/utils/supabase/service'
 import { revalidatePath } from 'next/cache'
 import { calcPoints, calcSessionRewards } from '@/utils/vana-quest'
 import { gameUnavailableError } from '@/utils/game-access'
-
-function generatePin(): string {
-  return String(Math.floor(100000 + Math.random() * 900000))
-}
+import { generatePin } from '@/utils/pin'
 
 // ── Admin: VanaQuest management ────────────────────────────────────
 
