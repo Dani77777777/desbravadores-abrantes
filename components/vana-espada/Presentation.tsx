@@ -155,7 +155,7 @@ export function Presentation({ sessionId, initialSession, siteUrl, serverNow }: 
         ) : (
           <div className="w-full h-full grid grid-cols-[1fr_auto] gap-10 items-center">
             <div className="space-y-6">
-              <img src="/images/VanaEspada.png" alt="" className="h-40 object-contain" />
+              <img src="/images/VanaEspada.jpeg" alt="" className="h-40 object-contain" />
               <div>
                 <p className="text-amber-300 text-2xl font-black uppercase tracking-[0.3em]">PIN do jogo</p>
                 <p className="text-white font-black tabular-nums tracking-[0.12em] leading-none"

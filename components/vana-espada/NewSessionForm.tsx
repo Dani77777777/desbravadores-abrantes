@@ -51,7 +51,7 @@ export function NewSessionForm({ verseCounts }: Props) {
       </Link>
 
       <div className="text-center">
-        <img src="/images/VanaEspada.png" alt="" className="w-20 h-20 object-contain mx-auto mb-3" />
+        <img src="/images/VanaEspada.jpeg" alt="" className="w-20 h-20 object-contain mx-auto mb-3" />
         <h1 className="text-3xl font-black text-white">Nova sessão</h1>
         <p className="text-sky-200 text-sm mt-1">
           &quot;Onde Está?&quot; — aparece um excerto e cada um adivinha a referência.

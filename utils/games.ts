@@ -94,7 +94,7 @@ export const GAMES: GameDefinition[] = [
     id: 'vana-espada',
     title: 'VanaEspada',
     description: 'Onde está este versículo? Saca a tua Bíblia e sê o mais rápido do JA!',
-    image: '/images/VanaEspada.png',
+    image: '/images/VanaEspada.jpeg',
     href: '/jogos/vana-espada',
     loginHref: '/jogos/vana-espada',
     adminHref: '/admin/vana-espada',

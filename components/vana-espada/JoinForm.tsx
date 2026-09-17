@@ -71,7 +71,7 @@ export function JoinForm({ user, profile, initialPin, canHost, activeSessions }:
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <img
-            src="/images/VanaEspada.png"
+            src="/images/VanaEspada.jpeg"
             alt="VanaEspada"
             className="w-24 h-24 object-contain mx-auto mb-4 drop-shadow-2xl"
           />

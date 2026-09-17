@@ -230,7 +230,7 @@ export function HostControl({ sessionId, initialSession, rounds, siteUrl, server
       <div className="px-4 pt-4 pb-3 border-b border-white/10 bg-black/20">
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-2 min-w-0">
-            <img src="/images/VanaEspada.png" alt="" className="w-7 h-7 object-contain flex-shrink-0" />
+            <img src="/images/VanaEspada.jpeg" alt="" className="w-7 h-7 object-contain flex-shrink-0" />
             <div className="min-w-0">
               <p className="text-amber-300 text-[10px] font-bold uppercase tracking-widest">Controlo</p>
               <p className="font-bold text-sm truncate">VanaEspada · Onde Está?</p>

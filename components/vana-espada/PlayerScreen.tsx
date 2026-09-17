@@ -241,7 +241,7 @@ export function PlayerScreen({ sessionId, userId, initialSession, serverNow, all
     return (
       <Shell>
         <div className="text-center space-y-4">
-          <img src="/images/VanaEspada.png" alt="" className="w-20 h-20 object-contain mx-auto" />
+          <img src="/images/VanaEspada.jpeg" alt="" className="w-20 h-20 object-contain mx-auto" />
           <div className="flex items-center justify-center gap-2.5 bg-white/10 rounded-2xl px-5 py-3">
             <PlayerAvatar
               name={me?.displayName || '?'}
@@ -433,7 +433,7 @@ export function PlayerScreen({ sessionId, userId, initialSession, serverNow, all
     return (
       <div className="min-h-[100dvh] bg-gradient-to-br from-slate-900 via-sky-950 to-slate-900 flex flex-col p-6 gap-5 overflow-y-auto">
         <div className="text-center pt-4">
-          <img src="/images/VanaEspada.png" alt="" className="w-14 h-14 object-contain mx-auto mb-2" />
+          <img src="/images/VanaEspada.jpeg" alt="" className="w-14 h-14 object-contain mx-auto mb-2" />
           <h2 className="text-2xl font-black text-white">Jogo terminado!</h2>
           <p className="text-sky-200 mt-1">{totalPoints} pontos</p>
         </div>
@@ -537,7 +537,7 @@ export function PlayerScreen({ sessionId, userId, initialSession, serverNow, all
     return (
       <Shell>
         <div className="text-center space-y-5 w-full max-w-sm">
-          <img src="/images/VanaEspada.png" alt="" className="w-20 h-20 object-contain mx-auto" />
+          <img src="/images/VanaEspada.jpeg" alt="" className="w-20 h-20 object-contain mx-auto" />
           <h1 className="text-3xl font-black text-white">🏆 Concluído!</h1>
 
           {donationDone === 'sent' && (
