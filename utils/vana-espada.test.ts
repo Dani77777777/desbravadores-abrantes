@@ -3,11 +3,13 @@
 import { describe, expect, test } from 'bun:test'
 import {
   MAX_LOCATE_POINTS,
+  answerTier,
   calcEspadaRewards,
   formatGuess,
   formatReference,
   pickRounds,
   scoreLocate,
+  summarizePlayerStrengths,
 } from './vana-espada'
 import { BIBLE_BOOKS, TOTAL_CHAPTERS, isValidChapter } from './bible-books'
 import type { EspadaReference } from '@/types/vana-espada'
@@ -225,21 +227,89 @@ describe('pickRounds', () => {
 })
 
 describe('calcEspadaRewards', () => {
-  test('escala os pontos do jogo antes de os converter em Gold', () => {
-    // 7340 pontos ≈ 73 Gold (e não 500, que seria o limite da sessão).
-    expect(calcEspadaRewards(7_340, 9_000)).toEqual({ gold: 73, xp: 146 })
+  test('tira a última casa: 4826 pontos dão 482 Gold e o dobro de XP', () => {
+    expect(calcEspadaRewards(4_826)).toEqual({ gold: 482, xp: 964 })
   })
 
-  test('respeita o limite da sessão, escalando todos na mesma proporção', () => {
-    const top = calcEspadaRewards(100_000, 100_000)
-    expect(top.gold).toBe(500)
-    expect(top.xp).toBe(1_000)
-
-    const metade = calcEspadaRewards(50_000, 100_000)
-    expect(metade.gold).toBe(250)
+  test('arredonda sempre para baixo', () => {
+    expect(calcEspadaRewards(4_829)).toEqual({ gold: 482, xp: 964 })
+    expect(calcEspadaRewards(9)).toEqual({ gold: 0, xp: 0 })
+    expect(calcEspadaRewards(10)).toEqual({ gold: 1, xp: 2 })
   })
 
-  test('pontos a zero não dão prémio', () => {
-    expect(calcEspadaRewards(0, 5_000)).toEqual({ gold: 0, xp: 0 })
+  test('não tem teto: um jogo perfeito de 15 rondas paga tudo', () => {
+    expect(calcEspadaRewards(15_000)).toEqual({ gold: 1_500, xp: 3_000 })
+  })
+
+  test('pontos a zero ou negativos não dão prémio', () => {
+    expect(calcEspadaRewards(0)).toEqual({ gold: 0, xp: 0 })
+    expect(calcEspadaRewards(-50)).toEqual({ gold: 0, xp: 0 })
+  })
+})
+
+describe('answerTier', () => {
+  const tierOf = (guess: { bookId: number; chapter: number | null; verse: number | null }) =>
+    answerTier(scoreLocate(guess, SL_23, 0, LIMIT).breakdown)
+
+  test('classifica do mais perto para o mais longe', () => {
+    expect(tierOf({ bookId: 19, chapter: 23, verse: 1 })).toBe('exact')
+    expect(tierOf({ bookId: 19, chapter: 23, verse: 4 })).toBe('chapter')
+    expect(tierOf({ bookId: 19, chapter: 23, verse: null })).toBe('chapter')
+    expect(tierOf({ bookId: 19, chapter: 30, verse: 1 })).toBe('book')
+    expect(tierOf({ bookId: 19, chapter: null, verse: null })).toBe('book') // "Só sei o livro"
+    expect(tierOf({ bookId: 20, chapter: 1, verse: 1 })).toBe('section')
+    expect(tierOf({ bookId: 1, chapter: 1, verse: 1 })).toBe('testament')
+    expect(tierOf({ bookId: 43, chapter: 3, verse: 16 })).toBe('miss')
+    expect(answerTier(null)).toBe('unanswered')
+  })
+})
+
+describe('summarizePlayerStrengths', () => {
+  // Duas rondas nos Evangelhos, uma nos profetas menores, uma nos poéticos.
+  const rounds = [
+    { id: 'r1', bookId: 43 }, // João (evangelhos)
+    { id: 'r2', bookId: 40 }, // Mateus (evangelhos)
+    { id: 'r3', bookId: 33 }, // Miqueias (profetas menores)
+    { id: 'r4', bookId: 19 }, // Salmos (poéticos)
+  ]
+  const exact = scoreLocate({ bookId: 43, chapter: 3, verse: 16 }, { bookId: 43, chapter: 3, verseStart: 16, verseEnd: 16 }, 3_000, LIMIT)
+  const book = scoreLocate({ bookId: 40, chapter: null, verse: null }, { bookId: 40, chapter: 6, verseStart: 33, verseEnd: 33 }, 9_000, LIMIT)
+  const miss = scoreLocate({ bookId: 43, chapter: 1, verse: 1 }, { bookId: 33, chapter: 6, verseStart: 8, verseEnd: 8 }, 20_000, LIMIT)
+
+  const s = summarizePlayerStrengths(rounds, [
+    { roundId: 'r1', breakdown: exact.breakdown, points: exact.points, elapsedMs: 3_000 },
+    { roundId: 'r2', breakdown: book.breakdown, points: book.points, elapsedMs: 9_000 },
+    { roundId: 'r3', breakdown: miss.breakdown, points: miss.points, elapsedMs: 20_000 },
+    // r4 sem resposta
+  ])
+
+  test('conta os níveis e as rondas sem resposta', () => {
+    expect(s.rounds).toBe(4)
+    expect(s.answered).toBe(3)
+    expect(s.tiers.exact).toBe(1)
+    expect(s.tiers.book).toBe(1)
+    expect(s.tiers.miss).toBe(1)
+    expect(s.tiers.unanswered).toBe(1)
+  })
+
+  test('a média de tempo só usa as rondas respondidas', () => {
+    expect(s.avgSeconds).toBe(10.7) // (3 + 9 + 20) / 3
+  })
+
+  test('encontra o ponto forte e as secções a treinar', () => {
+    expect(s.bySection[0].section).toBe('gospels')
+    expect(s.bySection[0].bookRight).toBe(2)
+    expect(s.strongest).toEqual(['gospels'])
+    // Sem resposta nos poéticos (0) e falhou os profetas menores (0): os dois a treinar.
+    expect(s.weakest).toHaveLength(2)
+    expect(s.weakest).toContain('minor_prophets')
+    expect(s.weakest).toContain('poetry')
+  })
+
+  test('sem rondas não rebenta', () => {
+    const empty = summarizePlayerStrengths([], [])
+    expect(empty.avgPoints).toBe(0)
+    expect(empty.avgSeconds).toBeNull()
+    expect(empty.bySection).toEqual([])
   })
 })

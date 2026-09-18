@@ -39,7 +39,7 @@ const MAX_LANES = 3      // filas de avatares antes de passar a contador "+N"
  * A Bíblia inteira numa barra: 66 livros com largura proporcional ao número de
  * capítulos, Antigo e Novo Testamento em linhas separadas e cores por secção.
  *
- * Os avatares caem como pins no sítio onde cada um apostou e uma coluna dourada
+ * Os avatares caem como pins no sítio onde cada um respondeu e uma coluna dourada
  * marca a resposta certa. É o momento alto da revelação, por isso a queda é
  * escalonada (40 ms entre pins) em vez de tudo aparecer de uma vez.
  *
@@ -124,7 +124,7 @@ function TestamentRow({
     .filter(Boolean) as { pin: EspadaPin; x: number; order: number }[]
 
   // Pins muito próximos empilham-se em vez de se sobreporem — mas com um tecto.
-  // Num JA a sério meia dúzia de pessoas apostam todas em Salmos 23, e uma pilha
+  // Num JA a sério meia dúzia de pessoas respondem todas Salmos 23, e uma pilha
   // sem limite crescia por cima do título e saía do ecrã. A partir da quarta fila
   // fica só um contador "+N".
   const lanes = new Map<number, number>()
@@ -144,12 +144,21 @@ function TestamentRow({
     }
   }
 
-  const maxLane = Math.max(
-    stacked.reduce((m, s) => Math.max(m, s.lane), 0),
-    overflow.size > 0 ? MAX_LANES : 0
-  )
   const answerX = showAnswer ? positionOf(answer.bookId, answer.chapter) : null
   const answerBook = getBook(answer.bookId)
+
+  // A estrela coroa a pilha de quem respondeu naquele sítio, em vez de ficar na
+  // primeira fila — aí tapava a cara de quem acertou em cheio.
+  const answerBucket = answerX != null ? Math.round(answerX / 2.5) : null
+  const starLane = answerBucket == null
+    ? 0
+    : Math.min(lanes.get(answerBucket) ?? 0, MAX_LANES) + (overflow.has(answerBucket) ? 1 : 0)
+
+  const maxLane = Math.max(
+    stacked.reduce((m, s) => Math.max(m, s.lane), 0),
+    overflow.size > 0 ? MAX_LANES : 0,
+    starLane
+  )
 
   return (
     <div>
@@ -202,8 +211,8 @@ function TestamentRow({
           {/* Marcador da resposta certa */}
           {answerX != null && revealed && (
             <div
-              className="absolute bottom-0 flex flex-col items-center espada-star"
-              style={{ left: `${answerX}%` }}
+              className="absolute flex flex-col items-center espada-star"
+              style={{ left: `${answerX}%`, bottom: `${starLane * LANE_HEIGHT}rem` }}
             >
               <span className="text-5xl leading-none drop-shadow-[0_0_18px_rgba(251,191,36,0.95)]">⭐</span>
               <span className="w-1 h-3 bg-amber-300" />
@@ -247,7 +256,10 @@ function TestamentRow({
             e o `px-8` acima desalinhava-a da barra. */}
         {answerX != null && revealed && answerBook && (
           <div className="relative w-full h-10 mt-2.5">
-            <div className="absolute espada-answer-label" style={{ left: `${answerX}%` }}>
+            <div
+              className="absolute espada-answer-label"
+              style={{ left: `${answerX}%`, transform: `translateX(${labelShift(answerX)})` }}
+            >
               <span className="inline-block bg-amber-300 text-slate-900 font-black text-xl px-4 py-1 rounded-lg shadow-lg whitespace-nowrap">
                 {answerBook.name} {answer.chapter}
               </span>
@@ -267,9 +279,10 @@ function TestamentRow({
           60% { transform: translate(-50%, 0) scale(1.35); opacity: 1; }
           100% { transform: translate(-50%, 0) scale(1); opacity: 1; }
         }
+        /* Só opacidade: o alinhamento horizontal vem do transform inline (labelShift). */
         @keyframes espadaLabel {
-          from { opacity: 0; transform: translate(-50%, -6px); }
-          to { opacity: 1; transform: translate(-50%, 0); }
+          from { opacity: 0; }
+          to { opacity: 1; }
         }
         .espada-pin {
           animation: espadaDrop 0.55s cubic-bezier(0.34, 1.3, 0.64, 1) both;
@@ -283,6 +296,16 @@ function TestamentRow({
       `}</style>
     </div>
   )
+}
+
+/**
+ * Alinhamento da etiqueta da resposta. Centrada, exceto junto às bordas: aí
+ * encosta para dentro, senão "Apocalipse 22" ou "Génesis 1" ficavam cortados.
+ */
+export function labelShift(xPct: number): string {
+  if (xPct < 8) return '0%'
+  if (xPct > 92) return '-100%'
+  return '-50%'
 }
 
 /**

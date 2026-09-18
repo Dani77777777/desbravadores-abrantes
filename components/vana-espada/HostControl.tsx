@@ -5,18 +5,17 @@ import { QRCodeSVG } from 'qrcode.react'
 import { createClient } from '@/utils/supabase/client'
 import {
   AlertTriangle, Check, CheckCircle2, ChevronRight, Clock, Copy, Eye, Gift,
-  Maximize2, MonitorPlay, Play, Trophy, UserX, Users, Volume2, VolumeX, XCircle,
+  Maximize2, MonitorPlay, Play, Trophy, UserX, Users, Volume2, VolumeX,
 } from 'lucide-react'
 import { PlayerAvatar } from '@/components/vana-quest/PlayerAvatar'
 import { useWakeLock } from '@/components/vana-camp/useWakeLock'
 import {
-  awardSessionPoints, beginRound, closeRound, finishSession,
-  kickPlayer, nextRound, showLeaderboard, startGame,
+  advanceAfterReveal, awardSessionPoints, beginRound, closeRound,
+  kickPlayer, nextRound, startGame,
 } from '@/lib/actions/vana-espada'
 import {
   calcEspadaRewards, formatGuess, formatReference, toAnswerViews, toEspadaPlayer,
 } from '@/utils/vana-espada'
-import { MAX_SESSION_GOLD, MAX_SESSION_XP } from '@/utils/vana-quest'
 import { ESPADA_STATUS_LABELS } from '@/utils/vana-espada-labels'
 import { getBook } from '@/utils/bible-books'
 import type { EspadaAnswerView, EspadaPlayer, EspadaSession } from '@/types/vana-espada'
@@ -184,7 +183,8 @@ export function HostControl({ sessionId, initialSession, rounds, siteUrl, server
       case 'round_active':
         return run(() => closeRound(sessionId, session.currentRound, true))
       case 'round_reveal':
-        return run(() => showLeaderboard(sessionId))
+        // Na última ronda salta a classificação e vai direto ao pódio.
+        return run(() => advanceAfterReveal(sessionId))
       case 'leaderboard':
         return run(() => nextRound(sessionId))
     }
@@ -218,16 +218,16 @@ export function HostControl({ sessionId, initialSession, rounds, siteUrl, server
   const answered = answers.filter((a) => a.answeredAt)
   const pending = answers.filter((a) => !a.answeredAt)
   const sortedPlayers = [...players].sort((a, b) => b.totalPoints - a.totalPoints)
-  const topPoints = sortedPlayers[0]?.totalPoints ?? 0
 
   const guests = players.filter((p) => p.isGuest)
   const guestsDecided = guests.filter((p) => p.rewardsRecipientId || p.rewardsSkipped).length
   const allGuestsDecided = guests.length === 0 || guestsDecided >= guests.length
 
   const isLastRound = session.currentRound >= session.totalRounds - 1
+  // Como no VanaQuest: depois da última revelação não há classificação — o pódio é-a.
   const nextLabel =
-    session.status === 'leaderboard' && isLastRound
-      ? '🏆 Terminar e ver pódio'
+    isLastRound && (session.status === 'round_reveal' || session.status === 'leaderboard')
+      ? '🏆 Revelar pódio final'
       : NEXT_LABEL[session.status] ?? ''
 
   return (
@@ -472,16 +472,15 @@ export function HostControl({ sessionId, initialSession, rounds, siteUrl, server
               </p>
             </div>
 
-            {session.status === 'finished' && calcEspadaRewards(topPoints, topPoints).gold >= MAX_SESSION_GOLD && (
+            {session.status === 'finished' && (
               <p className="text-sky-300/70 text-[11px] mb-2">
-                Prémios ajustados ao limite da sessão (máx. {MAX_SESSION_GOLD}🪙 / {MAX_SESSION_XP}⭐) — o 1.º recebe
-                o máximo e os restantes são escalados na mesma proporção.
+                Cada 10 pontos valem 1 Gold, e o XP é o dobro (4826 pts → 482🪙 + 964⭐).
               </p>
             )}
 
             <div className="space-y-2 max-h-[28rem] overflow-y-auto">
               {sortedPlayers.map((p, i) => {
-                const { gold, xp } = calcEspadaRewards(p.totalPoints, topPoints)
+                const { gold, xp } = calcEspadaRewards(p.totalPoints)
                 return (
                   <div
                     key={p.id}
@@ -684,14 +683,6 @@ export function HostControl({ sessionId, initialSession, rounds, siteUrl, server
               {nextLabel}
               {session.status !== 'lobby' && <ChevronRight className="w-5 h-5" />}
             </button>
-            {session.status !== 'lobby' && (
-              <button
-                onClick={() => run(() => finishSession(sessionId))}
-                className="w-full text-white/40 hover:text-white/70 text-xs font-bold py-1.5 flex items-center justify-center gap-1.5 transition-colors"
-              >
-                <XCircle className="w-3.5 h-3.5" /> Terminar sessão já
-              </button>
-            )}
           </div>
         </div>
       )}

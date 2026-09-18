@@ -177,14 +177,19 @@ export function useEspadaAudio(status: EspadaStatus, musicEnabled: boolean) {
   // ── Efeitos sonoros ────────────────────────────────────────────
   // Tocam sempre que o áudio esteja desbloqueado, mesmo com a música desligada:
   // o anfitrião desliga a música para falar por cima, não os avisos.
-  const playSfx = useCallback((name: keyof typeof SFX) => {
+  //
+  // Devolve uma promessa que resolve quando o som começou MESMO a tocar (true) ou
+  // quando não pôde tocar (false — áudio ainda bloqueado, ficheiro em falta…).
+  // Quem precisa de sincronizar uma animação com o som espera por ela.
+  const playSfx = useCallback((name: keyof typeof SFX): Promise<boolean> => {
     const el = sfxRef.current[name]
-    if (!el) return
+    if (!el) return Promise.resolve(false)
     try {
       el.currentTime = 0
-      el.play().catch(() => {})
+      return el.play().then(() => true, () => false)
     } catch {
       // Um SFX perdido não estraga o jogo.
+      return Promise.resolve(false)
     }
   }, [])
 

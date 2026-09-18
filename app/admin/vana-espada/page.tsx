@@ -1,11 +1,12 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import { ChevronLeft, History, Play, Sword, Users } from 'lucide-react'
+import { ChevronLeft, ChevronRight, History, Play, Sword, Users } from 'lucide-react'
 import { createClient } from '@/utils/supabase/server'
 import { Navbar } from '@/components/layout/Navbar'
 import { isAdminRole } from '@/utils/permissions'
 import { GameAvailabilityBanner } from '../components/GameAvailabilityBanner'
 import { VerseBankClient, type VerseRow } from './VerseBankClient'
+import { DeleteSessionButton } from '@/components/vana-espada/DeleteSessionButton'
 import { ESPADA_STATUS_LABELS } from '@/utils/vana-espada-labels'
 import type { EspadaStatus } from '@/types/vana-espada'
 
@@ -82,7 +83,12 @@ export default async function VanaEspadaAdminPage() {
                 const playerCount = (s.vanaespada_players as unknown as { count: number }[])?.[0]?.count ?? 0
                 const live = s.status !== 'finished'
                 return (
-                  <div key={s.id} className="p-4 flex items-center gap-4">
+                  <div key={s.id} className="pr-3 flex items-center gap-2 hover:bg-gray-50 transition-colors">
+                    <Link
+                      href={`/admin/vana-espada/sessions/${s.id}`}
+                      className="flex-1 min-w-0 flex items-center gap-4 p-4"
+                      title="Ver o relatório da sessão"
+                    >
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="font-mono font-bold text-gray-900">{s.pin}</span>
@@ -98,6 +104,8 @@ export default async function VanaEspadaAdminPage() {
                         <span>{new Date(s.created_at).toLocaleDateString('pt-PT')}</span>
                       </p>
                     </div>
+                    <ChevronRight className="w-4 h-4 text-gray-300 flex-shrink-0" />
+                    </Link>
                     {live && (
                       <Link
                         href={`/jogos/vana-espada/${s.id}/control`}
@@ -106,6 +114,7 @@ export default async function VanaEspadaAdminPage() {
                         Retomar →
                       </Link>
                     )}
+                    <DeleteSessionButton sessionId={s.id} pin={s.pin} live={live} />
                   </div>
                 )
               })}

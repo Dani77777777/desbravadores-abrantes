@@ -4,8 +4,7 @@
 // nunca envia pontos nem o tempo que demorou. Estas funções também são usadas no
 // cliente, mas só para mostrar os números que o servidor já calculou.
 
-import { getBook, MAX_VERSE, type BibleBook } from '@/utils/bible-books'
-import { calcSessionRewards } from '@/utils/vana-quest'
+import { getBook, MAX_VERSE, type BibleBook, type BibleSection } from '@/utils/bible-books'
 import type {
   EspadaAnswerJson,
   EspadaAnswerView,
@@ -205,21 +204,151 @@ export function shuffle<T>(items: T[], rng: () => number = Math.random): T[] {
 
 // ── Prémios ──────────────────────────────────────────────────────
 
-/**
- * Escala da conversão pontos → Gold. Uma ronda vale até 1000 pontos (no VanaQuest
- * uma pergunta vale ~10), por isso dividimos por 100 antes de reutilizar a fórmula
- * do VanaQuest — senão toda a gente batia no limite de 500 Gold à terceira ronda.
- */
-export const ESPADA_POINTS_PER_GOLD = 100
+/** Pontos do jogo por cada Gold. */
+export const ESPADA_POINTS_PER_GOLD = 10
 
-export function calcEspadaRewards(
-  totalPoints: number,
-  topPoints: number
-): { gold: number; xp: number } {
-  return calcSessionRewards(
-    Math.max(0, totalPoints) / ESPADA_POINTS_PER_GOLD,
-    Math.max(0, topPoints) / ESPADA_POINTS_PER_GOLD
-  )
+/**
+ * Pontos → Gold/XP: tira-se a última casa e o XP é o dobro.
+ *   4826 pts → 482 🪙 + 964 ⭐
+ *
+ * Arredonda para baixo (482,6 dá 482, não 483) e NÃO tem o teto de 500 Gold
+ * por sessão do VanaQuest, de propósito: este jogo é para premiar quem sabe
+ * mesmo a Bíblia, e a conta de cada um não pode depender de quanto fez o 1.º
+ * (com o teto, se o 1.º passasse os 5000 pontos todos levavam menos).
+ */
+export function calcEspadaRewards(totalPoints: number): { gold: number; xp: number } {
+  const gold = Math.floor(Math.max(0, totalPoints) / ESPADA_POINTS_PER_GOLD)
+  return { gold, xp: gold * 2 }
+}
+
+// ── Análise de desempenho (relatório da sessão) ──────────────────
+
+/** Quão perto ficou uma resposta, do melhor para o pior. */
+export type AnswerTier = 'exact' | 'chapter' | 'book' | 'section' | 'testament' | 'miss' | 'unanswered'
+
+export const ANSWER_TIERS: AnswerTier[] = ['exact', 'chapter', 'book', 'section', 'testament', 'miss', 'unanswered']
+
+/**
+ * Classifica uma resposta a partir do breakdown gravado no servidor.
+ * "Só sei o livro" conta como livro certo; capítulo certo sem versículo, como capítulo certo.
+ */
+export function answerTier(breakdown: LocateBreakdown | null | undefined): AnswerTier {
+  if (!breakdown) return 'unanswered'
+  switch (breakdown.bookMatch) {
+    case 'exact':
+      if (breakdown.chapterDelta === 0 && breakdown.verseDelta === 0) return 'exact'
+      if (breakdown.chapterDelta === 0) return 'chapter'
+      return 'book'
+    case 'section':
+      return 'section'
+    case 'testament':
+      return 'testament'
+    default:
+      return 'miss'
+  }
+}
+
+/** Acertou pelo menos o livro (referência exata, capítulo certo ou livro certo). */
+export function foundTheBook(tier: AnswerTier): boolean {
+  return tier === 'exact' || tier === 'chapter' || tier === 'book'
+}
+
+/** Média de pontos por ronda a partir da qual uma secção conta como ponto forte (= encontra o livro). */
+export const STRONG_SECTION_AVG = 600
+/** Abaixo disto, nem a secção costuma acertar — é uma secção a treinar. */
+export const WEAK_SECTION_AVG = 200
+
+export interface SectionScore {
+  section: BibleSection
+  rounds: number
+  bookRight: number
+  avgPoints: number
+}
+
+export interface PlayerStrengths {
+  /** Rondas em que o jogador estava na sessão. */
+  rounds: number
+  answered: number
+  tiers: Record<AnswerTier, number>
+  totalPoints: number
+  avgPoints: number
+  /** Tempo médio de resposta, só das rondas respondidas. */
+  avgSeconds: number | null
+  /** Da secção mais forte para a mais fraca. */
+  bySection: SectionScore[]
+  strongest: BibleSection[]
+  weakest: BibleSection[]
+}
+
+/**
+ * Pontos fortes de um jogador numa sessão, por secção da Bíblia.
+ *
+ * `rounds` são só as rondas em que o jogador já estava (quem entrou a meio não é
+ * penalizado pelas que perdeu). Uma ronda sem resposta conta como 0 pontos.
+ * A força de uma secção é a média de pontos por ronda: apanha também os quase
+ * (capítulo ao lado) que um simples "acertou/falhou" esconderia.
+ */
+export function summarizePlayerStrengths(
+  rounds: { id: string; bookId: number }[],
+  answers: { roundId: string; breakdown: LocateBreakdown | null; points: number; elapsedMs: number | null }[]
+): PlayerStrengths {
+  const byRound = new Map(answers.map((a) => [a.roundId, a]))
+  const tiers = Object.fromEntries(ANSWER_TIERS.map((t) => [t, 0])) as Record<AnswerTier, number>
+  const sections = new Map<BibleSection, { rounds: number; bookRight: number; points: number }>()
+
+  let totalPoints = 0
+  let answered = 0
+  let elapsedSum = 0
+  let elapsedCount = 0
+
+  for (const round of rounds) {
+    const answer = byRound.get(round.id)
+    const tier = answer ? answerTier(answer.breakdown) : 'unanswered'
+    const points = answer?.points ?? 0
+
+    tiers[tier] += 1
+    totalPoints += points
+    if (answer) {
+      answered += 1
+      if (answer.elapsedMs != null) {
+        elapsedSum += answer.elapsedMs
+        elapsedCount += 1
+      }
+    }
+
+    const section = getBook(round.bookId)?.section
+    if (!section) continue
+    const acc = sections.get(section) ?? { rounds: 0, bookRight: 0, points: 0 }
+    acc.rounds += 1
+    acc.points += points
+    if (foundTheBook(tier)) acc.bookRight += 1
+    sections.set(section, acc)
+  }
+
+  const bySection: SectionScore[] = [...sections.entries()]
+    .map(([section, s]) => ({
+      section,
+      rounds: s.rounds,
+      bookRight: s.bookRight,
+      avgPoints: Math.round(s.points / s.rounds),
+    }))
+    .sort((a, b) => b.avgPoints - a.avgPoints)
+
+  return {
+    rounds: rounds.length,
+    answered,
+    tiers,
+    totalPoints,
+    avgPoints: rounds.length ? Math.round(totalPoints / rounds.length) : 0,
+    avgSeconds: elapsedCount ? Math.round((elapsedSum / elapsedCount) / 100) / 10 : null,
+    bySection,
+    strongest: bySection.filter((s) => s.avgPoints >= STRONG_SECTION_AVG).slice(0, 3).map((s) => s.section),
+    weakest: bySection
+      .filter((s) => s.avgPoints < WEAK_SECTION_AVG)
+      .slice(-3)
+      .reverse()
+      .map((s) => s.section),
+  }
 }
 
 // ── Mapeamento snake_case (BD) → camelCase (UI) ──────────────────

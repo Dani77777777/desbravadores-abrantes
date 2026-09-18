@@ -13,7 +13,6 @@ import {
   formatReference,
   toEspadaPlayer,
 } from '@/utils/vana-espada'
-import { MAX_SESSION_GOLD, MAX_SESSION_XP } from '@/utils/vana-quest'
 import { SECTION_LABELS } from '@/utils/permissions'
 import type { EspadaGuess, EspadaPlayer, EspadaSession, LocateBreakdown } from '@/types/vana-espada'
 import { ReferencePicker } from './ReferencePicker'
@@ -52,7 +51,6 @@ export function PlayerScreen({ sessionId, userId, initialSession, serverNow, all
   const [rank, setRank] = useState<{ position: number; total: number; pointsToNext: number | null }>({
     position: 0, total: 0, pointsToNext: null,
   })
-  const [topPoints, setTopPoints] = useState(0)
 
   const isGuest = !userId
   const timeLeft = useCountdown(session.status === 'round_active' ? session.phaseEndsAt : null, now)
@@ -117,7 +115,6 @@ export function PlayerScreen({ sessionId, userId, initialSession, serverNow, all
       .order('total_points', { ascending: false })
       .then(({ data }) => {
         if (!data?.length) return
-        setTopPoints(Number(data[0].total_points) || 0)
         const index = data.findIndex((p) => p.id === playerId)
         if (index < 0) return
         const above = index > 0 ? Number(data[index - 1].total_points) || 0 : null
@@ -181,8 +178,7 @@ export function PlayerScreen({ sessionId, userId, initialSession, serverNow, all
   const [pendingRecipient, setPendingRecipient] = useState<Member | null>(null)
 
   const totalPoints = me?.totalPoints ?? 0
-  const { gold, xp } = calcEspadaRewards(totalPoints, topPoints)
-  const rewardsCapped = calcEspadaRewards(topPoints, topPoints).gold >= MAX_SESSION_GOLD
+  const { gold, xp } = calcEspadaRewards(totalPoints)
 
   const filteredMembers = allMembers
     .filter((m) => m.full_name.toLowerCase().includes(donationSearch.toLowerCase()))
@@ -442,11 +438,9 @@ export function PlayerScreen({ sessionId, userId, initialSession, serverNow, all
           <div className="text-center">
             <p className="text-sky-200 text-sm">Podes enviar ao teu Desbravador:</p>
             <p className="text-amber-300 font-black text-2xl mt-1">{gold} 🪙 + {xp} ⭐ XP</p>
-            {rewardsCapped && (
-              <p className="text-sky-300/70 text-[11px] mt-1">
-                Prémios ajustados ao limite da sessão (máx. {MAX_SESSION_GOLD} 🪙 / {MAX_SESSION_XP} ⭐)
-              </p>
-            )}
+            <p className="text-sky-300/70 text-[11px] mt-1">
+              Cada 10 pontos valem 1 Gold, e o XP é o dobro.
+            </p>
           </div>
 
           <input

@@ -303,9 +303,21 @@ export async function closeRound(
   return { ok: data === true }
 }
 
-/** round_reveal → leaderboard. */
-export async function showLeaderboard(sessionId: string): Promise<{ ok: boolean }> {
-  const { service } = await requireSessionHost(sessionId)
+/**
+ * round_reveal → leaderboard, ou — na última ronda — direto ao pódio (finished),
+ * como no VanaQuest: a classificação final é o próprio pódio.
+ */
+export async function advanceAfterReveal(
+  sessionId: string
+): Promise<{ ok: boolean; finished?: boolean }> {
+  const { session, service } = await requireSessionHost(sessionId)
+  if (session.status !== 'round_reveal') return { ok: false }
+
+  if (session.current_round >= session.total_rounds - 1) {
+    await service.rpc('vanaespada_finish_session', { p_session_id: sessionId })
+    return { ok: true, finished: true }
+  }
+
   const { data } = await service.rpc('vanaespada_show_leaderboard', { p_session_id: sessionId })
   return { ok: data === true }
 }
@@ -324,12 +336,8 @@ export async function nextRound(sessionId: string): Promise<{ ok: boolean; finis
   return { ok: true }
 }
 
-/** Terminar já (botão do anfitrião). */
-export async function finishSession(sessionId: string): Promise<{ ok: boolean }> {
-  const { service } = await requireSessionHost(sessionId)
-  await service.rpc('vanaespada_finish_session', { p_session_id: sessionId })
-  return { ok: true }
-}
+// Não há ação de "terminar já": cortar a sessão a meio deturpava o jogo. Uma
+// sessão só acaba depois da revelação da última ronda (advanceAfterReveal).
 
 // ── Responder ──────────────────────────────────────────────────────
 
@@ -554,10 +562,19 @@ export async function kickPlayer(
   }
 }
 
-export async function deleteSession(sessionId: string): Promise<void> {
-  const { service } = await requireSessionHost(sessionId)
-  await service.from('vanaespada_sessions').delete().eq('id', sessionId)
+/**
+ * Apaga uma sessão e, em cascata, as rondas, os jogadores e as respostas.
+ * Qualquer dirigente/coordenação pode (como no VanaQuest), não só quem a criou:
+ * serve para limpar sessões abandonadas na gestão. O Gold já atribuído fica —
+ * vive no points_log, não na sessão.
+ */
+export async function deleteSession(sessionId: string): Promise<{ ok: boolean; error?: string }> {
+  await requireHost()
+  const service = createServiceClient()
+  const { error } = await service.from('vanaespada_sessions').delete().eq('id', sessionId)
+  if (error) return { ok: false, error: error.message }
   revalidatePath('/admin/vana-espada')
+  return { ok: true }
 }
 
 export async function setRewardsRecipient(playerId: string, recipientId: string): Promise<void> {
@@ -588,17 +605,31 @@ export async function skipRewards(playerId: string): Promise<void> {
 export async function awardSessionPoints(
   sessionId: string
 ): Promise<{ ok: boolean; alreadyAwarded?: boolean; error?: string }> {
-  const { me, service } = await requireSessionHost(sessionId)
+  // Qualquer dirigente/coordenação, como no VanaQuest: os prémios também se atribuem
+  // no relatório da sessão (gestão), e nem sempre é quem conduziu o jogo.
+  const me = await requireHost()
+  const service = createServiceClient()
 
+  // Tranca primeiro, e só sessões terminadas: atribuir a meio do jogo trancava a
+  // sessão antes da última ronda contar.
   const { data: locked } = await service
     .from('vanaespada_sessions')
     .update({ points_awarded_at: new Date().toISOString() })
     .eq('id', sessionId)
+    .eq('status', 'finished')
     .is('points_awarded_at', null)
     .select('id')
     .maybeSingle()
 
-  if (!locked) return { ok: true, alreadyAwarded: true }
+  if (!locked) {
+    const { data: current } = await service
+      .from('vanaespada_sessions')
+      .select('status, points_awarded_at')
+      .eq('id', sessionId)
+      .maybeSingle()
+    if (current?.points_awarded_at) return { ok: true, alreadyAwarded: true }
+    return { ok: false, error: 'A sessão ainda não terminou.' }
+  }
 
   const { data: players } = await service
     .from('vanaespada_players')
@@ -607,8 +638,6 @@ export async function awardSessionPoints(
 
   if (!players?.length) return { ok: true }
 
-  const topPoints = Math.max(0, ...players.map((p) => Number(p.total_points) || 0))
-
   for (const player of players) {
     const totalPoints = Number(player.total_points) || 0
     if (totalPoints <= 0) continue
@@ -616,7 +645,7 @@ export async function awardSessionPoints(
     const targetUserId = player.is_guest ? player.rewards_recipient_id : player.user_id
     if (!targetUserId) continue
 
-    const { gold, xp } = calcEspadaRewards(totalPoints, topPoints)
+    const { gold, xp } = calcEspadaRewards(totalPoints)
     if (gold <= 0 && xp <= 0) continue
 
     await service.from('points_log').insert({

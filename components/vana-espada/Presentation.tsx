@@ -94,11 +94,8 @@ export function Presentation({ sessionId, initialSession, siteUrl, serverNow }: 
     prevStatusRef.current = session.status
 
     if (prev === 'round_active' && session.status === 'round_reveal') playSfx('roundEnd')
-    if (prev !== 'leaderboard' && session.status === 'leaderboard') {
-      // Pequeno atraso para o som cair em cima da animação dos números.
-      const t = setTimeout(() => playSfx('points'), 500)
-      return () => clearTimeout(t)
-    }
+    // O som dos pontos NÃO é tocado aqui: é a <Leaderboard> que o toca, no instante
+    // em que começa a contar, para som e números subirem juntos.
   }, [session.status, playSfx])
 
   // "Ploc" a cada resposta que entra — dá ritmo à contagem no projetor.
@@ -326,7 +323,7 @@ export function Presentation({ sessionId, initialSession, siteUrl, serverNow }: 
           {stage === 0 && (
             <>
               <p className="text-amber-300 font-black uppercase tracking-[0.3em] text-3xl text-center">
-                Onde apostou cada um
+                Onde cada um respondeu
               </p>
               <BibleBar pins={pins} answer={reference} />
               <div className="flex justify-center gap-4">
@@ -402,7 +399,13 @@ export function Presentation({ sessionId, initialSession, siteUrl, serverNow }: 
   // `key` = ronda: cada classificação monta de novo e volta a contar desde o total
   // de antes da ronda. Espera pelos jogadores para a contagem ter de onde partir.
   if (session.status === 'leaderboard' && players.length > 0) {
-    return <Leaderboard key={session.currentRound} players={players} />
+    return (
+      <Leaderboard
+        key={session.currentRound}
+        players={players}
+        onCountStart={() => playSfx('points')}
+      />
+    )
   }
 
   // ── PÓDIO ────────────────────────────────────────────────────────

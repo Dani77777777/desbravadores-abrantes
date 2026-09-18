@@ -12,8 +12,13 @@ const pointsBefore = (p: EspadaPlayer) => p.totalPoints - (p.lastRoundPoints ?? 
 // projetor 1080p; com 140 cabe o top 6 inteiro.
 const ROW_HEIGHT = 140
 const VISIBLE_ROWS = 6
-const COUNT_DURATION = 1800
-const COUNT_DELAY = 400 // pequena pausa antes de começar a contar
+// A contagem dura o mesmo que o som das moedas ("earning points", ~1 s): os
+// números param quando o som pára. O VanaQuest usa 1,8 s, mas com a subida
+// quase toda no início e o som a entrar depois, os pontos pareciam subir em silêncio.
+const COUNT_DURATION = 1100
+const COUNT_DELAY = 400      // pausa antes de começar, para o ecrã assentar
+const MAX_SOUND_WAIT = 350   // nunca esperar mais do que isto pelo som
+const SWAP_AFTER = 700       // troca de posições, contada desde o início da contagem
 
 /**
  * Classificação do projetor — o mesmo ecrã do VanaQuest.
@@ -23,8 +28,18 @@ const COUNT_DELAY = 400 // pequena pausa antes de começar a contar
  * deslizam para as posições novas: assim vê-se quem ultrapassou quem.
  *
  * Montar uma vez por ronda (`key` = ronda) para a animação arrancar do zero.
+ *
+ * `onCountStart` toca o som dos pontos e a contagem só começa quando ele
+ * começar de facto a tocar. Os dois arrancam juntos, seja qual for a latência
+ * do áudio no computador do projetor.
  */
-export function Leaderboard({ players }: { players: EspadaPlayer[] }) {
+export function Leaderboard({
+  players,
+  onCountStart,
+}: {
+  players: EspadaPlayer[]
+  onCountStart?: () => Promise<unknown> | void
+}) {
   const [animatedPoints, setAnimatedPoints] = useState<Record<string, number>>(() =>
     Object.fromEntries(players.map((p) => [p.id, pointsBefore(p)]))
   )
@@ -36,33 +51,47 @@ export function Leaderboard({ players }: { players: EspadaPlayer[] }) {
     players.map((p) => ({ id: p.id, start: pointsBefore(p), end: p.totalPoints }))
   )
 
+  // Lido só na montagem: a contagem arranca uma vez por ronda.
+  const onCountStartRef = useRef(onCountStart)
+
   useEffect(() => {
     const snapshot = snapshotRef.current
-    const startTime = performance.now() + COUNT_DELAY
-    let rafId: number
+    let cancelled = false
+    let rafId = 0
+    let swapTimer: ReturnType<typeof setTimeout> | undefined
 
-    const tick = (now: number) => {
-      const elapsed = now - startTime
-      if (elapsed < 0) {
-        rafId = requestAnimationFrame(tick)
-        return
+    const startCounting = () => {
+      if (cancelled) return
+      const startTime = performance.now()
+
+      const tick = (now: number) => {
+        const t = Math.min(1, (now - startTime) / COUNT_DURATION)
+        const eased = 1 - Math.pow(1 - t, 3)
+        setAnimatedPoints(
+          Object.fromEntries(snapshot.map((s) => [s.id, s.start + (s.end - s.start) * eased]))
+        )
+        if (t < 1) rafId = requestAnimationFrame(tick)
       }
-      const t = Math.min(1, elapsed / COUNT_DURATION)
-      const eased = 1 - Math.pow(1 - t, 3)
-      setAnimatedPoints(
-        Object.fromEntries(snapshot.map((s) => [s.id, s.start + (s.end - s.start) * eased]))
-      )
-      if (t < 1) rafId = requestAnimationFrame(tick)
-    }
-    rafId = requestAnimationFrame(tick)
+      rafId = requestAnimationFrame(tick)
 
-    // A troca de posições começa antes de a contagem acabar — a sobreposição
-    // dá mais vida do que esperar pelo fim.
-    const swapTimer = setTimeout(() => setShowFinalOrder(true), 1100)
+      // A troca de posições começa antes de a contagem acabar — a sobreposição
+      // dá mais vida do que esperar pelo fim.
+      swapTimer = setTimeout(() => { if (!cancelled) setShowFinalOrder(true) }, SWAP_AFTER)
+    }
+
+    const kickoff = setTimeout(async () => {
+      // Espera que o som comece mesmo a tocar (o play() só resolve aí), mas com
+      // tecto: sem áudio desbloqueado ou com o som em falta, conta na mesma.
+      const sound = onCountStartRef.current?.()
+      await Promise.race([sound, new Promise((r) => setTimeout(r, MAX_SOUND_WAIT))])
+      startCounting()
+    }, COUNT_DELAY)
 
     return () => {
+      cancelled = true
+      clearTimeout(kickoff)
+      if (swapTimer) clearTimeout(swapTimer)
       cancelAnimationFrame(rafId)
-      clearTimeout(swapTimer)
     }
   }, [])
 
