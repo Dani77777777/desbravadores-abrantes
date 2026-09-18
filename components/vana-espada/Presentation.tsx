@@ -2,9 +2,8 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { QRCodeSVG } from 'qrcode.react'
-import confetti from 'canvas-confetti'
 import { createClient } from '@/utils/supabase/client'
-import { ArrowDown, ArrowUp, Sword, Target, Users } from 'lucide-react'
+import { Sword, Target, Users } from 'lucide-react'
 import { PlayerAvatar } from '@/components/vana-quest/PlayerAvatar'
 import { useWakeLock } from '@/components/vana-camp/useWakeLock'
 import { closeRound } from '@/lib/actions/vana-espada'
@@ -16,6 +15,8 @@ import {
 import type { EspadaAnswerView, EspadaPlayer, EspadaSession } from '@/types/vana-espada'
 import { BibleBar, type EspadaPin } from './BibleBar'
 import { BookZoom } from './BookZoom'
+import { Leaderboard } from './Leaderboard'
+import { Podium } from './Podium'
 import { useEspadaAudio } from './useEspadaAudio'
 import { useCountdown, useEspadaSession, usePhaseWatchdog, useServerClock } from './useEspadaSession'
 
@@ -92,7 +93,6 @@ export function Presentation({ sessionId, initialSession, siteUrl, serverNow }: 
     const prev = prevStatusRef.current
     prevStatusRef.current = session.status
 
-    if (prev === 'round_ready' && session.status === 'round_active') playSfx('roundStart')
     if (prev === 'round_active' && session.status === 'round_reveal') playSfx('roundEnd')
     if (prev !== 'leaderboard' && session.status === 'leaderboard') {
       // Pequeno atraso para o som cair em cima da animação dos números.
@@ -135,19 +135,6 @@ export function Presentation({ sessionId, initialSession, siteUrl, serverNow }: 
     return () => timers.forEach(clearTimeout)
   }, [session.status, session.currentRound])
 
-  // ── Confettis no fim ─────────────────────────────────────────────
-  const firedRef = useRef(false)
-  useEffect(() => {
-    if (session.status !== 'finished' || firedRef.current) return
-    firedRef.current = true
-    const end = Date.now() + 2500
-    const tick = () => {
-      confetti({ particleCount: 4, spread: 70, origin: { x: Math.random(), y: 0.2 }, colors: ['#FBBF24', '#0EA5E9', '#FFFFFF'] })
-      if (Date.now() < end) requestAnimationFrame(tick)
-    }
-    tick()
-  }, [session.status])
-
   const pins: EspadaPin[] = useMemo(
     () => reveal.map((a) => ({
       playerId: a.playerId,
@@ -158,20 +145,6 @@ export function Presentation({ sessionId, initialSession, siteUrl, serverNow }: 
     })),
     [reveal]
   )
-
-  const standings = useMemo(() => {
-    const sorted = [...players].sort((a, b) => b.totalPoints - a.totalPoints)
-    // A posição anterior sai dos pontos menos o que se ganhou nesta ronda.
-    const before = [...players]
-      .map((p) => ({ id: p.id, points: p.totalPoints - (p.lastRoundPoints ?? 0) }))
-      .sort((a, b) => b.points - a.points)
-    const previousRank = new Map(before.map((p, i) => [p.id, i]))
-    return sorted.map((p, i) => ({
-      player: p,
-      position: i + 1,
-      change: (previousRank.get(p.id) ?? i) - i,
-    }))
-  }, [players])
 
   // ── LOBBY ────────────────────────────────────────────────────────
   if (session.status === 'lobby') {
@@ -426,89 +399,15 @@ export function Presentation({ sessionId, initialSession, siteUrl, serverNow }: 
   }
 
   // ── CLASSIFICAÇÃO ────────────────────────────────────────────────
-  if (session.status === 'leaderboard') {
-    return (
-      <Stage>
-        <div className="w-full h-full flex flex-col">
-          <p className="text-amber-300 font-black uppercase tracking-[0.3em] text-3xl text-center mb-6 flex-shrink-0">
-            Classificação
-          </p>
-          <div className="flex-1 flex flex-col justify-center gap-3 min-h-0">
-            {standings.slice(0, 5).map(({ player, position, change }) => (
-              <div
-                key={player.id}
-                className={`flex items-center gap-5 rounded-2xl px-6 py-4 border ${
-                  position === 1 ? 'bg-amber-400/20 border-amber-400/40' : 'bg-white/5 border-white/10'
-                }`}
-              >
-                <span className="text-4xl font-black text-white/50 tabular-nums w-14">{position}º</span>
-                <ChangeArrow change={change} />
-                <PlayerAvatar
-                  name={player.displayName}
-                  avatarUrl={player.avatarUrl}
-                  className="w-16 h-16"
-                  textClassName="text-2xl"
-                  fallbackBg="bg-amber-500/40"
-                />
-                <span className="text-white font-black text-4xl flex-1 truncate">{player.displayName}</span>
-                {player.lastRoundPoints != null && player.lastRoundPoints > 0 && (
-                  <span className="text-green-400 font-black text-2xl tabular-nums">+{player.lastRoundPoints}</span>
-                )}
-                <span className="text-amber-300 font-black text-5xl tabular-nums">{player.totalPoints}</span>
-              </div>
-            ))}
-          </div>
-          {players.length > 5 && (
-            <p className="text-white/30 text-center text-xl font-bold flex-shrink-0">
-              e mais {players.length - 5} a jogar
-            </p>
-          )}
-        </div>
-      </Stage>
-    )
+  // `key` = ronda: cada classificação monta de novo e volta a contar desde o total
+  // de antes da ronda. Espera pelos jogadores para a contagem ter de onde partir.
+  if (session.status === 'leaderboard' && players.length > 0) {
+    return <Leaderboard key={session.currentRound} players={players} />
   }
 
   // ── PÓDIO ────────────────────────────────────────────────────────
-  if (session.status === 'finished') {
-    const podium = standings.slice(0, 3)
-    const order = [1, 0, 2] // 2.º, 1.º, 3.º — o vencedor ao centro
-    const heights = ['h-52', 'h-72', 'h-40']
-
-    return (
-      <Stage>
-        <div className="w-full h-full flex flex-col items-center justify-center gap-8">
-          <p className="text-white font-black" style={{ fontSize: 'clamp(2.5rem, 6vw, 5rem)' }}>
-            🏆 Pódio final
-          </p>
-          <div className="flex items-end justify-center gap-6">
-            {order.map((idx, i) => {
-              const entry = podium[idx]
-              if (!entry) return null
-              return (
-                <div key={entry.player.id} className="flex flex-col items-center gap-3">
-                  <PlayerAvatar
-                    name={entry.player.displayName}
-                    avatarUrl={entry.player.avatarUrl}
-                    className={idx === 0 ? 'w-32 h-32 ring-4 ring-amber-300' : 'w-24 h-24 ring-2 ring-white/40'}
-                    textClassName={idx === 0 ? 'text-4xl' : 'text-3xl'}
-                    fallbackBg="bg-amber-500/40"
-                  />
-                  <p className="text-white font-black text-3xl">{entry.player.displayName}</p>
-                  <p className="text-amber-300 font-black text-4xl tabular-nums">{entry.player.totalPoints}</p>
-                  <div
-                    className={`${heights[i]} w-44 rounded-t-2xl flex items-start justify-center pt-3 ${
-                      idx === 0 ? 'bg-amber-400' : idx === 1 ? 'bg-slate-300' : 'bg-amber-700'
-                    }`}
-                  >
-                    <span className="text-5xl">{['🥇', '🥈', '🥉'][idx]}</span>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        </div>
-      </Stage>
-    )
+  if (session.status === 'finished' && players.length > 0) {
+    return <Podium players={players} />
   }
 
   return <Stage><Sword className="w-24 h-24 text-amber-300 animate-pulse" /></Stage>
@@ -536,17 +435,6 @@ function StatChip({
       <span className="font-bold text-lg opacity-70">de {total}</span>
       <span className="font-black uppercase tracking-widest text-sm">{label}</span>
     </div>
-  )
-}
-
-function ChangeArrow({ change }: { change: number }) {
-  if (change === 0) return <span className="w-10 text-white/20 text-2xl text-center">—</span>
-  const up = change > 0
-  return (
-    <span className={`w-10 flex items-center gap-0.5 font-black text-xl ${up ? 'text-green-400' : 'text-red-400'}`}>
-      {up ? <ArrowUp className="w-5 h-5" /> : <ArrowDown className="w-5 h-5" />}
-      {Math.abs(change)}
-    </span>
   )
 }
 

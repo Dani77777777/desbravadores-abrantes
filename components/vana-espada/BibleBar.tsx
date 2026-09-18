@@ -31,8 +31,9 @@ interface Props {
 // Medidas pensadas para um projetor a encher um salão, não para um portátil:
 // a barra tem de se ler do fundo da sala.
 const BAR_HEIGHT = '4.5rem'
-const LANE_HEIGHT = 4.25 // rem por fila de pins empilhados
+const LANE_HEIGHT = 3.75 // rem por fila de pins empilhados
 const PIN_BASE = 3.25    // rem de altura da primeira fila (avatar + haste)
+const MAX_LANES = 3      // filas de avatares antes de passar a contador "+N"
 
 /**
  * A Bíblia inteira numa barra: 66 livros com largura proporcional ao número de
@@ -122,17 +123,31 @@ function TestamentRow({
     })
     .filter(Boolean) as { pin: EspadaPin; x: number; order: number }[]
 
-  // Pins muito próximos empilham-se em vez de se sobreporem.
+  // Pins muito próximos empilham-se em vez de se sobreporem — mas com um tecto.
+  // Num JA a sério meia dúzia de pessoas apostam todas em Salmos 23, e uma pilha
+  // sem limite crescia por cima do título e saía do ecrã. A partir da quarta fila
+  // fica só um contador "+N".
   const lanes = new Map<number, number>()
   const stacked: { pin: EspadaPin; x: number; order: number; lane: number }[] = []
+  const overflow = new Map<number, { x: number; count: number }>()
+
   for (const item of [...placed].sort((a, b) => a.x - b.x)) {
     const bucket = Math.round(item.x / 2.5)
     const lane = lanes.get(bucket) ?? 0
     lanes.set(bucket, lane + 1)
-    stacked.push({ ...item, lane })
+
+    if (lane < MAX_LANES) {
+      stacked.push({ ...item, lane })
+    } else {
+      const current = overflow.get(bucket)
+      overflow.set(bucket, { x: current?.x ?? item.x, count: (current?.count ?? 0) + 1 })
+    }
   }
 
-  const maxLane = stacked.reduce((m, s) => Math.max(m, s.lane), 0)
+  const maxLane = Math.max(
+    stacked.reduce((m, s) => Math.max(m, s.lane), 0),
+    overflow.size > 0 ? MAX_LANES : 0
+  )
   const answerX = showAnswer ? positionOf(answer.bookId, answer.chapter) : null
   const answerBook = getBook(answer.bookId)
 
@@ -162,11 +177,25 @@ function TestamentRow({
                 <PlayerAvatar
                   name={pin.displayName}
                   avatarUrl={pin.avatarUrl}
-                  className="w-14 h-14 ring-4 ring-white/85 shadow-[0_6px_16px_rgba(0,0,0,0.55)]"
-                  textClassName="text-xl"
+                  className="w-12 h-12 ring-4 ring-white/85 shadow-[0_6px_16px_rgba(0,0,0,0.55)]"
+                  textClassName="text-lg"
                   fallbackBg="bg-slate-700"
                 />
                 <span className="w-0.5 h-3 bg-white/60" />
+              </div>
+            ))}
+
+          {/* Quem não coube nas filas visíveis */}
+          {revealed &&
+            [...overflow.entries()].map(([bucket, { x, count }]) => (
+              <div
+                key={`mais-${bucket}`}
+                className="absolute espada-pin"
+                style={{ left: `${x}%`, bottom: `${MAX_LANES * LANE_HEIGHT}rem`, animationDelay: '600ms' }}
+              >
+                <span className="flex items-center justify-center w-12 h-12 rounded-full bg-white/15 border-2 border-white/40 text-white font-black text-lg shadow-lg">
+                  +{count}
+                </span>
               </div>
             ))}
 

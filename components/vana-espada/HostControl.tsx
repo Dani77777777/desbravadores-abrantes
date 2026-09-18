@@ -372,24 +372,17 @@ export function HostControl({ sessionId, initialSession, rounds, siteUrl, server
           </>
         )}
 
-        {/* ANTES DA RONDA */}
+        {/* ANTES DA RONDA — o texto chega ao anfitrião antes de ir ao projetor */}
         {session.status === 'round_ready' && currentRound && (
-          <div className="bg-white/10 rounded-3xl p-5 border border-white/10 space-y-2 text-center">
-            <p className="text-amber-300 text-[10px] font-black uppercase tracking-widest">
-              Ronda {session.currentRound + 1} de {session.totalRounds}
-            </p>
-            <p className="text-white font-black text-2xl">
-              {formatReference({
-                bookId: currentRound.book_id,
-                chapter: currentRound.chapter,
-                verseStart: currentRound.verse_start,
-                verseEnd: currentRound.verse_end,
-              })}
-            </p>
-            <p className="text-white/50 text-xs">
-              Só tu vês a resposta. Começa em {Math.ceil(readyLeft)}s.
-            </p>
-          </div>
+          <VerseCard
+            round={currentRound}
+            label={`A seguir · ronda ${session.currentRound + 1} de ${session.totalRounds}`}
+            footer={
+              <p className="text-white/40 text-xs">
+                Vai lendo — aparece no projetor dentro de {Math.ceil(readyLeft)}s.
+              </p>
+            }
+          />
         )}
 
         {/* DURANTE E DEPOIS DA RONDA */}
@@ -419,21 +412,7 @@ export function HostControl({ sessionId, initialSession, rounds, siteUrl, server
               </p>
             </div>
 
-            {/* Resposta certa + excerto, para o anfitrião acompanhar */}
-            <div className="bg-amber-400/10 border border-amber-400/30 rounded-3xl p-4 space-y-2">
-              <p className="text-amber-300 text-[10px] font-black uppercase tracking-widest">Resposta certa</p>
-              <p className="text-white font-black text-2xl">
-                {formatReference({
-                  bookId: currentRound.book_id,
-                  chapter: currentRound.chapter,
-                  verseStart: currentRound.verse_start,
-                  verseEnd: currentRound.verse_end,
-                })}
-              </p>
-              {currentRound.excerpt && (
-                <p className="text-white/70 text-sm italic leading-snug">&ldquo;{currentRound.excerpt}&rdquo;</p>
-              )}
-            </div>
+            <VerseCard round={currentRound} label="Versículo desta ronda" />
 
             {/* ── O que cada um respondeu, ao vivo ── */}
             <div className="bg-white/10 rounded-3xl p-4 border border-white/10">
@@ -716,6 +695,55 @@ export function HostControl({ sessionId, initialSession, rounds, siteUrl, server
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+/**
+ * O cartão do versículo no painel do anfitrião.
+ *
+ * O TEXTO vem primeiro e grande, para se poder ir lendo em voz alta antes de
+ * aparecer no projetor; a referência — que é a resposta — fica em baixo, mais
+ * discreta. É a mesma ideia do VanaQuest, onde o painel mostra a pergunta e as
+ * opções à frente e a certa fica só assinalada.
+ */
+function VerseCard({
+  round, label, footer,
+}: {
+  round: HostRound
+  label: string
+  footer?: React.ReactNode
+}) {
+  return (
+    <div className="bg-white/10 rounded-3xl p-5 border border-white/10 space-y-3">
+      <p className="text-amber-300 text-[10px] font-black uppercase tracking-widest">{label}</p>
+
+      {round.excerpt ? (
+        <p className="text-white font-semibold text-lg leading-snug italic">
+          &ldquo;{round.excerpt}&rdquo;
+        </p>
+      ) : (
+        <p className="text-white/40 text-sm italic">Este versículo não tem texto.</p>
+      )}
+      {round.translation && (
+        <p className="text-white/35 text-[11px] font-bold uppercase tracking-widest">— {round.translation}</p>
+      )}
+
+      <div className="flex items-center gap-2 pt-2.5 border-t border-white/10">
+        <span className="text-white/30 text-[10px] font-black uppercase tracking-widest">Resposta</span>
+        <span className="text-amber-300 font-black text-base">
+          {formatReference({
+            bookId: round.book_id,
+            chapter: round.chapter,
+            verseStart: round.verse_start,
+            verseEnd: round.verse_end,
+          })}
+        </span>
+        <Clock className="w-3 h-3 text-white/25 ml-auto" />
+        <span className="text-white/30 text-[11px] font-bold tabular-nums">{round.time_seconds}s</span>
+      </div>
+
+      {footer}
     </div>
   )
 }

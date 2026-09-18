@@ -26,9 +26,11 @@ const TRACKS = {
   victory: sound('VanaQuest - Victory Celebration.mp3'),
 }
 
+// O "lightning" do VanaQuest fica de fora de propósito: ali anuncia uma pergunta
+// a dobrar ou a triplicar, e aqui todas as rondas valem o mesmo. Tocá-lo a cada
+// ronda só gastava o efeito e prometia uma coisa que não existe.
 const SFX = {
   answered: sound('player-answered.mp3'),
-  roundStart: sound('lightning - x2 and x3 points.mp3'),
   roundEnd: sound('theend.mp3'),
   points: sound('earning points.mp3'),
 }
@@ -58,7 +60,6 @@ export function useEspadaAudio(status: EspadaStatus, musicEnabled: boolean) {
   const currentTrackRef = useRef<string>('')
   const sfxRef = useRef<Record<keyof typeof SFX, HTMLAudioElement | null>>({
     answered: null,
-    roundStart: null,
     roundEnd: null,
     points: null,
   })
@@ -92,7 +93,6 @@ export function useEspadaAudio(status: EspadaStatus, musicEnabled: boolean) {
 
     sfxRef.current = {
       answered: make(SFX.answered, 'sfx-respondeu', 0.6),
-      roundStart: make(SFX.roundStart, 'sfx-arranque', 0.7),
       roundEnd: make(SFX.roundEnd, 'sfx-fim-da-ronda', 0.7),
       points: make(SFX.points, 'sfx-pontos', 0.7),
     }
