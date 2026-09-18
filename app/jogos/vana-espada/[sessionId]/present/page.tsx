@@ -2,6 +2,7 @@ import { createClient } from '@/utils/supabase/server'
 import { Presentation } from '@/components/vana-espada/Presentation'
 import { getSiteUrl } from '@/utils/site-url'
 import { toEspadaSession } from '@/utils/vana-espada'
+import PresentationReceiver from '@/components/presentation-effects/PresentationReceiver'
 
 // Ecrã do projetor: público por natureza (só existe para sessões que alguém com
 // acesso ao jogo criou). Não mostra nada de secreto — o excerto e os palpites
@@ -31,11 +32,15 @@ export default async function PresentPage({ params }: { params: Promise<{ sessio
   const siteUrl = await getSiteUrl()
 
   return (
-    <Presentation
-      sessionId={sessionId}
-      initialSession={toEspadaSession(session)}
-      siteUrl={siteUrl}
-      serverNow={serverNow}
-    />
+    <>
+      <Presentation
+        sessionId={sessionId}
+        initialSession={toEspadaSession(session)}
+        siteUrl={siteUrl}
+        serverNow={serverNow}
+      />
+      {/* Desenha por cima do jogo os efeitos que o anfitrião dispara no painel de controlo */}
+      <PresentationReceiver />
+    </>
   )
 }

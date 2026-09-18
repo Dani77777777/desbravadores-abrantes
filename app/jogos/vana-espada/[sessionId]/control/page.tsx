@@ -5,6 +5,7 @@ import { HostControl, type HostRound } from '@/components/vana-espada/HostContro
 import { getSiteUrl } from '@/utils/site-url'
 import { isAdminRole } from '@/utils/permissions'
 import { toEspadaSession } from '@/utils/vana-espada'
+import PresentationController from '@/components/presentation-effects/PresentationController'
 
 // O middleware deixa /jogos/vana-espada passar sem login (por causa dos
 // convidados), por isso o painel do anfitrião faz aqui a sua própria guarda.
@@ -44,12 +45,16 @@ export default async function ControlPage({ params }: { params: Promise<{ sessio
   const siteUrl = await getSiteUrl()
 
   return (
-    <HostControl
-      sessionId={sessionId}
-      initialSession={toEspadaSession(session)}
-      rounds={(rounds ?? []) as HostRound[]}
-      siteUrl={siteUrl}
-      serverNow={serverNow}
-    />
+    <>
+      <HostControl
+        sessionId={sessionId}
+        initialSession={toEspadaSession(session)}
+        rounds={(rounds ?? []) as HostRound[]}
+        siteUrl={siteUrl}
+        serverNow={serverNow}
+      />
+      {/* Efeitos para o projetor (confettis, cortina, tambores…), os mesmos do VanaQuest e do VanaWords */}
+      <PresentationController />
+    </>
   )
 }
