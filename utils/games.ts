@@ -40,6 +40,12 @@ export interface GameDefinition {
   requiresAuth: boolean
   /** A página de gestão só aparece à coordenação. */
   adminCoordOnly: boolean
+  /**
+   * true → o jogador ganha os pontos sozinho, na sua própria partida.
+   * São estes que podem ter multiplicador de pontos (ver `points_multiplier`):
+   * nos jogos ao vivo quem paga é o anfitrião, no fim da sessão.
+   */
+  singlePlayer: boolean
 }
 
 export const GAMES: GameDefinition[] = [
@@ -54,6 +60,7 @@ export const GAMES: GameDefinition[] = [
     color: 'from-amber-400 to-orange-600',
     requiresAuth: true,
     adminCoordOnly: true,
+    singlePlayer: true,
   },
   {
     id: 'vana-quest',
@@ -66,6 +73,7 @@ export const GAMES: GameDefinition[] = [
     color: 'from-blue-700 via-blue-900 to-yellow-500',
     requiresAuth: false,
     adminCoordOnly: true,
+    singlePlayer: false,
   },
   {
     id: 'vana-words',
@@ -78,6 +86,7 @@ export const GAMES: GameDefinition[] = [
     color: 'from-emerald-600 via-teal-700 to-indigo-800',
     requiresAuth: true,
     adminCoordOnly: false,
+    singlePlayer: false,
   },
   {
     id: 'vana-trilha',
@@ -90,6 +99,7 @@ export const GAMES: GameDefinition[] = [
     color: 'from-amber-500 via-orange-600 to-yellow-500',
     requiresAuth: true,
     adminCoordOnly: false,
+    singlePlayer: true,
   },
   {
     id: 'vana-camp',
@@ -102,6 +112,7 @@ export const GAMES: GameDefinition[] = [
     color: 'from-stone-900 via-amber-900 to-orange-600',
     requiresAuth: true,
     adminCoordOnly: true,
+    singlePlayer: false,
   },
   {
     id: 'vana-espada',
@@ -114,6 +125,7 @@ export const GAMES: GameDefinition[] = [
     color: 'from-slate-800 via-sky-800 to-amber-400',
     requiresAuth: false,
     adminCoordOnly: false,
+    singlePlayer: false,
   },
   {
     id: 'vana-sketch',
@@ -126,6 +138,7 @@ export const GAMES: GameDefinition[] = [
     color: 'from-pink-500 via-rose-600 to-indigo-800',
     requiresAuth: true,
     adminCoordOnly: false,
+    singlePlayer: false,
   },
   {
     id: 'vana-codigo',
@@ -137,6 +150,7 @@ export const GAMES: GameDefinition[] = [
     color: 'from-emerald-500 via-emerald-700 to-slate-800',
     requiresAuth: true,
     adminCoordOnly: false,
+    singlePlayer: true,
   },
 ]
 
@@ -164,10 +178,64 @@ export interface GameSetting {
   allowed_roles: GameRole[]
   /** Esconder o jogo (em vez de o mostrar como indisponível) a quem não pode jogar. */
   hidden: boolean
+  /**
+   * Campanha de pontos a dobrar (só jogos singleplayer): 1 = pontuação normal.
+   * Só conta dentro da janela; fora dela o valor fica guardado mas não se aplica.
+   */
+  points_multiplier: number
+  multiplier_starts_at: string | null
+  multiplier_ends_at: string | null
+}
+
+/** Valores aceites no painel — passos redondos, fáceis de explicar ao clube. */
+export const POINTS_MULTIPLIERS = [1, 1.5, 2, 3] as const
+export const MAX_POINTS_MULTIPLIER = 3
+
+/** "2" ou "1,5" (vírgula, como se escreve em português). */
+export function formatMultiplier(multiplier: number): string {
+  return Number.isInteger(multiplier) ? String(multiplier) : String(multiplier).replace('.', ',')
+}
+
+export type MultiplierState = 'off' | 'scheduled' | 'active' | 'expired'
+
+export interface MultiplierStatus {
+  state: MultiplierState
+  /** O que multiplica os pontos AGORA (1 quando não há campanha a decorrer). */
+  multiplier: number
+  /** O valor guardado, mesmo que a janela ainda não tenha começado ou já tenha acabado. */
+  configured: number
+  startsAt: Date | null
+  endsAt: Date | null
+}
+
+export function multiplierStatus(
+  setting: GameSetting | null | undefined,
+  now: Date = new Date(),
+): MultiplierStatus {
+  const configured = setting?.points_multiplier ?? 1
+  const startsAt = setting?.multiplier_starts_at ? new Date(setting.multiplier_starts_at) : null
+  const endsAt = setting?.multiplier_ends_at ? new Date(setting.multiplier_ends_at) : null
+  if (!(configured > 1)) return { state: 'off', multiplier: 1, configured: 1, startsAt, endsAt }
+  if (startsAt && startsAt > now) return { state: 'scheduled', multiplier: 1, configured, startsAt, endsAt }
+  if (endsAt && endsAt <= now) return { state: 'expired', multiplier: 1, configured, startsAt, endsAt }
+  return { state: 'active', multiplier: configured, configured, startsAt, endsAt }
+}
+
+/** O que multiplica os pontos deste jogo agora mesmo (1 = normal). */
+export function activeMultiplier(setting: GameSetting | null | undefined, now: Date = new Date()): number {
+  return multiplierStatus(setting, now).multiplier
 }
 
 export function defaultGameSetting(gameId: string): GameSetting {
-  return { game_id: gameId, enabled: true, allowed_roles: [...GAME_ROLES], hidden: false }
+  return {
+    game_id: gameId,
+    enabled: true,
+    allowed_roles: [...GAME_ROLES],
+    hidden: false,
+    points_multiplier: 1,
+    multiplier_starts_at: null,
+    multiplier_ends_at: null,
+  }
 }
 
 /** Mapa jogo → definição, com o valor por defeito para jogos sem linha na BD. */
@@ -199,7 +267,20 @@ export async function fetchGameSetting(supabase: SupabaseClient, gameId: string)
 export function normalizeGameSetting(gameId: string, row: Partial<GameSetting> | null | undefined): GameSetting {
   if (!row) return defaultGameSetting(gameId)
   const roles = (row.allowed_roles ?? []).filter((r): r is GameRole => (GAME_ROLES as readonly string[]).includes(r))
-  return { game_id: gameId, enabled: row.enabled !== false, allowed_roles: roles, hidden: row.hidden === true }
+  // Colunas em falta (migração do multiplicador por correr) → pontuação normal.
+  const rawMultiplier = Number(row.points_multiplier ?? 1)
+  const multiplier = Number.isFinite(rawMultiplier)
+    ? Math.min(MAX_POINTS_MULTIPLIER, Math.max(1, rawMultiplier))
+    : 1
+  return {
+    game_id: gameId,
+    enabled: row.enabled !== false,
+    allowed_roles: roles,
+    hidden: row.hidden === true,
+    points_multiplier: multiplier,
+    multiplier_starts_at: row.multiplier_starts_at ?? null,
+    multiplier_ends_at: row.multiplier_ends_at ?? null,
+  }
 }
 
 /**
@@ -217,7 +298,7 @@ export function canAccessGame(setting: GameSetting | null | undefined, role: str
   return setting.allowed_roles.includes(gameAudienceOf(role))
 }
 
-export function isOpenToEveryone(setting: GameSetting): boolean {
+export function isOpenToEveryone(setting: Pick<GameSetting, 'enabled' | 'allowed_roles'>): boolean {
   return setting.enabled && GAME_ROLES.every((r) => setting.allowed_roles.includes(r))
 }
 

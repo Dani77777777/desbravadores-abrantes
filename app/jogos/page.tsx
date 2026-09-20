@@ -2,9 +2,9 @@ import { createClient } from '@/utils/supabase/server';
 import { Navbar } from '@/components/layout/Navbar';
 import { Card, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Gamepad2, Sword, Trophy, Lock, LogIn, Ban, Settings } from 'lucide-react';
+import { Gamepad2, Sword, Trophy, Lock, LogIn, Ban, Settings, Zap } from 'lucide-react';
 import Link from 'next/link';
-import { GAMES, fetchGameSettings, gameAvailabilitySummary, gameVisibilityFor } from '@/utils/games';
+import { GAMES, fetchGameSettings, formatMultiplier, gameAvailabilitySummary, gameVisibilityFor, multiplierStatus } from '@/utils/games';
 import { effectiveRole } from '@/utils/permissions';
 
 export default async function GamesHubPage() {
@@ -29,9 +29,12 @@ export default async function GamesHubPage() {
     const visibility = gameVisibilityFor(setting, role);
     // Escondido (surpresa): quem não pode jogar nem sabe que o jogo existe.
     if (visibility === 'hidden') return [];
+    const bonus = multiplierStatus(setting);
     return [{
       ...game,
       available: visibility === 'available',
+      // Campanha de pontos a dobrar a decorrer (só jogos de um jogador)
+      bonus: bonus.state === 'active' ? bonus : null,
       // Mostrado a quem pode jogar quando o jogo não está aberto a todos (ex.: "Só liderança")
       restriction: setting.enabled ? gameAvailabilitySummary(setting) : null,
     }];
@@ -95,15 +98,29 @@ export default async function GamesHubPage() {
                 <CardHeader className="flex-1">
                   <div className="flex justify-between items-start gap-2">
                     <CardTitle className="text-2xl font-bold">{game.title}</CardTitle>
-                    <span className={`text-[10px] font-bold px-2 py-1 rounded-full uppercase whitespace-nowrap ${
-                      isAvailable ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
-                    }`}>
-                      {isAvailable ? 'Disponível' : 'Indisponível'}
-                    </span>
+                    <div className="flex flex-col items-end gap-1">
+                      <span className={`text-[10px] font-bold px-2 py-1 rounded-full uppercase whitespace-nowrap ${
+                        isAvailable ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
+                      }`}>
+                        {isAvailable ? 'Disponível' : 'Indisponível'}
+                      </span>
+                      {isAvailable && game.bonus && (
+                        <span className="flex items-center gap-1 text-[10px] font-black px-2 py-1 rounded-full uppercase whitespace-nowrap bg-amber-100 text-amber-800">
+                          <Zap className="w-3 h-3" /> Pontos ×{formatMultiplier(game.bonus.multiplier)}
+                        </span>
+                      )}
+                    </div>
                   </div>
                   <CardDescription className="text-gray-600 min-h-[3rem]">
                     {game.description}
                   </CardDescription>
+                  {isAvailable && game.bonus && (
+                    <p className="text-xs text-amber-700 font-bold flex items-center gap-1 mt-1">
+                      <Zap className="w-3 h-3" />
+                      Pontos a {game.bonus.multiplier === 2 ? 'dobrar' : `×${formatMultiplier(game.bonus.multiplier)}`}
+                      {game.bonus.endsAt && ` até ${game.bonus.endsAt.toLocaleString('pt-PT', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}`}
+                    </p>
+                  )}
                   {isAvailable && game.restriction && game.restriction.tone !== 'green' && (
                     <p className="text-xs text-amber-700 font-semibold flex items-center gap-1 mt-1">
                       <Lock className="w-3 h-3" /> {game.restriction.label}

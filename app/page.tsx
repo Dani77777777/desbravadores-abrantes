@@ -16,7 +16,7 @@ import { User, Trophy, Coins, Megaphone, ScanLine, History, ListChecks, CheckCir
 
 import { LandingPage } from '@/components/landing/LandingPage'
 import { getJAEvents, filterJAEventsForSection } from '@/utils/ja-agenda'
-import { GAMES, fetchGameSettings, gameVisibilityFor } from '@/utils/games'
+import { GAMES, activeMultiplier, fetchGameSettings, gameVisibilityFor } from '@/utils/games'
 
 const SECTION_COLORS = {
   rebentos: 'bg-emerald-600',
@@ -44,7 +44,8 @@ export default async function Dashboard() {
   if (!user) {
       const gameSettings = await fetchGameSettings(supabase)
       const gameVisibility = Object.fromEntries(GAMES.map((g) => [g.id, gameVisibilityFor(gameSettings[g.id], null)]))
-      return <LandingPage gameVisibility={gameVisibility} />
+      const gameMultipliers = Object.fromEntries(GAMES.map((g) => [g.id, activeMultiplier(gameSettings[g.id])]))
+      return <LandingPage gameVisibility={gameVisibility} gameMultipliers={gameMultipliers} />
   }
 
   const { data: profile } = await supabase

@@ -15,13 +15,18 @@ import {
   Heart,
   Gamepad2,
 } from "lucide-react";
-import { GAMES, type GameVisibility } from "@/utils/games";
+import { GAMES, formatMultiplier, type GameVisibility } from "@/utils/games";
 
-/** gameVisibility: id do jogo → estado para visitantes sem conta (jogos escondidos não aparecem). */
+/**
+ * gameVisibility: id do jogo → estado para visitantes sem conta (jogos escondidos não aparecem).
+ * gameMultipliers: id do jogo → multiplicador de pontos a decorrer (1 = pontuação normal).
+ */
 export function LandingPage({
   gameVisibility = {},
+  gameMultipliers = {},
 }: {
   gameVisibility?: Record<string, GameVisibility>;
+  gameMultipliers?: Record<string, number>;
 }) {
   const router = useRouter();
 
@@ -250,6 +255,7 @@ export function LandingPage({
               (game) => {
                 const available =
                   (gameVisibility[game.id] ?? "available") === "available";
+                const multiplier = gameMultipliers[game.id] ?? 1;
 
                 return (
                   <div
@@ -269,6 +275,11 @@ export function LandingPage({
                       {!available && (
                         <span className="absolute top-2 right-2 z-20 rounded-full bg-black/40 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white">
                           Indisponível
+                        </span>
+                      )}
+                      {available && multiplier > 1 && (
+                        <span className="absolute top-2 right-2 z-20 rounded-full bg-amber-400 px-2 py-0.5 text-[10px] font-black uppercase tracking-wider text-amber-950 shadow">
+                          Pontos ×{formatMultiplier(multiplier)}
                         </span>
                       )}
                     </div>
