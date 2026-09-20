@@ -6,6 +6,8 @@
 // num teclado sem acentos.
 // =============================================
 
+import { lisbonDateParts } from './day';
+
 export type VanaCodigoMode = 'recruta' | 'explorador' | 'mestre';
 
 // Recruta: palavras curtas (4–6 letras)
@@ -60,8 +62,8 @@ function mulberry32(seed: number): number {
 /** Mensagem secreta do dia para um modo — igual para todos os jogadores. */
 export function getDailySecret(mode: VanaCodigoMode, date: Date = new Date()): string {
   const pool = POOLS[mode];
-  const daySeed =
-    date.getFullYear() * 10000 + (date.getMonth() + 1) * 100 + date.getDate();
+  const { year, month, day } = lisbonDateParts(date);
+  const daySeed = year * 10000 + month * 100 + day;
   const rnd = mulberry32(daySeed * 131 + MODE_SALT[mode]);
   return pool[Math.floor(rnd * pool.length)];
 }

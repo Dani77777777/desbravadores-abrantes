@@ -8,6 +8,8 @@ import VanaCodigoGame from '@/components/vana-codigo/VanaCodigoGame';
 import VanaCodigoHowToPlay from '@/components/vana-codigo/VanaCodigoHowToPlay';
 import { getCodeTypeForDate, CODE_LABELS } from '@/utils/vana-codigo/codecs';
 import { getDailySecret, VanaCodigoMode } from '@/utils/vana-codigo/word-bank';
+import { lisbonDayStart } from '@/utils/vana-codigo/day';
+import { gameUnavailableError } from '@/utils/game-access';
 
 interface ModeCardProps {
   title: string;
@@ -58,7 +60,7 @@ export default async function VanaCodigoGamePage() {
   } = await supabase.auth.getUser();
 
   if (!user) {
-    redirect('/auth/login');
+    redirect('/login?next=/jogos/vana-codigo');
   }
 
   const { data: profile } = await supabase
@@ -67,9 +69,8 @@ export default async function VanaCodigoGamePage() {
     .eq('id', user.id)
     .single();
 
-  // Sessões de hoje deste utilizador
-  const todayStart = new Date();
-  todayStart.setHours(0, 0, 0, 0);
+  // Sessões de hoje deste utilizador (dia de Lisboa — o servidor corre em UTC)
+  const todayStart = lisbonDayStart();
 
   const { data: sessions } = await supabase
     .from('vana_codigo_sessions')
@@ -88,19 +89,23 @@ export default async function VanaCodigoGamePage() {
     const uId = formData.get('userId') as string;
 
     try {
+      // O jogo pode ter sido desativado em Gestão → Jogos entretanto.
+      if (await gameUnavailableError('vana-codigo')) return;
+
       const supabaseAction = await (await import('@/utils/supabase/server')).createClient();
 
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
+      // Já existe partida de hoje neste modo? Não lhe tocar — recomeçar aqui
+      // apagava as tentativas já feitas (o upsert reescreve a linha).
+      // O upsert não mexe em created_at, por isso a janela é sobre updated_at.
       const { data: existing } = await supabaseAction
         .from('vana_codigo_sessions')
         .select('is_finished')
         .eq('user_id', uId)
         .eq('mode', modeVal)
-        .gte('created_at', today.toISOString())
-        .single();
+        .gte('updated_at', lisbonDayStart().toISOString())
+        .maybeSingle();
 
-      if (existing?.is_finished) return;
+      if (existing) return;
 
       // Desafio do dia — igual para todos os jogadores
       const now = new Date();

@@ -37,11 +37,25 @@ DROP POLICY IF EXISTS "vana_codigo_sessions_update" ON public.vana_codigo_sessio
 CREATE POLICY "vana_codigo_sessions_update" ON public.vana_codigo_sessions
   FOR UPDATE USING (auth.uid() = user_id);
 
--- 3. RPC de recompensas — 1/2/4 XP+Gold por modo, uma vez por dia por modo.
+-- 3. Início do dia do clube (Europe/Lisbon). O servidor corre em UTC: sem isto,
+--    no horário de verão a primeira hora da noite contava para o dia seguinte.
+CREATE OR REPLACE FUNCTION public.vana_codigo_day_start()
+RETURNS timestamptz
+LANGUAGE sql STABLE
+SET search_path = public
+AS $$
+  SELECT ((now() AT TIME ZONE 'Europe/Lisbon')::date)::timestamp AT TIME ZONE 'Europe/Lisbon';
+$$;
+
+GRANT EXECUTE ON FUNCTION public.vana_codigo_day_start() TO authenticated;
+
+-- 4. RPC de recompensas — 1/2/4 XP+Gold por modo, uma vez por dia por modo.
 --    O trigger existente em points_log atualiza o perfil automaticamente.
 CREATE OR REPLACE FUNCTION public.award_vana_codigo_rewards(p_user_id uuid, p_mode text)
 RETURNS jsonb
-LANGUAGE plpgsql SECURITY DEFINER AS $$
+LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = public
+AS $$
 DECLARE
   v_amount integer;
   v_desc text;
@@ -73,7 +87,7 @@ BEGIN
       AND mode = p_mode
       AND is_finished = true
       AND is_won = true
-      AND updated_at >= date_trunc('day', now())
+      AND updated_at >= public.vana_codigo_day_start()
   ) THEN
     RETURN jsonb_build_object('awarded', false, 'message', null);
   END IF;
@@ -83,7 +97,7 @@ BEGIN
     SELECT 1 FROM public.points_log
     WHERE target_user_id = p_user_id
       AND description = v_desc
-      AND created_at >= date_trunc('day', now())
+      AND created_at >= public.vana_codigo_day_start()
   ) THEN
     RETURN jsonb_build_object(
       'awarded', false,

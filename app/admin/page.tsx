@@ -11,8 +11,11 @@ import { EventPanel } from './components/EventPanel'
 import { StorePanel } from './components/StorePanel'
 import { QrPanel } from './components/QrPanel'
 import { SurveyPanel } from './components/SurveyPanel'
-import { Users, ListChecks, Megaphone, MessageSquare, LayoutDashboard, CalendarDays, ShoppingBag, QrCode, Gamepad2, Swords, ClipboardList } from 'lucide-react'
+import { AuditPanel } from './components/AuditPanel'
+import { GamesPanel } from './components/GamesPanel'
+import { Users, ListChecks, Megaphone, MessageSquare, LayoutDashboard, CalendarDays, ShoppingBag, QrCode, Gamepad2, ClipboardList, ScrollText } from 'lucide-react'
 import { effectiveRole, effectiveLeadershipSection, isHelper, helperLabel } from '@/utils/permissions'
+import { fetchGameSettings } from '@/utils/games'
 
 export default async function AdminPage({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
   const supabase = await createClient()
@@ -86,6 +89,20 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
     .eq('author_id', profile.id)
     .order('created_at', { ascending: false })
     .limit(20)
+
+  // Destinatários e estado de leitura dos comunicados enviados
+  const sentIds = (sentAnnouncements || []).map((a) => a.id)
+  const { data: sentRecipients } = sentIds.length
+    ? await supabase
+      .from('announcement_recipients')
+      .select('announcement_id, user_id, read_at')
+      .in('announcement_id', sentIds)
+    : { data: [] as any[] }
+
+  // Membros cuja idade sugere outra classe (só a coordenação recebe linhas)
+  const { data: sectionSuggestions } = effRole === 'coordenador'
+    ? await supabase.rpc('list_section_suggestions')
+    : { data: [] as any[] }
 
   // Fetch suggestions
   let suggestionsQuery = supabase
@@ -168,6 +185,14 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
   if (isDirigente && coordOnlyTabs.includes(activeTab)) {
     redirect('/admin?tab=members')
   }
+  // Auditoria: só coordenadores REAIS (ajudantes de coordenação não se auditam a si próprios)
+  const isRealCoordenador = profile.role === 'coordenador'
+  if (activeTab === 'audit' && !isRealCoordenador) {
+    redirect(`/admin?tab=${defaultTab}`)
+  }
+
+  // Disponibilidade dos jogos (aba "Jogos")
+  const gameSettings = activeTab === 'games' ? await fetchGameSettings(supabase) : null
 
   const SECTION_LABELS: Record<string, string> = {
     rebentos: 'Rebentos', ticoes: 'Tições', exploradores: 'Exploradores',
@@ -193,7 +218,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
 
         {/* Tab navigation */}
         <div className="bg-white p-1.5 rounded-2xl border border-gray-200 shadow-sm overflow-x-auto no-scrollbar scroll-smooth flex gap-1 mb-2">
-          {( [
+          {([
             { id: 'overview', label: 'Visão Geral', icon: LayoutDashboard, coordOnly: true, count: 0, countColor: 'blue' },
             { id: 'members', label: 'Membros', icon: Users, coordOnly: false, count: 0, countColor: 'blue' },
             { id: 'tasks', label: 'Tarefas', icon: ListChecks, coordOnly: false, count: 0, countColor: 'blue' },
@@ -202,30 +227,27 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
             { id: 'suggestions', label: 'Sugestões', icon: MessageSquare, coordOnly: false, count: suggestions?.filter(s => !s.is_read).length || 0, countColor: 'red' },
             { id: 'qr', label: 'Questões / QR', icon: QrCode, coordOnly: true, count: 0, countColor: 'blue' },
             { id: 'surveys', label: 'Inquéritos', icon: ClipboardList, coordOnly: true, count: 0, countColor: 'blue' },
-            { id: 'vantur', label: 'Vantur', icon: Gamepad2, coordOnly: true, count: 0, countColor: 'blue', href: '/admin/vantur' },
-            { id: 'vana-quest', label: 'VanaQuest', icon: Swords, coordOnly: true, count: 0, countColor: 'blue', href: '/admin/vana-quest' },
-            { id: 'vana-words', label: 'VanaWords', icon: Gamepad2, coordOnly: false, count: 0, countColor: 'blue', href: '/admin/vana-words' },
-            { id: 'store', label: 'Loja', icon: ShoppingBag, coordOnly: true, count: purchases?.filter(p => p.status === 'pending').length || 0, countColor: 'orange' }
-          ] as { id: string, label: string, icon: any, coordOnly: boolean, count: number, countColor: string, href?: string }[])
-            .filter(tab => !tab.coordOnly || isCoordenador)
+            { id: 'games', label: 'Jogos', icon: Gamepad2, coordOnly: false, count: 0, countColor: 'blue' },
+            { id: 'store', label: 'Loja', icon: ShoppingBag, coordOnly: true, count: purchases?.filter(p => p.status === 'pending').length || 0, countColor: 'orange' },
+            { id: 'audit', label: 'Auditoria', icon: ScrollText, coordOnly: true, realCoordOnly: true, count: 0, countColor: 'blue' }
+          ] as { id: string, label: string, icon: any, coordOnly: boolean, realCoordOnly?: boolean, count: number, countColor: string, href?: string }[])
+            .filter(tab => (!tab.coordOnly || isCoordenador) && (!tab.realCoordOnly || isRealCoordenador))
             .map((tab) => (
               <a
                 key={tab.id}
                 href={tab.href || `/admin?tab=${tab.id}`}
-                className={`flex items-center gap-2 px-5 py-2.5 text-sm font-bold rounded-xl transition-all whitespace-nowrap ${
-                  activeTab === tab.id
+                className={`flex items-center gap-2 px-5 py-2.5 text-sm font-bold rounded-xl transition-all whitespace-nowrap ${activeTab === tab.id
                     ? 'bg-blue-900 text-white shadow-md'
                     : 'text-gray-500 hover:bg-gray-100'
-                }`}
+                  }`}
               >
                 <tab.icon className="w-4 h-4" /> {tab.label}
                 {tab.count !== undefined && tab.count > 0 && (
-                  <span className={`ml-1 text-[10px] font-black rounded-full px-1.5 py-0.5 ${
-                    activeTab === tab.id 
-                      ? 'bg-white/20 text-white' 
-                      : tab.countColor === 'red' ? 'bg-red-100 text-red-700' : 
+                  <span className={`ml-1 text-[10px] font-black rounded-full px-1.5 py-0.5 ${activeTab === tab.id
+                      ? 'bg-white/20 text-white'
+                      : tab.countColor === 'red' ? 'bg-red-100 text-red-700' :
                         tab.countColor === 'orange' ? 'bg-orange-100 text-orange-700' : 'bg-blue-100 text-blue-700'
-                  }`}>
+                    }`}>
                     {tab.count}
                   </span>
                 )}
@@ -249,7 +271,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
           <Card>
             <CardHeader>
               <CardTitle>Membros da Classe</CardTitle>
-              <CardDescription>Gerencie os pontos, XP e investiduras dos desbravadores.</CardDescription>
+              <CardDescription>Pesquisa, filtra e gere pontos, cargos, investiduras e contas dos desbravadores.</CardDescription>
             </CardHeader>
             <CardContent>
               <MemberList
@@ -257,6 +279,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
                 currentUserRole={profile.role}
                 adminProfile={profile}
                 clubMembers={clubMembers}
+                sectionSuggestions={sectionSuggestions || []}
               />
             </CardContent>
           </Card>
@@ -286,6 +309,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
             profile={effProfile}
             members={members || []}
             sentAnnouncements={sentAnnouncements || []}
+            sentRecipients={sentRecipients || []}
           />
         )}
 
@@ -301,7 +325,20 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
           <QrPanel profile={effProfile} />
         )}
 
-        {/* Surveys tab */}
+        {/* Games tab */}
+        {activeTab === 'games' && gameSettings && (
+          <GamesPanel
+            initialSettings={gameSettings}
+            canEdit={isCoordenador}
+            isCoordenador={isCoordenador}
+          />
+        )}
+
+        {/* Audit tab */}
+        {activeTab === 'audit' && isRealCoordenador && (
+          <AuditPanel members={members || []} />
+        )}
+
         {activeTab === 'surveys' && isCoordenador && (
           <SurveyPanel profile={effProfile} surveys={surveys} />
         )}

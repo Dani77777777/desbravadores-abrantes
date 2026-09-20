@@ -10,6 +10,7 @@ import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
 import { getSignedCallbackUrl } from './actions'
+import { safeNextPath } from '@/utils/safe-next-path'
 
 function LoginContent() {
   const [email, setEmail] = useState('')
@@ -22,10 +23,9 @@ function LoginContent() {
   const [isSignUp, setIsSignUp] = useState(mode === 'signup')
   const supabase = createClient()
 
-  // Para onde redirecionar após entrar. Só aceita caminhos internos (começados por "/")
+  // Para onde redirecionar após entrar. Só aceita caminhos internos (ver safeNextPath)
   // para evitar open-redirects. Por defeito vai para a home.
-  const nextParam = searchParams.get('next')
-  const next = nextParam && nextParam.startsWith('/') ? nextParam : '/'
+  const next = safeNextPath(searchParams.get('next'))
 
   useEffect(() => {
     // If mode changes in URL, update state

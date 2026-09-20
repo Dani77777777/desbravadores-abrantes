@@ -7,6 +7,7 @@ import { ChevronLeft, Plus, Trash2, Pencil, ListChecks, BookOpen, History, Users
 import { startSession } from '@/lib/actions/vana-quest'
 import { DeleteSessionButton } from '@/components/vana-quest/DeleteSessionButton'
 import { isAdminRole } from '@/utils/permissions'
+import { GameAvailabilityBanner } from '../components/GameAvailabilityBanner'
 
 export default async function VanaQuestAdminPage() {
   const supabase = await createClient()
@@ -63,7 +64,7 @@ export default async function VanaQuestAdminPage() {
       <main className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
         {/* Header */}
         <div className="flex items-center gap-4">
-          <Link href="/admin" className="text-gray-500 hover:text-gray-900 transition-colors">
+          <Link href="/admin?tab=games" className="text-gray-500 hover:text-gray-900 transition-colors" title="Voltar aos Jogos">
             <ChevronLeft className="w-5 h-5" />
           </Link>
           <div className="flex items-center gap-3">
@@ -74,6 +75,8 @@ export default async function VanaQuestAdminPage() {
             </div>
           </div>
         </div>
+
+        <GameAvailabilityBanner gameId="vana-quest" />
 
         {/* Create */}
         <div className="bg-white rounded-2xl border shadow-sm p-6">

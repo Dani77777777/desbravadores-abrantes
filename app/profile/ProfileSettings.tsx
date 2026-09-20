@@ -15,6 +15,7 @@ import { createClient } from '@/utils/supabase/client'
 import { useRef } from 'react'
 import Link from 'next/link'
 import { PurchaseHistory } from './PurchaseHistory'
+import { DeleteAccountCard } from './DeleteAccountCard'
 
 interface ProfileSettingsProps {
   profile: {
@@ -30,9 +31,10 @@ interface ProfileSettingsProps {
   user: any
   userEmail: string
   purchases: any[]
+  vanaTrilhaStations?: number
 }
 
-export default function ProfileSettings({ profile, user, userEmail, purchases }: ProfileSettingsProps) {
+export default function ProfileSettings({ profile, user, userEmail, purchases, vanaTrilhaStations = 0 }: ProfileSettingsProps) {
   const [fullName, setFullName] = useState(profile.full_name)
   const [avatarUrl, setAvatarUrl] = useState(profile.avatar_url || '')
   const [loading, setLoading] = useState(false)
@@ -227,6 +229,25 @@ export default function ProfileSettings({ profile, user, userEmail, purchases }:
                   {Math.floor(profile.total_xp / 1000) + 1}
                 </span>
               </div>
+              <div className="flex justify-between items-center gap-2">
+                <span className="text-sm text-gray-600">Insígnias:</span>
+                {vanaTrilhaStations >= 7 ? (
+                  <span
+                    className="inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-yellow-300 to-amber-500 px-2.5 py-1 text-xs font-bold text-amber-950 shadow-sm"
+                    title="Completou as 7 estações do VanaTrilha"
+                  >
+                    🏅 Peregrino da Promessa
+                  </span>
+                ) : (
+                  <Link
+                    href="/jogos/vana-trilha"
+                    className="text-xs font-semibold text-amber-700 hover:underline"
+                    title="Completa as 7 estações do VanaTrilha para ganhar a insígnia Peregrino da Promessa"
+                  >
+                    VanaTrilha: {vanaTrilhaStations}/7 estações
+                  </Link>
+                )}
+              </div>
               <div className="pt-2">
                 <Link href="/points-history">
                   <Button variant="outline" size="sm" className="w-full flex items-center gap-2 border-indigo-200 text-indigo-700 hover:bg-indigo-50">
@@ -390,6 +411,9 @@ export default function ProfileSettings({ profile, user, userEmail, purchases }:
             )}
           </CardContent>
         </Card>
+
+        {/* Delete Account */}
+        <DeleteAccountCard userEmail={userEmail} />
       </div>
     </div>
   )

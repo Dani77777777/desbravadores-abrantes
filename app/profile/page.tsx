@@ -44,10 +44,17 @@ export default async function ProfilePage() {
     .eq('user_id', user.id)
     .order('created_at', { ascending: false })
 
+  // Insígnia "Peregrino da Promessa" (VanaTrilha): 7 estações completadas.
+  const { data: trilhaProgress } = await supabase
+    .from('vanatrilha_station_progress')
+    .select('station')
+    .eq('user_id', user.id)
+
   return <ProfileSettings 
     profile={profile} 
     user={user} 
     userEmail={user.email || ''} 
     purchases={purchases || []}
+    vanaTrilhaStations={new Set((trilhaProgress || []).map((r) => r.station)).size}
   />
 }

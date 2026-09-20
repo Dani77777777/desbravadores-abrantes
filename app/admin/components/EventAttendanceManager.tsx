@@ -108,6 +108,8 @@ export function EventAttendanceManager({ event, members, profile, onComplete }: 
       // 2. Award points
       const pointsLogs = []
       for (const member of members) {
+        // Só o coordenador real pode receber pontos de si próprio; os outros a BD rejeitaria (o lote inteiro).
+        if (member.id === profile.id && !(profile.role === 'coordenador' && !profile.helper_role)) continue
         const status = attendance[member.id] || 'faltou'
         let xp = 0
         let gold = 0

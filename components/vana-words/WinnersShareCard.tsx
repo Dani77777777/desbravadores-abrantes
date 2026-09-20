@@ -1,6 +1,6 @@
 'use client'
 
-import { forwardRef } from 'react'
+import { forwardRef, useState } from 'react'
 import { VW, VW_SCREEN_STYLE, TEAM_GRADIENT, vwSans, vwSerif } from './theme'
 import { initials } from './ui'
 import { shortDisplayNames } from '@/utils/vana-words'
@@ -14,6 +14,8 @@ interface Props {
   allPlayers?: VanaWordsPlayer[]
   team: TeamId
   winReason?: string | null
+  /** Data em que o jogo aconteceu (ISO string) — por omissão usa a data atual */
+  gameDate?: string | null
 }
 
 /**
@@ -24,8 +26,9 @@ interface Props {
  *  - Pronto para ser capturado por html-to-image
  */
 export const WinnersShareCard = forwardRef<HTMLDivElement, Props>(
-  ({ winners, allPlayers, team, winReason }, ref) => {
+  ({ winners, allPlayers, team, winReason, gameDate }, ref) => {
     const label = TEAM_LABELS[team]
+    const displayDate = gameDate ? new Date(gameDate) : new Date()
     const emoji = team === 'a' ? '🦁' : '🦅'
     const accent = team === 'a' ? VW.amber : VW.blue
     const rgb = team === 'a' ? '245,166,35' : '63,140,255'
@@ -33,6 +36,8 @@ export const WinnersShareCard = forwardRef<HTMLDivElement, Props>(
     const shortNames = shortDisplayNames(allPlayers ?? winners)
     // Com equipas grandes, encolhe os avatares para caber tudo no card
     const av = winners.length > 8 ? 100 : winners.length > 5 ? 116 : 132
+    // Avatares que falharam a carregar — evita <img> partidas a mancharem a captura (html-to-image)
+    const [brokenAvatars, setBrokenAvatars] = useState<Set<string>>(new Set())
 
     return (
       <div
@@ -59,7 +64,7 @@ export const WinnersShareCard = forwardRef<HTMLDivElement, Props>(
               ? 'A equipa adversária revelou a palavra preta 💀'
               : 'Encontraram todas as palavras da equipa!'}
             {' · '}
-            {new Date().toLocaleDateString('pt-PT', { day: 'numeric', month: 'long', year: 'numeric' })}
+            {displayDate.toLocaleDateString('pt-PT', { day: 'numeric', month: 'long', year: 'numeric' })}
           </p>
         </div>
 
@@ -99,7 +104,7 @@ export const WinnersShareCard = forwardRef<HTMLDivElement, Props>(
                     style={{
                       width: `${av}px`,
                       height: `${av}px`,
-                      background: p.avatar_url ? '#0b1226' : TEAM_GRADIENT[team],
+                      background: p.avatar_url && !brokenAvatars.has(p.id) ? '#0b1226' : TEAM_GRADIENT[team],
                       color: '#12131f',
                       fontSize: `${Math.round(av * 0.34)}px`,
                       border: '3px solid rgba(255,255,255,.35)',
@@ -108,13 +113,21 @@ export const WinnersShareCard = forwardRef<HTMLDivElement, Props>(
                         : '0 8px 20px rgba(0,0,0,.4)',
                     }}
                   >
-                    {p.avatar_url ? (
+                    {p.avatar_url && !brokenAvatars.has(p.id) ? (
                       <img
                         src={p.avatar_url}
                         alt={p.display_name}
                         className="w-full h-full object-cover"
                         crossOrigin="anonymous"
                         referrerPolicy="no-referrer"
+                        onError={() =>
+                          setBrokenAvatars((prev) => {
+                            if (prev.has(p.id)) return prev
+                            const next = new Set(prev)
+                            next.add(p.id)
+                            return next
+                          })
+                        }
                       />
                     ) : (
                       initials(p.display_name)

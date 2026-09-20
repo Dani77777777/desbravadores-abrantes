@@ -3,6 +3,8 @@
 // Morse, Semáforo, Cifra de César, Números (A1Z26) e Atbash
 // =============================================
 
+import { lisbonWeekday } from './day';
+
 export type CodeType = 'morse' | 'semaforo' | 'cesar' | 'numeros' | 'atbash';
 
 // Rotação semanal do código (Domingo → Sábado).
@@ -33,8 +35,8 @@ export const CODE_DESCRIPTIONS: Record<CodeType, string> = {
   atbash: 'O alfabeto foi invertido: A↔Z, B↔Y, C↔X...',
 };
 
-export function getCodeTypeForDate(date: Date): CodeType {
-  return CODE_BY_WEEKDAY[date.getDay()];
+export function getCodeTypeForDate(date: Date = new Date()): CodeType {
+  return CODE_BY_WEEKDAY[lisbonWeekday(date)];
 }
 
 // ---- Morse ----

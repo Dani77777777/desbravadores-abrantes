@@ -56,7 +56,7 @@ export function SuggestionPanel({ profile, initialSuggestions }: SuggestionPanel
       })
 
     if (logError) {
-      toast.error('Erro ao atribuir pontos')
+      toast.error(logError.message || 'Erro ao atribuir pontos')
       setRewardLoading(null)
       return
     }
