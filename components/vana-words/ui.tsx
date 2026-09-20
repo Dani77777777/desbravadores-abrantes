@@ -1,3 +1,6 @@
+'use client'
+
+import { useState } from 'react'
 import { TEAM_LABELS } from '@/types/vana-words'
 import type { TeamId } from '@/types/vana-words'
 import { TEAM_GRADIENT, VW } from './theme'
@@ -37,20 +40,22 @@ export function Avatar({
   avatarUrl?: string | null
   size?: number
 }) {
+  const [broken, setBroken] = useState(false)
+  const showPhoto = !!avatarUrl && !broken
   return (
     <div className="relative shrink-0" style={{ width: size, height: size }}>
       <div
         className="w-full h-full rounded-full flex items-center justify-center font-extrabold overflow-hidden"
         style={{
-          background: avatarUrl ? undefined : TEAM_GRADIENT[team],
+          background: showPhoto ? undefined : TEAM_GRADIENT[team],
           color: '#12131f',
           fontSize: size * 0.32,
           border: '2px solid rgba(255,255,255,.3)',
           boxShadow: isArauto ? `0 0 0 2px ${VW.gold}, 0 4px 10px rgba(0,0,0,.4)` : '0 3px 8px rgba(0,0,0,.35)',
         }}
       >
-        {avatarUrl ? (
-          <img src={avatarUrl} alt="" className="w-full h-full object-cover" />
+        {showPhoto ? (
+          <img src={avatarUrl} alt="" className="w-full h-full object-cover" onError={() => setBroken(true)} />
         ) : (
           initials
         )}

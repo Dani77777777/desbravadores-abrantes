@@ -6,6 +6,7 @@ import { createClient } from '@/utils/supabase/client'
 import { WordGrid } from './WordGrid'
 import { TeamRoulette } from './TeamRoulette'
 import { TeamChip, Avatar, OverflowAvatar, BlipDots, initials } from './ui'
+import { PlayerAvatar } from './PlayerAvatar'
 import { VW, VW_SCREEN_STYLE, VW_PANEL_STYLE, VW_SOFT_PULSE, TEAM_GRADIENT, teamPanelStyle, vwSans, vwSerif } from './theme'
 import { TEAM_LABELS } from '@/types/vana-words'
 import type { VanaWordsSession, VanaWordsPlayer, VanaWordsWord, VanaWordsGuess, TeamId } from '@/types/vana-words'
@@ -463,13 +464,12 @@ export function ProjectorView({ session: initSession, initialPlayers }: Projecto
                         key={p.id}
                         className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-slate-800/70 text-white font-semibold text-lg animate-in fade-in zoom-in-95 duration-500"
                       >
-                        {p.avatar_url ? (
-                          <img src={p.avatar_url} alt="" className="w-7 h-7 rounded-full object-cover" />
-                        ) : (
-                          <span className="w-7 h-7 rounded-full bg-emerald-600 flex items-center justify-center text-sm">
-                            {p.display_name.charAt(0).toUpperCase()}
-                          </span>
-                        )}
+                        <PlayerAvatar
+                          avatarUrl={p.avatar_url}
+                          name={p.display_name}
+                          className="w-7 h-7 rounded-full object-cover"
+                          fallbackClassName="w-7 h-7 rounded-full bg-emerald-600 flex items-center justify-center text-sm"
+                        />
                         {p.display_name}
                       </div>
                     ))}
@@ -488,13 +488,12 @@ export function ProjectorView({ session: initSession, initialPlayers }: Projecto
                 key={p.id}
                 className="flex items-center gap-2 px-5 py-3 rounded-2xl border border-slate-600 bg-slate-800/60 text-white font-semibold text-lg animate-in fade-in zoom-in-95 duration-500"
               >
-                {p.avatar_url ? (
-                  <img src={p.avatar_url} alt="" className="w-7 h-7 rounded-full object-cover" />
-                ) : (
-                  <span className="w-7 h-7 rounded-full bg-emerald-600 flex items-center justify-center text-sm">
-                    {p.display_name.charAt(0).toUpperCase()}
-                  </span>
-                )}
+                <PlayerAvatar
+                  avatarUrl={p.avatar_url}
+                  name={p.display_name}
+                  className="w-7 h-7 rounded-full object-cover"
+                  fallbackClassName="w-7 h-7 rounded-full bg-emerald-600 flex items-center justify-center text-sm"
+                />
                 {p.display_name}
               </div>
             ))}

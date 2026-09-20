@@ -41,7 +41,7 @@ export function DrawingCanvas({ sessionId, roundNumber, canvasVersion, disabled 
   useEffect(() => {
     const canvas = canvasRef.current
     if (!canvas) return
-    let raf = requestAnimationFrame(() => {
+    const raf = requestAnimationFrame(() => {
       fitCanvas(canvas)
       renderBoard(canvas, strokesRef.current.values())
     })

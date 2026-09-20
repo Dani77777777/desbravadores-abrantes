@@ -223,11 +223,37 @@ export function HostControl({ session: initSession, initialPlayers, initialWords
       const node = winnersCardRef.current
       if (!node) throw new Error('Card não pronto')
 
-      const dataUrl = await toPng(node, {
-        pixelRatio: 2,
-        cacheBust: true,
-        backgroundColor: '#0a1022',
-      })
+      // Pré-carregar todas as imagens antes de capturar (evita falhas CORS com avatares)
+      const imgs = node.querySelectorAll<HTMLImageElement>('img')
+      await Promise.allSettled(
+        Array.from(imgs).map(
+          (img) =>
+            new Promise<void>((resolve) => {
+              if (img.complete) { resolve(); return }
+              img.onload = () => resolve()
+              img.onerror = () => resolve()
+            })
+        )
+      )
+
+      // Captura com retry — a 1ª tentativa pode falhar por fontes web não carregadas ainda
+      let dataUrl: string | null = null
+      for (let attempt = 0; attempt < 3; attempt++) {
+        try {
+          dataUrl = await toPng(node, {
+            pixelRatio: 2,
+            cacheBust: true,
+            backgroundColor: '#0a1022',
+            fetchRequestInit: { cache: 'no-store' },
+          })
+          break
+        } catch (err) {
+          if (attempt === 2) throw err
+          await new Promise((r) => setTimeout(r, 400))
+        }
+      }
+
+      if (!dataUrl) throw new Error('Sem imagem gerada')
 
       const winner = session.winner_team as TeamId | null
       if (!winner) throw new Error('Sem equipa vencedora')
@@ -240,7 +266,8 @@ export function HostControl({ session: initSession, initialPlayers, initialWords
       // Mensagem apropriada para acompanhar a imagem. Nomes desambiguados:
       // primeiro nome, ou "Primeiro Último" se houver homónimos na sessão.
       const shortNames = shortDisplayNames(players)
-      const today = new Date().toLocaleDateString('pt-PT', { day: 'numeric', month: 'long', year: 'numeric' })
+      const gameDate = session.started_at ?? session.created_at
+      const today = new Date(gameDate).toLocaleDateString('pt-PT', { day: 'numeric', month: 'long', year: 'numeric' })
       const names = winners.map((p) => shortNames.get(p.id) ?? p.display_name)
       const namesText = names.length > 1
         ? `${names.slice(0, -1).join(', ')} e ${names[names.length - 1]}`
@@ -274,13 +301,15 @@ export function HostControl({ session: initSession, initialPlayers, initialWords
       link.download = fileName
       link.click()
       setShareToast('Imagem transferida!')
-    } catch {
-      setShareToast('Erro ao gerar imagem')
+    } catch (err) {
+      console.error('[HostControl] handleShareWinners', err)
+      setShareToast('Erro ao gerar imagem. Tenta novamente.')
     } finally {
       setSharing(false)
-      setTimeout(() => setShareToast(null), 3000)
+      setTimeout(() => setShareToast(null), 4000)
     }
   }
+
 
   const wordsA = words.filter((w) => w.team === 'a')
   const wordsB = words.filter((w) => w.team === 'b')
@@ -1005,6 +1034,7 @@ export function HostControl({ session: initSession, initialPlayers, initialWords
               allPlayers={players}
               team={winner}
               winReason={session.win_reason}
+              gameDate={session.started_at ?? session.created_at}
             />
           </div>
         )}

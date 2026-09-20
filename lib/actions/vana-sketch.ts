@@ -12,6 +12,7 @@ import {
 } from '@/utils/vana-sketch'
 import { normalizeText } from '@/utils/text-normalization'
 import { effectiveRole } from '@/utils/permissions'
+import { gameUnavailableError } from '@/utils/game-access'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 // ── Criar sessão (admin/host) ─────────────────────────────────
@@ -53,6 +54,9 @@ export async function joinVanaSketchSession(
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { sessionId: '', error: 'Precisas de fazer login para jogar.' }
 
+  const unavailable = await gameUnavailableError('vana-sketch')
+  if (unavailable) return { sessionId: '', error: unavailable }
+
   const { data: profile } = await supabase
     .from('profiles')
     .select('id, full_name, avatar_url, section, role')
@@ -86,13 +90,26 @@ export async function joinVanaSketchSession(
   if (existing) return { sessionId: session.id }
 
   // A meio do jogo ainda se pode entrar — só para palpitar (draw_order null)
-  await service.from('vanasketch_players').insert({
+  const { error: insertError } = await service.from('vanasketch_players').insert({
     session_id: session.id,
     user_id: user.id,
     display_name: profile.full_name ?? user.email ?? 'Jogador',
     avatar_url: profile.avatar_url,
     section: profile.section,
   })
+
+  // Sem isto, um erro aqui mandava o jogador para a sessão sem estar nela —
+  // e a página devolvia-o ao ecrã do código, sem explicação nenhuma.
+  if (insertError) {
+    const { data: retry } = await service
+      .from('vanasketch_players')
+      .select('id')
+      .eq('session_id', session.id)
+      .eq('user_id', user.id)
+      .maybeSingle()
+    // Corrida com outro dispositivo do mesmo jogador: a linha já lá está.
+    if (!retry) return { sessionId: '', error: 'Não foi possível entrar na sessão. Tenta outra vez.' }
+  }
 
   return { sessionId: session.id }
 }

@@ -65,7 +65,7 @@ export function PlayerView({ session: initialSession, myPlayer, initialPlayers, 
           </div>
         </header>
 
-        {session.status === 'lobby' && <LobbyView session={session} players={players} meId={me.id} />}
+        {session.status === 'lobby' && <LobbyView players={players} meId={me.id} />}
 
         {session.status === 'playing' && session.phase === 'choosing' && (
           isDrawer
@@ -98,7 +98,7 @@ export function PlayerView({ session: initialSession, myPlayer, initialPlayers, 
 }
 
 // ── Lobby ─────────────────────────────────────────────────────
-function LobbyView({ session, players, meId }: { session: VanaSketchSession; players: VanaSketchPlayer[]; meId: string }) {
+function LobbyView({ players, meId }: { players: VanaSketchPlayer[]; meId: string }) {
   return (
     <div className="flex flex-1 flex-col items-center justify-center gap-6 text-center">
       <img src="/images/VanaSketch.png" alt="" className="h-28 w-auto object-contain drop-shadow-2xl" />
@@ -200,11 +200,20 @@ function DrawerView({ session }: { session: VanaSketchSession }) {
 
   useEffect(() => {
     let cancelled = false
+    let loaded = false
     const supabase = createClient()
-    supabase.rpc('get_vanasketch_drawer_info', { p_session_id: session.id }).then(({ data }) => {
-      if (!cancelled && data && data.length > 0) setWord(data[0].word)
-    })
-    return () => { cancelled = true }
+    const load = async () => {
+      if (loaded) return
+      const { data } = await supabase.rpc('get_vanasketch_drawer_info', { p_session_id: session.id })
+      if (!cancelled && data && data.length > 0 && data[0].word) {
+        loaded = true
+        setWord(data[0].word)
+      }
+    }
+    load()
+    // Sem a palavra o desenhador fica bloqueado — reintenta até chegar
+    const t = setInterval(load, 2000)
+    return () => { cancelled = true; clearInterval(t) }
   }, [session.id, session.round_number])
 
   return (

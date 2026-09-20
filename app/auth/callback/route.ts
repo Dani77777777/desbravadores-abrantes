@@ -2,11 +2,13 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
 import { createClient as createAdminClient } from '@supabase/supabase-js'
 import crypto from 'crypto'
+import { safeNextPath } from '@/utils/safe-next-path'
 
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url)
   const code = searchParams.get('code')
-  const next = searchParams.get('next') ?? '/'
+  // Só caminhos internos, para evitar open-redirects (ex.: "@evil.com" viraria origin@evil.com)
+  const next = safeNextPath(searchParams.get('next'))
 
   if (code) {
     const supabase = await createClient()

@@ -6,6 +6,7 @@ import { ChevronLeft, Brain, Zap, Layers } from 'lucide-react';
 import { Navbar } from '@/components/layout/Navbar';
 import VanturGame from '@/components/vantur/VanturGame';
 import VanturHowToPlay from '@/components/vantur/VanturHowToPlay';
+import { gameUnavailableError } from '@/utils/game-access';
 
 interface ModeCardProps {
   title: string;
@@ -83,7 +84,9 @@ export default async function VanturGamePage() {
     'use server'
     const modeVal = formData.get('mode') as string;
     const uId = formData.get('userId') as string;
-    
+
+    if (await gameUnavailableError('vantur')) redirect('/jogos/vantur');
+
     try {
       const supabaseAction = await (await import('@/utils/supabase/server')).createClient();
       

@@ -4,6 +4,8 @@ import { createClient as createServerClient } from '@/utils/supabase/server'
 import { createClient } from '@supabase/supabase-js'
 import { revalidatePath } from 'next/cache'
 import { headers } from 'next/headers'
+import { createServiceClient } from '@/utils/supabase/service'
+import { deleteUserCompletely } from '@/utils/delete-account'
 
 export async function triggerResetPassword(userId: string) {
   const supabase = await createServerClient()
@@ -62,5 +64,52 @@ export async function triggerResetPassword(userId: string) {
   }
 
   revalidatePath('/admin')
+  return { success: true }
+}
+
+/**
+ * Apaga definitivamente a conta de um membro (auth.users → profiles em cascata).
+ * Só o coordenador REAL pode apagar; não pode apagar-se a si próprio (usa o
+ * Perfil para isso) nem apagar outro coordenador.
+ */
+export async function deleteMemberAccount(memberId: string): Promise<{ success?: boolean; error?: string }> {
+  const supabase = await createServerClient()
+
+  const { data: { user: requester }, error: authError } = await supabase.auth.getUser()
+  if (authError || !requester) {
+    return { error: 'Não autorizado' }
+  }
+
+  const { data: requesterProfile } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', requester.id)
+    .single()
+
+  if (requesterProfile?.role !== 'coordenador') {
+    return { error: 'Apenas o coordenador pode apagar contas.' }
+  }
+
+  if (memberId === requester.id) {
+    return { error: 'Não podes apagar a tua própria conta aqui. Usa a página de Perfil.' }
+  }
+
+  const supabaseAdmin = createServiceClient()
+
+  const { data: target } = await supabaseAdmin
+    .from('profiles')
+    .select('id, role, full_name')
+    .eq('id', memberId)
+    .maybeSingle()
+
+  if (target?.role === 'coordenador') {
+    return { error: 'Não é possível apagar a conta de outro coordenador. Altera primeiro o cargo.' }
+  }
+
+  const result = await deleteUserCompletely(memberId)
+  if (result.error) return result
+
+  revalidatePath('/admin')
+  revalidatePath('/leaderboard')
   return { success: true }
 }

@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { ChevronLeft, BookOpen, ScrollText, Plus, Trash2, Search, X, AlertCircle } from 'lucide-react';
 import { normalizeText } from '@/utils/text-normalization';
 import { isAdminRole } from '@/utils/permissions';
+import { GameAvailabilityBanner } from '../components/GameAvailabilityBanner';
 
 export default async function VanturAdminPage({ searchParams }: { searchParams: Promise<{ qBib?: string, qDict?: string, error?: string }> }) {
   const supabase = await createClient();
@@ -82,8 +83,8 @@ export default async function VanturAdminPage({ searchParams }: { searchParams: 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
         <div className="mb-10 flex flex-col md:flex-row md:items-end justify-between gap-6">
           <div className="space-y-4">
-            <Link href="/admin" className="inline-flex items-center gap-2 text-gray-500 hover:text-blue-600 font-medium transition-colors group">
-              <ChevronLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" /> Voltar à Gestão
+            <Link href="/admin?tab=games" className="inline-flex items-center gap-2 text-gray-500 hover:text-blue-600 font-medium transition-colors group">
+              <ChevronLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" /> Voltar aos Jogos
             </Link>
             <h1 className="text-5xl font-black text-slate-900 tracking-tighter">Gestão Vantur</h1>
             <p className="text-slate-500 max-w-lg">Alimenta o jogo com novas palavras bíblicas e expande o dicionário de validação.</p>
@@ -92,6 +93,10 @@ export default async function VanturAdminPage({ searchParams }: { searchParams: 
           <div className="flex bg-white p-2 rounded-3xl shadow-sm border border-slate-100 items-center gap-2">
              <div className="px-6 py-3 bg-blue-50 text-blue-600 rounded-2xl font-bold text-sm">Controlo de Dicionário</div>
           </div>
+        </div>
+
+        <div className="mb-8">
+          <GameAvailabilityBanner gameId="vantur" />
         </div>
 
         {errorMsg && (

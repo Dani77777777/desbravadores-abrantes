@@ -11,6 +11,7 @@ import {
   type PlayerForTeam,
 } from '@/utils/vana-words'
 import type { TeamId } from '@/types/vana-words'
+import { gameUnavailableError } from '@/utils/game-access'
 
 // ── Criar sessão (admin/host) ─────────────────────────────────
 export async function createVanaWordsSession(isTest = false): Promise<string> {
@@ -50,6 +51,9 @@ export async function joinVanaWordsSession(
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { sessionId: '', error: 'Precisas de fazer login para jogar.' }
+
+  const unavailable = await gameUnavailableError('vana-words')
+  if (unavailable) return { sessionId: '', error: unavailable }
 
   const { data: profile } = await supabase
     .from('profiles')
@@ -279,7 +283,9 @@ export async function confirmVanaWordsTeams(
   for (const h of recentHistory ?? []) {
     if (h.user_id && !recentArautosMap[h.user_id]) {
       const sess = h.vanawords_sessions as any
-      recentArautosMap[h.user_id] = sess?.created_at ?? new Date().toISOString()
+      // Sem created_at fiável, não assumimos "agora" (penalizaria injustamente
+      // o jogador) — deixamos por preencher, o que o trata como "nunca foi Arauto"
+      if (sess?.created_at) recentArautosMap[h.user_id] = sess.created_at
     }
   }
   const recentArautos = Object.entries(recentArautosMap).map(([user_id, last_at]) => ({ user_id, last_at }))
@@ -358,7 +364,9 @@ export async function rerollArauto(
     for (const h of recentHistory ?? []) {
       if (h.user_id && !recentArautosMap[h.user_id]) {
         const sess = h.vanawords_sessions as any
-        recentArautosMap[h.user_id] = sess?.created_at ?? new Date().toISOString()
+        // Sem created_at fiável, não assumimos "agora" (penalizaria injustamente
+        // o jogador) — deixamos por preencher, o que o trata como "nunca foi Arauto"
+        if (sess?.created_at) recentArautosMap[h.user_id] = sess.created_at
       }
     }
     const recentArautos = Object.entries(recentArautosMap).map(([user_id, last_at]) => ({ user_id, last_at }))
