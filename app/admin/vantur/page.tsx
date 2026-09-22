@@ -7,6 +7,8 @@ import { ChevronLeft, BookOpen, ScrollText, Plus, Trash2, Search, X, AlertCircle
 import { normalizeText } from '@/utils/text-normalization';
 import { isAdminRole } from '@/utils/permissions';
 import { GameAvailabilityBanner } from '../components/GameAvailabilityBanner';
+import { getDailyPlayersStats } from '@/lib/actions/daily-game-stats';
+import { DailyPlayersCard } from '@/components/admin/DailyPlayersCard';
 
 export default async function VanturAdminPage({ searchParams }: { searchParams: Promise<{ qBib?: string, qDict?: string, error?: string }> }) {
   const supabase = await createClient();
@@ -29,6 +31,8 @@ export default async function VanturAdminPage({ searchParams }: { searchParams: 
 
   const isAdmin = isAdminRole(profile);
   if (!isAdmin) redirect('/');
+
+  const dailyStats = await getDailyPlayersStats('vantur_sessions');
 
   // Fetch words with filtering
   let bibQuery = supabase.from('vantur_dictionary').select('*');
@@ -95,8 +99,9 @@ export default async function VanturAdminPage({ searchParams }: { searchParams: 
           </div>
         </div>
 
-        <div className="mb-8">
+        <div className="mb-8 grid gap-4 lg:grid-cols-[minmax(0,1fr)_280px]">
           <GameAvailabilityBanner gameId="vantur" />
+          <DailyPlayersCard date={dailyStats.date} players={dailyStats.players} />
         </div>
 
         {errorMsg && (

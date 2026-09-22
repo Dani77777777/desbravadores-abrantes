@@ -134,6 +134,7 @@ export const GAMES: GameDefinition[] = [
     image: '/images/VanaCodigo.png',
     href: '/jogos/vana-codigo',
     loginHref: '/login?next=/jogos/vana-codigo',
+    adminHref: '/admin/vana-codigo',
     color: 'from-emerald-500 via-emerald-700 to-slate-800',
     requiresAuth: true,
     adminCoordOnly: false,

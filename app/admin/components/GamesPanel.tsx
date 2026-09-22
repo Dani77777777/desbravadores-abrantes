@@ -206,7 +206,6 @@ export function GamesPanel({
               </div>
 
               <div className="mt-auto flex gap-2 border-t border-gray-100 p-3">
-                {/* Jogos sem nada a gerir (ex.: VanaCódigo) não têm página de gestão. */}
                 {game.adminHref && (
                   <Link
                     href={game.adminHref}
