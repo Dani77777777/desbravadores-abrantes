@@ -41,7 +41,17 @@ export default async function Dashboard() {
   if (!user) {
       const gameSettings = await fetchGameSettings(supabase)
       const gameVisibility = Object.fromEntries(GAMES.map((g) => [g.id, gameVisibilityFor(gameSettings[g.id], null)]))
-      return <LandingPage gameVisibility={gameVisibility} />
+      // Próximo evento aberto a todo o clube (sem secção) para mostrar aos visitantes
+      const { data: nextEvent } = await supabase
+        .from('events')
+        .select('id, title, description, location, start_at, end_at')
+        .is('target_section', null)
+        .eq('is_finished', false)
+        .gte('start_at', new Date().toISOString())
+        .order('start_at', { ascending: true })
+        .limit(1)
+        .maybeSingle()
+      return <LandingPage gameVisibility={gameVisibility} nextEvent={nextEvent} />
   }
 
   const { data: profile } = await supabase

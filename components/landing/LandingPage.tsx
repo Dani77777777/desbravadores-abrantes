@@ -25,6 +25,7 @@ import {
 import { GAMES, type GameVisibility } from "@/utils/games";
 import { displayFont } from "./fonts";
 import { SiteFooter } from "./SiteFooter";
+import { NextEventCard, type PublicEvent } from "./NextEventCard";
 
 const PHOTO = "/images/desbravadores todos 2.jpg";
 const D = displayFont.className;
@@ -43,11 +44,16 @@ const MARQUEE_WORDS = [
 /** Atraso de animação (entrada / reveal) em ms. */
 const delay = (ms: number) => ({ "--d": `${ms}ms` }) as CSSProperties;
 
-/** gameVisibility: id do jogo → estado para visitantes sem conta (jogos escondidos não aparecem). */
+/**
+ * gameVisibility: id do jogo → estado para visitantes sem conta (jogos escondidos não aparecem).
+ * nextEvent: próximo evento aberto a todo o clube (null = não há, a secção não aparece).
+ */
 export function LandingPage({
   gameVisibility = {},
+  nextEvent = null,
 }: {
   gameVisibility?: Record<string, GameVisibility>;
+  nextEvent?: PublicEvent | null;
 }) {
   const router = useRouter();
   const rootRef = useRef<HTMLDivElement>(null);
@@ -308,6 +314,15 @@ export function LandingPage({
           starClass="text-yellow-300"
         />
       </div>
+
+      {/* ── Próximo evento (aberto a todo o clube) ───────────── */}
+      {nextEvent && (
+        <section className="relative bg-stone-50 pt-20">
+          <div data-reveal className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+            <NextEventCard event={nextEvent} />
+          </div>
+        </section>
+      )}
 
       {/* ── O que são os Desbravadores ───────────────────────── */}
       <section id="welcome" className="relative scroll-mt-16 bg-stone-50 pb-24 pt-24">
