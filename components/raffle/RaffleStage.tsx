@@ -241,18 +241,21 @@ export function RaffleStage({
 }
 
 function WinnerGrid({ winners, big }: { winners: RaffleEntry[]; big: boolean }) {
+  // No projetor, com poucos vencedores há espaço de sobra — cartões maiores
+  const huge = big && winners.length <= 3
   return (
-    <div className={`mx-auto grid w-full gap-3 ${big ? 'max-w-6xl grid-cols-2 lg:grid-cols-3 gap-5' : 'max-w-3xl grid-cols-1 sm:grid-cols-2'}`}>
+    // flex-wrap centrado: 2 vencedores ficam ao meio (numa grelha fixa ficavam encostados à esquerda)
+    <div className={`mx-auto flex w-full flex-wrap justify-center ${big ? 'max-w-7xl gap-6' : 'max-w-3xl gap-3'}`}>
       {winners.map((w, i) => (
         <div
           key={w.id}
-          className={`flex items-center gap-3 rounded-2xl bg-white/10 ring-1 ring-white/15 animate-in fade-in zoom-in-95 duration-500 ${
-            big ? 'p-5' : 'p-3'
+          className={`flex max-w-full items-center gap-3 rounded-2xl bg-white/10 ring-1 ring-white/15 animate-in fade-in zoom-in-95 duration-500 ${
+            huge ? 'min-w-[26rem] px-8 py-7' : big ? 'min-w-[22rem] px-6 py-5' : 'w-full p-3 sm:w-auto sm:min-w-[16rem]'
           }`}
         >
-          <span className={`font-black text-amber-300 ${big ? 'w-12 text-3xl' : 'w-8 text-lg'}`}>{i + 1}.º</span>
-          <EntryAvatar entry={w} className={big ? 'size-16' : 'size-10'} />
-          <span className={`min-w-0 truncate font-black text-white ${big ? 'text-4xl' : 'text-lg'}`}>{w.name}</span>
+          <span className={`flex-shrink-0 font-black text-amber-300 ${huge ? 'text-5xl' : big ? 'text-3xl' : 'w-8 text-lg'}`}>{i + 1}.º</span>
+          <EntryAvatar entry={w} className={`flex-shrink-0 ${huge ? 'size-24' : big ? 'size-16' : 'size-10'}`} />
+          <span className={`min-w-0 truncate pr-2 font-black text-white ${huge ? 'text-6xl' : big ? 'text-4xl' : 'text-lg'}`}>{w.name}</span>
         </div>
       ))}
     </div>
