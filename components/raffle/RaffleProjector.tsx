@@ -1,9 +1,9 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Maximize, Shuffle, Smartphone, Users, Volume2 } from 'lucide-react'
+import { Maximize, MonitorSmartphone, Shuffle, Users, Volume2 } from 'lucide-react'
 import { createClient } from '@/utils/supabase/client'
-import type { RaffleScreenState } from '@/utils/raffle'
+import { raffleLocalChannelName, type RaffleLocalMessage, type RaffleScreenState } from '@/utils/raffle'
 import { unlockRaffleSound } from '@/utils/raffle-sound'
 import { RaffleStage } from './RaffleStage'
 
@@ -11,14 +11,49 @@ export function RaffleProjector({ userId, initialState }: { userId: string; init
   const [supabase] = useState(() => createClient())
   const [screen, setScreen] = useState<RaffleScreenState | null>(initialState)
   // Um sorteio que já existia quando o ecrã abriu mostra logo o resultado (sem rodar).
-  const [instantDrawId] = useState<string | null>(initialState?.draw?.id ?? null)
+  const [instantDrawId, setInstantDrawId] = useState<string | null>(initialState?.draw?.id ?? null)
   const [soundOn, setSoundOn] = useState(false)
   const [isFull, setIsFull] = useState(false)
+  // Enquanto um sorteador aberto NESTE computador está a controlar, ignora a base de dados
+  // (que pode ter um estado antigo do modo telemóvel).
+  const localActiveRef = useRef(false)
 
   const refetch = useCallback(async () => {
+    if (localActiveRef.current) return
     const { data } = await supabase.from('raffle_screens').select('state').eq('host_id', userId).maybeSingle()
-    if (data) setScreen(data.state as RaffleScreenState)
+    if (data && !localActiveRef.current) setScreen(data.state as RaffleScreenState)
   }, [supabase, userId])
+
+  // Sorteador noutra janela/separador deste computador
+  useEffect(() => {
+    if (typeof BroadcastChannel === 'undefined') return
+    const bc = new BroadcastChannel(raffleLocalChannelName(userId))
+    const send = (m: RaffleLocalMessage) => bc.postMessage(m)
+    bc.onmessage = (ev: MessageEvent<RaffleLocalMessage>) => {
+      const m = ev.data
+      if (m.type === 'state') {
+        if (!localActiveRef.current) {
+          // Primeiro contacto: um sorteio que já ia a meio aparece logo resolvido
+          localActiveRef.current = true
+          setInstantDrawId(m.state.draw?.id ?? null)
+        }
+        setScreen(m.state)
+      } else if (m.type === 'bye' && m.from === 'controller') {
+        localActiveRef.current = false
+        refetch()
+      }
+    }
+    send({ type: 'hello' })
+    const ping = setInterval(() => send({ type: 'ping' }), 2000)
+    const onHide = () => send({ type: 'bye', from: 'projector' })
+    window.addEventListener('pagehide', onHide)
+    return () => {
+      clearInterval(ping)
+      window.removeEventListener('pagehide', onHide)
+      onHide()
+      bc.close()
+    }
+  }, [userId, refetch])
 
   useEffect(() => {
     const channel = supabase
@@ -90,10 +125,11 @@ export function RaffleProjector({ userId, initialState }: { userId: string; init
           </div>
         ) : (
           <div className="flex flex-col items-center text-center">
-            <Smartphone className="h-20 w-20 text-blue-300" />
-            <p className="mt-6 text-4xl font-black">À espera do telemóvel…</p>
+            <MonitorSmartphone className="h-20 w-20 text-blue-300" />
+            <p className="mt-6 text-4xl font-black">À espera do sorteador…</p>
             <p className="mt-3 max-w-2xl text-xl text-blue-200">
-              No telemóvel, abre Gestão → Ferramentas → Sorteador com esta mesma conta e liga &quot;Mostrar no projetor&quot;.
+              Abre o Sorteador noutra janela deste computador, ou no telemóvel com esta mesma conta e liga &quot;Controlar a
+              partir do telemóvel&quot;.
             </p>
           </div>
         )}

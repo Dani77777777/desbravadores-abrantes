@@ -46,6 +46,25 @@ export type RaffleDraw = {
   revealAll: boolean
 }
 
+/**
+ * Janela do projetor no MESMO computador: fala com o sorteador por BroadcastChannel
+ * (instantâneo, sem base de dados).
+ *   projetor → sorteador: hello (pede o estado), ping (a cada 2s), bye
+ *   sorteador → projetor: state, bye
+ */
+export type RaffleLocalMessage =
+  | { type: 'hello' }
+  | { type: 'ping' }
+  | { type: 'bye'; from: 'projector' | 'controller' }
+  | { type: 'state'; state: RaffleScreenState }
+
+export function raffleLocalChannelName(userId: string) {
+  return `raffle-local-${userId}`
+}
+
+export const PROJECTOR_PATH = '/admin/ferramentas/sorteio/projetor'
+export const PROJECTOR_WINDOW_NAME = 'sorteio-projetor'
+
 export const GUEST_PREFIX = 'guest:'
 
 export function isGuestId(id: string) {

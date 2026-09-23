@@ -17,6 +17,7 @@ import {
   RotateCcw,
   Search,
   Shuffle,
+  Smartphone,
   Sparkles,
   Trash2,
   UserMinus,
@@ -32,16 +33,20 @@ import { Switch } from '@/components/ui/switch'
 import { SECTION_LABELS, helperLabel } from '@/utils/permissions'
 import {
   GUEST_PREFIX,
+  PROJECTOR_PATH,
+  PROJECTOR_WINDOW_NAME,
   isGuestId,
   isHelperFor,
   isLeaderFor,
   memberEntry,
   newId,
   pickWinners,
+  raffleLocalChannelName,
   recommendEvent,
   type RaffleDraw,
   type RaffleEntry,
   type RaffleEvent,
+  type RaffleLocalMessage,
   type RaffleMember,
   type RaffleScreenState,
 } from '@/utils/raffle'
@@ -351,9 +356,64 @@ export function RaffleClient({
     return () => clearTimeout(t)
   }, [hydrated, projector, screenState, draw, supabase, userId])
 
+  // Janela do projetor neste computador (BroadcastChannel — instantâneo, sem base de dados)
+  const screenStateRef = useRef(screenState)
+  screenStateRef.current = screenState
+  const bcRef = useRef<BroadcastChannel | null>(null)
+  const lastPingRef = useRef(0)
+  const [localProjector, setLocalProjector] = useState(false)
+
+  useEffect(() => {
+    if (typeof BroadcastChannel === 'undefined') return
+    const bc = new BroadcastChannel(raffleLocalChannelName(userId))
+    bcRef.current = bc
+    const send = (m: RaffleLocalMessage) => bc.postMessage(m)
+    bc.onmessage = (ev: MessageEvent<RaffleLocalMessage>) => {
+      const m = ev.data
+      if (m.type === 'hello' || m.type === 'ping') {
+        const wasOff = Date.now() - lastPingRef.current > 5000
+        lastPingRef.current = Date.now()
+        setLocalProjector(true)
+        if (m.type === 'hello' || wasOff) send({ type: 'state', state: screenStateRef.current })
+      } else if (m.type === 'bye' && m.from === 'projector') {
+        lastPingRef.current = 0
+        setLocalProjector(false)
+      }
+    }
+    const check = setInterval(() => {
+      if (lastPingRef.current && Date.now() - lastPingRef.current > 5000) {
+        lastPingRef.current = 0
+        setLocalProjector(false)
+      }
+    }, 2000)
+    const onHide = () => send({ type: 'bye', from: 'controller' })
+    window.addEventListener('pagehide', onHide)
+    return () => {
+      clearInterval(check)
+      window.removeEventListener('pagehide', onHide)
+      onHide()
+      bc.close()
+      bcRef.current = null
+    }
+  }, [userId])
+
+  useEffect(() => {
+    bcRef.current?.postMessage({ type: 'state', state: screenState } satisfies RaffleLocalMessage)
+  }, [screenState])
+
+  const openProjectorWindow = () => {
+    unlockRaffleSound()
+    const w = window.open(PROJECTOR_PATH, PROJECTOR_WINDOW_NAME, 'popup=yes,width=1280,height=720')
+    if (!w) {
+      toast.error('O browser bloqueou a janela. Permite pop-ups para este site e tenta outra vez.')
+      return
+    }
+    w.focus()
+  }
+
   const [origin, setOrigin] = useState('')
   useEffect(() => setOrigin(window.location.origin), [])
-  const projectorPath = '/admin/ferramentas/sorteio/projetor'
+  const projectorPath = PROJECTOR_PATH
 
   // ── Sortear ────────────────────────────────────────────────
   const maxCount = Math.max(1, pool.length)
@@ -361,6 +421,8 @@ export function RaffleClient({
 
   const startDraw = () => {
     unlockRaffleSound()
+    // Tira o foco do botão para o Espaço seguinte ir para os atalhos (e não "clicar" outra vez)
+    ;(document.activeElement as HTMLElement | null)?.blur?.()
     if (pool.length === 0) {
       toast.error('Não há ninguém no sorteio.')
       return
@@ -390,6 +452,28 @@ export function RaffleClient({
 
   const nextPoolCount = pool.length
 
+  // Atalhos de teclado (para controlar no PC): Espaço/Enter sorteia, Esc fecha.
+  const keysRef = useRef({ startDraw, closeDraw, draw, drawDone })
+  keysRef.current = { startDraw, closeDraw, draw, drawDone }
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.ctrlKey || e.metaKey || e.altKey || e.repeat) return
+      const t = e.target as HTMLElement | null
+      if (t && (t.closest('input, textarea, select, button, a, [contenteditable="true"]') || t.isContentEditable)) return
+      const k = keysRef.current
+      if (e.key === ' ' || e.key === 'Enter') {
+        if (k.draw && !k.drawDone) return
+        e.preventDefault()
+        k.startDraw()
+      } else if (e.key === 'Escape' && k.draw) {
+        e.preventDefault()
+        k.closeDraw()
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
+
   return (
     <>
       <main className="mx-auto max-w-3xl space-y-5 px-4 pb-44 pt-6">
@@ -401,6 +485,74 @@ export function RaffleClient({
             <Shuffle className="h-6 w-6 text-blue-700" /> Sorteador
           </h1>
         </div>
+
+        {/* Projetor */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <MonitorPlay className="h-5 w-5 text-blue-700" /> Projetor
+              {localProjector && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-0.5 text-[11px] font-bold text-green-700">
+                  <span className="h-1.5 w-1.5 rounded-full bg-green-500" /> Janela ligada
+                </span>
+              )}
+            </CardTitle>
+            <CardDescription>
+              Abre a janela do projetor, arrasta-a para o ecrã do projetor e clica lá em &quot;ecrã inteiro&quot;. Controlas tudo a partir
+              daqui (Espaço sorteia, Esc fecha).
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <button
+              type="button"
+              onClick={openProjectorWindow}
+              className="flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-blue-900 px-4 text-sm font-bold text-white hover:bg-blue-800 sm:w-auto"
+            >
+              <ExternalLink className="h-4 w-4" /> {localProjector ? 'Mostrar janela do projetor' : 'Abrir janela do projetor'}
+            </button>
+
+            <div className="border-t border-gray-100 pt-4">
+              <div className="flex items-center justify-between gap-3">
+                <label htmlFor="raffle-remote" className="min-w-0">
+                  <span className="flex items-center gap-1.5 text-sm font-bold text-gray-800">
+                    <Smartphone className="h-4 w-4" /> Controlar a partir do telemóvel
+                  </span>
+                  <span className="block text-xs text-gray-500">
+                    Para quando o projetor está noutro computador: este dispositivo controla e o outro mostra.
+                  </span>
+                </label>
+                <Switch id="raffle-remote" checked={projector} onCheckedChange={setProjector} />
+              </div>
+              {projector && (
+                <div className="mt-3 space-y-2">
+                  <p className="text-sm text-gray-600">
+                    No computador do projetor, entra com <b>a tua conta</b> e abre <b>Gestão → Ferramentas → Ecrã do projetor</b>, ou
+                    este endereço:
+                  </p>
+                  <div className="flex gap-2">
+                    <code className="min-w-0 flex-1 truncate rounded-lg bg-gray-100 px-3 py-2.5 text-xs text-gray-700">
+                      {origin}
+                      {projectorPath}
+                    </code>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard
+                          ?.writeText(`${origin}${projectorPath}`)
+                          .then(() => toast.success('Endereço copiado'))
+                          .catch(() => toast.error('Não foi possível copiar.'))
+                      }}
+                      className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50"
+                      title="Copiar"
+                    >
+                      <Copy className="h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Evento */}
         <Card>
@@ -720,59 +872,6 @@ export function RaffleClient({
             )}
           </CardContent>
         </Card>
-
-        {/* Projetor */}
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between gap-3">
-              <CardTitle className="flex items-center gap-2 text-base">
-                <MonitorPlay className="h-5 w-5 text-blue-700" /> Mostrar no projetor
-              </CardTitle>
-              <Switch checked={projector} onCheckedChange={setProjector} />
-            </div>
-            <CardDescription>
-              {projector
-                ? 'O ecrã do projetor segue este telemóvel em tempo real.'
-                : 'Desligado: o sorteio aparece só neste ecrã.'}
-            </CardDescription>
-          </CardHeader>
-          {projector && (
-            <CardContent className="space-y-3">
-              <p className="text-sm text-gray-600">
-                No computador ligado ao projetor, entra com <b>a tua conta</b> e abre <b>Gestão → Ferramentas → Ecrã do projetor</b>, ou este
-                endereço:
-              </p>
-              <div className="flex gap-2">
-                <code className="min-w-0 flex-1 truncate rounded-lg bg-gray-100 px-3 py-2.5 text-xs text-gray-700">
-                  {origin}
-                  {projectorPath}
-                </code>
-                <button
-                  type="button"
-                  onClick={() => {
-                    navigator.clipboard
-                      ?.writeText(`${origin}${projectorPath}`)
-                      .then(() => toast.success('Endereço copiado'))
-                      .catch(() => toast.error('Não foi possível copiar.'))
-                  }}
-                  className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50"
-                  title="Copiar"
-                >
-                  <Copy className="h-4 w-4" />
-                </button>
-                <a
-                  href={projectorPath}
-                  target="_blank"
-                  rel="noopener"
-                  className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50"
-                  title="Abrir aqui noutro separador"
-                >
-                  <ExternalLink className="h-4 w-4" />
-                </a>
-              </div>
-            </CardContent>
-          )}
-        </Card>
       </main>
 
       {/* Barra de sortear */}
@@ -820,7 +919,8 @@ export function RaffleClient({
         <DrawOverlay
           draw={draw}
           title={event?.title ?? null}
-          sound={sound}
+          // Com a janela do projetor ligada, o som toca só lá (senão ouvia-se a dobrar)
+          sound={sound && !localProjector}
           onToggleSound={() => setSound((s) => !s)}
           done={drawDone}
           onDone={() => setDrawDone(true)}
@@ -829,7 +929,8 @@ export function RaffleClient({
           onAgain={startDraw}
           nextPoolCount={nextPoolCount}
           nextCount={Math.min(count, Math.max(1, nextPoolCount))}
-          projector={projector}
+          projector={projector || localProjector}
+          soundOnProjector={localProjector}
         />
       )}
     </>
@@ -849,6 +950,7 @@ function DrawOverlay({
   nextPoolCount,
   nextCount,
   projector,
+  soundOnProjector,
 }: {
   draw: RaffleDraw
   title: string | null
@@ -862,6 +964,8 @@ function DrawOverlay({
   nextPoolCount: number
   nextCount: number
   projector: boolean
+  /** O som toca na janela do projetor — o botão de som aqui não faz nada. */
+  soundOnProjector: boolean
 }) {
   const ref = useRef<HTMLDivElement>(null)
   const [isFull, setIsFull] = useState(false)
@@ -887,9 +991,11 @@ function DrawOverlay({
           {title ? `Sorteio · ${title}` : 'Sorteio'}
           {projector && <span className="ml-2 rounded bg-white/10 px-1.5 py-0.5 text-[10px] uppercase">No projetor</span>}
         </p>
-        <button type="button" onClick={onToggleSound} className="rounded-lg p-2 text-blue-200 hover:bg-white/10" title="Som">
-          {sound ? <Volume2 className="h-5 w-5" /> : <VolumeX className="h-5 w-5" />}
-        </button>
+        {!soundOnProjector && (
+          <button type="button" onClick={onToggleSound} className="rounded-lg p-2 text-blue-200 hover:bg-white/10" title="Som">
+            {sound ? <Volume2 className="h-5 w-5" /> : <VolumeX className="h-5 w-5" />}
+          </button>
+        )}
         {typeof document !== 'undefined' && document.fullscreenEnabled && (
           <button type="button" onClick={toggleFull} className="rounded-lg p-2 text-blue-200 hover:bg-white/10" title="Ecrã inteiro">
             {isFull ? <Minimize className="h-5 w-5" /> : <Maximize className="h-5 w-5" />}
