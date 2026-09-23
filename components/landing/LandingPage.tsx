@@ -297,23 +297,26 @@ export function LandingPage({
             </div>
           </div>
         </div>
-      </section>
 
-      {/* ── Faixas a correr ──────────────────────────────────── */}
-      <div
-        aria-hidden
-        className="relative z-20 -mb-6 overflow-hidden py-6"
-      >
-        <Marquee
-          className="-rotate-2 bg-yellow-400 text-blue-950"
-          starClass="text-red-500"
-        />
-        <Marquee
-          reverse
-          className="-mt-3 rotate-1 bg-red-500 text-white"
-          starClass="text-yellow-300"
-        />
-      </div>
+        {/* ── Faixas a correr ────────────────────────────────── */}
+        {/* Dentro do topo para herdarem o mesmo fundo com gradiente. A parte de baixo
+            (por trás da faixa vermelha) já tem a cor da secção seguinte, para não
+            aparecer uma lista de azul liso por baixo das faixas inclinadas. */}
+        <div
+          aria-hidden
+          className="relative z-20 bg-[linear-gradient(to_bottom,transparent_58%,#fafaf9_58%)] py-6"
+        >
+          <Marquee
+            className="-rotate-2 bg-yellow-400 text-blue-950"
+            starClass="text-red-500"
+          />
+          <Marquee
+            reverse
+            className="-mt-3 rotate-1 bg-red-500 text-white"
+            starClass="text-yellow-300"
+          />
+        </div>
+      </section>
 
       {/* ── Próximo evento (aberto a todo o clube) ───────────── */}
       {nextEvent && (
@@ -792,19 +795,23 @@ function Marquee({
       <Star className={`h-5 w-5 fill-current ${starClass}`} />
     </span>
   ));
+  // A faixa é bem mais larga que o ecrã (130vw) para as pontas inclinadas nunca se
+  // verem. A frase repete-se 4× e a animação anda 50% (2 repetições): assim a outra
+  // metade cobre sempre a faixa toda e as palavras não "desaparecem" em ecrãs largos.
   return (
-    <div className={`-mx-4 overflow-hidden py-3 shadow-lg ${className}`}>
+    <div className={`-ml-[15vw] w-[130vw] overflow-hidden py-3 shadow-lg ${className}`}>
       <div
         className={`lp-marquee flex w-max ${D} text-2xl font-extrabold uppercase tracking-tight sm:text-3xl`}
         style={
           {
             animationDirection: reverse ? "reverse" : "normal",
-            "--lp-speed": reverse ? "38s" : "30s",
+            "--lp-speed": reverse ? "76s" : "60s",
           } as CSSProperties
         }
       >
-        <div className="flex">{row}</div>
-        <div className="flex">{row}</div>
+        {[0, 1, 2, 3].map((i) => (
+          <div key={i} className="flex">{row}</div>
+        ))}
       </div>
     </div>
   );
