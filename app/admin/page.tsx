@@ -1,6 +1,5 @@
 import { createClient } from '@/utils/supabase/server'
 import { Navbar } from '@/components/layout/Navbar'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { redirect } from 'next/navigation'
 import { MemberList } from './components/MemberList'
 import { TaskPanel } from './components/TaskPanel'
@@ -17,6 +16,7 @@ import { ToolsPanel } from './components/ToolsPanel'
 import { Users, ListChecks, Megaphone, MessageSquare, LayoutDashboard, CalendarDays, ShoppingBag, QrCode, Gamepad2, ClipboardList, ScrollText, Wrench } from 'lucide-react'
 import { effectiveRole, effectiveLeadershipSection, isHelper, helperLabel } from '@/utils/permissions'
 import { fetchGameSettings } from '@/utils/games'
+import { displayFont } from '@/components/landing/fonts'
 
 export default async function AdminPage({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
   const supabase = await createClient()
@@ -195,6 +195,20 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
   // Disponibilidade dos jogos (aba "Jogos")
   const gameSettings = activeTab === 'games' ? await fetchGameSettings(supabase) : null
 
+  // Presenças dos últimos eventos concluídos (taxas de presença na Visão Geral e nos Eventos).
+  // Limitado aos 15 mais recentes para ficar bem abaixo do limite de 1000 linhas por pedido.
+  let attendance: any[] = []
+  if (activeTab === 'overview' || activeTab === 'events') {
+    const recentFinishedIds = (events || []).filter((e) => e.is_finished).slice(0, 15).map((e) => e.id)
+    if (recentFinishedIds.length) {
+      const { data: att } = await supabase
+        .from('event_attendance')
+        .select('event_id, user_id, status')
+        .in('event_id', recentFinishedIds)
+      attendance = att || []
+    }
+  }
+
   const SECTION_LABELS: Record<string, string> = {
     rebentos: 'Rebentos', ticoes: 'Tições', exploradores: 'Exploradores',
     companheiros: 'Companheiros', embaixadores: 'Embaixadores',
@@ -207,8 +221,8 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Painel de Gestão</h1>
-            <p className="text-gray-600">
+            <h1 className={`${displayFont.className} text-3xl font-extrabold tracking-tight text-blue-950`}>Painel de Gestão</h1>
+            <p className="text-stone-500">
               {isHelper(profile) && <span className="font-bold text-blue-700">{helperLabel(profile)} • </span>}
               {isCoordenador
                 ? `Coordenação • Todos os membros (${members?.length || 0})`
@@ -239,7 +253,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
                 key={tab.id}
                 href={tab.href || `/admin?tab=${tab.id}`}
                 className={`flex items-center gap-2 px-5 py-2.5 text-sm font-bold rounded-xl transition-all whitespace-nowrap ${activeTab === tab.id
-                    ? 'bg-blue-900 text-white shadow-md'
+                    ? 'bg-blue-950 text-white shadow-md'
                     : 'text-gray-500 hover:bg-gray-100'
                   }`}
               >
@@ -265,26 +279,23 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
             events={events || []}
             purchases={purchases || []}
             rateInfo={storeRateInfo}
+            attendance={attendance}
+            suggestions={suggestions || []}
+            tasks={tasks || []}
+            completions={completions || []}
+            sectionSuggestions={sectionSuggestions || []}
           />
         )}
 
         {/* Members tab */}
         {activeTab === 'members' && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Membros da Classe</CardTitle>
-              <CardDescription>Pesquisa, filtra e gere pontos, cargos, investiduras e contas dos desbravadores.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <MemberList
-                members={members || []}
-                currentUserRole={profile.role}
-                adminProfile={profile}
-                clubMembers={clubMembers}
-                sectionSuggestions={sectionSuggestions || []}
-              />
-            </CardContent>
-          </Card>
+          <MemberList
+            members={members || []}
+            currentUserRole={profile.role}
+            adminProfile={profile}
+            clubMembers={clubMembers}
+            sectionSuggestions={sectionSuggestions || []}
+          />
         )}
 
         {/* Tasks tab */}
@@ -293,6 +304,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
             profile={effProfile}
             tasks={tasks || []}
             completions={completions || []}
+            members={members || []}
           />
         )}
 
@@ -302,6 +314,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
             profile={effProfile}
             members={members || []}
             events={events || []}
+            attendance={attendance}
           />
         )}
 
