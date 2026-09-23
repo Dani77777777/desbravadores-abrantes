@@ -202,6 +202,7 @@ FROM (
   SELECT
     x.id, x.created_at, x.target_user_id, x.target_name, x.target_avatar, x.target_section, x.target_role,
     x.awarded_by_user_id, x.awarded_by_name, x.awarded_by_role, x.awarded_by_real_role,
+    x.awarded_by_helper_role, x.awarded_by_helper_section,
     x.amount_xp, x.amount_gold, x.description, x.event_id, x.is_self,
     -- Coordenador (cargo real) a dar pontos a si próprio com valor escolhido por ele:
     -- permitido, mas destacado. Presenças em eventos e tarefas NÃO contam: o valor vem
@@ -224,6 +225,10 @@ FROM (
       a.full_name              AS awarded_by_name,
       COALESCE(a.helper_role, a.role)::text AS awarded_by_role,
       a.role::text             AS awarded_by_real_role,
+      -- Ajudantes: o cargo efetivo acima é o do ajudante; estes dois servem para os
+      -- identificar como "Ajudante · Classe" (e não como Dirigente/Coordenador).
+      a.helper_role::text      AS awarded_by_helper_role,
+      a.helper_section::text   AS awarded_by_helper_section,
       pl.amount_xp,
       pl.amount_gold,
       pl.description,
@@ -330,6 +335,8 @@ BEGIN
     'top_awarders', COALESCE((
       SELECT json_agg(r) FROM (
         SELECT awarded_by_user_id AS user_id, max(awarded_by_name) AS name, max(awarded_by_role) AS role,
+               max(awarded_by_real_role) AS real_role, max(awarded_by_helper_role) AS helper_role,
+               max(awarded_by_helper_section) AS helper_section,
                count(*) AS movements,
                COALESCE(SUM(amount_xp) FILTER (WHERE amount_xp > 0), 0) AS xp_given
         FROM m

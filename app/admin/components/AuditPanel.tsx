@@ -12,7 +12,7 @@ import {
   RotateCcw, Search, ShieldCheck, ShoppingBag, Trophy, Users, Wrench, X,
 } from 'lucide-react'
 import { toast } from 'sonner'
-import { SECTION_LABELS } from '@/utils/permissions'
+import { SECTION_LABELS, helperLabel } from '@/utils/permissions'
 import { ROLE_LABELS } from './member-constants'
 import { PointsResetCard } from './PointsResetCard'
 
@@ -63,6 +63,14 @@ interface Filters {
   currency: Currency
   onlySuspicious: boolean
   onlyLarge: boolean
+}
+
+/** Cargo de quem atribuiu: Ajudantes aparecem como tal, não com o cargo efetivo (Dirigente/Coordenador). */
+function awarderRoleLabel(role?: string, realRole?: string, helperRole?: string, helperSection?: string) {
+  const helper = helperLabel({ helper_role: helperRole, helper_section: helperSection })
+  if (helper) return helper
+  const r = realRole || role
+  return r ? ROLE_LABELS[r] || r : ''
 }
 
 /** Aplica os filtros à query da vista points_audit (usado na tabela e no CSV). */
@@ -192,7 +200,7 @@ export function AuditPanel({ members }: { members: any[] }) {
     const lines = (data || []).map((r: any) => [
       new Date(r.created_at).toISOString(), r.target_name, SECTION_LABELS[r.target_section] || r.target_section,
       r.amount_xp, r.amount_gold, CATEGORIES[r.category]?.label || r.category, r.description,
-      r.awarded_by_name, ROLE_LABELS[r.awarded_by_role] || r.awarded_by_role,
+      r.awarded_by_name, awarderRoleLabel(r.awarded_by_role, r.awarded_by_real_role, r.awarded_by_helper_role, r.awarded_by_helper_section),
       r.is_suspicious ? 'Suspeito' : r.category === 'auto' ? 'Auto-atribuição (coordenação)' : '',
     ].map(esc).join(';'))
     const blob = new Blob(['﻿' + [header.map(esc).join(';'), ...lines].join('\n')], { type: 'text/csv;charset=utf-8' })
@@ -371,7 +379,7 @@ export function AuditPanel({ members }: { members: any[] }) {
           <TopList
             title="Quem mais atribuiu pontos"
             items={(overview?.top_awarders || []).map((r: any) => ({
-              id: r.user_id, name: r.name || 'Sistema', value: `${r.movements} mov.`, sub: ROLE_LABELS[r.role] || '',
+              id: r.user_id, name: r.name || 'Sistema', value: `${r.movements} mov.`, sub: awarderRoleLabel(r.role, r.real_role, r.helper_role, r.helper_section),
             }))}
             onSelect={(id) => { setView('movements'); setFilter('memberId', id) }}
           />
@@ -635,7 +643,9 @@ function MovementsTable({ rows, loading }: { rows: any[]; loading: boolean }) {
                   {r.is_self ? 'O próprio' : r.awarded_by_name || 'Sistema'}
                 </p>
                 {!r.is_self && r.awarded_by_role && (
-                  <p className="text-[11px] text-slate-400">{ROLE_LABELS[r.awarded_by_role] || r.awarded_by_role}</p>
+                  <p className="text-[11px] text-slate-400">
+                    {awarderRoleLabel(r.awarded_by_role, r.awarded_by_real_role, r.awarded_by_helper_role, r.awarded_by_helper_section)}
+                  </p>
                 )}
               </td>
             </tr>
