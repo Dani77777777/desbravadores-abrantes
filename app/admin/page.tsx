@@ -13,7 +13,8 @@ import { QrPanel } from './components/QrPanel'
 import { SurveyPanel } from './components/SurveyPanel'
 import { AuditPanel } from './components/AuditPanel'
 import { GamesPanel } from './components/GamesPanel'
-import { Users, ListChecks, Megaphone, MessageSquare, LayoutDashboard, CalendarDays, ShoppingBag, QrCode, Gamepad2, ClipboardList, ScrollText } from 'lucide-react'
+import { ToolsPanel } from './components/ToolsPanel'
+import { Users, ListChecks, Megaphone, MessageSquare, LayoutDashboard, CalendarDays, ShoppingBag, QrCode, Gamepad2, ClipboardList, ScrollText, Wrench } from 'lucide-react'
 import { effectiveRole, effectiveLeadershipSection, isHelper, helperLabel } from '@/utils/permissions'
 import { fetchGameSettings } from '@/utils/games'
 
@@ -228,6 +229,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
             { id: 'qr', label: 'Questões / QR', icon: QrCode, coordOnly: true, count: 0, countColor: 'blue' },
             { id: 'surveys', label: 'Inquéritos', icon: ClipboardList, coordOnly: true, count: 0, countColor: 'blue' },
             { id: 'games', label: 'Jogos', icon: Gamepad2, coordOnly: false, count: 0, countColor: 'blue' },
+            { id: 'tools', label: 'Ferramentas', icon: Wrench, coordOnly: false, count: 0, countColor: 'blue' },
             { id: 'store', label: 'Loja', icon: ShoppingBag, coordOnly: true, count: purchases?.filter(p => p.status === 'pending').length || 0, countColor: 'orange' },
             { id: 'audit', label: 'Auditoria', icon: ScrollText, coordOnly: true, realCoordOnly: true, count: 0, countColor: 'blue' }
           ] as { id: string, label: string, icon: any, coordOnly: boolean, realCoordOnly?: boolean, count: number, countColor: string, href?: string }[])
@@ -333,6 +335,9 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
             isCoordenador={isCoordenador}
           />
         )}
+
+        {/* Tools tab */}
+        {activeTab === 'tools' && <ToolsPanel />}
 
         {/* Audit tab */}
         {activeTab === 'audit' && isRealCoordenador && (
