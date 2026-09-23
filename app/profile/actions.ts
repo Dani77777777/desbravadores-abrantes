@@ -4,6 +4,7 @@ import { createClient } from '@/utils/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { createServiceClient } from '@/utils/supabase/service'
 import { deleteUserCompletely } from '@/utils/delete-account'
+import { deleteOwnAvatarFile } from '@/utils/avatar-storage'
 
 export async function updateUserProfile(data: {
   fullName?: string
@@ -21,6 +22,9 @@ export async function updateUserProfile(data: {
   if (data.fullName) updateData.full_name = data.fullName
   if (data.avatarUrl !== undefined) updateData.avatar_url = data.avatarUrl || null
 
+  // Foto atual (lida da BD) para apagar do bucket se for trocada ou removida
+  const { data: current } = await supabase.from('profiles').select('avatar_url').eq('id', user.id).single()
+
   const { error: updateError } = await supabase
     .from('profiles')
     .update(updateData)
@@ -29,6 +33,10 @@ export async function updateUserProfile(data: {
   if (updateError) {
     console.error('Update error:', updateError)
     return { error: `Erro ao atualizar: ${updateError.message}` }
+  }
+
+  if ('avatar_url' in updateData && current?.avatar_url && current.avatar_url !== updateData.avatar_url) {
+    await deleteOwnAvatarFile(current.avatar_url, user.id)
   }
 
   revalidatePath('/')

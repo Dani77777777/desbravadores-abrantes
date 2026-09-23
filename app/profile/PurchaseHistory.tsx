@@ -20,10 +20,10 @@ export function PurchaseHistory({ purchases }: PurchaseHistoryProps) {
 
   if (purchases.length === 0) {
     return (
-      <Card>
+      <Card className="gap-0 rounded-[1.75rem] border-none py-6 shadow-md shadow-blue-950/5 ring-1 ring-stone-200 sm:py-7">
         <CardHeader>
-          <CardTitle className="text-lg flex items-center gap-2">
-            <ShoppingBag className="w-5 h-5 text-indigo-600" />
+          <CardTitle className="flex items-center gap-3 text-xl font-extrabold text-blue-950">
+            <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-pink-500 text-white shadow-md"><ShoppingBag className="w-5 h-5" /></span>
             Histórico de Compras
           </CardTitle>
           <CardDescription>Ainda não realizaste compras na loja.</CardDescription>
@@ -33,15 +33,15 @@ export function PurchaseHistory({ purchases }: PurchaseHistoryProps) {
   }
 
   return (
-    <Card>
+    <Card className="gap-0 rounded-[1.75rem] border-none py-6 shadow-md shadow-blue-950/5 ring-1 ring-stone-200 sm:py-7">
       <CardHeader>
-        <CardTitle className="text-lg flex items-center gap-2">
-          <ShoppingBag className="w-5 h-5 text-indigo-600" />
+        <CardTitle className="flex items-center gap-3 text-xl font-extrabold text-blue-950">
+          <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-pink-500 text-white shadow-md"><ShoppingBag className="w-5 h-5" /></span>
           Histórico de Compras
         </CardTitle>
         <CardDescription>Consulta as tuas encomendas, pagamentos e chaves digitais.</CardDescription>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="mt-6 space-y-3">
         {purchases.map((purchase) => {
           const product = purchase.store_products
           const isDigital = product?.type === 'digital'
@@ -57,7 +57,7 @@ export function PurchaseHistory({ purchases }: PurchaseHistoryProps) {
           })
 
           return (
-            <div key={purchase.id} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 rounded-xl border border-gray-100 bg-stone-50/50 gap-4 transition-all hover:border-indigo-100">
+            <div key={purchase.id} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 rounded-2xl border border-stone-100 bg-stone-50 gap-4 transition-all hover:border-indigo-200 hover:bg-white">
               <div className="flex items-center gap-4">
                 <div className="w-12 h-12 rounded-lg bg-white flex items-center justify-center border border-gray-100 overflow-hidden shadow-sm shrink-0">
                    {product?.image_url ? (

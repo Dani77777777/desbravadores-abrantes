@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { displayFont } from '@/components/landing/fonts'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -37,7 +38,7 @@ export function EventDashboard({ events, profile, surveys, userId }: EventDashbo
         {/* Calendar Side */}
         <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
+            <h2 className={`${displayFont.className} flex items-center gap-2 text-xl font-extrabold text-blue-950`}>
               <CalendarIcon className="w-5 h-5 text-blue-700" /> Calendário de Atividades
             </h2>
           </div>
@@ -52,7 +53,7 @@ export function EventDashboard({ events, profile, surveys, userId }: EventDashbo
         {/* Events List Side */}
         <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
+            <h2 className={`${displayFont.className} flex items-center gap-2 text-xl font-extrabold text-blue-950`}>
               {selectedDate ? (
                 <>
                   <Info className="w-5 h-5 text-blue-700" />

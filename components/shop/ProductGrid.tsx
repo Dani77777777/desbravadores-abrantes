@@ -2,7 +2,6 @@
 
 import { useState } from 'react'
 import { ProductCard } from './ProductCard'
-import { Badge } from '@/components/ui/badge'
 import { ShoppingBag, Search } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 
@@ -40,47 +39,38 @@ export function ProductGrid({ products, userProfile, goldRate }: ProductGridProp
   // Count relevant for user
   const relevantProducts = products.filter(p => !p.restrictions || p.restrictions.length === 0 || (userProfile && p.restrictions.includes(userProfile.section))).length
 
+  const filters: { key: typeof filter; label: string; show: boolean }[] = [
+    { key: 'all', label: `Todos (${products.length})`, show: true },
+    { key: 'mine', label: `Para a minha Classe (${relevantProducts})`, show: !!userProfile },
+    { key: 'physical', label: 'Físicos', show: true },
+    { key: 'digital', label: 'Digitais', show: true },
+  ]
+
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col md:flex-row gap-4 justify-between items-center">
-        <div className="flex flex-wrap items-center gap-2">
-          <Badge
-            variant={filter === 'all' ? 'default' : 'outline'}
-            className={`cursor-pointer px-4 py-1.5 rounded-full ${filter === 'all' ? 'bg-blue-900' : 'text-gray-500'}`}
-            onClick={() => setFilter('all')}
-          >
-            Todos ({products.length})
-          </Badge>
-          {userProfile && (
-            <Badge
-              variant={filter === 'mine' ? 'default' : 'outline'}
-              className={`cursor-pointer px-4 py-1.5 rounded-full ${filter === 'mine' ? 'bg-blue-900 border-none' : 'text-gray-500'}`}
-              onClick={() => setFilter('mine')}
+    <div className="space-y-8">
+      <div className="flex flex-col items-stretch justify-between gap-4 rounded-[1.75rem] bg-white p-3 shadow-xl shadow-blue-950/10 ring-1 ring-stone-200 md:flex-row md:items-center">
+        <div className="no-scrollbar -mx-1 flex items-center gap-2 overflow-x-auto px-1">
+          {filters.filter(f => f.show).map(f => (
+            <button
+              key={f.key}
+              type="button"
+              onClick={() => setFilter(f.key)}
+              className={`shrink-0 cursor-pointer rounded-full px-4 py-2.5 text-sm font-bold transition-all ${
+                filter === f.key
+                  ? 'bg-blue-950 text-white shadow-md'
+                  : 'text-stone-500 hover:bg-stone-100 hover:text-blue-950'
+              }`}
             >
-              Para a minha Classe ({relevantProducts})
-            </Badge>
-          )}
-          <Badge
-            variant={filter === 'physical' ? 'default' : 'outline'}
-            className={`cursor-pointer px-4 py-1.5 rounded-full ${filter === 'physical' ? 'bg-blue-900 border-none' : 'text-gray-500'}`}
-            onClick={() => setFilter('physical')}
-          >
-            Físicos
-          </Badge>
-          <Badge
-            variant={filter === 'digital' ? 'default' : 'outline'}
-            className={`cursor-pointer px-4 py-1.5 rounded-full ${filter === 'digital' ? 'bg-blue-900 border-none' : 'text-gray-500'}`}
-            onClick={() => setFilter('digital')}
-          >
-            Digitais
-          </Badge>
+              {f.label}
+            </button>
+          ))}
         </div>
 
-        <div className="relative w-full md:w-64">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+        <div className="relative w-full md:w-72">
+          <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-stone-400" />
           <Input
             placeholder="Procurar artigos..."
-            className="pl-9 bg-white border-gray-200"
+            className="h-11 rounded-full border-stone-200 bg-stone-50 pl-10"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
@@ -88,13 +78,15 @@ export function ProductGrid({ products, userProfile, goldRate }: ProductGridProp
       </div>
 
       {filteredProducts.length === 0 ? (
-        <div className="text-center py-20 bg-white rounded-3xl border-2 border-dashed border-gray-100">
-          <ShoppingBag className="w-16 h-16 text-gray-200 mx-auto mb-4" />
-          <p className="text-gray-500 font-medium text-lg">Nenhum produto encontrado.</p>
-          <p className="text-gray-400 text-sm">Tenta ajustar os filtros ou pesquisar outra coisa.</p>
+        <div className="rounded-[2rem] border-2 border-dashed border-stone-200 bg-white py-20 text-center">
+          <div className="mx-auto mb-5 flex h-20 w-20 -rotate-6 items-center justify-center rounded-3xl bg-yellow-400 text-blue-950 shadow-lg">
+            <ShoppingBag className="h-10 w-10" />
+          </div>
+          <p className="text-lg font-bold text-blue-950">Nenhum produto encontrado.</p>
+          <p className="text-sm text-stone-500">Tenta ajustar os filtros ou pesquisar outra coisa.</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {filteredProducts.map(product => (
             <ProductCard
               key={product.id}

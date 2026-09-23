@@ -1,4 +1,5 @@
 import { createServiceClient } from '@/utils/supabase/service'
+import { deleteOwnAvatarFile } from '@/utils/avatar-storage'
 
 /**
  * Apaga um utilizador do Auth (o perfil e os dados ligados caem em cascata).
@@ -7,6 +8,9 @@ import { createServiceClient } from '@/utils/supabase/service'
  */
 export async function deleteUserCompletely(userId: string): Promise<{ success?: true; error?: string }> {
   const supabaseAdmin = createServiceClient()
+
+  // Guardar o URL da foto antes de o perfil desaparecer, para a apagar do bucket no fim
+  const { data: profile } = await supabaseAdmin.from('profiles').select('avatar_url').eq('id', userId).maybeSingle()
 
   const { error } = await supabaseAdmin.auth.admin.deleteUser(userId)
 
@@ -27,6 +31,8 @@ export async function deleteUserCompletely(userId: string): Promise<{ success?: 
     console.error('Profile delete error:', profileError)
     return { error: `Conta removida, mas o perfil não foi apagado: ${profileError.message}` }
   }
+
+  await deleteOwnAvatarFile(profile?.avatar_url, userId)
 
   return { success: true }
 }

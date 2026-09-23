@@ -1,23 +1,35 @@
 'use client'
 
-import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { updateProfile } from './actions'
-import { User, Calendar, Image } from 'lucide-react'
+import { User, Calendar, ArrowRight, Loader2 } from 'lucide-react'
+import { AuthShell } from '@/components/auth/AuthShell'
+import { displayFont } from '@/components/landing/fonts'
+import { AvatarPicker, type AvatarChoice } from '@/components/profile/AvatarPicker'
+import { uploadAvatar, discardUploadedAvatar } from '@/utils/avatar-upload'
+import { createClient } from '@/utils/supabase/client'
+
+const D = displayFont.className
+
+const SELECT_CLASS =
+  'flex h-12 w-full cursor-pointer rounded-xl border border-stone-200 bg-stone-50 px-2.5 text-base text-blue-950 transition-colors focus-visible:border-yellow-400 focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-yellow-400/40 invalid:text-stone-400 disabled:cursor-not-allowed disabled:opacity-50'
+
+const INPUT_CLASS =
+  'h-12 rounded-xl border-stone-200 bg-stone-50 pl-12 text-base focus-visible:border-yellow-400 focus-visible:ring-yellow-400/40'
 
 export default function OnboardingPage() {
   const [fullName, setFullName] = useState('')
   const [day, setDay] = useState('')
   const [month, setMonth] = useState('')
   const [year, setYear] = useState('')
-  const [avatarUrl, setAvatarUrl] = useState('')
+  const [avatar, setAvatar] = useState<AvatarChoice>({ file: null, url: '' })
   const [loading, setLoading] = useState(false)
   const router = useRouter()
+  const supabase = createClient()
 
   const currentYear = new Date().getFullYear()
   const years = Array.from({ length: 100 }, (_, i) => (currentYear - i).toString())
@@ -39,7 +51,7 @@ export default function OnboardingPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
+
     if (!day || !month || !year) {
       toast.error('Por favor, seleciona a data de nascimento completa.')
       return
@@ -48,14 +60,25 @@ export default function OnboardingPage() {
     const birthDateFormatted = `${year}-${month}-${day}`
     setLoading(true)
 
+    // A foto do telemóvel só vai para o bucket agora; se a gravação falhar, é apagada outra vez.
+    let uploadedUrl: string | null = null
+    let userId: string | null = null
     try {
+      if (avatar.file) {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) throw new Error('Sessão expirada. Entra outra vez.')
+        userId = user.id
+        uploadedUrl = await uploadAvatar(supabase, user.id, avatar.file)
+      }
+
       const result = await updateProfile({
         fullName,
         birthDate: birthDateFormatted,
-        avatarUrl: avatarUrl || undefined
+        avatarUrl: (uploadedUrl ?? avatar.url.trim()) || undefined
       })
 
       if (result.error) {
+        if (uploadedUrl && userId) await discardUploadedAvatar(supabase, userId, uploadedUrl)
         toast.error(result.error)
       } else {
         toast.success('Perfil criado com sucesso!')
@@ -64,112 +87,100 @@ export default function OnboardingPage() {
       }
     } catch (error: any) {
       console.error('Error updating profile:', error)
-      toast.error('Erro ao salvar. Tente novamente.')
+      if (uploadedUrl && userId) await discardUploadedAvatar(supabase, userId, uploadedUrl).catch(() => {})
+      toast.error('Erro ao guardar: ' + (error?.message || 'tenta novamente.'))
     } finally {
       setLoading(false)
     }
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-900 via-blue-800 to-blue-950 p-4">
-      <Card className="w-full max-w-md shadow-xl bg-white/95 backdrop-blur-sm">
-        <CardHeader className="text-center">
-          <div className="mx-auto w-16 h-16 bg-red-600 rounded-full flex items-center justify-center mb-3 shadow-lg border-4 border-yellow-400">
-            <User className="w-8 h-8 text-white" />
+    <AuthShell
+      showBackLink={false}
+      asideTitle={<>Quase <span className="text-yellow-400">lá!</span></>}
+      asideText="Só falta completares o teu perfil para entrares no clube, ganhares XP e apareceres no ranking."
+    >
+      <div className="lp-rise rounded-[2rem] bg-white p-6 shadow-2xl shadow-black/30 sm:p-8" style={{ '--d': '100ms' } as React.CSSProperties}>
+        {/* Progresso */}
+        <div className="flex items-center gap-3">
+          <div className="h-2 flex-1 overflow-hidden rounded-full bg-stone-100">
+            <div className="h-full w-[85%] rounded-full bg-gradient-to-r from-yellow-300 via-orange-400 to-red-500" />
           </div>
-          <CardTitle className="text-2xl text-blue-900 font-bold">Bem-vindo, Desbravador!</CardTitle>
-          <CardDescription className="text-blue-800">
-            Completa o teu perfil para começares a aventura
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <div className="space-y-2">
-              <Label htmlFor="full_name" className="flex items-center gap-2 text-blue-900 font-semibold">
-                <User className="w-4 h-4" />
-                Nome Completo
-              </Label>
+          <span className="text-[11px] font-extrabold uppercase tracking-wider text-stone-400">Último passo</span>
+        </div>
+
+        <h1 className={`${D} mt-7 text-3xl font-extrabold leading-tight text-blue-950 sm:text-4xl`}>
+          Bem-vindo, Desbravador!
+        </h1>
+        <p className="mt-1.5 text-stone-500">Completa o teu perfil para começares a aventura.</p>
+
+        <form onSubmit={handleSubmit} className="mt-7 space-y-5">
+          <div className="space-y-1.5">
+            <Label htmlFor="full_name" className="text-sm font-bold text-blue-950">Nome Completo</Label>
+            <div className="relative">
+              <User className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-stone-400" />
               <Input
                 id="full_name"
                 type="text"
                 placeholder="Ex: João Miguel Silva"
+                autoComplete="name"
                 required
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
-                className="w-full border-blue-100 focus:border-blue-400"
+                className={INPUT_CLASS}
               />
             </div>
+          </div>
 
-            <div className="space-y-2">
-              <Label className="flex items-center gap-2 text-blue-900 font-semibold">
-                <Calendar className="w-4 h-4" />
-                Data de Nascimento
-              </Label>
-              <div className="grid grid-cols-3 gap-2">
-                <select
-                  required
-                  value={day}
-                  onChange={(e) => setDay(e.target.value)}
-                  className="flex h-10 w-full rounded-md border border-blue-100 bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  <option value="" disabled>Dia</option>
-                  {days.map(d => (
-                    <option key={d} value={d}>{d}</option>
-                  ))}
-                </select>
-                <select
-                  required
-                  value={month}
-                  onChange={(e) => setMonth(e.target.value)}
-                  className="flex h-10 w-full rounded-md border border-blue-100 bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  <option value="" disabled>Mês</option>
-                  {months.map(m => (
-                    <option key={m.value} value={m.value}>{m.label}</option>
-                  ))}
-                </select>
-                <select
-                  required
-                  value={year}
-                  onChange={(e) => setYear(e.target.value)}
-                  className="flex h-10 w-full rounded-md border border-blue-100 bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  <option value="" disabled>Ano</option>
-                  {years.map(y => (
-                    <option key={y} value={y}>{y}</option>
-                  ))}
-                </select>
-              </div>
+          <div className="space-y-1.5">
+            <Label className="flex items-center gap-1.5 text-sm font-bold text-blue-950">
+              <Calendar className="h-4 w-4 text-stone-400" /> Data de Nascimento
+            </Label>
+            <div className="grid grid-cols-[1fr_1.35fr_1.1fr] gap-2">
+              <select required value={day} onChange={(e) => setDay(e.target.value)} className={SELECT_CLASS} aria-label="Dia">
+                <option value="" disabled>Dia</option>
+                {days.map(d => (
+                  <option key={d} value={d}>{d}</option>
+                ))}
+              </select>
+              <select required value={month} onChange={(e) => setMonth(e.target.value)} className={SELECT_CLASS} aria-label="Mês">
+                <option value="" disabled>Mês</option>
+                {months.map(m => (
+                  <option key={m.value} value={m.value}>{m.label}</option>
+                ))}
+              </select>
+              <select required value={year} onChange={(e) => setYear(e.target.value)} className={SELECT_CLASS} aria-label="Ano">
+                <option value="" disabled>Ano</option>
+                {years.map(y => (
+                  <option key={y} value={y}>{y}</option>
+                ))}
+              </select>
             </div>
+          </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="avatar_url" className="flex items-center gap-2 text-blue-900 font-semibold">
-                <Image className="w-4 h-4" />
-                URL da Foto de Perfil (Opcional)
-              </Label>
-              <Input
-                id="avatar_url"
-                type="url"
-                placeholder="https://exemplo.com/foto.jpg"
-                value={avatarUrl}
-                onChange={(e) => setAvatarUrl(e.target.value)}
-                className="w-full border-blue-100 focus:border-blue-400"
-              />
-              <p className="text-[10px] text-gray-500 italic">
-                Podes adicionar uma foto mais tarde nas definições do teu perfil.
-              </p>
-            </div>
+          <div className="space-y-2">
+            <Label className="text-sm font-bold text-blue-950">
+              Foto de Perfil <span className="font-medium text-stone-400">(opcional)</span>
+            </Label>
+            <AvatarPicker name={fullName} value={avatar} onChange={setAvatar} disabled={loading} />
+            {!avatar.file && !avatar.url && (
+              <p className="text-xs text-stone-400">Podes adicionar uma foto mais tarde no teu perfil.</p>
+            )}
+          </div>
 
-            <Button 
-              type="submit" 
-              className="w-full bg-blue-800 hover:bg-blue-900 text-white font-bold py-6 text-lg shadow-lg transition-all hover:scale-[1.02] active:scale-95"
-              disabled={loading}
-            >
-              {loading ? 'A guardar...' : 'Confirmar e Entrar'}
-            </Button>
-          </form>
-        </CardContent>
-      </Card>
-    </div>
+          <button
+            type="submit"
+            disabled={loading}
+            className="group flex w-full cursor-pointer items-center justify-center gap-2 rounded-2xl bg-yellow-400 py-4 text-lg font-extrabold text-blue-950 shadow-[0_14px_30px_-10px_rgba(250,204,21,.7)] transition-all hover:-translate-y-0.5 hover:bg-yellow-300 active:translate-y-0 disabled:cursor-wait disabled:opacity-70"
+          >
+            {loading ? (
+              <><Loader2 className="h-5 w-5 animate-spin" /> {avatar.file ? 'A carregar a foto...' : 'A guardar...'}</>
+            ) : (
+              <>Confirmar e Entrar <ArrowRight className="h-5 w-5 transition-transform group-hover:translate-x-1" /></>
+            )}
+          </button>
+        </form>
+      </div>
+    </AuthShell>
   )
 }

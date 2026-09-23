@@ -4,15 +4,16 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@/utils/supabase/client'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { KeyRound, Lock } from 'lucide-react'
+import { KeyRound, Lock, Eye, EyeOff, Check, X, ArrowRight, Loader2 } from 'lucide-react'
+import { AuthShell } from '@/components/auth/AuthShell'
+import { displayFont } from '@/components/landing/fonts'
 
 export default function ResetPasswordPage() {
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [sessionReady, setSessionReady] = useState(false)
   const router = useRouter()
@@ -69,73 +70,91 @@ export default function ResetPasswordPage() {
     }
   }
 
+  const D = displayFont.className
+  const inputClass =
+    'h-12 rounded-xl border-stone-200 bg-stone-50 pl-12 pr-12 text-base focus-visible:border-yellow-400 focus-visible:ring-yellow-400/40'
+  const matches = confirmPassword.length > 0 && password === confirmPassword
+
   return (
-    <div className="min-h-screen relative flex items-center justify-center bg-gradient-to-br from-blue-900 via-blue-800 to-blue-950">
-      {/* Decorative overlay pattern */}
-      <div className="absolute inset-0 z-0 opacity-10" style={{
-        backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.4'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`
-      }} />
+    <AuthShell
+      showBackLink={false}
+      asideTitle={<>Uma nova <span className="text-yellow-400">password.</span></>}
+      asideText="Escolhe uma password nova e volta à aventura com o clube."
+    >
+      <div className="lp-rise rounded-[2rem] bg-white p-6 shadow-2xl shadow-black/30 sm:p-8" style={{ '--d': '100ms' } as React.CSSProperties}>
+        <div className="flex h-14 w-14 -rotate-6 items-center justify-center rounded-2xl bg-yellow-400 text-blue-950 shadow-md">
+          <KeyRound className="h-7 w-7" />
+        </div>
+        <h1 className={`${D} mt-6 text-3xl font-extrabold leading-tight text-blue-950 sm:text-4xl`}>Nova Password</h1>
+        <p className="mt-1.5 text-stone-500">Introduz a tua nova password para acederes à conta.</p>
 
-      <Card className="w-full max-w-md mx-4 z-10 bg-white/95 backdrop-blur-sm shadow-xl border-none">
-        <CardHeader className="text-center space-y-2">
-          <div className="mx-auto w-16 h-16 bg-white rounded-full flex items-center justify-center mb-2 shadow-lg border-4 border-yellow-400 p-2 overflow-hidden">
-            <img src="/images/Logo Desbravadores.png" alt="Logo" className="w-full h-full object-contain" />
+        <form onSubmit={handleResetPassword} className="mt-7 space-y-4">
+          <div className="space-y-1.5">
+            <Label htmlFor="password" className="text-sm font-bold text-blue-950">Nova Password</Label>
+            <div className="relative">
+              <Lock className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-stone-400" />
+              <Input
+                id="password"
+                type={showPassword ? 'text' : 'password'}
+                placeholder="••••••••"
+                autoComplete="new-password"
+                className={inputClass}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                minLength={6}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-4 top-1/2 -translate-y-1/2 cursor-pointer text-stone-400 hover:text-blue-950"
+                aria-label={showPassword ? 'Esconder password' : 'Mostrar password'}
+                tabIndex={-1}
+              >
+                {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+              </button>
+            </div>
+            <p className="text-xs text-stone-400">Mínimo de 6 caracteres.</p>
           </div>
-          <CardTitle className="text-2xl font-bold tracking-tight text-blue-900">
-            Nova Password
-          </CardTitle>
-          <CardDescription className="text-blue-800">
-            Introduz a tua nova password para acederes à conta.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <form onSubmit={handleResetPassword} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="password">Nova Password</Label>
-              <div className="relative">
-                <Lock className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
-                <Input
-                  id="password"
-                  type="password"
-                  placeholder="••••••••"
-                  className="pl-10"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  minLength={6}
-                />
-              </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="confirm-password" className="text-sm font-bold text-blue-950">Confirmar Nova Password</Label>
+            <div className="relative">
+              <Lock className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-stone-400" />
+              <Input
+                id="confirm-password"
+                type={showPassword ? 'text' : 'password'}
+                placeholder="••••••••"
+                autoComplete="new-password"
+                className={inputClass}
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                required
+                minLength={6}
+              />
+              {confirmPassword.length > 0 && (
+                <span className={`absolute right-4 top-1/2 -translate-y-1/2 ${matches ? 'text-emerald-500' : 'text-red-400'}`}>
+                  {matches ? <Check className="h-5 w-5" /> : <X className="h-5 w-5" />}
+                </span>
+              )}
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="confirm-password">Confirmar Nova Password</Label>
-              <div className="relative">
-                <Lock className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
-                <Input
-                  id="confirm-password"
-                  type="password"
-                  placeholder="••••••••"
-                  className="pl-10"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  required
-                  minLength={6}
-                />
-              </div>
-            </div>
-            <Button 
-              type="submit"
-              className="w-full bg-blue-800 hover:bg-blue-900 text-white font-medium py-6 text-lg shadow-md transition-all hover:scale-[1.02]" 
-              disabled={loading}
-            >
-              {loading ? 'A atualizar...' : 'Atualizar Password'}
-            </Button>
-          </form>
+            {confirmPassword.length > 0 && !matches && (
+              <p className="text-xs font-semibold text-red-500">As passwords ainda não coincidem.</p>
+            )}
+          </div>
 
-          <p className="text-xs text-center text-gray-500 mt-6">
-            Clube de Desbravadores Abrantes
-          </p>
-        </CardContent>
-      </Card>
-    </div>
+          <button
+            type="submit"
+            disabled={loading}
+            className="group mt-2 flex w-full cursor-pointer items-center justify-center gap-2 rounded-2xl bg-yellow-400 py-4 text-lg font-extrabold text-blue-950 shadow-[0_14px_30px_-10px_rgba(250,204,21,.7)] transition-all hover:-translate-y-0.5 hover:bg-yellow-300 active:translate-y-0 disabled:cursor-wait disabled:opacity-70"
+          >
+            {loading ? (
+              <><Loader2 className="h-5 w-5 animate-spin" /> A atualizar...</>
+            ) : (
+              <>Atualizar Password <ArrowRight className="h-5 w-5 transition-transform group-hover:translate-x-1" /></>
+            )}
+          </button>
+        </form>
+      </div>
+    </AuthShell>
   )
 }

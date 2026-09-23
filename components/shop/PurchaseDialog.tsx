@@ -98,7 +98,7 @@ export function PurchaseDialog({ product, userProfile, goldRate, disabled, reaso
     }}>
       <DialogTrigger asChild>
         <Button
-          className="bg-blue-900 hover:bg-black text-white rounded-2xl h-11 px-6 shadow-md transition-all active:scale-95 disabled:bg-gray-100 disabled:text-gray-400"
+          className="bg-blue-950 hover:bg-yellow-400 hover:text-blue-950 text-white font-extrabold rounded-full h-auto min-h-11 min-w-0 shrink whitespace-normal py-2 px-5 text-center leading-tight shadow-md transition-all active:scale-95 disabled:bg-stone-100 disabled:text-stone-400 disabled:shadow-none"
           disabled={disabled}
         >
           {reason || 'Comprar'}

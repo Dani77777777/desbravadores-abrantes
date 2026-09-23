@@ -56,7 +56,7 @@ export function PushNotificationButton() {
       size="icon"
       onClick={handleClick}
       disabled={isLoading || permission === 'denied'}
-      className="text-white hover:bg-blue-800 relative"
+      className="text-white hover:bg-white/10 rounded-full relative"
       aria-label={label}
       title={label}
     >

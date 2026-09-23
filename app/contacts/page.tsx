@@ -1,12 +1,19 @@
+import type { CSSProperties } from 'react'
 import { createClient } from '@/utils/supabase/server'
 import { Navbar } from '@/components/layout/Navbar'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { MessageCircle, MapPin, Mail, Instagram, ExternalLink } from 'lucide-react'
+import { MessageCircle, MapPin, Mail, Instagram, ArrowUpRight, Navigation, Star, Sparkles } from 'lucide-react'
+import { displayFont } from '@/components/landing/fonts'
+import { SiteFooter } from '@/components/landing/SiteFooter'
+import { CopyEmailButton } from '@/components/contacts/CopyEmailButton'
+
+const D = displayFont.className
+
+/** Atraso da animação de entrada em ms. */
+const delay = (ms: number) => ({ '--d': `${ms}ms` }) as CSSProperties
 
 export default async function ContactsPage() {
   const supabase = await createClient()
-  
+
   // Try to get current user/profile for navigation consistency
   const { data: { user } } = await supabase.auth.getUser()
   let profile = null
@@ -17,158 +24,226 @@ export default async function ContactsPage() {
 
   const whatsappLink = "https://chat.whatsapp.com/IfZxTuAswraCibvmg6PApu"
   const instagramLink = "https://www.instagram.com/desbravadores.abrantes/"
+  const email = "direcao.desbravadores.abrantes@gmail.com"
   const address = "Av. Defensores de Chaves 23, Abrantes"
   const simpleMapsUrl = `https://www.google.com/maps?q=${encodeURIComponent(address)}&output=embed`
+  const directionsUrl = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(address)}`
 
   return (
-    <div className="min-h-screen bg-stone-50">
+    <div className="min-h-screen overflow-x-clip bg-stone-50">
       <Navbar user={user} profile={profile} />
 
-      {/* Hero Section */}
-      <section className="bg-blue-900 text-white py-20 relative overflow-hidden">
-        <div className="absolute inset-0 opacity-10 pointer-events-none" style={{
-          backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.4'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`
-        }} />
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 text-center">
-          <h1 className="text-4xl md:text-6xl font-black tracking-tight mb-4">Contactos</h1>
-          <p className="text-xl text-blue-100 max-w-2xl mx-auto font-medium">
-            Estamos prontos para te receber. Escolhe a forma mais fácil de falares connosco!
+      {/* ── Hero ─────────────────────────────────────────────── */}
+      <section className="relative overflow-hidden bg-blue-950 pb-40 pt-16 text-white md:pb-48 md:pt-24">
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0"
+          style={{
+            backgroundImage:
+              'radial-gradient(50% 60% at 15% 20%, rgba(16,185,129,.25), transparent 70%), radial-gradient(45% 55% at 85% 30%, rgba(236,72,153,.25), transparent 70%), radial-gradient(50% 50% at 50% 100%, rgba(59,130,246,.35), transparent 70%)',
+          }}
+        />
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 opacity-[0.07]"
+          style={{
+            backgroundImage:
+              'linear-gradient(rgba(255,255,255,.8) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.8) 1px, transparent 1px)',
+            backgroundSize: '48px 48px',
+            maskImage: 'radial-gradient(ellipse at center, black 30%, transparent 75%)',
+            WebkitMaskImage: 'radial-gradient(ellipse at center, black 30%, transparent 75%)',
+          }}
+        />
+        <Star aria-hidden className="lp-spin absolute -right-10 top-10 hidden h-32 w-32 fill-yellow-400/20 text-yellow-400/20 md:block" />
+        <Star aria-hidden className="lp-spin absolute -left-8 bottom-16 hidden h-20 w-20 fill-red-500/25 text-red-500/25 md:block" />
+
+        <div className="relative z-10 mx-auto max-w-4xl px-4 text-center sm:px-6 lg:px-8">
+          <div
+            className="lp-rise inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-4 py-1.5 text-xs font-semibold uppercase tracking-[0.18em] text-yellow-300 backdrop-blur"
+            style={delay(0)}
+          >
+            <Sparkles className="h-3.5 w-3.5" /> Contactos
+          </div>
+          <h1
+            className={`${D} lp-rise mt-6 text-5xl font-extrabold leading-[0.95] tracking-tight sm:text-7xl md:text-8xl`}
+            style={delay(120)}
+          >
+            Fala{' '}
+            <span className="lp-shimmer bg-clip-text text-transparent [background-image:linear-gradient(90deg,#fde047,#fb923c,#ef4444,#fb923c,#fde047)]">
+              connosco!
+            </span>
+          </h1>
+          <p
+            className="lp-rise mx-auto mt-6 max-w-xl text-lg leading-relaxed text-blue-100/85 sm:text-xl"
+            style={delay(240)}
+          >
+            Estamos prontos para te receber. Escolhe a forma mais fácil de
+            chegares até nós.
           </p>
         </div>
       </section>
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-10 pb-20 space-y-16">
-        {/* Contact Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {/* WhatsApp Card */}
-          <Card className="border-none shadow-xl bg-white overflow-hidden group hover:shadow-2xl transition-all duration-300">
-            <div className="h-2 bg-emerald-500 w-full" />
-            <CardContent className="p-8 space-y-6 flex flex-col h-full">
-              <div className="w-14 h-14 bg-emerald-50 rounded-2xl flex items-center justify-center text-emerald-600 group-hover:scale-110 transition-transform">
-                <MessageCircle className="w-8 h-8" />
+      <main className="relative z-10 mx-auto -mt-28 max-w-7xl space-y-20 px-4 pb-24 sm:px-6 md:-mt-32 lg:px-8">
+        {/* ── Canais de contacto ─────────────────────────────── */}
+        <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
+          {/* WhatsApp */}
+          <a
+            href={whatsappLink}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="lp-rise group relative flex flex-col overflow-hidden rounded-[2rem] bg-gradient-to-br from-emerald-400 to-emerald-600 p-7 text-white shadow-xl shadow-emerald-900/25 transition-all duration-300 hover:-translate-y-1.5 hover:-rotate-1 md:p-8"
+            style={delay(300)}
+          >
+            <MessageCircle aria-hidden className="absolute -bottom-8 -right-8 h-44 w-44 text-white/10 transition-transform duration-500 group-hover:scale-110 group-hover:-rotate-12" />
+            <div className="flex items-start justify-between">
+              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/20 ring-1 ring-inset ring-white/30">
+                <MessageCircle className="h-7 w-7" />
               </div>
-              <div className="flex-1">
-                <h3 className="text-2xl font-bold text-stone-900 mb-2">WhatsApp</h3>
-                <p className="text-stone-600 leading-relaxed">
-                  Junta-te ao nosso grupo de interessados e recebe todas as novidades.
-                </p>
-              </div>
-              <a 
-                href={whatsappLink} 
-                target="_blank" 
-                rel="noopener noreferrer"
-              >
-                <Button className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-6 rounded-xl shadow-md border-none">
-                  Entrar no Grupo <ExternalLink className="ml-2 w-4 h-4" />
-                </Button>
-              </a>
-            </CardContent>
-          </Card>
+              <ArrowUpRight className="h-6 w-6 transition-transform group-hover:-translate-y-1 group-hover:translate-x-1" />
+            </div>
+            <h2 className={`${D} mt-6 text-3xl font-extrabold`}>WhatsApp</h2>
+            <p className="relative mt-2 flex-1 text-emerald-50">
+              Entra no grupo de interessados e recebe as novidades todas em
+              primeira mão.
+            </p>
+            <span className="relative mt-7 inline-flex items-center justify-center gap-2 rounded-xl bg-white px-4 py-3.5 font-extrabold text-emerald-700 shadow-md transition-colors group-hover:bg-emerald-50">
+              Entrar no grupo
+            </span>
+          </a>
 
-          {/* Instagram Card */}
-          <Card className="border-none shadow-xl bg-white overflow-hidden group hover:shadow-2xl transition-all duration-300">
-            <div className="h-2 bg-pink-500 w-full" />
-            <CardContent className="p-8 space-y-6 flex flex-col h-full">
-              <div className="w-14 h-14 bg-pink-50 rounded-2xl flex items-center justify-center text-pink-600 group-hover:scale-110 transition-transform">
-                <Instagram className="w-8 h-8" />
+          {/* Instagram */}
+          <a
+            href={instagramLink}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="lp-rise group relative flex flex-col overflow-hidden rounded-[2rem] bg-gradient-to-br from-amber-400 via-pink-500 to-purple-600 p-7 text-white shadow-xl shadow-pink-900/25 transition-all duration-300 hover:-translate-y-1.5 hover:rotate-1 md:p-8"
+            style={delay(400)}
+          >
+            <Instagram aria-hidden className="absolute -bottom-8 -right-8 h-44 w-44 text-white/10 transition-transform duration-500 group-hover:scale-110 group-hover:rotate-12" />
+            <div className="flex items-start justify-between">
+              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/20 ring-1 ring-inset ring-white/30">
+                <Instagram className="h-7 w-7" />
               </div>
-              <div className="flex-1">
-                <h3 className="text-2xl font-bold text-stone-900 mb-2">Instagram</h3>
-                <p className="text-stone-600 leading-relaxed">
-                  Segue as nossas aventuras diárias e vê as fotos do clube.
-                </p>
-              </div>
-              <a 
-                href={instagramLink} 
-                target="_blank" 
-                rel="noopener noreferrer"
-              >
-                <Button variant="outline" className="w-full border-pink-200 text-pink-600 hover:bg-pink-50 font-bold py-6 rounded-xl">
-                  @desbravadores.abrantes
-                </Button>
-              </a>
-            </CardContent>
-          </Card>
+              <ArrowUpRight className="h-6 w-6 transition-transform group-hover:-translate-y-1 group-hover:translate-x-1" />
+            </div>
+            <h2 className={`${D} mt-6 text-3xl font-extrabold`}>Instagram</h2>
+            <p className="relative mt-2 flex-1 text-pink-50">
+              Segue as nossas aventuras do dia a dia e vê as fotos do clube.
+            </p>
+            <span className="relative mt-7 inline-flex items-center justify-center gap-2 truncate rounded-xl bg-white px-4 py-3.5 font-extrabold text-pink-600 shadow-md transition-colors group-hover:bg-pink-50">
+              @desbravadores.abrantes
+            </span>
+          </a>
 
-          {/* Email Card */}
-          <Card className="border-none shadow-xl bg-white overflow-hidden group hover:shadow-2xl transition-all duration-300">
-            <div className="h-2 bg-blue-500 w-full" />
-            <CardContent className="p-8 space-y-6 flex flex-col h-full">
-              <div className="w-14 h-14 bg-blue-50 rounded-2xl flex items-center justify-center text-blue-600 group-hover:scale-110 transition-transform">
-                <Mail className="w-8 h-8" />
-              </div>
-              <div className="flex-1">
-                <h3 className="text-2xl font-bold text-stone-900 mb-2">Email</h3>
-                <p className="text-stone-600 leading-relaxed">
-                  Para questões administrativas ou parcerias institucionais.
-                </p>
-              </div>
-              <div className="bg-blue-50 p-4 rounded-xl text-center">
-                <p className="text-sm font-bold text-blue-900 break-all select-all">
-                  direcao.desbravadores.abrantes@gmail.com
-                </p>
-              </div>
-            </CardContent>
-          </Card>
+          {/* Email */}
+          <div
+            className="lp-rise group relative flex flex-col overflow-hidden rounded-[2rem] bg-gradient-to-br from-blue-500 to-indigo-700 p-7 text-white shadow-xl shadow-blue-900/25 md:p-8"
+            style={delay(500)}
+          >
+            <Mail aria-hidden className="absolute -bottom-8 -right-8 h-44 w-44 text-white/10 transition-transform duration-500 group-hover:scale-110 group-hover:-rotate-12" />
+            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/20 ring-1 ring-inset ring-white/30">
+              <Mail className="h-7 w-7" />
+            </div>
+            <h2 className={`${D} mt-6 text-3xl font-extrabold`}>Email</h2>
+            <p className="relative mt-2 flex-1 text-blue-100">
+              Para assuntos administrativos ou parcerias institucionais.
+            </p>
+            <p className="relative mt-6 rounded-xl bg-blue-950/30 px-4 py-3 text-center text-sm font-bold select-all">
+              direcao.desbravadores.abrantes<wbr />@gmail.com
+            </p>
+            <div className="relative mt-3 grid grid-cols-2 gap-2">
+              <a
+                href={`mailto:${email}`}
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-white px-4 py-3.5 font-extrabold text-blue-700 shadow-md transition-colors hover:bg-blue-50"
+              >
+                Enviar
+              </a>
+              <CopyEmailButton email={email} />
+            </div>
+          </div>
         </div>
 
-        {/* Map Section */}
-        <section className="space-y-8">
-          <div className="flex flex-col md:flex-row items-center justify-between gap-6">
-            <div className="space-y-2 text-center md:text-left">
-              <h2 className="text-3xl font-black text-blue-900 tracking-tight">Onde nos encontrar</h2>
-              <div className="flex items-center justify-center md:justify-start gap-2 text-stone-600">
-                <MapPin className="w-5 h-5 text-red-500" />
-                <span className="font-medium text-lg">{address}</span>
-              </div>
+        {/* ── Onde estamos ───────────────────────────────────── */}
+        <section className="relative">
+          <div className="overflow-hidden rounded-[2rem] bg-white p-2 shadow-2xl shadow-blue-950/15 ring-1 ring-stone-200 sm:p-3">
+            <div className="h-[360px] overflow-hidden rounded-[1.5rem] md:h-[520px]">
+              <iframe
+                title="Mapa com a localização do clube"
+                width="100%"
+                height="100%"
+                style={{ border: 0 }}
+                loading="lazy"
+                allowFullScreen
+                referrerPolicy="no-referrer-when-downgrade"
+                src={simpleMapsUrl}
+              ></iframe>
             </div>
-            <a 
-              href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(address)}`} 
-              target="_blank" 
-              rel="noopener noreferrer"
-            >
-              <Button size="lg" className="bg-blue-900 hover:bg-blue-800 text-white rounded-full px-8 py-6 font-bold text-lg shadow-lg">
-                Como chegar <MapPin className="ml-2 w-5 h-5" />
-              </Button>
-            </a>
           </div>
-          
-          <div className="w-full h-[500px] bg-white rounded-3xl overflow-hidden shadow-2xl border-8 border-white">
-            <iframe
-              width="100%"
-              height="100%"
-              style={{ border: 0 }}
-              loading="lazy"
-              allowFullScreen
-              referrerPolicy="no-referrer-when-downgrade"
-              src={simpleMapsUrl}
-            ></iframe>
+
+          {/* Cartão da morada por cima do mapa em ecrãs grandes; por baixo dele nos outros */}
+          <div className="relative mx-auto -mt-10 max-w-md px-3 lg:absolute lg:left-8 lg:top-28 lg:mt-0 lg:max-w-sm lg:px-0">
+            <div className="-rotate-1 rounded-[1.75rem] bg-blue-950 p-7 text-white shadow-2xl ring-4 ring-white">
+              <span className="inline-flex -rotate-2 items-center rounded-lg bg-yellow-400 px-3 py-1 text-xs font-extrabold uppercase tracking-wider text-blue-950">
+                Onde estamos
+              </span>
+              <h2 className={`${D} mt-4 text-3xl font-extrabold leading-tight`}>
+                Vem ter connosco!
+              </h2>
+              <p className="mt-3 flex items-start gap-2 text-lg text-blue-100">
+                <MapPin className="mt-1 h-5 w-5 shrink-0 text-red-400" />
+                <span className="font-medium">{address}</span>
+              </p>
+              <a
+                href={directionsUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="group mt-6 inline-flex w-full items-center justify-center gap-2 rounded-full bg-yellow-400 px-6 py-3.5 font-extrabold text-blue-950 shadow-[0_14px_30px_-10px_rgba(250,204,21,.7)] transition-all hover:-translate-y-0.5 hover:bg-yellow-300"
+              >
+                Como chegar
+                <Navigation className="h-4 w-4 transition-transform group-hover:rotate-12" />
+              </a>
+            </div>
           </div>
         </section>
 
-        <section className="bg-gradient-to-br from-blue-900 to-blue-950 rounded-[2.5rem] p-12 md:p-20 text-center space-y-8 relative overflow-hidden shadow-2xl">
-          <div className="absolute top-0 left-0 w-full h-full opacity-10 pointer-events-none" style={{
-            backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.4'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`
-          }} />
-          <div className="relative z-10 space-y-6">
-            <h2 className="text-4xl md:text-5xl font-black text-white px-4 leading-tight">Ainda tens perguntas?</h2>
-            <p className="text-xl text-blue-100 max-w-2xl mx-auto leading-relaxed">
-              Não hesites em contactar-nos. Ficaremos muito felizes em responder a quaisquer dúvidas sobre inscrições ou sobre o que significa ser um Desbravador.
+        {/* ── Ainda tens perguntas? ──────────────────────────── */}
+        <section className="relative overflow-hidden rounded-[2.5rem] bg-yellow-400 px-6 py-16 text-center text-blue-950 shadow-2xl shadow-yellow-700/20 md:px-16 md:py-24">
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-0 opacity-[0.12]"
+            style={{
+              backgroundImage: 'radial-gradient(circle at 1px 1px, #172554 1.5px, transparent 0)',
+              backgroundSize: '22px 22px',
+            }}
+          />
+          <Star aria-hidden className="lp-spin absolute -left-10 -top-10 h-36 w-36 fill-orange-400/60 text-orange-400/60" />
+          <Star aria-hidden className="lp-spin absolute -bottom-12 -right-8 h-44 w-44 fill-red-500/40 text-red-500/40" />
+          <div className="relative z-10 mx-auto max-w-3xl">
+            <h2 className={`${D} text-4xl font-extrabold leading-[0.95] tracking-tight sm:text-5xl md:text-6xl`}>
+              Ainda tens perguntas?
+            </h2>
+            <p className="mx-auto mt-6 max-w-2xl text-lg font-medium leading-relaxed text-blue-950/75">
+              Não hesites em falar connosco! Respondemos com todo o gosto a
+              dúvidas sobre inscrições ou sobre o que é ser Desbravador.
             </p>
-            <div className="pt-4">
-               <div className="inline-flex items-center gap-2 bg-yellow-400 text-blue-950 font-black px-8 py-3 rounded-full text-lg shadow-lg">
-                 Sempre prontos para servir!
-               </div>
+            <div className="mt-9 flex flex-col items-center justify-center gap-4 sm:flex-row">
+              <a
+                href={whatsappLink}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="group inline-flex items-center gap-2 rounded-full bg-blue-950 px-8 py-4 text-lg font-extrabold text-white shadow-[0_18px_40px_-12px_rgba(23,37,84,.7)] transition-all hover:-translate-y-1 hover:bg-blue-900"
+              >
+                <MessageCircle className="h-5 w-5" /> Pergunta no WhatsApp
+              </a>
+              <span className="inline-flex rotate-2 items-center rounded-full bg-white px-6 py-3 font-extrabold shadow-lg">
+                Sempre prontos para servir!
+              </span>
             </div>
           </div>
         </section>
-
-        <footer className="text-center pt-10">
-           <p className="text-xs text-stone-400 font-bold uppercase tracking-[0.3em]">
-             Clube de Desbravadores de Abrantes • {new Date().getFullYear()}
-           </p>
-        </footer>
       </main>
+
+      <SiteFooter />
     </div>
   )
 }

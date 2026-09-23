@@ -78,20 +78,20 @@ export function DeleteAccountCard({ userEmail }: { userEmail: string }) {
   const codeValid = /^\d{6,8}$/.test(code)
 
   return (
-    <Card className="border-red-200">
+    <Card className="gap-0 rounded-[1.75rem] border-none bg-white py-6 shadow-md shadow-blue-950/5 ring-1 ring-red-200 sm:py-7">
       <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-red-700">
-          <Trash2 className="w-5 h-5" />
+        <CardTitle className="flex items-center gap-3 text-xl font-extrabold text-red-700">
+          <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-red-500 text-white shadow-md"><Trash2 className="w-5 h-5" /></span>
           Apagar Conta
         </CardTitle>
         <CardDescription>
           Remove permanentemente a tua conta e todos os teus dados do clube.
         </CardDescription>
       </CardHeader>
-      <CardContent>
+      <CardContent className="mt-6">
         <Button
           variant="outline"
-          className="w-full border-red-300 text-red-700 hover:bg-red-50 hover:text-red-800"
+          className="h-12 w-full rounded-2xl border-red-300 font-bold text-red-700 hover:bg-red-50 hover:text-red-800"
           onClick={() => { reset(); setOpen(true) }}
         >
           Apagar a minha conta

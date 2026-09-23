@@ -1,12 +1,13 @@
 'use client'
 
 import { createClient } from '@/utils/supabase/client'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Mail, Eye, EyeOff } from 'lucide-react'
-import { useState, useEffect, Suspense } from 'react'
+import { Mail, Eye, EyeOff, Lock, ArrowRight, Loader2, MailCheck } from 'lucide-react'
+import { AuthShell } from '@/components/auth/AuthShell'
+import { PageLoader } from '@/components/layout/PageLoader'
+import { displayFont } from '@/components/landing/fonts'
+import { useState, useEffect, useRef, useCallback, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
 import { getSignedCallbackUrl } from './actions'
@@ -21,11 +22,25 @@ function LoginContent() {
   const searchParams = useSearchParams()
   const mode = searchParams.get('mode')
   const [isSignUp, setIsSignUp] = useState(mode === 'signup')
+  // Email para onde foi enviada a confirmação depois de criar conta
+  const [sentTo, setSentTo] = useState<string | null>(null)
   const supabase = createClient()
 
   // Para onde redirecionar após entrar. Só aceita caminhos internos (ver safeNextPath)
   // para evitar open-redirects. Por defeito vai para a home.
   const next = safeNextPath(searchParams.get('next'))
+
+  // Depois de entrar: navegação completa (o servidor vê logo a sessão nova, sem a
+  // página em cache de quando não havia sessão) e o ecrã "A entrar..." fica visível
+  // até o painel aparecer. O ref evita navegar duas vezes (o SIGNED_IN também dispara).
+  const redirectingRef = useRef(false)
+  const [entering, setEntering] = useState(false)
+  const goToApp = useCallback(() => {
+    if (redirectingRef.current) return
+    redirectingRef.current = true
+    setEntering(true)
+    window.location.assign(next)
+  }, [next])
 
   useEffect(() => {
     // If mode changes in URL, update state
@@ -64,8 +79,7 @@ function LoginContent() {
           if (!error && data.session) {
             // Clear the hash from URL and redirect
             window.location.hash = ''
-            router.push(next)
-            router.refresh()
+            goToApp()
           }
         })
         return
@@ -77,13 +91,12 @@ function LoginContent() {
       if (event === 'PASSWORD_RECOVERY') {
         router.replace('/login/reset-password' + window.location.hash)
       } else if (event === 'SIGNED_IN' && session) {
-        router.push(next)
-        router.refresh()
+        goToApp()
       }
     })
 
     return () => subscription.unsubscribe()
-  }, [supabase, router])
+  }, [supabase, router, goToApp])
 
   const handleEmailLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -102,111 +115,167 @@ function LoginContent() {
         })
         if (error) throw error
         toast.success('Conta criada! Verifica o teu email para confirmar.')
+        setSentTo(email)
       } else {
         const { error } = await supabase.auth.signInWithPassword({
           email,
           password,
         })
         if (error) throw error
-        router.push(next)
-        router.refresh()
+        // Não desliga o loading: fica o ecrã "A entrar..." até a página mudar
+        goToApp()
+        return
       }
     } catch (error: any) {
       toast.error(error.message || 'Erro ao autenticar')
-    } finally {
-      setLoading(false)
     }
+    setLoading(false)
+  }
+
+  const D = displayFont.className
+
+  if (entering) {
+    return <PageLoader overlay title="A entrar na tua conta..." subtitle="Estamos a preparar o teu painel." />
   }
 
   return (
-    <div className="min-h-screen relative flex items-center justify-center bg-gradient-to-br from-blue-900 via-blue-800 to-blue-950">
-      {/* Decorative overlay pattern */}
-      <div className="absolute inset-0 z-0 opacity-10" style={{
-        backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.4'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`
-      }} />
-
-      <Card className="w-full max-w-md mx-4 z-10 bg-white/95 backdrop-blur-sm shadow-xl border-none">
-        <CardHeader className="text-center space-y-2">
-          <div className="mx-auto w-16 h-16 bg-white rounded-full flex items-center justify-center mb-2 shadow-lg border-4 border-yellow-400 p-2 overflow-hidden">
-            <img src="/images/Logo Desbravadores.png" alt="Logo" className="w-full h-full object-contain" />
-          </div>
-          <CardTitle className="text-2xl font-bold tracking-tight text-blue-900">
-            Clube de Desbravadores
-          </CardTitle>
-          <CardDescription className="text-blue-800">
-            Abrantes
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {/* Email/Password Form */}
-          <form onSubmit={handleEmailLogin} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <div className="relative">
-                <Mail className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="teu@email.com"
-                  className="pl-10"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                />
-              </div>
+    <AuthShell
+      asideTitle={isSignUp ? <>A tua aventura <span className="text-yellow-400">começa aqui.</span></> : <>Bom ver-te <span className="text-yellow-400">outra vez!</span></>}
+      asideText={
+        isSignUp
+          ? 'Cria a tua conta para ganhares XP, acumulares Gold e subires no ranking do clube.'
+          : 'Entra para veres os avisos, as tarefas e continuares a subir de nível.'
+      }
+    >
+      <div className="lp-rise rounded-[2rem] bg-white p-6 shadow-2xl shadow-black/30 sm:p-8" style={{ '--d': '100ms' } as React.CSSProperties}>
+        {sentTo ? (
+          <div className="py-4 text-center">
+            <div className="mx-auto flex h-20 w-20 -rotate-6 items-center justify-center rounded-3xl bg-emerald-500 text-white shadow-lg">
+              <MailCheck className="h-10 w-10" />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
-              <div className="relative">
-                <Input
-                  id="password"
-                  type={showPassword ? 'text' : 'password'}
-                  placeholder="••••••••"
-                  className="pr-10"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  minLength={6}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-2.5 text-gray-400 hover:text-gray-600"
-                  aria-label={showPassword ? 'Esconder password' : 'Mostrar password'}
-                  tabIndex={-1}
-                >
-                  {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-                </button>
-              </div>
-            </div>
-            <Button 
-              type="submit"
-              className="w-full bg-blue-800 hover:bg-blue-900 text-white font-medium py-6 text-lg shadow-md transition-all hover:scale-[1.02]" 
-              disabled={loading}
-            >
-              {loading ? 'A processar...' : (isSignUp ? 'Criar Conta' : 'Entrar')}
-            </Button>
+            <h1 className={`${D} mt-6 text-3xl font-extrabold text-blue-950`}>Verifica o teu email!</h1>
+            <p className="mt-3 text-stone-600">
+              Enviámos um link de confirmação para{' '}
+              <span className="break-all font-bold text-blue-950">{sentTo}</span>. Abre-o para ativar a tua conta.
+            </p>
+            <p className="mt-2 text-sm text-stone-400">Não encontras? Espreita a pasta de spam.</p>
             <button
               type="button"
-              onClick={() => setIsSignUp(!isSignUp)}
-              className="w-full text-sm text-blue-700 hover:text-blue-900 underline"
+              onClick={() => { setSentTo(null); setIsSignUp(false) }}
+              className="mt-7 w-full cursor-pointer rounded-2xl bg-blue-950 py-3.5 font-extrabold text-white transition-colors hover:bg-blue-900"
             >
-              {isSignUp ? 'Já tens conta? Entrar' : 'Não tens conta? Criar conta'}
+              Já confirmei, quero entrar
             </button>
-          </form>
+          </div>
+        ) : (
+          <>
+            {/* Entrar / Criar conta */}
+            <div className="grid grid-cols-2 gap-1 rounded-full bg-stone-100 p-1">
+              {[
+                { value: false, label: 'Entrar' },
+                { value: true, label: 'Criar conta' },
+              ].map((tab) => (
+                <button
+                  key={tab.label}
+                  type="button"
+                  onClick={() => setIsSignUp(tab.value)}
+                  className={`cursor-pointer rounded-full py-2.5 text-sm font-extrabold transition-all ${
+                    isSignUp === tab.value ? 'bg-blue-950 text-white shadow-md' : 'text-stone-500 hover:text-blue-950'
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
 
-          <p className="text-xs text-center text-gray-500 mt-6">
-            Aventura • Amizade • Fé
-          </p>
-        </CardContent>
-      </Card>
-    </div>
+            <h1 className={`${D} mt-7 text-3xl font-extrabold leading-tight text-blue-950 sm:text-4xl`}>
+              {isSignUp ? 'Junta-te à aventura!' : 'Bem-vindo de volta!'}
+            </h1>
+            <p className="mt-1.5 text-stone-500">
+              {isSignUp ? 'Cria a tua conta em menos de um minuto.' : 'Entra para continuares a tua jornada.'}
+            </p>
+
+            <form onSubmit={handleEmailLogin} className="mt-7 space-y-4">
+              <div className="space-y-1.5">
+                <Label htmlFor="email" className="text-sm font-bold text-blue-950">Email</Label>
+                <div className="relative">
+                  <Mail className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-stone-400" />
+                  <Input
+                    id="email"
+                    type="email"
+                    placeholder="teu@email.com"
+                    autoComplete="email"
+                    className="h-12 rounded-xl border-stone-200 bg-stone-50 pl-12 text-base focus-visible:border-yellow-400 focus-visible:ring-yellow-400/40"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                  />
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="password" className="text-sm font-bold text-blue-950">Password</Label>
+                <div className="relative">
+                  <Lock className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-stone-400" />
+                  <Input
+                    id="password"
+                    type={showPassword ? 'text' : 'password'}
+                    placeholder="••••••••"
+                    autoComplete={isSignUp ? 'new-password' : 'current-password'}
+                    className="h-12 rounded-xl border-stone-200 bg-stone-50 pl-12 pr-12 text-base focus-visible:border-yellow-400 focus-visible:ring-yellow-400/40"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                    minLength={6}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 cursor-pointer text-stone-400 hover:text-blue-950"
+                    aria-label={showPassword ? 'Esconder password' : 'Mostrar password'}
+                    tabIndex={-1}
+                  >
+                    {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                  </button>
+                </div>
+                {isSignUp && <p className="text-xs text-stone-400">Mínimo de 6 caracteres.</p>}
+              </div>
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="group mt-2 flex w-full cursor-pointer items-center justify-center gap-2 rounded-2xl bg-yellow-400 py-4 text-lg font-extrabold text-blue-950 shadow-[0_14px_30px_-10px_rgba(250,204,21,.7)] transition-all hover:-translate-y-0.5 hover:bg-yellow-300 active:translate-y-0 disabled:cursor-wait disabled:opacity-70"
+              >
+                {loading ? (
+                  <><Loader2 className="h-5 w-5 animate-spin" /> A processar...</>
+                ) : (
+                  <>
+                    {isSignUp ? 'Criar Conta' : 'Entrar'}
+                    <ArrowRight className="h-5 w-5 transition-transform group-hover:translate-x-1" />
+                  </>
+                )}
+              </button>
+            </form>
+
+            <p className="mt-6 text-center text-sm text-stone-500">
+              {isSignUp ? 'Já tens conta?' : 'Ainda não tens conta?'}{' '}
+              <button
+                type="button"
+                onClick={() => setIsSignUp(!isSignUp)}
+                className="cursor-pointer font-extrabold text-blue-950 underline decoration-yellow-400 decoration-2 underline-offset-4 hover:text-blue-700"
+              >
+                {isSignUp ? 'Entrar' : 'Criar conta'}
+              </button>
+            </p>
+          </>
+        )}
+      </div>
+    </AuthShell>
   )
 }
 
 export default function LoginPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-blue-950 flex items-center justify-center text-white">Carregando...</div>}>
+    <Suspense fallback={<div className="flex min-h-screen items-center justify-center bg-blue-950 text-white">A carregar...</div>}>
       <LoginContent />
     </Suspense>
   )

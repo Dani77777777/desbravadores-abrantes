@@ -1,22 +1,19 @@
 import { createClient } from '@/utils/supabase/server'
 import { Navbar } from '@/components/layout/Navbar'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Progress } from '@/components/ui/progress'
-import { Badge } from '@/components/ui/badge'
 import Link from 'next/link'
 import { GoldTransferDialog } from '@/components/profile/GoldTransferDialog'
-
-// ... lines 7-9 ...
 import { TaskCompleteButton } from '@/components/tasks/TaskCompleteButton'
 import { AnnouncementsFeed } from '@/components/dashboard/AnnouncementsFeed'
 import { EventDashboard } from '@/components/events/EventDashboard'
-import { Button } from '@/components/ui/button'
-// ... (adding import at top) ...
-import { User, Trophy, Coins, Megaphone, ScanLine, History, ListChecks, CheckCircle2, Clock, CalendarDays } from 'lucide-react'
+import { User, Trophy, Coins, Megaphone, History, ListChecks, CheckCircle2, Clock, ShieldCheck, Hourglass } from 'lucide-react'
+import { displayFont } from '@/components/landing/fonts'
+import { SiteFooter } from '@/components/landing/SiteFooter'
 
 import { LandingPage } from '@/components/landing/LandingPage'
 import { getJAEvents, filterJAEventsForSection } from '@/utils/ja-agenda'
 import { GAMES, fetchGameSettings, gameVisibilityFor } from '@/utils/games'
+
+const D = displayFont.className
 
 const SECTION_COLORS = {
   rebentos: 'bg-emerald-600',
@@ -124,167 +121,227 @@ export default async function Dashboard() {
   const openTasks = (tasks || []).filter(t => !completedTaskIds.has(t.id))
   const doneTasks = (tasks || []).filter(t => completedTaskIds.has(t.id))
 
+  const level = Math.floor(profile.total_xp / 1000) + 1
+  const xpInLevel = profile.total_xp % 1000
+
   return (
-    <div className="min-h-screen bg-stone-50">
+    <div className="min-h-screen overflow-x-clip bg-blue-950">
       <Navbar user={user} profile={profile} />
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
-        
-        {/* Hero Section */}
-        <Card className="overflow-hidden border-none shadow-md">
-            <div className={`h-24 ${sectionColor} relative`}>
-                {!profile.is_invested && (
-                  <div className="absolute top-2 right-2">
-                    <Badge variant="destructive" className="bg-red-500/90 text-white hover:bg-red-600">
-                      A aguardar investidura
-                    </Badge>
+      {/* ── Cabeçalho ─────────────────────────────────────────── */}
+      <section className="relative overflow-hidden pb-24 pt-10 text-white md:pt-14">
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0"
+          style={{
+            backgroundImage:
+              'radial-gradient(40% 55% at 10% 30%, rgba(250,204,21,.16), transparent 70%), radial-gradient(45% 60% at 95% 20%, rgba(99,102,241,.3), transparent 70%)',
+          }}
+        />
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 opacity-[0.07]"
+          style={{
+            backgroundImage:
+              'linear-gradient(rgba(255,255,255,.8) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.8) 1px, transparent 1px)',
+            backgroundSize: '48px 48px',
+            maskImage: 'radial-gradient(ellipse at center, black 30%, transparent 75%)',
+            WebkitMaskImage: 'radial-gradient(ellipse at center, black 30%, transparent 75%)',
+          }}
+        />
+
+        <div className="relative z-10 mx-auto grid max-w-7xl grid-cols-1 items-center gap-10 px-4 sm:px-6 lg:grid-cols-[1.15fr_0.85fr] lg:px-8">
+          <div className="lp-rise flex flex-col items-center gap-5 text-center sm:flex-row sm:items-center sm:text-left">
+            <div className="relative shrink-0">
+              <div aria-hidden className="absolute -inset-3 rounded-full bg-yellow-400/25 blur-xl" />
+              <div className="relative h-24 w-24 overflow-hidden rounded-full bg-blue-700 ring-4 ring-yellow-400 ring-offset-4 ring-offset-blue-950 sm:h-28 sm:w-28">
+                {profile.avatar_url ? (
+                  <img src={profile.avatar_url} alt="Avatar" className="h-full w-full object-cover" />
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center text-white">
+                    <User className="h-10 w-10" />
                   </div>
                 )}
-            </div>
-            <CardContent className="pt-0 relative px-6 pb-6">
-                <div className="flex flex-col sm:flex-row items-center sm:items-end -mt-12 mb-4 gap-4">
-                     <div className="relative">
-                        <div className="w-24 h-24 rounded-full border-4 border-white bg-gray-200 overflow-hidden shadow-sm">
-                            {profile.avatar_url ? (
-                                <img src={profile.avatar_url} alt="Avatar" className="w-full h-full object-cover" />
-                            ) : (
-                                <div className="w-full h-full flex items-center justify-center bg-gray-300 text-gray-500">
-                                    <User className="h-10 w-10" />
-                                </div>
-                            )}
-                        </div>
-                        {profile.is_invested && (
-                           <div className="absolute -bottom-2 -right-2 bg-yellow-400 p-1.5 rounded-full border-2 border-white shadow-sm" title="Investido">
-                               <div className="w-4 h-4 bg-yellow-600 rounded-full" />
-                           </div>
-                        )}
-                     </div>
-                     <div className="text-center sm:text-left flex-1">
-                        <h1 className="text-2xl font-bold text-gray-900">{profile.full_name}</h1>
-                        <div className="flex items-center justify-center sm:justify-start gap-2 mt-1">
-                            <Badge variant="secondary" className={`${sectionColor} text-white border-none capitalize`}>
-                                {sectionLabel}
-                            </Badge>
-                            <Badge variant="outline" className="text-gray-600 capitalize">
-                                {profile.role}
-                            </Badge>
-                        </div>
-                     </div>
-                </div>
-
-                {/* Gamification Stats */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
-                    <div className="space-y-2">
-                         <div className="flex justify-between items-center text-sm font-medium">
-                            <div className="flex items-center gap-2 text-indigo-700">
-                                <Trophy className="w-4 h-4" />
-                                <span>Pontos de Experiência (XP)</span>
-                            </div>
-                            <span className="text-gray-600">{profile.total_xp} XP</span>
-                         </div>
-                         <Progress value={(profile.total_xp % 1000) / 10} className="h-3 bg-indigo-100" indicatorColor="bg-indigo-600" />
-                         <p className="text-xs text-right text-gray-500">Próximo nível em {1000 - (profile.total_xp % 1000)} XP</p>
-                    </div>
-
-                    <div className="flex items-center justify-between p-4 bg-yellow-50 rounded-xl border border-yellow-100">
-                        <div className="flex items-center gap-3">
-                            <div className="p-2 bg-yellow-100 rounded-full text-yellow-700">
-                                <Coins className="w-6 h-6" />
-                            </div>
-                            <div>
-                                <p className="text-sm text-yellow-800 font-medium">Saldo Atual</p>
-                                <p className="text-2xl font-bold text-yellow-900">{profile.current_gold}</p>
-                            </div>
-                        </div>
-                        <div className="flex flex-col gap-2">
-                            <GoldTransferDialog currentUserId={user.id} currentGold={profile.current_gold} />
-                            <Link href="/points-history">
-                              <Button size="sm" variant="outline" className="w-full border-yellow-300 text-yellow-800 hover:bg-yellow-100 flex items-center gap-1">
-                                  <History className="w-4 h-4" />
-                                  Histórico
-                              </Button>
-                            </Link>
-                        </div>
-                    </div>
-                </div>
-            </CardContent>
-        </Card>
-        
-        {/* Main Content Grid: Announcements and Events */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            {/* Announcements Section */}
-            <div className="space-y-4">
-                <h2 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
-                    <Megaphone className="w-5 h-5 text-blue-700" /> Avisos e Novidades
-                    {unreadAnnouncements > 0 && (
-                      <Badge className="bg-red-600 text-white ml-1">{unreadAnnouncements} {unreadAnnouncements === 1 ? 'novo' : 'novos'}</Badge>
-                    )}
-                </h2>
-                <AnnouncementsFeed recent={recentAnnouncements} older={olderAnnouncements} />
-            </div>
-
-            {/* Events Agenda & Calendar Section */}
-            <div>
-                <EventDashboard events={allEvents} profile={profile} surveys={surveys || []} userId={user.id} />
-            </div>
-        </div>
-
-        {/* Tasks Section */}
-        {tasks && tasks.length > 0 && (
-          <div className="space-y-3 pt-4 border-t border-stone-200">
-            <h2 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
-              <ListChecks className="w-5 h-5 text-blue-700" /> As Minhas Tarefas
-              {openTasks.length > 0 && (
-                <Badge className="bg-blue-700 text-white ml-1">{openTasks.length} pendentes</Badge>
-              )}
-            </h2>
-
-            {openTasks.length > 0 && (
-              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
-                {openTasks.map(task => (
-                  <Card key={task.id} className="border border-blue-100 bg-white hover:shadow-md transition-shadow">
-                    <CardContent className="p-4">
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="flex-1 min-w-0">
-                          <h3 className="font-medium text-gray-900 text-sm truncate">{task.title}</h3>
-                          <div className="flex items-center gap-3 mt-2">
-                            {task.xp_reward > 0 && <span className="text-xs text-indigo-600 font-medium flex items-center gap-1"><Trophy className="w-3 h-3" /> +{task.xp_reward}</span>}
-                            {task.gold_reward > 0 && <span className="text-xs text-yellow-600 font-medium flex items-center gap-1"><Coins className="w-3 h-3" /> +{task.gold_reward}</span>}
-                            {task.deadline && (
-                              <span className="text-[10px] text-gray-400">
-                                até {new Date(task.deadline).toLocaleDateString('pt-PT')}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                        <TaskCompleteButton taskId={task.id} userId={user.id} />
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
               </div>
-            )}
+              {profile.is_invested && (
+                <span className="absolute -bottom-1 -right-1 flex h-9 w-9 items-center justify-center rounded-full bg-yellow-400 text-blue-950 shadow-md ring-4 ring-blue-950" title="Investido">
+                  <ShieldCheck className="h-5 w-5" />
+                </span>
+              )}
+            </div>
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-blue-100/70">Olá de novo 👋</p>
+              <h1 className={`${D} text-4xl font-extrabold leading-[0.95] tracking-tight sm:text-5xl`}>
+                {profile.full_name}
+              </h1>
+              <div className="mt-3 flex flex-wrap justify-center gap-2 sm:justify-start">
+                <span className={`rounded-full px-3 py-1 text-xs font-extrabold uppercase tracking-wide text-white ${sectionColor}`}>
+                  {sectionLabel}
+                </span>
+                <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-bold uppercase tracking-wide text-blue-100 ring-1 ring-inset ring-white/15">
+                  {profile.role}
+                </span>
+                {!profile.is_invested && (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-red-500/90 px-3 py-1 text-xs font-bold uppercase tracking-wide text-white">
+                    <Hourglass className="h-3.5 w-3.5" /> A aguardar investidura
+                  </span>
+                )}
+              </div>
+              {(unreadAnnouncements > 0 || openTasks.length > 0) && (
+                <div className="mt-4 flex flex-wrap justify-center gap-2 sm:justify-start">
+                  {unreadAnnouncements > 0 && (
+                    <a href="#avisos" className="inline-flex items-center gap-1.5 rounded-full bg-yellow-400 px-3.5 py-1.5 text-sm font-extrabold text-blue-950 transition-transform hover:-translate-y-0.5">
+                      <Megaphone className="h-4 w-4" /> {unreadAnnouncements} {unreadAnnouncements === 1 ? 'aviso novo' : 'avisos novos'}
+                    </a>
+                  )}
+                  {openTasks.length > 0 && (
+                    <a href="#tarefas" className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3.5 py-1.5 text-sm font-bold text-white ring-1 ring-inset ring-white/20 transition-colors hover:bg-white/20">
+                      <ListChecks className="h-4 w-4 text-yellow-300" /> {openTasks.length} {openTasks.length === 1 ? 'tarefa pendente' : 'tarefas pendentes'}
+                    </a>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
 
-            {doneTasks.length > 0 && (
-              <details className="group">
-                <summary className="cursor-pointer text-sm text-gray-500 hover:text-gray-700 flex items-center gap-1 list-none">
-                  <CheckCircle2 className="w-4 h-4 text-green-600" />
-                  {doneTasks.length} tarefa{doneTasks.length !== 1 ? 's' : ''} concluída{doneTasks.length !== 1 ? 's' : ''}
-                </summary>
-                <div className="mt-2 grid grid-cols-1 md:grid-cols-3 gap-2">
-                  {doneTasks.map(task => (
-                    <div key={task.id} className="p-2 px-3 border rounded-lg bg-gray-50 flex items-center gap-2 text-xs text-gray-500">
-                      <CheckCircle2 className="w-3 h-3 text-green-600 shrink-0" />
-                      <span className="truncate">{task.title}</span>
+          {/* XP e Gold */}
+          <div className="lp-rise grid grid-cols-1 gap-3 sm:grid-cols-2" style={{ '--d': '150ms' } as React.CSSProperties}>
+            <div className="relative overflow-hidden rounded-[1.5rem] bg-gradient-to-br from-indigo-500 to-violet-700 p-5 shadow-xl shadow-indigo-950/40">
+              <Trophy aria-hidden className="absolute -bottom-5 -right-5 h-24 w-24 text-white/10" />
+              <div className="flex items-end justify-between gap-2">
+                <div>
+                  <p className="text-[11px] font-extrabold uppercase tracking-wider text-indigo-100">Nível</p>
+                  <p className={`${D} text-5xl font-extrabold leading-none`}>{level}</p>
+                </div>
+                <p className="text-sm font-bold text-indigo-100">{profile.total_xp} XP</p>
+              </div>
+              <div className="relative mt-4 h-2.5 overflow-hidden rounded-full bg-white/15">
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-yellow-300 via-orange-400 to-pink-400"
+                  style={{ width: `${Math.max(3, xpInLevel / 10)}%` }}
+                />
+              </div>
+              <p className="mt-1.5 text-right text-xs font-semibold text-indigo-100">Próximo nível em {1000 - xpInLevel} XP</p>
+            </div>
+
+            <div className="relative overflow-hidden rounded-[1.5rem] bg-yellow-400 p-5 text-blue-950 shadow-xl shadow-yellow-900/30">
+              <Coins aria-hidden className="absolute -bottom-5 -right-5 h-24 w-24 text-amber-600/20" />
+              <p className="text-[11px] font-extrabold uppercase tracking-wider text-blue-950/70">Saldo Atual</p>
+              <p className={`${D} text-5xl font-extrabold leading-none`}>{profile.current_gold}</p>
+              <div className="relative mt-4 flex flex-wrap gap-2">
+                <GoldTransferDialog
+                  currentUserId={user.id}
+                  currentGold={profile.current_gold}
+                  triggerClassName="flex h-9 items-center gap-1.5 rounded-full border-none bg-blue-950 px-4 text-sm font-bold text-white hover:bg-blue-900 hover:text-white"
+                />
+                <Link
+                  href="/points-history"
+                  className="flex h-9 items-center gap-1.5 rounded-full px-4 text-sm font-bold text-blue-950 ring-1 ring-inset ring-blue-950/25 transition-colors hover:bg-blue-950/10"
+                >
+                  <History className="h-4 w-4" /> Histórico
+                </Link>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ── Conteúdo ──────────────────────────────────────────── */}
+      <div className="relative -mt-10 rounded-t-[2.5rem] bg-stone-50 pb-20 pt-10">
+        <main className="mx-auto max-w-7xl space-y-10 px-4 sm:px-6 lg:px-8">
+          <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
+            {/* Avisos */}
+            <div id="avisos" className="scroll-mt-24 space-y-4">
+              <h2 className={`${D} flex items-center gap-2.5 text-2xl font-extrabold text-blue-950`}>
+                <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-blue-600 text-white shadow-md">
+                  <Megaphone className="h-5 w-5" />
+                </span>
+                Avisos e Novidades
+                {unreadAnnouncements > 0 && (
+                  <span className="rounded-full bg-red-500 px-2.5 py-0.5 font-sans text-xs font-extrabold text-white">
+                    {unreadAnnouncements} {unreadAnnouncements === 1 ? 'novo' : 'novos'}
+                  </span>
+                )}
+              </h2>
+              <AnnouncementsFeed recent={recentAnnouncements} older={olderAnnouncements} />
+            </div>
+
+            {/* Agenda e calendário */}
+            <div>
+              <EventDashboard events={allEvents} profile={profile} surveys={surveys || []} userId={user.id} />
+            </div>
+          </div>
+
+          {/* Tarefas */}
+          {tasks && tasks.length > 0 && (
+            <section id="tarefas" className="scroll-mt-24 space-y-4">
+              <h2 className={`${D} flex flex-wrap items-center gap-2.5 text-2xl font-extrabold text-blue-950`}>
+                <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-orange-500 text-white shadow-md">
+                  <ListChecks className="h-5 w-5" />
+                </span>
+                As Minhas Tarefas
+                {openTasks.length > 0 && (
+                  <span className="rounded-full bg-blue-950 px-2.5 py-0.5 font-sans text-xs font-extrabold text-yellow-300">
+                    {openTasks.length} pendentes
+                  </span>
+                )}
+              </h2>
+
+              {openTasks.length > 0 && (
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+                  {openTasks.map(task => (
+                    <div
+                      key={task.id}
+                      className="group flex items-start justify-between gap-3 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-stone-200 transition-all hover:-translate-y-0.5 hover:shadow-md hover:ring-blue-200"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <h3 className="truncate font-bold text-blue-950">{task.title}</h3>
+                        <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                          {task.xp_reward > 0 && (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-indigo-100 px-2 py-0.5 text-xs font-extrabold text-indigo-700">
+                              <Trophy className="h-3 w-3" /> +{task.xp_reward}
+                            </span>
+                          )}
+                          {task.gold_reward > 0 && (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-yellow-100 px-2 py-0.5 text-xs font-extrabold text-amber-700">
+                              <Coins className="h-3 w-3" /> +{task.gold_reward}
+                            </span>
+                          )}
+                          {task.deadline && (
+                            <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-stone-400">
+                              <Clock className="h-3 w-3" /> até {new Date(task.deadline).toLocaleDateString('pt-PT')}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <TaskCompleteButton taskId={task.id} userId={user.id} />
                     </div>
                   ))}
                 </div>
-              </details>
-            )}
-          </div>
-        )}
+              )}
 
-      </main>
+              {doneTasks.length > 0 && (
+                <details className="group rounded-2xl bg-white p-4 ring-1 ring-stone-200">
+                  <summary className="flex cursor-pointer list-none items-center gap-2 text-sm font-bold text-stone-500 hover:text-blue-950">
+                    <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                    {doneTasks.length} tarefa{doneTasks.length !== 1 ? 's' : ''} concluída{doneTasks.length !== 1 ? 's' : ''}
+                  </summary>
+                  <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-3">
+                    {doneTasks.map(task => (
+                      <div key={task.id} className="flex items-center gap-2 rounded-xl bg-stone-50 p-2 px-3 text-xs text-stone-500">
+                        <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-emerald-500" />
+                        <span className="truncate">{task.title}</span>
+                      </div>
+                    ))}
+                  </div>
+                </details>
+              )}
+            </section>
+          )}
+        </main>
+      </div>
+
+      <SiteFooter />
     </div>
   )
 }

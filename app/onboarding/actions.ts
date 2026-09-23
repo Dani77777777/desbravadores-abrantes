@@ -2,6 +2,7 @@
 
 import { createClient } from '@/utils/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { deleteOwnAvatarFile } from '@/utils/avatar-storage'
 
 export async function updateProfile(data: {
   birthDate: string
@@ -20,7 +21,7 @@ export async function updateProfile(data: {
   // Check if profile exists
   const { data: existingProfile, error: fetchError } = await supabase
     .from('profiles')
-    .select('id')
+    .select('id, avatar_url')
     .eq('id', user.id)
     .single()
 
@@ -61,6 +62,11 @@ export async function updateProfile(data: {
     if (updateError) {
       console.error('Update error:', updateError)
       return { error: `Erro ao atualizar: ${updateError.message}` }
+    }
+
+    // Foto antiga carregada por este utilizador que foi trocada ou removida
+    if (existingProfile?.avatar_url && existingProfile.avatar_url !== (data.avatarUrl || null)) {
+      await deleteOwnAvatarFile(existingProfile.avatar_url, user.id)
     }
   }
 

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import {
@@ -12,20 +12,51 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { Menu, X, LogOut, User, Shield, Tent, MessageSquare, Trophy, Phone, ShoppingBag, Gamepad2 } from 'lucide-react'
+import { Menu, X, LogOut, User, Shield, MessageSquare, Trophy, Phone, ShoppingBag, Gamepad2, Home, Coins, ChevronDown, type LucideIcon } from 'lucide-react'
 import { PushNotificationButton } from '@/components/notifications/PushNotificationButton'
 import { createClient } from '@/utils/supabase/client'
-import { useRouter } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { isAdminRole, isHelper, helperLabel } from '@/utils/permissions'
+import { displayFont } from '@/components/landing/fonts'
 
 interface NavbarProps {
   user: any
   profile: any
 }
 
+interface NavItem {
+  href: string
+  label: string
+  /** Texto mais descritivo no menu do telemóvel. */
+  mobileLabel?: string
+  icon: LucideIcon
+  /** Cor do ícone no menu do telemóvel. */
+  tile: string
+}
+
+const USER_ITEMS: NavItem[] = [
+  { href: '/', label: 'Painel', mobileLabel: 'Painel Principal', icon: Home, tile: 'bg-blue-500' },
+  { href: '/profile', label: 'Perfil', mobileLabel: 'O Meu Perfil', icon: User, tile: 'bg-sky-500' },
+  { href: '/suggestions', label: 'Sugestões', icon: MessageSquare, tile: 'bg-violet-500' },
+  { href: '/leaderboard', label: 'Ranking', icon: Trophy, tile: 'bg-yellow-500' },
+  { href: '/contacts', label: 'Contactos', icon: Phone, tile: 'bg-emerald-500' },
+  { href: '/shop', label: 'Loja', icon: ShoppingBag, tile: 'bg-pink-500' },
+  { href: '/jogos', label: 'Jogos', icon: Gamepad2, tile: 'bg-orange-500' },
+]
+
+const GUEST_ITEMS: NavItem[] = [
+  { href: '/jogos', label: 'Jogos', icon: Gamepad2, tile: 'bg-orange-500' },
+  { href: '/shop', label: 'Loja', icon: ShoppingBag, tile: 'bg-pink-500' },
+  { href: '/leaderboard', label: 'Ranking', mobileLabel: 'Ranking Público', icon: Trophy, tile: 'bg-yellow-500' },
+  { href: '/contacts', label: 'Contactos', mobileLabel: 'Contactos do Clube', icon: Phone, tile: 'bg-emerald-500' },
+]
+
+const ADMIN_ITEM: NavItem = { href: '/admin', label: 'Gestão', mobileLabel: 'Área de Gestão', icon: Shield, tile: 'bg-red-500' }
+
 export function Navbar({ user, profile }: NavbarProps) {
   const [isOpen, setIsOpen] = useState(false)
   const router = useRouter()
+  const pathname = usePathname()
   const supabase = createClient()
 
   const handleLogout = async () => {
@@ -33,357 +64,300 @@ export function Navbar({ user, profile }: NavbarProps) {
     router.refresh()
   }
 
+  // Fundo translúcido só depois de descer mais do que a altura da barra (64px).
+  // Antes disso, por trás do header está o espaço que ele ocupa no início da página,
+  // que em várias páginas tem fundo claro e deixava a barra "lavada".
+  const [scrolled, setScrolled] = useState(false)
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 64)
+    onScroll()
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [])
+
+  // Sem scroll da página por trás do menu do telemóvel
+  useEffect(() => {
+    if (!isOpen) return
+    const previous = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => { document.body.style.overflow = previous }
+  }, [isOpen])
+
   const isAdmin = isAdminRole(profile)
   const roleLabel = isHelper(profile) ? helperLabel(profile) : `${profile?.role} • ${profile?.section}`
+  const avatarSrc = profile?.avatar_url || user?.user_metadata?.avatar_url
+
+  const items = user ? [...USER_ITEMS, ...(isAdmin ? [ADMIN_ITEM] : [])] : GUEST_ITEMS
+  const isActive = (href: string) =>
+    href === '/' ? pathname === '/' : pathname === href || pathname?.startsWith(href + '/')
+
+  // Com sessão há muitos links: o menu completo só aparece a partir de lg.
+  const desktopOnly = user ? 'hidden lg:flex' : 'hidden md:flex'
+  const mobileOnly = user ? 'flex lg:hidden' : 'flex md:hidden'
 
   return (
-    <nav className="bg-blue-900 border-b border-blue-800 text-white shadow-md sticky top-0 z-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16">
-          <div className="flex items-center">
-            <Link href="/" className="flex-shrink-0 font-bold text-xl tracking-tight flex items-center gap-2">
-              <img src="/images/Logo Desbravadores.png" alt="Logo" className="h-8 w-auto" />
-              <span className="hidden sm:inline">Desbravadores Abrantes</span>
-              <span className="sm:hidden">DBV Abrantes</span>
-            </Link>
-            {user && (
-              <div className="hidden md:block">
-                <div className="ml-10 flex items-center space-x-4">
-                  <Link
-                    href="/"
-                    className="hover:bg-blue-800 px-3 py-2 rounded-md text-sm font-medium transition-colors"
-                  >
-                    Painel
-                  </Link>
-                  <Link
-                    href="/profile"
-                    className="hover:bg-blue-800 px-3 py-2 rounded-md text-sm font-medium transition-colors flex items-center gap-1"
-                  >
-                    <User className="w-4 h-4" /> Perfil
-                  </Link>
-                  <Link
-                    href="/suggestions"
-                    className="hover:bg-blue-800 px-3 py-2 rounded-md text-sm font-medium transition-colors flex items-center gap-1"
-                  >
-                    <MessageSquare className="w-4 h-4" /> Sugestões
-                  </Link>
-                  <Link
-                    href="/leaderboard"
-                    className="hover:bg-blue-800 px-3 py-2 rounded-md text-sm font-medium transition-colors flex items-center gap-1"
-                  >
-                    <Trophy className="w-4 h-4" /> Ranking
-                  </Link>
-                  <Link
-                    href="/contacts"
-                    className="hover:bg-blue-800 px-3 py-2 rounded-md text-sm font-medium transition-colors flex items-center gap-1"
-                  >
-                    <Phone className="w-4 h-4" /> Contactos
-                  </Link>
-                  <Link
-                    href="/shop"
-                    className="hover:bg-blue-800 px-3 py-2 rounded-md text-sm font-medium transition-colors flex items-center gap-1"
-                  >
-                    <ShoppingBag className="w-4 h-4" /> Loja
-                  </Link>
-                  <Link
-                    href="/jogos"
-                    className="hover:bg-blue-800 px-3 py-2 rounded-md text-sm font-medium transition-colors flex items-center gap-1"
-                  >
-                    <Gamepad2 className="w-4 h-4" /> Jogos
-                  </Link>
-                  {isAdmin && (
-                    <Link
-                      href="/admin"
-                      className="hover:bg-blue-800 px-3 py-2 rounded-md text-sm font-medium transition-colors flex items-center gap-1"
-                    >
-                      <Shield className="w-4 h-4" /> Gestão
-                    </Link>
-                  )}
-                </div>
-              </div>
-            )}
-            {!user && (
-              <div className="hidden md:block">
-                <div className="ml-10 flex items-center space-x-4">
-                  <Link
-                    href="/jogos"
-                    className="hover:bg-blue-800 px-3 py-2 rounded-md text-sm font-medium transition-colors flex items-center gap-1 text-white"
-                  >
-                    <Gamepad2 className="w-4 h-4" /> Jogos
-                  </Link>
-                  <Link
-                    href="/shop"
-                    className="hover:bg-blue-800 px-3 py-2 rounded-md text-sm font-medium transition-colors flex items-center gap-1 text-white"
-                  >
-                    <ShoppingBag className="w-4 h-4" /> Loja
-                  </Link>
-                  <Link
-                    href="/leaderboard"
-                    className="hover:bg-blue-800 px-3 py-2 rounded-md text-sm font-medium transition-colors flex items-center gap-1 text-white"
-                  >
-                    <Trophy className="w-4 h-4" /> Ranking
-                  </Link>
-                  <Link
-                    href="/contacts"
-                    className="hover:bg-blue-800 px-3 py-2 rounded-md text-sm font-medium transition-colors flex items-center gap-1 text-white"
-                  >
-                    <Phone className="w-4 h-4" /> Contactos
-                  </Link>
-                </div>
-              </div>
-            )}
+    <nav className="sticky top-0 z-50 text-white shadow-lg shadow-blue-950/20">
+      {/* Fundo numa camada à parte (o <nav> não pode ter filtros, senão prende o menu do
+          telemóvel, que é position: fixed, dentro da barra). Sólido no topo, translúcido
+          quando já só há conteúdo da página por trás. */}
+      <div
+        aria-hidden
+        className={`absolute inset-0 -z-10 transition-colors duration-300 ${
+          scrolled ? 'bg-blue-950/80 backdrop-blur-xl' : 'bg-blue-950'
+        }`}
+      />
+      {/* Linha com as cores do lenço */}
+      <div aria-hidden className="absolute inset-x-0 bottom-0 h-[2px] bg-gradient-to-r from-yellow-400 via-orange-500 to-red-500 opacity-80" />
+
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div className="flex h-16 items-center justify-between gap-4">
+          <Link href="/" className="group flex shrink-0 items-center gap-2.5">
+            <img
+              src="/images/Logo Desbravadores.png"
+              alt="Logo"
+              className="h-9 w-auto drop-shadow-[0_2px_8px_rgba(250,204,21,.25)] transition-transform duration-300 group-hover:-rotate-6 group-hover:scale-110"
+            />
+            <span className={`${displayFont.className} text-lg font-extrabold leading-none tracking-tight sm:text-xl`}>
+              <span className={user ? 'xl:hidden' : 'sm:hidden'}>DBV <span className="text-yellow-400">Abrantes</span></span>
+              <span className={user ? 'hidden xl:inline' : 'hidden sm:inline'}>
+                Desbravadores <span className="text-yellow-400">Abrantes</span>
+              </span>
+            </span>
+          </Link>
+
+          {/* Links (desktop) */}
+          <div className={`${desktopOnly} min-w-0 items-center gap-0.5 rounded-full bg-white/[0.06] p-1 ring-1 ring-inset ring-white/10`}>
+            {items.map(({ href, label, icon: Icon }) => {
+              const active = isActive(href)
+              const isAdminLink = href === '/admin'
+              return (
+                <Link
+                  key={href}
+                  href={href}
+                  className={`flex items-center gap-1.5 whitespace-nowrap rounded-full px-3 py-1.5 text-sm font-semibold transition-all ${
+                    active
+                      ? 'bg-yellow-400 text-blue-950 shadow-md'
+                      : isAdminLink
+                        ? 'text-red-300 hover:bg-red-500/15 hover:text-red-200'
+                        : 'text-blue-100/85 hover:bg-white/10 hover:text-white'
+                  }`}
+                >
+                  {/* Com sessão são 8 links: só texto, para caber ao lado do nome e do avatar */}
+                  {!user && <Icon className="h-4 w-4" />}
+                  {label}
+                </Link>
+              )
+            })}
           </div>
-          <div className="hidden md:block">
-            <div className="ml-4 flex items-center md:ml-6 gap-1">
-              {user && <PushNotificationButton />}
-              {user ? (
+
+          {/* Lado direito (desktop) */}
+          <div className={`${desktopOnly} shrink-0 items-center gap-1.5`}>
+            {user ? (
+              <>
+                <Link
+                  href="/points-history"
+                  title="O teu Gold"
+                  className="hidden items-center gap-1.5 rounded-full bg-yellow-400/10 px-3 py-1.5 text-sm font-extrabold text-yellow-300 ring-1 ring-inset ring-yellow-400/25 transition-colors hover:bg-yellow-400/20 xl:flex"
+                >
+                  <Coins className="h-4 w-4" /> {profile?.current_gold ?? 0}
+                </Link>
+                <PushNotificationButton />
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" className="relative h-10 w-10 rounded-full hover:bg-blue-800 focus:ring-0">
-                      <Avatar className="h-9 w-9 border-2 border-yellow-400/60">
-                        <AvatarImage src={profile?.avatar_url || user?.user_metadata?.avatar_url} alt={profile?.full_name} className="object-cover" />
-                        <AvatarFallback className="bg-blue-700 text-white">{profile?.full_name?.charAt(0) || 'D'}</AvatarFallback>
+                    <button className="group flex cursor-pointer items-center gap-1 rounded-full p-0.5 pr-1.5 transition-colors hover:bg-white/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-yellow-400">
+                      <Avatar className="h-9 w-9 ring-2 ring-yellow-400/70 ring-offset-2 ring-offset-blue-950">
+                        <AvatarImage src={avatarSrc} alt={profile?.full_name} className="object-cover" />
+                        <AvatarFallback className="bg-blue-700 font-bold text-white">{profile?.full_name?.charAt(0) || 'D'}</AvatarFallback>
                       </Avatar>
-                    </Button>
+                      <ChevronDown className="h-4 w-4 text-blue-200 transition-transform group-data-[state=open]:rotate-180" />
+                    </button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent className="w-56" align="end" forceMount>
+                  <DropdownMenuContent className="w-60 rounded-2xl p-2" align="end" forceMount>
                     <DropdownMenuLabel className="font-normal">
-                      <div className="flex flex-col space-y-1">
-                        <p className="text-sm font-medium leading-none">{profile?.full_name}</p>
-                        <p className="text-xs leading-none text-muted-foreground capitalize">
-                          {roleLabel}
-                        </p>
+                      <div className="flex items-center gap-3">
+                        <Avatar className="h-10 w-10">
+                          <AvatarImage src={avatarSrc} alt={profile?.full_name} className="object-cover" />
+                          <AvatarFallback className="bg-blue-700 font-bold text-white">{profile?.full_name?.charAt(0) || 'D'}</AvatarFallback>
+                        </Avatar>
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-bold leading-tight">{profile?.full_name}</p>
+                          <p className="truncate text-xs capitalize text-muted-foreground">{roleLabel}</p>
+                        </div>
                       </div>
                     </DropdownMenuLabel>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={handleLogout} className="text-red-600 focus:text-red-600 cursor-pointer">
+                    <DropdownMenuItem asChild className="cursor-pointer rounded-lg">
+                      <Link href="/profile">
+                        <User className="mr-2 h-4 w-4" /> O meu perfil
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild className="cursor-pointer rounded-lg">
+                      <Link href="/points-history">
+                        <Coins className="mr-2 h-4 w-4" /> {profile?.current_gold ?? 0} Gold · Histórico
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={handleLogout} className="cursor-pointer rounded-lg text-red-600 focus:text-red-600">
                       <LogOut className="mr-2 h-4 w-4" />
                       <span>Sair</span>
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
-              ) : (
-                <div className="flex items-center gap-3">
-                  <Link href="/login?mode=login">
-                    <Button variant="ghost" className="text-white hover:bg-blue-800 font-medium">
-                      Entrar
-                    </Button>
-                  </Link>
-                  <Link href="/login?mode=signup">
-                    <Button className="bg-white text-blue-900 hover:bg-yellow-400 hover:text-blue-900 border-none font-bold shadow-sm transition-colors">
-                      Registar
-                    </Button>
-                  </Link>
-                </div>
-              )}
-            </div>
+              </>
+            ) : (
+              <>
+                <Link
+                  href="/login?mode=login"
+                  className="rounded-full px-4 py-2 text-sm font-semibold text-blue-100 transition-colors hover:bg-white/10 hover:text-white"
+                >
+                  Entrar
+                </Link>
+                <Link
+                  href="/login?mode=signup"
+                  className="rounded-full bg-yellow-400 px-5 py-2 text-sm font-extrabold text-blue-950 shadow-[0_0_0_3px_rgba(250,204,21,.18),0_8px_20px_-6px_rgba(250,204,21,.6)] transition-all hover:-translate-y-0.5 hover:bg-yellow-300"
+                >
+                  Registar
+                </Link>
+              </>
+            )}
           </div>
-          <div className="-mr-2 flex md:hidden">
-            <Button
-              variant="ghost"
+
+          {/* Botão do menu (telemóvel) */}
+          <div className={`${mobileOnly} items-center gap-1`}>
+            {!user && (
+              <Link
+                href="/login?mode=signup"
+                className="rounded-full bg-yellow-400 px-4 py-1.5 text-sm font-extrabold text-blue-950"
+              >
+                Registar
+              </Link>
+            )}
+            <button
+              type="button"
               onClick={() => setIsOpen(!isOpen)}
-              className="inline-flex items-center justify-center p-2 rounded-md text-blue-200 hover:text-white hover:bg-blue-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-blue-900 focus:ring-white"
+              className="inline-flex h-10 w-10 items-center justify-center rounded-xl text-blue-100 ring-1 ring-inset ring-white/15 transition-colors hover:bg-white/10 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-yellow-400"
             >
-              <span className="sr-only">Open main menu</span>
-              {isOpen ? <X className="block h-6 w-6" /> : <Menu className="block h-6 w-6" />}
-            </Button>
+              <span className="sr-only">Abrir menu</span>
+              {isOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+            </button>
           </div>
         </div>
       </div>
 
-      {/* Mobile menu */}
+      {/* Menu (telemóvel) */}
       {isOpen && (
-        <div className="md:hidden fixed inset-0 z-[60] bg-blue-900/98 backdrop-blur-xl animate-in fade-in duration-300">
-          {/* Close button inside the overlay for better UX */}
-          <button 
-            onClick={() => setIsOpen(false)}
-            className="absolute top-4 right-4 p-2 text-white/70 hover:text-white transition-colors"
-          >
-            <X className="w-8 h-8" />
-          </button>
+        <div className={`${user ? 'lg:hidden' : 'md:hidden'} fixed inset-0 z-[60] overflow-y-auto bg-blue-950 animate-in fade-in duration-200`}>
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-0"
+            style={{
+              backgroundImage:
+                'radial-gradient(60% 40% at 100% 0%, rgba(250,204,21,.18), transparent 70%), radial-gradient(60% 40% at 0% 100%, rgba(99,102,241,.25), transparent 70%)',
+            }}
+          />
 
-          <div className="px-5 py-20 flex flex-col h-full overflow-y-auto">
-            <div className="flex-1 space-y-3">
-              {user ? (
-                <>
-                  <Link
-                    href="/"
-                    className="flex items-center gap-4 px-5 py-4 rounded-2xl bg-blue-800/40 hover:bg-blue-800 text-white font-bold transition-all border border-blue-700/50 shadow-sm"
-                    onClick={() => setIsOpen(false)}
-                  >
-                    <div className="p-2 bg-white rounded-lg">
-                      <img src="/images/Logo Desbravadores.png" alt="Logo" className="w-5 h-5 object-contain" />
-                    </div>
-                    <span>Painel Principal</span>
-                  </Link>
-                  <Link
-                    href="/profile"
-                    className="flex items-center gap-4 px-5 py-4 rounded-2xl hover:bg-blue-800/40 text-gray-100 font-semibold transition-all border border-transparent hover:border-blue-700/50"
-                    onClick={() => setIsOpen(false)}
-                  >
-                    <div className="p-2 bg-blue-700/50 rounded-lg text-blue-300">
-                      <User className="w-5 h-5" />
-                    </div>
-                    <span>O Meu Perfil</span>
-                  </Link>
-                  <Link
-                    href="/suggestions"
-                    className="flex items-center gap-4 px-5 py-4 rounded-2xl hover:bg-blue-800/40 text-gray-100 font-semibold transition-all border border-transparent hover:border-blue-700/50"
-                    onClick={() => setIsOpen(false)}
-                  >
-                    <div className="p-2 bg-blue-700/50 rounded-lg text-blue-300">
-                      <MessageSquare className="w-5 h-5" />
-                    </div>
-                    <span>Sugestões</span>
-                  </Link>
-                  <Link
-                    href="/leaderboard"
-                    className="flex items-center gap-4 px-5 py-4 rounded-2xl hover:bg-blue-800/40 text-gray-100 font-semibold transition-all border border-transparent hover:border-blue-700/50"
-                    onClick={() => setIsOpen(false)}
-                  >
-                    <div className="p-2 bg-blue-700/50 rounded-lg text-blue-300">
-                      <Trophy className="w-5 h-5" />
-                    </div>
-                    <span>Ranking</span>
-                  </Link>
-                  <Link
-                    href="/contacts"
-                    className="flex items-center gap-4 px-5 py-4 rounded-2xl hover:bg-blue-800/40 text-gray-100 font-semibold transition-all border border-transparent hover:border-blue-700/50"
-                    onClick={() => setIsOpen(false)}
-                  >
-                    <div className="p-2 bg-blue-700/50 rounded-lg text-blue-300">
-                      <Phone className="w-5 h-5" />
-                    </div>
-                    <span>Contactos</span>
-                  </Link>
-                  <Link
-                    href="/shop"
-                    className="flex items-center gap-4 px-5 py-4 rounded-2xl hover:bg-blue-800/40 text-gray-100 font-semibold transition-all border border-transparent hover:border-blue-700/50"
-                    onClick={() => setIsOpen(false)}
-                  >
-                    <div className="p-2 bg-blue-700/50 rounded-lg text-blue-300">
-                      <ShoppingBag className="w-5 h-5" />
-                    </div>
-                    <span>Loja</span>
-                  </Link>
-                  <Link
-                    href="/jogos"
-                    className="flex items-center gap-4 px-5 py-4 rounded-2xl hover:bg-blue-800/40 text-gray-100 font-semibold transition-all border border-transparent hover:border-blue-700/50"
-                    onClick={() => setIsOpen(false)}
-                  >
-                    <div className="p-2 bg-blue-700/50 rounded-lg text-blue-300">
-                      <Gamepad2 className="w-5 h-5" />
-                    </div>
-                    <span>Jogos</span>
-                  </Link>
-                  {isAdmin && (
-                    <Link
-                      href="/admin"
-                      className="mt-4 flex items-center gap-4 px-5 py-4 rounded-2xl bg-red-600/10 hover:bg-red-600/20 text-red-400 font-bold transition-all border border-red-500/20"
-                      onClick={() => setIsOpen(false)}
-                    >
-                      <div className="p-2 bg-red-600/20 rounded-lg">
-                        <Shield className="w-5 h-5" />
-                      </div>
-                      <span>Área de Gestão</span>
-                    </Link>
-                  )}
-                </>
-              ) : (
-                <div className="space-y-4">
-                  <Link
-                    href="/jogos"
-                    className="flex items-center gap-4 px-5 py-4 rounded-2xl bg-blue-800/40 hover:bg-blue-800 text-white font-bold transition-all border border-blue-700/50"
-                    onClick={() => setIsOpen(false)}
-                  >
-                    <div className="p-2 bg-blue-700/50 rounded-lg text-blue-300">
-                      <Gamepad2 className="w-5 h-5" />
-                    </div>
-                    <span>Jogos</span>
-                  </Link>
-                  <Link
-                    href="/shop"
-                    className="flex items-center gap-4 px-5 py-4 rounded-2xl hover:bg-blue-800/40 text-gray-100 font-semibold transition-all border border-transparent hover:border-blue-700/50"
-                    onClick={() => setIsOpen(false)}
-                  >
-                    <div className="p-2 bg-blue-700/50 rounded-lg text-blue-300">
-                      <ShoppingBag className="w-5 h-5" />
-                    </div>
-                    <span>Loja</span>
-                  </Link>
-                  <Link
-                    href="/leaderboard"
-                    className="flex items-center gap-4 px-5 py-4 rounded-2xl hover:bg-blue-800/40 text-gray-100 font-semibold transition-all border border-transparent hover:border-blue-700/50"
-                    onClick={() => setIsOpen(false)}
-                  >
-                    <div className="p-2 bg-blue-700/50 rounded-lg text-blue-300">
-                      <Trophy className="w-5 h-5" />
-                    </div>
-                    <span>Ranking Público</span>
-                  </Link>
-                  <Link
-                    href="/contacts"
-                    className="flex items-center gap-4 px-5 py-4 rounded-2xl hover:bg-blue-800/40 text-gray-100 font-semibold transition-all border border-transparent hover:border-blue-700/50"
-                    onClick={() => setIsOpen(false)}
-                  >
-                    <div className="p-2 bg-blue-700/50 rounded-lg text-blue-300">
-                      <Phone className="w-5 h-5" />
-                    </div>
-                    <span>Contactos do Clube</span>
-                  </Link>
-                </div>
-              )}
+          <div className="relative mx-auto flex min-h-full max-w-md flex-col px-5 pb-10 pt-4">
+            <div className="flex items-center justify-between">
+              <span className={`${displayFont.className} text-xl font-extrabold`}>
+                Menu<span className="text-yellow-400">.</span>
+              </span>
+              <button
+                onClick={() => setIsOpen(false)}
+                className="flex h-10 w-10 items-center justify-center rounded-xl text-white/80 ring-1 ring-inset ring-white/15 transition-colors hover:bg-white/10 hover:text-white"
+              >
+                <span className="sr-only">Fechar menu</span>
+                <X className="h-5 w-5" />
+              </button>
             </div>
 
-            <div className="mt-8 pt-8 border-t border-blue-800/60 pb-10">
+            {user && (
+              <div className="mt-6 flex items-center gap-4 rounded-3xl bg-white/[0.07] p-4 ring-1 ring-inset ring-white/10">
+                <div className="relative">
+                  <Avatar className="h-14 w-14 ring-2 ring-yellow-400 ring-offset-2 ring-offset-blue-950">
+                    <AvatarImage src={avatarSrc} alt={profile?.full_name} className="object-cover" />
+                    <AvatarFallback className="bg-blue-700 text-xl font-bold text-white">{profile?.full_name?.charAt(0) || 'D'}</AvatarFallback>
+                  </Avatar>
+                  <span className="absolute -bottom-0.5 -right-0.5 h-4 w-4 rounded-full border-2 border-blue-950 bg-emerald-500" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-lg font-bold leading-tight">{profile?.full_name}</p>
+                  <p className="truncate text-sm capitalize text-blue-300">{roleLabel}</p>
+                </div>
+                <Link
+                  href="/points-history"
+                  onClick={() => setIsOpen(false)}
+                  className="flex shrink-0 items-center gap-1 rounded-full bg-yellow-400 px-3 py-1.5 text-sm font-extrabold text-blue-950"
+                >
+                  <Coins className="h-4 w-4" /> {profile?.current_gold ?? 0}
+                </Link>
+              </div>
+            )}
+
+            <div className="mt-6 grid grid-cols-2 gap-3">
+              {items.map(({ href, label, mobileLabel, icon: Icon, tile }, i) => {
+                const active = isActive(href)
+                const isAdminLink = href === '/admin'
+                // Número ímpar de itens: o último ocupa a linha toda
+                const fullRow = items.length % 2 === 1 && i === items.length - 1
+                return (
+                  <Link
+                    key={href}
+                    href={href}
+                    onClick={() => setIsOpen(false)}
+                    className={`group flex flex-col gap-3 rounded-3xl p-4 transition-all active:scale-95 ${
+                      fullRow ? 'col-span-2' : ''
+                    } ${
+                      active
+                        ? 'bg-yellow-400 text-blue-950 shadow-[0_12px_30px_-10px_rgba(250,204,21,.6)]'
+                        : isAdminLink
+                          ? 'bg-red-500/10 text-red-200 ring-1 ring-inset ring-red-400/25'
+                          : 'bg-white/[0.07] text-white ring-1 ring-inset ring-white/10 hover:bg-white/[0.12]'
+                    }`}
+                  >
+                    <span className={`flex h-10 w-10 items-center justify-center rounded-2xl text-white shadow-md ${active ? 'bg-blue-950' : tile}`}>
+                      <Icon className="h-5 w-5" />
+                    </span>
+                    <span className="font-bold leading-tight">{mobileLabel ?? label}</span>
+                  </Link>
+                )
+              })}
+            </div>
+
+            <div className="mt-auto pt-8">
               {user ? (
-                <div className="space-y-8">
-                  <div className="flex items-center px-2">
-                    <div className="relative">
-                      <Avatar className="h-16 w-16 border-2 border-yellow-400 shadow-lg">
-                          <AvatarImage src={profile?.avatar_url || user?.user_metadata?.avatar_url} alt={profile?.full_name} className="object-cover" />
-                          <AvatarFallback className="bg-blue-700 text-white text-xl font-bold">{profile?.full_name?.charAt(0) || 'D'}</AvatarFallback>
-                      </Avatar>
-                      <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-emerald-500 border-2 border-blue-900 rounded-full" />
-                    </div>
-                    <div className="ml-5">
-                      <div className="text-xl font-bold text-white tracking-tight leading-none mb-1">{profile?.full_name}</div>
-                      <div className="text-sm text-blue-300 font-medium capitalize flex items-center gap-2">
-                         <span className="w-2 h-2 rounded-full bg-blue-400" />
-                         {roleLabel}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex items-center justify-center gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="rounded-2xl ring-1 ring-inset ring-white/15">
                     <PushNotificationButton />
-                    <Button
-                      variant="ghost"
-                      className="flex-1 justify-center text-red-100 hover:text-white hover:bg-red-600/20 py-8 text-lg font-bold rounded-2xl border border-red-900/30 transition-all active:scale-95"
-                      onClick={handleLogout}
-                    >
-                      <LogOut className="mr-3 h-5 w-5 text-red-400" /> Encerrar Sessão
-                    </Button>
                   </div>
+                  <Button
+                    variant="ghost"
+                    className="flex-1 justify-center rounded-2xl border border-red-400/25 py-7 text-base font-bold text-red-200 transition-all hover:bg-red-600/20 hover:text-white active:scale-95"
+                    onClick={handleLogout}
+                  >
+                    <LogOut className="mr-2 h-5 w-5 text-red-400" /> Encerrar Sessão
+                  </Button>
                 </div>
               ) : (
-                <div className="flex flex-col gap-4">
-                  <Link href="/login?mode=signup" onClick={() => setIsOpen(false)}>
-                    <Button className="w-full bg-yellow-400 text-blue-900 hover:bg-yellow-500 py-8 text-xl font-bold rounded-2xl border-none shadow-xl transform transition-transform active:scale-[0.98]">
-                      Registar agora
-                    </Button>
+                <div className="flex flex-col gap-3">
+                  <Link
+                    href="/login?mode=signup"
+                    onClick={() => setIsOpen(false)}
+                    className="rounded-2xl bg-yellow-400 py-5 text-center text-xl font-extrabold text-blue-950 shadow-[0_18px_40px_-12px_rgba(250,204,21,.6)] transition-transform active:scale-[0.98]"
+                  >
+                    Registar agora
                   </Link>
-                  <Link href="/login?mode=login" onClick={() => setIsOpen(false)}>
-                    <Button variant="ghost" className="w-full border border-blue-400/30 text-white hover:bg-blue-800/50 py-7 text-lg font-semibold rounded-2xl">
-                      Já tenho conta
-                    </Button>
+                  <Link
+                    href="/login?mode=login"
+                    onClick={() => setIsOpen(false)}
+                    className="rounded-2xl py-4 text-center text-lg font-semibold text-white ring-1 ring-inset ring-white/20 transition-colors hover:bg-white/10"
+                  >
+                    Já tenho conta
                   </Link>
                 </div>
               )}
-              <div className="text-center mt-12">
-                <p className="text-[10px] text-blue-400/60 font-medium tracking-widest uppercase">
-                  Aventura • Amizade • Fé
-                </p>
-              </div>
+              <p className="mt-8 text-center text-[10px] font-semibold uppercase tracking-[0.3em] text-blue-300/50">
+                Aventura • Amizade • Fé
+              </p>
             </div>
           </div>
         </div>
