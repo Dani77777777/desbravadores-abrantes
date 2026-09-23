@@ -17,6 +17,8 @@ import { displayFont } from '@/components/landing/fonts'
 import { SiteFooter } from '@/components/landing/SiteFooter'
 import { PurchaseHistory } from './PurchaseHistory'
 import { DeleteAccountCard } from './DeleteAccountCard'
+import { GenderChoice } from '@/components/profile/GenderChoice'
+import type { Gender } from '@/utils/name-gender'
 
 const D = displayFont.className
 
@@ -25,6 +27,7 @@ interface ProfileSettingsProps {
     full_name: string
     avatar_url: string | null
     birth_date: string | null
+    gender?: string | null
     section: string
     role: string
     total_xp: number
@@ -76,6 +79,8 @@ function Panel({ icon: Icon, iconClass, title, description, children, className 
 export default function ProfileSettings({ profile, user, userEmail, purchases, vanaTrilhaStations = 0 }: ProfileSettingsProps) {
   const [fullName, setFullName] = useState(profile.full_name)
   const [avatar, setAvatar] = useState<AvatarChoice>({ file: null, url: profile.avatar_url || '' })
+  const savedGender: Gender | null = profile.gender === 'm' || profile.gender === 'f' ? profile.gender : null
+  const [gender, setGender] = useState<Gender | null>(savedGender)
   const [loading, setLoading] = useState(false)
   const [newEmail, setNewEmail] = useState('')
   const [emailLoading, setEmailLoading] = useState(false)
@@ -97,6 +102,8 @@ export default function ProfileSettings({ profile, user, userEmail, purchases, v
       const result = await updateUserProfile({
         fullName,
         avatarUrl: finalUrl,
+        // Só contas antigas que nunca indicaram o sexo o escolhem aqui (uma vez)
+        ...(!savedGender && gender ? { gender } : {}),
       })
 
       if (result.error) {
@@ -286,6 +293,17 @@ export default function ProfileSettings({ profile, user, userEmail, purchases, v
                   </div>
                 </div>
 
+                {!savedGender && (
+                  <div className="space-y-1.5">
+                    <Label className="text-sm font-bold text-blue-950">Sexo</Label>
+                    <p className="rounded-xl bg-yellow-50 px-3 py-2 text-xs font-semibold text-amber-800 ring-1 ring-inset ring-yellow-300">
+                      Ainda não indicaste. Escolhe e carrega em &quot;Guardar Alterações&quot;. Serve para organizar as tendas nas saídas
+                      e depois já não se muda aqui.
+                    </p>
+                    <GenderChoice value={gender} onChange={setGender} disabled={loading} />
+                  </div>
+                )}
+
                 <div className="space-y-2">
                   <Label className="flex items-center gap-1.5 text-sm font-bold text-blue-950">
                     <ImageIcon className="h-4 w-4 text-stone-400" /> Foto de Perfil
@@ -322,6 +340,23 @@ export default function ProfileSettings({ profile, user, userEmail, purchases, v
                   <dt className="text-sm text-stone-500">Investido</dt>
                   <dd className={`font-bold ${profile.is_invested ? 'text-blue-600' : 'text-orange-600'}`}>
                     {profile.is_invested ? 'Sim' : 'Aguardando'}
+                  </dd>
+                </div>
+                <div className="flex items-center justify-between py-3">
+                  <dt className="text-sm text-stone-500">Sexo</dt>
+                  <dd>
+                    {savedGender ? (
+                      <span
+                        className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-extrabold ${
+                          savedGender === 'm' ? 'bg-sky-100 text-sky-800' : 'bg-pink-100 text-pink-800'
+                        }`}
+                      >
+                        <span className="text-sm leading-none">{savedGender === 'm' ? '♂' : '♀'}</span>
+                        {savedGender === 'm' ? 'Masculino' : 'Feminino'}
+                      </span>
+                    ) : (
+                      <span className="text-sm font-bold text-amber-600">Por indicar</span>
+                    )}
                   </dd>
                 </div>
                 {profile.birth_date && (

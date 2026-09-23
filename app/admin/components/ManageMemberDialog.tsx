@@ -19,6 +19,7 @@ import { triggerResetPassword } from '../actions'
 import { SECTION_LABELS, helperLabel } from '@/utils/permissions'
 import { ROLE_LABELS, SECTION_DOT } from './member-constants'
 import type { SectionSuggestion } from './SectionSuggestions'
+import { detectGender } from '@/utils/name-gender'
 
 const PRESETS = [5, 10, 25, 50, 100]
 
@@ -60,6 +61,8 @@ export function ManageMemberDialog({
   const [resetInvestiture, setResetInvestiture] = useState(true)
   const [notifyMember, setNotifyMember] = useState(true)
   const [sectionHistory, setSectionHistory] = useState<any[]>([])
+  const [gender, setGender] = useState<string | null>(null)
+  const [savingGender, setSavingGender] = useState(false)
 
   // Repõe o formulário sempre que se abre para um membro.
   useEffect(() => {
@@ -76,6 +79,7 @@ export function ManageMemberDialog({
     setResetInvestiture(true)
     setNotifyMember(true)
     setSectionHistory([])
+    setGender(member.gender ?? null)
   }, [open, member?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Histórico de classes (só a coordenação gere classes).
@@ -109,6 +113,20 @@ export function ManageMemberDialog({
   // O clube nunca pode ficar sem coordenador (a BD também o impede).
   const removesLastCoordinator = member.role === 'coordenador' && tempRole !== 'coordenador' && coordinatorCount <= 1
   const promotesHelper = !!member.helper_role && tempRole !== 'desbravador'
+
+  const handleGender = async (g: 'm' | 'f') => {
+    const prev = gender
+    setGender(g)
+    setSavingGender(true)
+    const { error } = await supabase.from('profiles').update({ gender: g }).eq('id', member.id)
+    setSavingGender(false)
+    if (error) {
+      setGender(prev)
+      toast.error('Não foi possível guardar o sexo.')
+      return
+    }
+    router.refresh()
+  }
 
   const handlePoints = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -212,6 +230,34 @@ export function ManageMemberDialog({
               </DialogDescription>
             </div>
           </div>
+          {isCoordenador && (
+            <div className="mt-3 flex items-center gap-2">
+              <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400">Sexo</span>
+              {(['m', 'f'] as const).map((g) => {
+                const current = gender === 'm' || gender === 'f' ? gender : null
+                const guess = current ? null : detectGender(member.full_name || '')
+                return (
+                  <button
+                    key={g}
+                    type="button"
+                    onClick={() => handleGender(g)}
+                    disabled={savingGender}
+                    className={`h-7 rounded-md px-2 text-xs font-bold transition-colors disabled:opacity-50 ${
+                      current === g
+                        ? g === 'm' ? 'bg-sky-600 text-white' : 'bg-pink-600 text-white'
+                        : guess === g
+                          ? 'border border-dashed border-slate-400 bg-white text-slate-600'
+                          : 'border bg-white text-slate-400 hover:text-slate-700'
+                    }`}
+                    title={guess === g ? 'Palpite pelo nome — carrega para guardar' : undefined}
+                  >
+                    {g === 'm' ? '♂ Masculino' : '♀ Feminino'}
+                  </button>
+                )
+              })}
+              {gender !== 'm' && gender !== 'f' && <span className="text-[11px] text-slate-400">não indicado</span>}
+            </div>
+          )}
           <div className="grid grid-cols-2 gap-2 mt-4">
             <div className="rounded-lg bg-white border px-3 py-2">
               <p className="text-[10px] uppercase font-bold tracking-wider text-slate-400">XP</p>

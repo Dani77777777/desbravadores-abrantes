@@ -9,6 +9,7 @@ import { deleteOwnAvatarFile } from '@/utils/avatar-storage'
 export async function updateUserProfile(data: {
   fullName?: string
   avatarUrl?: string
+  gender?: 'm' | 'f'
 }) {
   const supabase = await createClient()
 
@@ -21,9 +22,15 @@ export async function updateUserProfile(data: {
   const updateData: any = {}
   if (data.fullName) updateData.full_name = data.fullName
   if (data.avatarUrl !== undefined) updateData.avatar_url = data.avatarUrl || null
-
   // Foto atual (lida da BD) para apagar do bucket se for trocada ou removida
-  const { data: current } = await supabase.from('profiles').select('avatar_url').eq('id', user.id).single()
+  const { data: current } = await supabase.from('profiles').select('avatar_url, gender').eq('id', user.id).single()
+
+  // O sexo escolhe-se no onboarding; aqui só o podem indicar (uma vez) as contas antigas sem ele.
+  if (data.gender !== undefined) {
+    if (data.gender !== 'm' && data.gender !== 'f') return { error: 'Sexo inválido.' }
+    if (current?.gender) return { error: 'O sexo já está definido. Fala com a coordenação se estiver errado.' }
+    updateData.gender = data.gender
+  }
 
   const { error: updateError } = await supabase
     .from('profiles')

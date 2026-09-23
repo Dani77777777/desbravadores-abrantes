@@ -12,6 +12,8 @@ import { displayFont } from '@/components/landing/fonts'
 import { AvatarPicker, type AvatarChoice } from '@/components/profile/AvatarPicker'
 import { uploadAvatar, discardUploadedAvatar } from '@/utils/avatar-upload'
 import { createClient } from '@/utils/supabase/client'
+import { GenderChoice } from '@/components/profile/GenderChoice'
+import type { Gender } from '@/utils/name-gender'
 
 const D = displayFont.className
 
@@ -26,6 +28,7 @@ export default function OnboardingPage() {
   const [day, setDay] = useState('')
   const [month, setMonth] = useState('')
   const [year, setYear] = useState('')
+  const [gender, setGender] = useState<Gender | null>(null)
   const [avatar, setAvatar] = useState<AvatarChoice>({ file: null, url: '' })
   const [loading, setLoading] = useState(false)
   const router = useRouter()
@@ -56,6 +59,10 @@ export default function OnboardingPage() {
       toast.error('Por favor, seleciona a data de nascimento completa.')
       return
     }
+    if (!gender) {
+      toast.error('Indica se és do sexo masculino ou feminino.')
+      return
+    }
 
     const birthDateFormatted = `${year}-${month}-${day}`
     setLoading(true)
@@ -74,6 +81,7 @@ export default function OnboardingPage() {
       const result = await updateProfile({
         fullName,
         birthDate: birthDateFormatted,
+        gender,
         avatarUrl: (uploadedUrl ?? avatar.url.trim()) || undefined
       })
 
@@ -156,6 +164,12 @@ export default function OnboardingPage() {
                 ))}
               </select>
             </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label className="text-sm font-bold text-blue-950">Sexo</Label>
+            <GenderChoice value={gender} onChange={setGender} disabled={loading} />
+            <p className="text-xs text-stone-400">Serve para a organização das saídas (por exemplo, as tendas).</p>
           </div>
 
           <div className="space-y-2">

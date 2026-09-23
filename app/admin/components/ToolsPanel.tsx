@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { ChevronRight, MonitorPlay, Shuffle, Wrench } from 'lucide-react'
+import { ChevronRight, MonitorPlay, Shuffle, Tent, Timer, Wrench } from 'lucide-react'
 import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 
 const TOOLS = [
@@ -12,6 +12,26 @@ const TOOLS = [
     color: 'from-blue-600 to-indigo-700',
     href: '/admin/ferramentas/sorteio',
     projectorHref: '/admin/ferramentas/sorteio/projetor',
+  },
+  {
+    id: 'cronometro',
+    title: 'Cronómetro',
+    description:
+      'Contagem decrescente, cronómetro, tempos por equipa ou rondas com pausa. Números grandes no projetor, com aviso nos últimos segundos e alarme no fim.',
+    icon: Timer,
+    color: 'from-orange-500 to-red-600',
+    href: '/admin/ferramentas/cronometro',
+    projectorHref: '/admin/ferramentas/cronometro/projetor',
+  },
+  {
+    id: 'tendas',
+    title: 'Tendas e boleias',
+    description:
+      'Distribui quem vai a uma saída pelas tendas (rapazes/raparigas, por secção) e pelos carros da ida e da volta. Depois de publicar, cada um vê a sua no Painel.',
+    icon: Tent,
+    color: 'from-emerald-600 to-teal-700',
+    href: '/admin/ferramentas/tendas',
+    projectorHref: null,
   },
 ]
 

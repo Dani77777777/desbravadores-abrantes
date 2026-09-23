@@ -5,7 +5,9 @@ import { GoldTransferDialog } from '@/components/profile/GoldTransferDialog'
 import { TaskCompleteButton } from '@/components/tasks/TaskCompleteButton'
 import { AnnouncementsFeed } from '@/components/dashboard/AnnouncementsFeed'
 import { EventDashboard } from '@/components/events/EventDashboard'
-import { User, Trophy, Coins, Megaphone, History, ListChecks, CheckCircle2, Clock, ShieldCheck, Hourglass } from 'lucide-react'
+import { TripAssignments, type TripAssignmentRow } from '@/components/dashboard/TripAssignments'
+import { pendingRsvpCount } from '@/utils/event-rsvp'
+import { User, Trophy, Coins, Megaphone, History, ListChecks, CheckCircle2, Clock, ShieldCheck, Hourglass, CalendarCheck } from 'lucide-react'
 import { displayFont } from '@/components/landing/fonts'
 import { SiteFooter } from '@/components/landing/SiteFooter'
 
@@ -122,6 +124,14 @@ export default async function Dashboard() {
     .select('*, survey_options(*), survey_responses(id, option_id, user_id)')
     .order('created_at', { ascending: false })
 
+  // Respostas "Vou / Não vou" do membro aos eventos que pedem confirmação
+  const { data: rsvpRows } = await supabase.from('event_rsvps').select('event_id, going').eq('user_id', user.id)
+  const myRsvps: Record<string, boolean> = Object.fromEntries((rsvpRows || []).map((r) => [r.event_id, r.going]))
+  const pendingRsvps = pendingRsvpCount(events || [], new Set(Object.keys(myRsvps)))
+
+  // Tenda/boleias publicadas das saídas em que o membro aparece (a RPC só devolve essas).
+  const { data: tripRows } = await supabase.rpc('get_my_trip_assignments')
+
   const completedTaskIds = new Set((myCompletions || []).map(c => c.task_id))
   const pendingAwardIds = new Set((myCompletions || []).filter(c => !c.points_awarded).map(c => c.task_id))
 
@@ -130,6 +140,9 @@ export default async function Dashboard() {
 
   const openTasks = (tasks || []).filter(t => !completedTaskIds.has(t.id))
   const doneTasks = (tasks || []).filter(t => completedTaskIds.has(t.id))
+
+  // Contas criadas antes de o onboarding perguntar o sexo (serve às tendas nas saídas)
+  const missingGender = profile.gender !== 'm' && profile.gender !== 'f'
 
   const level = Math.floor(profile.total_xp / 1000) + 1
   const xpInLevel = profile.total_xp % 1000
@@ -197,7 +210,7 @@ export default async function Dashboard() {
                   </span>
                 )}
               </div>
-              {(unreadAnnouncements > 0 || openTasks.length > 0) && (
+              {(unreadAnnouncements > 0 || openTasks.length > 0 || missingGender || pendingRsvps > 0) && (
                 <div className="mt-4 flex flex-wrap justify-center gap-2 sm:justify-start">
                   {unreadAnnouncements > 0 && (
                     <a href="#avisos" className="inline-flex items-center gap-1.5 rounded-full bg-yellow-400 px-3.5 py-1.5 text-sm font-extrabold text-blue-950 transition-transform hover:-translate-y-0.5">
@@ -208,6 +221,16 @@ export default async function Dashboard() {
                     <a href="#tarefas" className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3.5 py-1.5 text-sm font-bold text-white ring-1 ring-inset ring-white/20 transition-colors hover:bg-white/20">
                       <ListChecks className="h-4 w-4 text-yellow-300" /> {openTasks.length} {openTasks.length === 1 ? 'tarefa pendente' : 'tarefas pendentes'}
                     </a>
+                  )}
+                  {pendingRsvps > 0 && (
+                    <a href="#agenda" className="inline-flex items-center gap-1.5 rounded-full bg-violet-500 px-3.5 py-1.5 text-sm font-extrabold text-white transition-transform hover:-translate-y-0.5">
+                      <CalendarCheck className="h-4 w-4" /> {pendingRsvps} {pendingRsvps === 1 ? 'evento à espera da tua resposta' : 'eventos à espera da tua resposta'}
+                    </a>
+                  )}
+                  {missingGender && (
+                    <Link href="/profile" className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3.5 py-1.5 text-sm font-bold text-white ring-1 ring-inset ring-white/20 transition-colors hover:bg-white/20">
+                      <User className="h-4 w-4 text-yellow-300" /> Completa o teu perfil
+                    </Link>
                   )}
                 </div>
               )}
@@ -259,6 +282,9 @@ export default async function Dashboard() {
       {/* ── Conteúdo ──────────────────────────────────────────── */}
       <div className="relative -mt-10 rounded-t-[2.5rem] bg-stone-50 pb-20 pt-10">
         <main className="mx-auto max-w-7xl space-y-10 px-4 sm:px-6 lg:px-8">
+          {/* Tenda e boleias da próxima saída (só aparece depois de a liderança publicar) */}
+          <TripAssignments rows={(tripRows || []) as TripAssignmentRow[]} userId={user.id} displayClass={D} />
+
           <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
             {/* Avisos */}
             <div id="avisos" className="scroll-mt-24 space-y-4">
@@ -277,8 +303,8 @@ export default async function Dashboard() {
             </div>
 
             {/* Agenda e calendário */}
-            <div>
-              <EventDashboard events={allEvents} profile={profile} surveys={surveys || []} userId={user.id} />
+            <div id="agenda" className="scroll-mt-24">
+              <EventDashboard events={allEvents} profile={profile} surveys={surveys || []} userId={user.id} rsvps={myRsvps} />
             </div>
           </div>
 

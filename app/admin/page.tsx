@@ -209,6 +209,16 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
     }
   }
 
+  // Respostas "Vou / Não vou" dos eventos por fechar que pedem confirmação
+  let rsvps: any[] = []
+  if (activeTab === 'events') {
+    const rsvpIds = (events || []).filter((e) => e.rsvp_enabled && !e.is_finished).map((e) => e.id)
+    if (rsvpIds.length) {
+      const { data: rs } = await supabase.from('event_rsvps').select('event_id, user_id, going').in('event_id', rsvpIds)
+      rsvps = rs || []
+    }
+  }
+
   const SECTION_LABELS: Record<string, string> = {
     rebentos: 'Rebentos', ticoes: 'Tições', exploradores: 'Exploradores',
     companheiros: 'Companheiros', embaixadores: 'Embaixadores',
@@ -315,6 +325,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
             members={members || []}
             events={events || []}
             attendance={attendance}
+            rsvps={rsvps}
           />
         )}
 

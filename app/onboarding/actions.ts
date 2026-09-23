@@ -7,6 +7,7 @@ import { deleteOwnAvatarFile } from '@/utils/avatar-storage'
 export async function updateProfile(data: {
   birthDate: string
   fullName: string
+  gender: 'm' | 'f'
   avatarUrl?: string
 }) {
   const supabase = await createClient()
@@ -16,6 +17,10 @@ export async function updateProfile(data: {
 
   if (userError || !user) {
     return { error: 'Utilizador não autenticado' }
+  }
+
+  if (data.gender !== 'm' && data.gender !== 'f') {
+    return { error: 'Indica se és do sexo masculino ou feminino.' }
   }
 
   // Check if profile exists
@@ -34,6 +39,7 @@ export async function updateProfile(data: {
         full_name: data.fullName,
         avatar_url: data.avatarUrl || null,
         birth_date: data.birthDate,
+        gender: data.gender,
         role: 'desbravador',
         section: 'rebentos', // Substituída pela classe da idade no trigger on_profile_lifecycle
         total_xp: 0,
@@ -55,6 +61,7 @@ export async function updateProfile(data: {
       .update({ 
         birth_date: data.birthDate,
         full_name: data.fullName,
+        gender: data.gender,
         avatar_url: data.avatarUrl || null
       })
       .eq('id', user.id)

@@ -15,6 +15,8 @@ import {
   Plus, Trophy, Coins, Calendar, MapPin, Trash2, ListChecks, Pencil, Share2, AlertTriangle, RotateCcw,
   Loader2, Copy, Megaphone, Search, Globe, CalendarClock, Activity, Clock, Info, CheckCircle2,
 } from 'lucide-react'
+import { fmtRsvpDeadline, summarizeRsvps, type RsvpRow } from '@/utils/event-rsvp'
+import { RsvpCountsButton, RsvpSettings, RsvpSummaryDialog } from './EventRsvpAdmin'
 import { EventAttendanceManager } from './EventAttendanceManager'
 import { EventShareDialog } from '@/components/events/EventShareDialog'
 import { displayFont } from '@/components/landing/fonts'
@@ -30,20 +32,30 @@ interface EventPanelProps {
   members: any[]
   events: any[]
   attendance?: AttendanceRow[]
+  rsvps?: RsvpRow[]
 }
 
 type Filter = 'upcoming' | 'overdue' | 'history'
 
 /** Texto automático do comunicado de um evento novo. */
-function newEventAnnouncement(f: { title: string; startAt: string; location: string; description: string; xp: number; gold: number }) {
+function newEventAnnouncement(f: {
+  title: string; startAt: string; location: string; description: string; xp: number; gold: number; rsvp: boolean; rsvpDeadline: string
+}) {
   const when = f.startAt ? fmtLong(new Date(f.startAt).toISOString()) : '(data por definir)'
   const parts = [`${f.title || 'Novo evento'} — ${when}${f.location ? `, em ${f.location}` : ''}.`]
   if (f.description.trim()) parts.push(f.description.trim())
   if (f.xp > 0 || f.gold > 0) parts.push(`Recompensas: ${f.xp} XP e ${f.gold} Gold.`)
+  if (f.rsvp) {
+    parts.push(
+      f.rsvpDeadline
+        ? `Confirma no Painel se vais (Vou / Não vou) até ${fmtRsvpDeadline(new Date(f.rsvpDeadline).toISOString())}.`
+        : 'Confirma no Painel se vais (Vou / Não vou).',
+    )
+  }
   return { title: `Novo Evento: ${f.title || '...'} 📅`, message: parts.join('\n\n') }
 }
 
-export function EventPanel({ profile, members, events, attendance = [] }: EventPanelProps) {
+export function EventPanel({ profile, members, events, attendance = [], rsvps = [] }: EventPanelProps) {
   const supabase = createClient()
   const router = useRouter()
   const isDirigente = profile.role === 'dirigente'
@@ -61,6 +73,8 @@ export function EventPanel({ profile, members, events, attendance = [] }: EventP
   const [goldReward, setGoldReward] = useState(10)
   const [lateDiscount, setLateDiscount] = useState(25)
   const [absentPenalty, setAbsentPenalty] = useState(0)
+  const [rsvpEnabled, setRsvpEnabled] = useState(false)
+  const [rsvpDeadline, setRsvpDeadline] = useState('')
   const [creating, setCreating] = useState(false)
   // Comunicado do evento novo (opcional). Enquanto não for editado à mão, acompanha o formulário.
   const [announceCreate, setAnnounceCreate] = useState(true)
@@ -107,14 +121,21 @@ export function EventPanel({ profile, members, events, attendance = [] }: EventP
   const [editGoldReward, setEditGoldReward] = useState(10)
   const [editLateDiscount, setEditLateDiscount] = useState(25)
   const [editAbsentPenalty, setEditAbsentPenalty] = useState(0)
+  const [editRsvpEnabled, setEditRsvpEnabled] = useState(false)
+  const [editRsvpDeadline, setEditRsvpDeadline] = useState('')
   const [updating, setUpdating] = useState(false)
+
+  // Quem vai / não vai / sem resposta
+  const [rsvpEvent, setRsvpEvent] = useState<any>(null)
 
   // Lista
   const [filter, setFilter] = useState<Filter>('upcoming')
   const [search, setSearch] = useState('')
 
   // Texto automático do comunicado (até ser editado à mão)
-  const autoAnn = newEventAnnouncement({ title, startAt, location, description, xp: xpReward, gold: goldReward })
+  const autoAnn = newEventAnnouncement({
+    title, startAt, location, description, xp: xpReward, gold: goldReward, rsvp: rsvpEnabled, rsvpDeadline,
+  })
   const shownAnnTitle = annEdited ? annTitle : autoAnn.title
   const shownAnnMessage = annEdited ? annMessage : autoAnn.message
 
@@ -137,6 +158,10 @@ export function EventPanel({ profile, members, events, attendance = [] }: EventP
       toast.error('O fim tem de ser depois do início.')
       return
     }
+    if (rsvpEnabled && rsvpDeadline && new Date(rsvpDeadline) > new Date(startAt)) {
+      toast.error('O prazo para responder tem de ser antes do início do evento.')
+      return
+    }
     setCreating(true)
     try {
       const section = targetSection === '__all__' ? null : targetSection
@@ -151,6 +176,8 @@ export function EventPanel({ profile, members, events, attendance = [] }: EventP
         gold_reward: goldReward,
         late_discount_percent: lateDiscount / 100,
         absent_penalty_percent: absentPenalty / 100,
+        rsvp_enabled: rsvpEnabled,
+        rsvp_deadline: rsvpEnabled && rsvpDeadline ? new_date_with_time(rsvpDeadline) : null,
         created_by: profile.id,
       })
 
@@ -220,6 +247,10 @@ export function EventPanel({ profile, members, events, attendance = [] }: EventP
   const handleEditEvent = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!editingEvent) return
+    if (editRsvpEnabled && editRsvpDeadline && new Date(editRsvpDeadline) > new Date(editingEvent.start_at)) {
+      toast.error('O prazo para responder tem de ser antes do início do evento.')
+      return
+    }
     setUpdating(true)
     try {
       const { error } = await supabase.from('events').update({
@@ -230,6 +261,8 @@ export function EventPanel({ profile, members, events, attendance = [] }: EventP
         gold_reward: editGoldReward,
         late_discount_percent: editLateDiscount / 100,
         absent_penalty_percent: editAbsentPenalty / 100,
+        rsvp_enabled: editRsvpEnabled,
+        rsvp_deadline: editRsvpEnabled && editRsvpDeadline ? new_date_with_time(editRsvpDeadline) : null,
         updated_at: new Date().toISOString()
       }).eq('id', editingEvent.id)
 
@@ -294,6 +327,8 @@ export function EventPanel({ profile, members, events, attendance = [] }: EventP
     setGoldReward(10)
     setLateDiscount(25)
     setAbsentPenalty(0)
+    setRsvpEnabled(false)
+    setRsvpDeadline('')
     setAnnounceCreate(true)
     setAnnEdited(false)
     setAnnTitle('')
@@ -322,6 +357,13 @@ export function EventPanel({ profile, members, events, attendance = [] }: EventP
     setGoldReward(event.gold_reward ?? 10)
     setLateDiscount(Math.round((event.late_discount_percent ?? 0.25) * 100))
     setAbsentPenalty(Math.round((event.absent_penalty_percent ?? 0) * 100))
+    // Confirmação de presença: mesmo prazo relativo ao início (ex.: 2 dias antes)
+    setRsvpEnabled(!!event.rsvp_enabled)
+    setRsvpDeadline(
+      event.rsvp_enabled && event.rsvp_deadline
+        ? toLocalInput(new Date(start.getTime() - (new Date(event.start_at).getTime() - new Date(event.rsvp_deadline).getTime())))
+        : '',
+    )
     setCreateOpen(true)
   }
 
@@ -334,6 +376,8 @@ export function EventPanel({ profile, members, events, attendance = [] }: EventP
     setEditGoldReward(event.gold_reward)
     setEditLateDiscount(Math.round((event.late_discount_percent ?? 0.25) * 100))
     setEditAbsentPenalty(Math.round((event.absent_penalty_percent ?? 0) * 100))
+    setEditRsvpEnabled(!!event.rsvp_enabled)
+    setEditRsvpDeadline(event.rsvp_deadline ? toLocalInput(event.rsvp_deadline) : '')
     setEditOpen(true)
   }
 
@@ -362,6 +406,9 @@ export function EventPanel({ profile, members, events, attendance = [] }: EventP
       setRevertingId(null)
     }
   }
+
+  /** Membros a quem o evento se destina (a secção dele, ou todos). */
+  const audienceOf = (e: any) => (e.target_section ? members.filter(m => m.section === e.target_section) : members)
 
   // ── Dados da lista ─────────────────────────────────────────────────────────
   const attendanceMap = attendanceByEvent(attendance)
@@ -518,6 +565,13 @@ export function EventPanel({ profile, members, events, attendance = [] }: EventP
                     <span className="inline-flex items-center gap-1 rounded-full bg-indigo-50 px-2.5 py-0.5 text-[10px] font-extrabold text-indigo-600"><Trophy className="h-3 w-3" /> {event.xp_reward} XP</span>
                     <span className="inline-flex items-center gap-1 rounded-full bg-yellow-50 px-2.5 py-0.5 text-[10px] font-extrabold text-amber-600"><Coins className="h-3 w-3" /> {event.gold_reward} Gold</span>
                   </div>
+                  {event.rsvp_enabled && (
+                    <RsvpCountsButton
+                      summary={summarizeRsvps(event.id, rsvps, audienceOf(event).map((m) => m.id))}
+                      deadline={event.rsvp_deadline}
+                      onClick={() => setRsvpEvent(event)}
+                    />
+                  )}
                   {overdue && (
                     <div className="mt-1 flex w-fit items-center gap-1.5 rounded-lg bg-amber-50 px-2.5 py-1.5 text-[11px] font-bold text-amber-700 ring-1 ring-inset ring-amber-200">
                       <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
@@ -682,6 +736,13 @@ export function EventPanel({ profile, members, events, attendance = [] }: EventP
                   <Input id="event-end" type="datetime-local" value={endAt} min={startAt || undefined} onChange={e => setEndAt(e.target.value)} />
                 </div>
               </div>
+              <RsvpSettings
+                enabled={rsvpEnabled}
+                onEnabledChange={setRsvpEnabled}
+                deadline={rsvpDeadline}
+                onDeadlineChange={setRsvpDeadline}
+                maxDeadline={startAt}
+              />
             </FormSection>
 
             <FormSection title="Para quem e recompensas">
@@ -886,6 +947,13 @@ export function EventPanel({ profile, members, events, attendance = [] }: EventP
                 <Input type="number" min={0} max={100} value={editAbsentPenalty} onChange={e => setEditAbsentPenalty(Number(e.target.value))} />
               </div>
             </div>
+            <RsvpSettings
+              enabled={editRsvpEnabled}
+              onEnabledChange={setEditRsvpEnabled}
+              deadline={editRsvpDeadline}
+              onDeadlineChange={setEditRsvpDeadline}
+              maxDeadline={editingEvent ? toLocalInput(editingEvent.start_at) : ''}
+            />
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setEditOpen(false)}>Cancelar</Button>
               <Button type="submit" className="bg-blue-950 hover:bg-blue-900" disabled={updating}>
@@ -895,6 +963,13 @@ export function EventPanel({ profile, members, events, attendance = [] }: EventP
           </form>
         </DialogContent>
       </Dialog>
+
+      <RsvpSummaryDialog
+        event={rsvpEvent}
+        onOpenChange={(v) => { if (!v) setRsvpEvent(null) }}
+        members={members}
+        summary={rsvpEvent ? summarizeRsvps(rsvpEvent.id, rsvps, audienceOf(rsvpEvent).map((m) => m.id)) : null}
+      />
 
       {sharingEvent && (
         <EventShareDialog
@@ -917,10 +992,7 @@ export function EventPanel({ profile, members, events, attendance = [] }: EventP
             </DialogHeader>
             <EventAttendanceManager
               event={selectedEvent}
-              members={selectedEvent.target_section
-                ? members.filter(m => m.section === selectedEvent.target_section)
-                : members
-              }
+              members={audienceOf(selectedEvent)}
               profile={profile}
               onComplete={() => {
                 setAttendanceOpen(false)

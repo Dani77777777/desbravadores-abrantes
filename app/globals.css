@@ -236,3 +236,13 @@ html {
   .lp-js [data-reveal] { opacity: 1; transform: none; transition: none; }
   .lp-xp-fill { transition: none; }
 }
+
+/* ── Ferramentas · Cronómetro: fundo a piscar quando o tempo acaba ─── */
+@keyframes timer-flash {
+  0%, 100% { background-color: rgb(220 38 38); }
+  50% { background-color: rgb(69 10 10); }
+}
+.timer-flash { animation: timer-flash .9s steps(1, end) infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .timer-flash { animation: none; background-color: rgb(185 28 28); }
+}

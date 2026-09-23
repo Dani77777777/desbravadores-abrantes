@@ -13,16 +13,21 @@ import { CodeEntryDialog } from '@/components/dashboard/CodeEntryDialog'
 import { SurveysSection } from '@/components/dashboard/SurveysSection'
 import { EventShareDialog } from './EventShareDialog'
 import { SECTION_LABELS } from '@/utils/permissions'
+import { EventRsvp, RsvpBadge } from './EventRsvp'
 
 interface EventDashboardProps {
   events: any[]
   profile: any
   surveys?: any[]
   userId?: string
+  /** Respostas do membro ("Vou"/"Não vou") por evento. */
+  rsvps?: Record<string, boolean>
 }
 
-export function EventDashboard({ events, profile, surveys, userId }: EventDashboardProps) {
+export function EventDashboard({ events, profile, surveys, userId, rsvps = {} }: EventDashboardProps) {
   const [selectedDate, setSelectedDate] = useState<Date | null>(null)
+  const [myRsvps, setMyRsvps] = useState<Record<string, boolean>>(rsvps)
+  const [now] = useState(() => Date.now())
   const [viewingEvent, setViewingEvent] = useState<any>(null)
   const [sharingEvent, setSharingEvent] = useState<any>(null)
 
@@ -112,6 +117,7 @@ export function EventDashboard({ events, profile, surveys, userId }: EventDashbo
                                 JA · {event.type}
                               </Badge>
                             )}
+                            {!isJA && <RsvpBadge event={event} answer={myRsvps[event.id]} now={now} />}
                           </h3>
                           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-gray-500">
                             {isJA ? (
@@ -226,6 +232,14 @@ export function EventDashboard({ events, profile, surveys, userId }: EventDashbo
                   </Badge>
                 </div>
               </div>
+
+              {viewingEvent.source !== 'ja' && viewingEvent.rsvp_enabled && (
+                <EventRsvp
+                  event={viewingEvent}
+                  answer={myRsvps[viewingEvent.id]}
+                  onAnswered={(going) => setMyRsvps((prev) => ({ ...prev, [viewingEvent.id]: going }))}
+                />
+              )}
 
               {viewingEvent.source === 'ja' ? (
                 <div className="bg-amber-50 p-4 rounded-xl space-y-2 border border-amber-100">

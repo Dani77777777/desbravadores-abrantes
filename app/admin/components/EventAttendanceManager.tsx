@@ -5,8 +5,9 @@ import { createClient } from '@/utils/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { toast } from 'sonner'
-import { Trophy, Coins, CheckCircle2, XCircle, Clock, Save, Loader2 } from 'lucide-react'
+import { Trophy, Coins, CheckCircle2, XCircle, Clock, Save, Loader2, CalendarCheck, Wand2 } from 'lucide-react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { rsvpRank } from '@/utils/event-rsvp'
 
 interface EventAttendanceManagerProps {
   event: any
@@ -22,9 +23,15 @@ export function EventAttendanceManager({ event, members, profile, onComplete }: 
   const [savingDraft, setSavingDraft] = useState(false)
   const [attendance, setAttendance] = useState<Record<string, 'presente' | 'atrasado' | 'faltou'>>({})
   const [hasChanges, setHasChanges] = useState(false)
+  // O que cada um disse no Painel ("Vou"/"Não vou") — só uma intenção; a presença é marcada aqui.
+  const [rsvps, setRsvps] = useState<Record<string, boolean>>({})
 
   useEffect(() => {
     async function fetchAttendance() {
+      if (event.rsvp_enabled) {
+        const { data: rs } = await supabase.from('event_rsvps').select('user_id, going').eq('event_id', event.id)
+        setRsvps(Object.fromEntries((rs || []).map((r) => [r.user_id, r.going])))
+      }
       const { data, error } = await supabase
         .from('event_attendance')
         .select('*')
@@ -42,7 +49,21 @@ export function EventAttendanceManager({ event, members, profile, onComplete }: 
       setLoading(false)
     }
     fetchAttendance()
-  }, [event.id, supabase])
+  }, [event.id, event.rsvp_enabled, supabase])
+
+  // Quem disse que ia primeiro, depois quem não respondeu, por fim quem disse que não ia
+  const sortedMembers = event.rsvp_enabled
+    ? [...members].sort((a, b) => rsvpRank(rsvps[a.id]) - rsvpRank(rsvps[b.id]))
+    : members
+  const saidGoingUnmarked = members.filter((m) => rsvps[m.id] === true && !attendance[m.id])
+
+  /** Marca como presentes os que disseram "Vou" e ainda não têm estado (não mexe no que já marcaste). */
+  const premarkGoing = () => {
+    if (saidGoingUnmarked.length === 0) return
+    setAttendance((prev) => ({ ...prev, ...Object.fromEntries(saidGoingUnmarked.map((m) => [m.id, 'presente' as const])) }))
+    setHasChanges(true)
+    toast.success(`${saidGoingUnmarked.length} marcados como presentes — corrige quem faltou ou chegou atrasado.`)
+  }
 
   const setStatus = (userId: string, status: 'presente' | 'atrasado' | 'faltou') => {
     setAttendance(prev => ({ ...prev, [userId]: status }))
@@ -188,6 +209,24 @@ export function EventAttendanceManager({ event, members, profile, onComplete }: 
         </div>
       </div>
 
+      {event.rsvp_enabled && !event.is_finished && (
+        <div className="flex flex-col gap-2 rounded-xl bg-violet-50 p-3 ring-1 ring-inset ring-violet-200 sm:flex-row sm:items-center">
+          <p className="flex-1 text-xs text-violet-900">
+            <CalendarCheck className="mr-1 inline h-4 w-4" />
+            <b>{Object.values(rsvps).filter(Boolean).length}</b> disseram que iam. É só o que disseram — confirma aqui quem esteve mesmo.
+          </p>
+          <Button
+            type="button"
+            size="sm"
+            onClick={premarkGoing}
+            disabled={saidGoingUnmarked.length === 0}
+            className="gap-1.5 rounded-lg bg-violet-600 text-xs font-bold hover:bg-violet-700"
+          >
+            <Wand2 className="h-3.5 w-3.5" /> Marcar presentes quem disse que ia{saidGoingUnmarked.length > 0 && ` (${saidGoingUnmarked.length})`}
+          </Button>
+        </div>
+      )}
+
       <div className="space-y-2">
         <div className="flex items-center justify-between px-1">
            <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest">Membros ({members.length})</h3>
@@ -197,8 +236,9 @@ export function EventAttendanceManager({ event, members, profile, onComplete }: 
         </div>
         
         <div className="border rounded-2xl overflow-hidden bg-white shadow-sm">
-          {members.map((member) => {
+          {sortedMembers.map((member) => {
             const currentStatus = attendance[member.id]
+            const said = rsvps[member.id]
             return (
               <div 
                 key={member.id} 
@@ -224,7 +264,18 @@ export function EventAttendanceManager({ event, members, profile, onComplete }: 
                     <p className={`text-sm font-bold transition-colors ${currentStatus === 'presente' ? 'text-green-700' : 'text-gray-900'}`}>
                       {member.full_name}
                     </p>
-                    <p className="text-[10px] text-gray-400 font-bold uppercase tracking-tight">{member.section}</p>
+                    <p className="flex flex-wrap items-center gap-1.5 text-[10px] text-gray-400 font-bold uppercase tracking-tight">
+                      {member.section}
+                      {event.rsvp_enabled && (
+                        <span
+                          className={`rounded-full px-1.5 py-0.5 normal-case tracking-normal ${
+                            said === true ? 'bg-emerald-100 text-emerald-700' : said === false ? 'bg-stone-100 text-stone-500' : 'bg-amber-50 text-amber-600'
+                          }`}
+                        >
+                          {said === true ? 'Disse que ia' : said === false ? 'Disse que não ia' : 'Sem resposta'}
+                        </span>
+                      )}
+                    </p>
                   </div>
                 </div>
 
