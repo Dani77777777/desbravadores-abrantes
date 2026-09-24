@@ -1,7 +1,7 @@
 import type { CSSProperties } from 'react'
 import { createClient } from '@/utils/supabase/server'
 import { Navbar } from '@/components/layout/Navbar'
-import { MessageCircle, MapPin, Mail, Instagram, ArrowUpRight, Navigation, Star, Sparkles } from 'lucide-react'
+import { MessageCircle, MapPin, Mail, Instagram, Youtube, ArrowUpRight, Navigation, Star, Sparkles } from 'lucide-react'
 import { displayFont } from '@/components/landing/fonts'
 import { SiteFooter } from '@/components/landing/SiteFooter'
 import { CopyEmailButton } from '@/components/contacts/CopyEmailButton'
@@ -24,6 +24,7 @@ export default async function ContactsPage() {
 
   const whatsappLink = "https://chat.whatsapp.com/IfZxTuAswraCibvmg6PApu"
   const instagramLink = "https://www.instagram.com/desbravadores.abrantes/"
+  const youtubeLink = "https://www.youtube.com/@DesbravadoresdeAbrantes"
   const email = "direcao.desbravadores.abrantes@gmail.com"
   const address = "Av. Defensores de Chaves 23, Abrantes"
   const simpleMapsUrl = `https://www.google.com/maps?q=${encodeURIComponent(address)}&output=embed`
@@ -85,7 +86,7 @@ export default async function ContactsPage() {
 
       <main className="relative z-10 mx-auto -mt-28 max-w-7xl space-y-20 px-4 pb-24 sm:px-6 md:-mt-32 lg:px-8">
         {/* ── Canais de contacto ─────────────────────────────── */}
-        <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
+        <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-4">
           {/* WhatsApp */}
           <a
             href={whatsappLink}
@@ -135,10 +136,34 @@ export default async function ContactsPage() {
             </span>
           </a>
 
+          {/* YouTube */}
+          <a
+            href={youtubeLink}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="lp-rise group relative flex flex-col overflow-hidden rounded-[2rem] bg-gradient-to-br from-red-500 to-red-700 p-7 text-white shadow-xl shadow-red-900/25 transition-all duration-300 hover:-translate-y-1.5 hover:-rotate-1 md:p-8"
+            style={delay(500)}
+          >
+            <Youtube aria-hidden className="absolute -bottom-8 -right-8 h-44 w-44 text-white/10 transition-transform duration-500 group-hover:scale-110 group-hover:-rotate-12" />
+            <div className="flex items-start justify-between">
+              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/20 ring-1 ring-inset ring-white/30">
+                <Youtube className="h-7 w-7" />
+              </div>
+              <ArrowUpRight className="h-6 w-6 transition-transform group-hover:-translate-y-1 group-hover:translate-x-1" />
+            </div>
+            <h2 className={`${D} mt-6 text-3xl font-extrabold`}>YouTube</h2>
+            <p className="relative mt-2 flex-1 text-red-50">
+              Vê os vídeos dos nossos acampamentos, atividades e cerimónias.
+            </p>
+            <span className="relative mt-7 inline-flex items-center justify-center gap-2 rounded-xl bg-white px-4 py-3.5 font-extrabold text-red-600 shadow-md transition-colors group-hover:bg-red-50">
+              Ver o canal
+            </span>
+          </a>
+
           {/* Email */}
           <div
             className="lp-rise group relative flex flex-col overflow-hidden rounded-[2rem] bg-gradient-to-br from-blue-500 to-indigo-700 p-7 text-white shadow-xl shadow-blue-900/25 md:p-8"
-            style={delay(500)}
+            style={delay(600)}
           >
             <Mail aria-hidden className="absolute -bottom-8 -right-8 h-44 w-44 text-white/10 transition-transform duration-500 group-hover:scale-110 group-hover:-rotate-12" />
             <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/20 ring-1 ring-inset ring-white/30">
