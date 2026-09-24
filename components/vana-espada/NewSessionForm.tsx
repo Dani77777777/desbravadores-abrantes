@@ -11,7 +11,9 @@ import type { EspadaDifficulty } from '@/types/vana-espada'
 type Difficulty = EspadaDifficulty | 'any'
 
 const ROUND_OPTIONS = [5, 10, 15]
-const TIME_OPTIONS = [20, 30, 45]
+const TIME_MIN = 20
+const TIME_MAX = 120
+const TIME_STEP = 5
 const DIFFICULTY_OPTIONS: Difficulty[] = ['any', 'easy', 'medium', 'hard']
 
 interface Props {
@@ -84,12 +86,19 @@ export function NewSessionForm({ verseCounts }: Props) {
       </Field>
 
       <Field icon={<Clock className="w-3.5 h-3.5" />} label="Tempo por ronda">
-        <div className="grid grid-cols-3 gap-2">
-          {TIME_OPTIONS.map((s) => (
-            <Choice key={s} active={timeSeconds === s} onClick={() => setTimeSeconds(s)}>
-              {s}s
-            </Choice>
-          ))}
+        <p className="text-center text-3xl font-black text-amber-400 tabular-nums">{formatTime(timeSeconds)}</p>
+        <input
+          type="range"
+          min={TIME_MIN}
+          max={TIME_MAX}
+          step={TIME_STEP}
+          value={timeSeconds}
+          onChange={(e) => setTimeSeconds(Number(e.target.value))}
+          className="w-full h-2 accent-amber-400 cursor-pointer"
+        />
+        <div className="flex justify-between text-[10px] font-bold text-white/40">
+          <span>{formatTime(TIME_MIN)}</span>
+          <span>{formatTime(TIME_MAX)}</span>
         </div>
       </Field>
 
@@ -125,6 +134,13 @@ export function NewSessionForm({ verseCounts }: Props) {
       </p>
     </div>
   )
+}
+
+function formatTime(seconds: number): string {
+  if (seconds < 60) return `${seconds}s`
+  const m = Math.floor(seconds / 60)
+  const s = seconds % 60
+  return s === 0 ? `${m}min` : `${m}min ${s}s`
 }
 
 function Field({ icon, label, children }: { icon: React.ReactNode; label: string; children: React.ReactNode }) {

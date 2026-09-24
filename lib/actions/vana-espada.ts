@@ -76,7 +76,8 @@ export async function createQuickSession(
   if (unavailable) return { error: unavailable }
 
   const rounds = clampInt(options.rounds, 1, 30, 10)
-  const timeSeconds = clampInt(options.timeSeconds, 10, 180, DEFAULT_LOCATE_SECONDS)
+  // Slider de 20s a 2min, de 5 em 5.
+  const timeSeconds = Math.round(clampInt(options.timeSeconds, 20, 120, DEFAULT_LOCATE_SECONDS) / 5) * 5
   const difficulty = options.difficulty
 
   const service = createServiceClient()
