@@ -18,6 +18,7 @@ import {
   Smartphone,
   Timer,
   Undo2,
+  UsersRound,
   Volume2,
   VolumeX,
   X,
@@ -43,6 +44,7 @@ import {
   type TimerScreenState,
 } from '@/utils/timer'
 import { unlockTimerSound } from '@/utils/timer-sound'
+import { TEAMS_PATH, lastTeamsKey, teamLabel, type LastTeams, type TeamsScreenState } from '@/utils/teams'
 import { TimerStage } from './TimerStage'
 
 type Saved = { v: 1; config: TimerConfig; sound: boolean; projector: boolean }
@@ -56,6 +58,17 @@ const MODES: { id: TimerMode; hint: string }[] = [
 
 function storageKey(userId: string) {
   return `timer:v1:${userId}`
+}
+
+/** Últimas equipas do Formador guardadas neste browser. */
+function loadLastTeams(userId: string): string[] | null {
+  try {
+    const raw = localStorage.getItem(lastTeamsKey(userId))
+    const t = raw ? (JSON.parse(raw) as LastTeams) : null
+    return t?.names?.length ? t.names.slice(0, MAX_TEAMS) : null
+  } catch {
+    return null
+  }
 }
 
 function loadSaved(userId: string): Saved | null {
@@ -94,9 +107,22 @@ export function TimerClient({ userId }: { userId: string }) {
   // Lido só depois de montar (no servidor não há localStorage; evita diferenças na hidratação).
   useEffect(() => {
     const saved = loadSaved(userId)
+    let next = saved
+      ? { ...DEFAULT_CONFIG, ...saved.config, rounds: { ...DEFAULT_CONFIG.rounds, ...saved.config.rounds } }
+      : DEFAULT_CONFIG
+    // Vindo do Formador ("Cronometrar estas equipas"): modo Equipas com os nomes formados
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('equipas') === 'formadas') {
+      const names = loadLastTeams(userId)
+      if (names) {
+        next = { ...next, mode: 'laps', teams: names }
+        toast.success(`${names.length} equipas prontas a cronometrar`)
+      }
+      window.history.replaceState(null, '', window.location.pathname)
+    }
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setConfig(next)
     if (saved) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setConfig({ ...DEFAULT_CONFIG, ...saved.config, rounds: { ...DEFAULT_CONFIG.rounds, ...saved.config.rounds } })
       setSound(saved.sound !== false)
       setProjector(!!saved.projector)
     }
@@ -184,6 +210,24 @@ export function TimerClient({ userId }: { userId: string }) {
     if (mode === config.mode) return
     reset()
     updateConfig({ mode })
+  }
+
+  /** Vai buscar as últimas equipas do Formador (base de dados → também de outro dispositivo). */
+  const [importing, setImporting] = useState(false)
+  const importFormedTeams = async () => {
+    setImporting(true)
+    const { data } = await supabase.from('team_screens').select('state').eq('host_id', userId).maybeSingle()
+    setImporting(false)
+    const state = data?.state as TeamsScreenState | undefined
+    const fromDb = state?.teams?.length ? state.teams.map(teamLabel).slice(0, MAX_TEAMS) : null
+    const names = fromDb ?? loadLastTeams(userId)
+    if (!names) {
+      toast.error('Ainda não formaste equipas no Formador de equipas.')
+      return
+    }
+    reset()
+    updateConfig({ teams: names })
+    toast.success(`${names.length} equipas do Formador`)
   }
 
   const addTeam = () => {
@@ -565,7 +609,22 @@ export function TimerClient({ userId }: { userId: string }) {
 
             {config.mode === 'laps' && (
               <div className="space-y-2">
-                <p className="text-xs font-bold uppercase tracking-wider text-gray-500">Equipas</p>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-xs font-bold uppercase tracking-wider text-gray-500">Equipas</p>
+                  <div className="flex gap-3">
+                    <button
+                      type="button"
+                      onClick={importFormedTeams}
+                      disabled={locked || importing}
+                      className="inline-flex items-center gap-1 text-xs font-bold text-fuchsia-700 hover:underline disabled:opacity-40"
+                    >
+                      <UsersRound className="h-3.5 w-3.5" /> Usar as equipas formadas
+                    </button>
+                    <Link href={TEAMS_PATH} className="text-xs font-bold text-gray-500 hover:underline">
+                      Formar equipas
+                    </Link>
+                  </div>
+                </div>
                 <form
                   className="flex gap-2"
                   onSubmit={(e) => {

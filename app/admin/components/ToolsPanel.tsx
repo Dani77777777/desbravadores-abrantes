@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { ChevronRight, MonitorPlay, Shuffle, Tent, Timer, Wrench } from 'lucide-react'
+import { ChevronRight, MonitorPlay, Shuffle, Tent, Timer, UsersRound, Wrench } from 'lucide-react'
 import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 
 const TOOLS = [
@@ -12,6 +12,16 @@ const TOOLS = [
     color: 'from-blue-600 to-indigo-700',
     href: '/admin/ferramentas/sorteio',
     projectorHref: '/admin/ferramentas/sorteio/projetor',
+  },
+  {
+    id: 'equipas',
+    title: 'Formador de equipas',
+    description:
+      'Forma equipas equilibradas (idades, rapazes/raparigas, dirigentes) com quem disse que ia ou quem está presente, revela-as no projetor e cronometra-as.',
+    icon: UsersRound,
+    color: 'from-fuchsia-600 to-indigo-700',
+    href: '/admin/ferramentas/equipas',
+    projectorHref: '/admin/ferramentas/equipas/projetor',
   },
   {
     id: 'cronometro',
