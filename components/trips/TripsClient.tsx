@@ -286,7 +286,10 @@ export function TripsClient({
   const assignedIds = useMemo(() => {
     const s = new Set<string>()
     plan.tents.forEach((t) => t.members.forEach((m) => s.add(m.id)))
-    plan.cars.forEach((c) => c.passengers.forEach((id) => s.add(id)))
+    plan.cars.forEach((c) => {
+      c.passengers.forEach((id) => s.add(id))
+      if (c.driverId) s.add(c.driverId)
+    })
     return s
   }, [plan])
 
@@ -310,7 +313,12 @@ export function TripsClient({
   const carOf = useCallback(
     (dir: TripDirection) => {
       const map = new Map<string, TripCar>()
-      plan.cars.filter((c) => c.direction === dir).forEach((c) => c.passengers.forEach((id) => map.set(id, c)))
+      plan.cars
+        .filter((c) => c.direction === dir)
+        .forEach((c) => {
+          c.passengers.forEach((id) => map.set(id, c))
+          if (c.driverId) map.set(c.driverId, c)
+        })
       return map
     },
     [plan.cars],
@@ -332,7 +340,11 @@ export function TripsClient({
       ? { ...p, tents: p.tents.map((t) => ({ ...t, members: t.members.filter((m) => m.id !== id) })) }
       : {
           ...p,
-          cars: p.cars.map((c) => (c.direction === where ? { ...c, passengers: c.passengers.filter((x) => x !== id) } : c)),
+          cars: p.cars.map((c) =>
+            c.direction === where
+              ? { ...c, passengers: c.passengers.filter((x) => x !== id), driverId: c.driverId === id ? null : c.driverId ?? null }
+              : c,
+          ),
         }
 
   const moveToTent = (tentId: string) => {
@@ -356,6 +368,21 @@ export function TripsClient({
     setSelectedId(null)
   }
 
+  /** A pessoa escolhida passa a conduzir este carro (quem conduzia antes volta a "Sem carro"). */
+  const makeDriver = (carId: string) => {
+    if (!selectedId || tab === 'tents') return
+    const id = selectedId
+    const dir = tab
+    edit((p) => {
+      const base = detach(p, id, dir)
+      return { ...base, cars: base.cars.map((c) => (c.id === carId ? { ...c, driverId: id } : c)) }
+    })
+    setSelectedId(null)
+  }
+
+  const clearDriver = (carId: string) =>
+    edit((p) => ({ ...p, cars: p.cars.map((c) => (c.id === carId ? { ...c, driverId: null } : c)) }))
+
   const unassignSelected = () => {
     if (!selectedId) return
     const id = selectedId
@@ -368,7 +395,11 @@ export function TripsClient({
       ...p,
       extraIds: p.extraIds.filter((x) => x !== id),
       tents: p.tents.map((t) => ({ ...t, members: t.members.filter((m) => m.id !== id) })),
-      cars: p.cars.map((c) => ({ ...c, passengers: c.passengers.filter((x) => x !== id) })),
+      cars: p.cars.map((c) => ({
+        ...c,
+        passengers: c.passengers.filter((x) => x !== id),
+        driverId: c.driverId === id ? null : c.driverId ?? null,
+      })),
     }))
     setSelectedId(null)
   }
@@ -514,7 +545,10 @@ export function TripsClient({
   const publish = async () => {
     const ids = new Set<string>()
     plan.tents.forEach((t) => t.members.forEach((m) => ids.add(m.id)))
-    plan.cars.forEach((c) => c.passengers.forEach((id) => ids.add(id)))
+    plan.cars.forEach((c) => {
+      c.passengers.forEach((id) => ids.add(id))
+      if (c.driverId) ids.add(c.driverId)
+    })
     if (ids.size === 0) {
       toast.error('Ainda não há ninguém distribuído.')
       return
@@ -960,8 +994,8 @@ export function TripsClient({
                     </div>
                     {carsOf(tab).length === 0 && (
                       <EmptyBox icon={<Car className="h-8 w-8" />}>
-                        Acrescenta os carros da {DIRECTION_LABELS[tab].toLowerCase()}: quem conduz, quantos lugares livres, onde e a que horas
-                        se encontram.
+                        Acrescenta os carros da {DIRECTION_LABELS[tab].toLowerCase()}: quem conduz (alguém da lista ou escrito à mão), quantos
+                        lugares livres, onde e a que horas se encontram.
                       </EmptyBox>
                     )}
                     <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
@@ -969,11 +1003,14 @@ export function TripsClient({
                         <CarCard
                           key={c.id}
                           car={c}
+                          driverPerson={c.driverId ? memberById.get(c.driverId) ?? null : null}
                           selected={selected}
                           onDrop={() => moveToCar(c.id)}
+                          onMakeDriver={() => makeDriver(c.id)}
+                          onClearDriver={() => clearDriver(c.id)}
                           onChange={(patch) => updateCar(c.id, patch)}
                           onRemove={() => {
-                            if (c.passengers.length > 0 && !confirm('Apagar este carro? Os passageiros voltam para "Sem carro".')) return
+                            if ((c.passengers.length > 0 || c.driverId) && !confirm('Apagar este carro? Quem lá está volta para "Sem carro".')) return
                             removeCar(c.id)
                           }}
                         >
@@ -1004,7 +1041,8 @@ export function TripsClient({
           <div className="mx-auto flex max-w-5xl flex-wrap items-center gap-2">
             <p className="min-w-0 flex-1 text-sm">
               <Sparkles className="mr-1 inline h-4 w-4 text-emerald-600" />
-              <b>{shortDisplayName(selected.full_name, 'Membro')}</b>: toca {tab === 'tents' ? 'na tenda' : 'no carro'} para onde vai.
+              <b>{shortDisplayName(selected.full_name, 'Membro')}</b>:{' '}
+              {tab === 'tents' ? 'toca na tenda para onde vai.' : 'toca no carro para onde vai, ou em "Pôr a conduzir".'}
               {tab === 'tents' && tentOf.get(selected.id) && <span className="text-gray-500"> (está na {tentOf.get(selected.id)!.name})</span>}
             </p>
             {(tab === 'tents' ? tentOf.has(selected.id) : carOf(tab).has(selected.id)) && (
@@ -1194,31 +1232,54 @@ function TentCard({
 
 function CarCard({
   car,
+  driverPerson,
   selected,
   onDrop,
+  onMakeDriver,
+  onClearDriver,
   onChange,
   onRemove,
   children,
 }: {
   car: TripCar
+  /** Condutor que é alguém da lista (desbravador ou líder). */
+  driverPerson: TripMember | null
   selected: TripMember | null
   onDrop: () => void
+  onMakeDriver: () => void
+  onClearDriver: () => void
   onChange: (patch: Partial<TripCar>) => void
   onRemove: () => void
   children: React.ReactNode
 }) {
   const over = car.passengers.length > car.seats
+  const selectedIsDriver = !!selected && car.driverId === selected.id
   return (
     <div className="space-y-3 rounded-2xl border border-t-4 border-gray-200 border-t-emerald-500 bg-white p-4 shadow-sm">
       <div className="flex items-center gap-2">
         <Car className="h-5 w-5 flex-shrink-0 text-emerald-700" />
-        <input
-          value={car.driver}
-          onChange={(e) => onChange({ driver: e.target.value.slice(0, 50) })}
-          placeholder="Quem conduz (ex.: Pai do João)"
-          className="h-9 min-w-0 flex-1 rounded-lg border border-gray-200 px-2 text-sm font-bold text-gray-900"
-          aria-label="Condutor"
-        />
+        {driverPerson ? (
+          <span className="flex h-9 min-w-0 flex-1 items-center gap-2 rounded-lg bg-emerald-50 px-2 ring-1 ring-inset ring-emerald-200">
+            <span className="flex-shrink-0 text-[10px] font-black uppercase tracking-wider text-emerald-700">Conduz</span>
+            <span className="min-w-0 flex-1 truncate text-sm font-bold text-gray-900">{shortDisplayName(driverPerson.full_name, 'Membro')}</span>
+            <button
+              type="button"
+              onClick={onClearDriver}
+              className="flex-shrink-0 rounded-md p-1 text-emerald-700 hover:bg-emerald-100"
+              title="Deixar de conduzir (volta para Sem carro)"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </span>
+        ) : (
+          <input
+            value={car.driver}
+            onChange={(e) => onChange({ driver: e.target.value.slice(0, 50) })}
+            placeholder="Quem conduz (ex.: Pai do João)"
+            className="h-9 min-w-0 flex-1 rounded-lg border border-gray-200 px-2 text-sm font-bold text-gray-900"
+            aria-label="Condutor"
+          />
+        )}
         <span
           className={`rounded-full px-2 py-0.5 text-xs font-black ${
             over ? 'bg-red-100 text-red-700' : car.passengers.length === car.seats ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-600'
@@ -1258,8 +1319,20 @@ function CarCard({
         full={car.passengers.length >= car.seats}
         warning={null}
         onDrop={onDrop}
-        already={!!selected && car.passengers.includes(selected.id)}
+        already={!!selected && (car.passengers.includes(selected.id) || selectedIsDriver)}
       />
+      {selected && !selectedIsDriver && (
+        <button
+          type="button"
+          onClick={onMakeDriver}
+          className="flex h-10 w-full items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-white text-sm font-bold text-emerald-800 hover:bg-emerald-50"
+        >
+          <Car className="h-4 w-4" />
+          {driverPerson
+            ? `Trocar condutor para ${shortDisplayName(selected.full_name, 'Membro')}`
+            : `Pôr ${shortDisplayName(selected.full_name, 'Membro')} a conduzir`}
+        </button>
+      )}
     </div>
   )
 }

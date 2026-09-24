@@ -41,7 +41,10 @@ export type TripTent = {
 export type TripCar = {
   id: string
   direction: TripDirection
+  /** Condutor escrito à mão (ex.: "Pai do João"), quando não é alguém da lista. */
   driver: string
+  /** Condutor que é um membro da saída (desbravador ou líder com carro). Tem prioridade sobre `driver`. */
+  driverId?: string | null
   /** Lugares para passageiros (sem contar o condutor). */
   seats: number
   meetingPoint: string

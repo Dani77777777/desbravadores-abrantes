@@ -21,7 +21,7 @@ export function TripAssignments({ rows, userId, displayClass }: { rows: TripAssi
       const tent = plan.tents.find((t) => t.members.some((m) => m.id === userId)) ?? null
       const cars = (['ida', 'volta'] as TripDirection[]).map((dir) => ({
         dir,
-        car: plan.cars.find((c) => c.direction === dir && c.passengers.includes(userId)) ?? null,
+        car: plan.cars.find((c) => c.direction === dir && (c.passengers.includes(userId) || c.driverId === userId)) ?? null,
       }))
       return { r, tent, cars, nameOf }
     })
@@ -74,12 +74,20 @@ export function TripAssignments({ rows, userId, displayClass }: { rows: TripAssi
               </div>
             )}
 
-            {cars.map(({ dir, car }) =>
-              car ? (
+            {cars.map(({ dir, car }) => {
+              if (!car) return null
+              const driving = car.driverId === userId
+              const driverName = car.driverId ? nameOf(car.driverId) : car.driver
+              const others = car.passengers.filter((id) => id !== userId)
+              return (
                 <div key={dir} className="rounded-2xl bg-stone-50 p-4 ring-1 ring-inset ring-stone-200">
                   <p className="flex items-center gap-2 text-sm font-extrabold text-blue-950">
                     <Car className={`h-4 w-4 ${dir === 'volta' ? '-scale-x-100' : ''}`} /> {DIRECTION_LABELS[dir]}
-                    {car.driver && <span className="font-bold text-stone-600">· com {car.driver}</span>}
+                    {driving ? (
+                      <span className="rounded-full bg-emerald-600 px-2 py-0.5 text-[11px] font-extrabold text-white">Vais a conduzir</span>
+                    ) : (
+                      driverName && <span className="font-bold text-stone-600">· com {driverName}</span>
+                    )}
                   </p>
                   {(car.meetingPoint || car.departAt) && (
                     <p className="mt-1 flex items-center gap-1.5 text-sm text-stone-700">
@@ -87,14 +95,14 @@ export function TripAssignments({ rows, userId, displayClass }: { rows: TripAssi
                       {[car.meetingPoint, formatDepart(car.departAt)].filter(Boolean).join(' · ')}
                     </p>
                   )}
-                  {car.passengers.length > 1 && (
+                  {others.length > 0 && (
                     <p className="mt-2 text-xs text-stone-500">
-                      Vais com {car.passengers.filter((id) => id !== userId).map(nameOf).join(', ')}
+                      {driving ? 'Levas' : 'Vais com'} {others.map(nameOf).join(', ')}
                     </p>
                   )}
                 </div>
-              ) : null,
-            )}
+              )
+            })}
           </article>
         ))}
       </div>
