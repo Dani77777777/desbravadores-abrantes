@@ -322,6 +322,15 @@ function SectionBadge({ section }: { section: string | null }) {
   )
 }
 
+function LeaderBadge({ member }: { member: RankingMember }) {
+  if (!member.is_leader) return null
+  return (
+    <span className="inline-flex rounded-full bg-yellow-400/15 px-[1vh] py-[0.25vh] text-[1.35vh] font-bold uppercase tracking-wide text-yellow-200 ring-1 ring-inset ring-yellow-300/50">
+      Dirigente
+    </span>
+  )
+}
+
 /** Pontos: a contar de `from` até `to` quando `counting`, com um "+N" a flutuar. */
 function Score({ display, className }: { display: Display; className?: string }) {
   const ref = useRef<HTMLSpanElement>(null)
@@ -423,6 +432,7 @@ function PodiumPlace({ place, display, view }: { place: number; display: Display
         </p>
         <div className="mt-[0.6vh] flex items-center gap-[1vh]">
           <SectionBadge section={row.member.section} />
+          <LeaderBadge member={row.member} />
           {display.showChanges && <MoveBadge row={row} />}
         </div>
         <p className={`${D} mb-[2vh] mt-[1vh] flex items-center gap-[1vh] text-[4.2vh] font-extrabold text-blue-50`}>
@@ -455,6 +465,7 @@ function TopCard({ display, view }: { display: Display; view: RankingView }) {
         <p className={`${D} truncate text-[3vh] font-extrabold leading-tight`}>{shortDisplayName(row.member.full_name, 'Membro')}</p>
         <div className="mt-[0.8vh] flex items-center gap-[1vh]">
           <SectionBadge section={row.member.section} />
+          <LeaderBadge member={row.member} />
           {display.showChanges && <MoveBadge row={row} />}
         </div>
       </div>
@@ -489,6 +500,7 @@ function ListRow({ display, view, best }: { display: Display; view: RankingView;
         </div>
         <div className="mt-[0.8vh] flex items-center gap-[1.2vh]">
           <SectionBadge section={row.member.section} />
+          <LeaderBadge member={row.member} />
           <div className="h-[0.8vh] flex-1 overflow-hidden rounded-full bg-white/10">
             <div
               className={`h-full rounded-full bg-gradient-to-r transition-[width] duration-[2600ms] ease-out ${VIEW_ICON[view].bar}`}

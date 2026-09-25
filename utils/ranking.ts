@@ -41,6 +41,8 @@ export type RankingMember = {
   avatar_url: string | null
   section: string | null
   is_invested: boolean
+  /** Dirigente (mostra a etiqueta "Dirigente"); os restantes são desbravadores. */
+  is_leader: boolean
   total_xp: number
   current_gold: number
 }
@@ -56,6 +58,7 @@ export function toRankingMembers(raw: unknown): RankingMember[] {
       avatar_url: typeof r.avatar_url === 'string' && r.avatar_url ? r.avatar_url : null,
       section: typeof r.section === 'string' ? r.section : null,
       is_invested: !!r.is_invested,
+      is_leader: r.role === 'dirigente',
       total_xp: Number(r.total_xp) || 0,
       current_gold: Number(r.current_gold) || 0,
     }))

@@ -590,14 +590,15 @@ SELECT
     id,
     full_name,
     avatar_url,
-    section,
+    -- Dirigentes: a secção que lideram.
+    CASE WHEN role = 'dirigente' THEN COALESCE(leadership_section, section) ELSE section END AS section,
     role,
     total_xp,
     current_gold,
     (total_xp + current_gold) as combined_score,
     is_invested
 FROM public.profiles
-WHERE role = 'desbravador'
+WHERE role IN ('desbravador', 'dirigente')
 ORDER BY total_xp DESC;
 
 -- Permissões para acesso anónimo à vista
@@ -609,7 +610,7 @@ CREATE POLICY "Public can view desbravador leaderboard info" ON public.profiles
 FOR SELECT
 USING (role = 'desbravador');
 
-COMMENT ON VIEW public.leaderboard IS 'Public view for the club leaderboard, showing only desbravadores.';
+COMMENT ON VIEW public.leaderboard IS 'Public view for the club leaderboard: desbravadores and dirigentes (not coordenadores).';
 
 -- ============================================
 -- 8. EVENTOS E AGENDA

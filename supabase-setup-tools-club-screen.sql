@@ -5,7 +5,7 @@
 --    sorteio, equipas) e as definições do ranking. Igual ao raffle_screens/timer_screens:
 --    uma linha por anfitrião; o controlo (PC, telemóvel ou a app) escreve `state` e o
 --    projetor (mesma conta) lê por realtime.
--- 2. get_leaderboard_at_date — pontos de cada desbravador até uma data (soma do
+-- 2. get_leaderboard_at_date — pontos de cada desbravador e dirigente até uma data (soma do
 --    points_log). Serve para mostrar "ontem" e depois "hoje" com quem subiu e desceu.
 --    Já existia para a app antiga do ranking; fica aqui para ficar tudo junto.
 --
@@ -44,12 +44,16 @@ EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 -- O reset de época não apaga histórico (insere compensações no points_log), por isso
 -- somar o points_log até uma data dá sempre o saldo certo nesse momento.
 
-CREATE OR REPLACE FUNCTION public.get_leaderboard_at_date(target_date timestamp with time zone)
+-- Desbravadores e dirigentes (com a secção que lideram); os coordenadores ficam de fora.
+DROP FUNCTION IF EXISTS public.get_leaderboard_at_date(timestamp with time zone);
+
+CREATE FUNCTION public.get_leaderboard_at_date(target_date timestamp with time zone)
 RETURNS TABLE (
   id uuid,
   full_name text,
   avatar_url text,
   section app_section,
+  role app_role,
   is_invested boolean,
   total_xp bigint,
   current_gold bigint
@@ -61,14 +65,15 @@ BEGIN
     p.id,
     p.full_name,
     p.avatar_url,
-    p.section,
+    CASE WHEN p.role = 'dirigente' THEN COALESCE(p.leadership_section, p.section) ELSE p.section END,
+    p.role,
     p.is_invested,
     COALESCE(SUM(pl.amount_xp), 0)::bigint AS total_xp,
     COALESCE(SUM(pl.amount_gold), 0)::bigint AS current_gold
   FROM public.profiles p
   LEFT JOIN public.points_log pl ON p.id = pl.target_user_id AND pl.created_at <= target_date
-  WHERE p.role = 'desbravador'
-  GROUP BY p.id, p.full_name, p.avatar_url, p.section, p.is_invested;
+  WHERE p.role IN ('desbravador', 'dirigente')
+  GROUP BY p.id, p.full_name, p.avatar_url, p.section, p.leadership_section, p.role, p.is_invested;
 END;
 $$;
 

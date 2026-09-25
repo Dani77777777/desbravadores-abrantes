@@ -33,6 +33,7 @@ type Member = {
   full_name: string | null
   avatar_url: string | null
   section: string
+  role: 'desbravador' | 'dirigente' | 'coordenador'
   total_xp: number
   current_gold: number
   combined_score: number
@@ -84,6 +85,20 @@ function SectionBadge({ section }: { section: string }) {
   )
 }
 
+/** `onYellow`: na linha do próprio (fundo amarelo). */
+function LeaderBadge({ member, onYellow }: { member: Member; onYellow?: boolean }) {
+  if (member.role !== 'dirigente') return null
+  return (
+    <span
+      className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${
+        onYellow ? 'bg-blue-950 text-yellow-300' : 'bg-yellow-400/15 text-yellow-200 ring-1 ring-inset ring-yellow-300/50'
+      }`}
+    >
+      Dirigente
+    </span>
+  )
+}
+
 function Podium({ data, type, userId }: { data: Member[]; type: RankingType; userId?: string }) {
   const top = data.slice(0, 3)
   if (top.length === 0) return null
@@ -130,6 +145,11 @@ function Podium({ data, type, userId }: { data: Member[]; type: RankingType; use
               <p className="w-full truncate px-1 text-center text-sm font-bold text-white sm:text-base">
                 {member.full_name?.split(' ')[0]}
               </p>
+              {member.role === 'dirigente' && (
+                <div className="mt-1">
+                  <LeaderBadge member={member} />
+                </div>
+              )}
               <p className="mb-3 mt-0.5 flex items-center gap-1 text-sm font-extrabold text-blue-100">
                 {scoreOf(member, type)} <Icon className={`h-3.5 w-3.5 ${meta.iconClass}`} />
               </p>
@@ -201,6 +221,7 @@ function RankList({ data, type, userId }: { data: Member[]; type: RankingType; u
               </div>
               <div className="mt-1.5 flex items-center gap-2">
                 <SectionBadge section={member.section} />
+                <LeaderBadge member={member} onYellow={!!isMe} />
                 <div className={`hidden h-1.5 flex-1 overflow-hidden rounded-full sm:block ${isMe ? 'bg-blue-950/15' : 'bg-white/10'}`}>
                   <div
                     className={`h-full rounded-full bg-gradient-to-r ${isMe ? 'from-blue-950 to-blue-800' : meta.bar}`}

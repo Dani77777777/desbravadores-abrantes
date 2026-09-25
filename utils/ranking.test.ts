@@ -17,6 +17,7 @@ const m = (id: string, xp: number, gold: number, section = 'rebentos', name = id
   avatar_url: null,
   section,
   is_invested: false,
+  is_leader: false,
   total_xp: xp,
   current_gold: gold,
 })
@@ -90,8 +91,16 @@ describe('toRankingMembers', () => {
   test('converte bigint em texto e ignora lixo', () => {
     const rows = toRankingMembers([{ id: 'a', full_name: 'Ana', total_xp: '12', current_gold: 3, is_invested: true }, null, { x: 1 }])
     expect(rows).toEqual([
-      { id: 'a', full_name: 'Ana', avatar_url: null, section: null, is_invested: true, total_xp: 12, current_gold: 3 },
+      { id: 'a', full_name: 'Ana', avatar_url: null, section: null, is_invested: true, is_leader: false, total_xp: 12, current_gold: 3 },
     ])
+  })
+
+  test('marca os dirigentes', () => {
+    const rows = toRankingMembers([
+      { id: 'a', role: 'desbravador', total_xp: 1, current_gold: 0 },
+      { id: 'b', role: 'dirigente', total_xp: 2, current_gold: 0 },
+    ])
+    expect(rows.map((r) => r.is_leader)).toEqual([false, true])
   })
 })
 
