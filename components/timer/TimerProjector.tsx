@@ -18,10 +18,24 @@ function received(state: TimerScreenState, live: boolean): Screen {
   return { state, anchor: live ? Date.now() : state.sentAt }
 }
 
-export function TimerProjector({ userId, initialState }: { userId: string; initialState: TimerScreenState | null }) {
+/**
+ * `embedded`: dentro do Ecrã do Clube, que já trata do som e do ecrã inteiro (sem botão próprio).
+ */
+export function TimerProjector({
+  userId,
+  initialState,
+  embedded = false,
+  sound = false,
+}: {
+  userId: string
+  initialState: TimerScreenState | null
+  embedded?: boolean
+  sound?: boolean
+}) {
   const [supabase] = useState(() => createClient())
   const [screen, setScreen] = useState<Screen | null>(() => (initialState?.config ? received(initialState, false) : null))
-  const [soundOn, setSoundOn] = useState(false)
+  const [soundOnLocal, setSoundOn] = useState(false)
+  const soundOn = embedded ? sound : soundOnLocal
   const [isFull, setIsFull] = useState(false)
   // Enquanto um controlo aberto NESTE computador está ligado, ignora a base de dados.
   const localActiveRef = useRef(false)
@@ -112,7 +126,7 @@ export function TimerProjector({ userId, initialState }: { userId: string; initi
         </div>
       )}
 
-      {(!soundOn || !isFull) && (
+      {!embedded && (!soundOn || !isFull) && (
         <button
           type="button"
           onClick={start}

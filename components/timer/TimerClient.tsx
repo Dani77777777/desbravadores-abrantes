@@ -24,6 +24,7 @@ import {
   X,
 } from 'lucide-react'
 import { createClient } from '@/utils/supabase/client'
+import { getClubApp } from '@/utils/club-screen'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Switch } from '@/components/ui/switch'
 import {
@@ -334,7 +335,8 @@ export function TimerClient({ userId }: { userId: string }) {
     unlockTimerSound()
     const w = window.open(TIMER_PROJECTOR_PATH, TIMER_PROJECTOR_WINDOW_NAME, 'popup=yes,width=1280,height=720')
     if (!w) {
-      toast.error('O browser bloqueou a janela. Permite pop-ups para este site e tenta outra vez.')
+      // Na app do clube a janela não abre: a app mostra esta ferramenta no ecrã do projetor.
+      if (!getClubApp()) toast.error('O browser bloqueou a janela. Permite pop-ups para este site e tenta outra vez.')
       return
     }
     w.focus()

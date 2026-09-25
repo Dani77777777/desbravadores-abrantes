@@ -7,12 +7,26 @@ import { teamsLocalChannelName, type TeamsLocalMessage, type TeamsScreenState } 
 import { unlockRaffleSound } from '@/utils/raffle-sound'
 import { TeamsBoard } from './TeamsBoard'
 
-export function TeamsProjector({ userId, initialState }: { userId: string; initialState: TeamsScreenState | null }) {
+/**
+ * `embedded`: dentro do Ecrã do Clube, que já trata do som e do ecrã inteiro (sem botão próprio).
+ */
+export function TeamsProjector({
+  userId,
+  initialState,
+  embedded = false,
+  sound = false,
+}: {
+  userId: string
+  initialState: TeamsScreenState | null
+  embedded?: boolean
+  sound?: boolean
+}) {
   const [supabase] = useState(() => createClient())
   const [screen, setScreen] = useState<TeamsScreenState | null>(initialState?.teams ? initialState : null)
   // Uma revelação que já existia quando o ecrã abriu aparece logo completa (sem animação).
   const [instantId, setInstantId] = useState<string | null>(initialState?.revealId ?? null)
-  const [soundOn, setSoundOn] = useState(false)
+  const [soundOnLocal, setSoundOn] = useState(false)
+  const soundOn = embedded ? sound : soundOnLocal
   const [isFull, setIsFull] = useState(false)
   const localActiveRef = useRef(false)
 
@@ -124,7 +138,7 @@ export function TeamsProjector({ userId, initialState }: { userId: string; initi
         )}
       </main>
 
-      {(!soundOn || !isFull) && (
+      {!embedded && (!soundOn || !isFull) && (
         <button
           type="button"
           onClick={start}

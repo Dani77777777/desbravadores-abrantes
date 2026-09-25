@@ -246,3 +246,21 @@ html {
 @media (prefers-reduced-motion: reduce) {
   .timer-flash { animation: none; background-color: rgb(185 28 28); }
 }
+
+/* ── Ferramentas · Ecrã do Clube (projetor) ─────────────────────── */
+@keyframes cs-stage-in { from { opacity: 0; transform: scale(1.015); } to { opacity: 1; transform: none; } }
+@keyframes cs-enter { from { opacity: 0; transform: translateY(2.5vh) scale(.97); } to { opacity: 1; transform: none; } }
+@keyframes cs-plus {
+  0% { opacity: 0; transform: translate(0, 1vh) scale(.6); }
+  15% { opacity: 1; transform: translate(0, -.5vh) scale(1.1); }
+  75% { opacity: 1; }
+  100% { opacity: 0; transform: translate(0, -6vh) scale(1); }
+}
+@keyframes cs-glow { 0%, 100% { opacity: .55; } 50% { opacity: 1; } }
+.cs-stage-in { animation: cs-stage-in .9s cubic-bezier(.2, .8, .2, 1) both; }
+.cs-enter { animation: cs-enter .8s cubic-bezier(.2, .8, .2, 1) both; animation-delay: var(--d, 0ms); }
+.cs-plus { animation: cs-plus 2.2s ease-out both; animation-delay: var(--d, 0ms); }
+.cs-glow { animation: cs-glow 3s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .cs-stage-in, .cs-enter, .cs-glow { animation: none; }
+}

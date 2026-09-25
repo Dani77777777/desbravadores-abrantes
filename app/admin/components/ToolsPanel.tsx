@@ -1,8 +1,18 @@
 import Link from 'next/link'
-import { ChevronRight, MonitorPlay, Shuffle, Tent, Timer, UsersRound, Wrench } from 'lucide-react'
+import { ChevronRight, MonitorPlay, Presentation, Shuffle, Tent, Timer, UsersRound, Wrench } from 'lucide-react'
 import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 
 const TOOLS = [
+  {
+    id: 'ecra',
+    title: 'Ecrã do Clube',
+    description:
+      'O projetor das reuniões: logo, ranking (mostra ontem e depois revela hoje, com quem subiu e desceu) e o ecrã do cronómetro, sorteio ou equipas. Controla-se do PC, do telemóvel ou da app do clube.',
+    icon: Presentation,
+    color: 'from-yellow-400 to-orange-500',
+    href: '/admin/ferramentas/ecra',
+    projectorHref: '/admin/ferramentas/ecra/projetor',
+  },
   {
     id: 'sorteio',
     title: 'Sorteador',

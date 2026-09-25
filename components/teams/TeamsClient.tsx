@@ -32,6 +32,7 @@ import {
   X,
 } from 'lucide-react'
 import { createClient } from '@/utils/supabase/client'
+import { getClubApp } from '@/utils/club-screen'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Switch } from '@/components/ui/switch'
 import { SECTION_LABELS } from '@/utils/permissions'
@@ -504,7 +505,8 @@ export function TeamsClient({ userId, members, events }: { userId: string; membe
     unlockRaffleSound()
     const w = window.open(TEAMS_PROJECTOR_PATH, TEAMS_PROJECTOR_WINDOW_NAME, 'popup=yes,width=1280,height=720')
     if (!w) {
-      toast.error('O browser bloqueou a janela. Permite pop-ups para este site e tenta outra vez.')
+      // Na app do clube a janela não abre: a app mostra esta ferramenta no ecrã do projetor.
+      if (!getClubApp()) toast.error('O browser bloqueou a janela. Permite pop-ups para este site e tenta outra vez.')
       return
     }
     w.focus()

@@ -7,12 +7,26 @@ import { raffleLocalChannelName, type RaffleLocalMessage, type RaffleScreenState
 import { unlockRaffleSound } from '@/utils/raffle-sound'
 import { RaffleStage } from './RaffleStage'
 
-export function RaffleProjector({ userId, initialState }: { userId: string; initialState: RaffleScreenState | null }) {
+/**
+ * `embedded`: dentro do Ecrã do Clube, que já trata do som e do ecrã inteiro (sem botão próprio).
+ */
+export function RaffleProjector({
+  userId,
+  initialState,
+  embedded = false,
+  sound = false,
+}: {
+  userId: string
+  initialState: RaffleScreenState | null
+  embedded?: boolean
+  sound?: boolean
+}) {
   const [supabase] = useState(() => createClient())
   const [screen, setScreen] = useState<RaffleScreenState | null>(initialState)
   // Um sorteio que já existia quando o ecrã abriu mostra logo o resultado (sem rodar).
   const [instantDrawId, setInstantDrawId] = useState<string | null>(initialState?.draw?.id ?? null)
-  const [soundOn, setSoundOn] = useState(false)
+  const [soundOnLocal, setSoundOn] = useState(false)
+  const soundOn = embedded ? sound : soundOnLocal
   const [isFull, setIsFull] = useState(false)
   // Enquanto um sorteador aberto NESTE computador está a controlar, ignora a base de dados
   // (que pode ter um estado antigo do modo telemóvel).
@@ -135,7 +149,7 @@ export function RaffleProjector({ userId, initialState }: { userId: string; init
         )}
       </main>
 
-      {(!soundOn || !isFull) && (
+      {!embedded && (!soundOn || !isFull) && (
         <button
           type="button"
           onClick={start}
