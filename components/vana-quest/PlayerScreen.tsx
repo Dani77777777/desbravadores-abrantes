@@ -6,6 +6,8 @@ import { submitAnswer, setRewardsRecipient, skipRewards } from '@/lib/actions/va
 import { CheckCircle2, XCircle, Trophy, Zap, Flame, Users, ArrowUp, Crown } from 'lucide-react'
 import { PlayerAvatar } from './PlayerAvatar'
 import { useLiveSession } from './useLiveSession'
+import { LobbyReactionPad } from '@/components/game-lobby/LobbyReactionPad'
+import { LobbyTips } from '@/components/game-lobby/LobbyTips'
 import { calcSessionRewards, streakMultiplier, MAX_SESSION_GOLD, MAX_SESSION_XP } from '@/utils/vana-quest'
 
 const OPTION_COLORS = [
@@ -439,25 +441,32 @@ export function PlayerScreen({ sessionId, userId, userProfile, initialSession, q
   // ── WAITING ────────────────────────────────────────────────────
   if (session.status === 'waiting') {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-900 via-blue-900 to-indigo-900 flex flex-col items-center justify-center p-6 gap-6 text-center">
-        <img src="/images/VanaQuest.png" alt="" className="w-20 h-20 object-contain animate-bounce" />
-        <h1 className="text-3xl font-black text-white">{questTitle}</h1>
-        <div className="bg-white/10 backdrop-blur rounded-3xl p-6 border border-white/20">
-          <div className="flex justify-center mb-3">
-            <PlayerAvatar
-              name={userProfile?.full_name || 'C'}
-              avatarUrl={userProfile?.avatar_url}
-              className="w-12 h-12"
-              textClassName="text-xl"
-              fallbackBg="bg-sky-300/30"
-            />
-          </div>
-          <p className="text-white font-bold text-lg">{userProfile?.full_name || 'Convidado'}</p>
-          {isGuest && <p className="text-sky-300 text-sm">Jogador convidado</p>}
+      <div className="min-h-[100dvh] bg-gradient-to-br from-blue-900 via-blue-900 to-indigo-900 flex flex-col items-center justify-center p-5 gap-5 text-center">
+        <div className="flex items-center gap-3">
+          <img src="/images/VanaQuest.png" alt="" className="w-12 h-12 object-contain" />
+          <h1 className="text-2xl font-black text-white text-left leading-tight">{questTitle}</h1>
         </div>
-        <div className="flex items-center gap-2">
-          <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
-          <p className="text-sky-200">À espera que o jogo comece...</p>
+        <div className="w-full max-w-sm flex items-center gap-3 bg-white/10 backdrop-blur rounded-2xl px-4 py-3 border border-white/20">
+          <PlayerAvatar
+            name={userProfile?.full_name || 'C'}
+            avatarUrl={userProfile?.avatar_url}
+            className="w-11 h-11"
+            textClassName="text-lg"
+            fallbackBg="bg-sky-300/30"
+          />
+          <div className="min-w-0 text-left">
+            <p className="text-white font-bold text-lg truncate">{userProfile?.full_name || 'Convidado'}</p>
+            <p className="text-sky-300 text-xs flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse" />
+              {isGuest ? 'Convidado · ' : ''}À espera que o jogo comece...
+            </p>
+          </div>
+        </div>
+        <div className="w-full max-w-sm">
+          <LobbyReactionPad game="vana-quest" sessionId={sessionId} playerId={participantId} />
+        </div>
+        <div className="w-full max-w-sm">
+          <LobbyTips game="vana-quest" variant="phone" />
         </div>
       </div>
     )

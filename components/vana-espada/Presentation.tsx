@@ -5,6 +5,7 @@ import { QRCodeSVG } from 'qrcode.react'
 import { createClient } from '@/utils/supabase/client'
 import { Sword, Target, Users } from 'lucide-react'
 import { PlayerAvatar } from '@/components/vana-quest/PlayerAvatar'
+import { ProjectorLobbyScreen } from '@/components/game-lobby/ProjectorLobby'
 import { useWakeLock } from '@/components/vana-camp/useWakeLock'
 import { closeRound } from '@/lib/actions/vana-espada'
 import { bibleOnlineUrl } from '@/utils/bible-link'
@@ -37,6 +38,7 @@ export function Presentation({ sessionId, initialSession, siteUrl, serverNow }: 
   useWakeLock()
 
   const [players, setPlayers] = useState<EspadaPlayer[]>([])
+  const [playersLoaded, setPlayersLoaded] = useState(false)
   const [reveal, setReveal] = useState<EspadaAnswerView[]>([])
   const [stage, setStage] = useState(0)
   const [qrZoomed, setQrZoomed] = useState(false)
@@ -65,7 +67,10 @@ export function Presentation({ sessionId, initialSession, siteUrl, serverNow }: 
         .from('vanaespada_players')
         .select('*')
         .eq('session_id', sessionId)
-        .then(({ data }) => { if (data) setPlayers(data.map(toEspadaPlayer)) })
+        .then(({ data }) => {
+          if (data) setPlayers(data.map(toEspadaPlayer))
+          setPlayersLoaded(true)
+        })
     }
     load()
     const channel = supabase
@@ -143,81 +148,30 @@ export function Presentation({ sessionId, initialSession, siteUrl, serverNow }: 
     [reveal]
   )
 
+  const lobbyPlayers = useMemo(
+    () => players.map((p) => ({ id: p.id, name: p.displayName, avatarUrl: p.avatarUrl, isGuest: p.isGuest })),
+    [players]
+  )
+
   // ── LOBBY ────────────────────────────────────────────────────────
   if (session.status === 'lobby') {
     return (
-      <div className="h-[100dvh] w-screen overflow-hidden bg-gradient-to-br from-slate-950 via-sky-950 to-slate-900 flex flex-col">
-        <div className="flex items-center justify-between px-10 pt-7">
-          <div className="flex items-center gap-4">
-            <img src="/images/VanaEspada.jpeg" alt="" className="w-14 h-14 object-contain rounded-xl drop-shadow-lg" />
-            <div>
-              <p className="text-white/50 text-xs font-bold uppercase tracking-[0.3em]">VanaEspada</p>
-              <h1 className="text-white font-black text-3xl">Onde Está?</h1>
-            </div>
-          </div>
-          <div className="flex items-center gap-2.5 bg-white/10 rounded-2xl px-5 py-2.5 border border-white/15">
-            <span className="w-2.5 h-2.5 bg-green-400 rounded-full animate-pulse" />
-            <span className="text-white font-bold text-xl">
-              {players.length} jogador{players.length !== 1 ? 'es' : ''}
-            </span>
-          </div>
-        </div>
-
-        <div className="flex-1 min-h-0 flex items-center justify-center gap-10 px-10 py-8 max-w-7xl mx-auto w-full">
-          {/* PIN + QR */}
-          <div className="flex flex-col items-center gap-6 w-full max-w-md flex-shrink-0">
-            <div className="w-full bg-white/10 backdrop-blur-sm rounded-3xl border border-white/20 p-8 text-center">
-              <p className="text-amber-300 text-xs font-black uppercase tracking-[0.25em] mb-3">Entra com o PIN</p>
-              <p className="text-7xl font-black text-white tracking-[0.12em] tabular-nums leading-none">{session.pin}</p>
-              <p className="text-sky-300 text-sm mt-4">
-                em <span className="text-white font-semibold">{siteUrl.replace(/^https?:\/\//, '')}/jogos/vana-espada</span>
-              </p>
-            </div>
-
-            <div className="bg-white rounded-3xl p-6 shadow-2xl">
-              <QRCodeSVG value={joinUrl} size={210} />
-            </div>
-          </div>
-
-          {/* Jogadores na sala */}
-          <div className="w-full max-w-md bg-white/10 backdrop-blur-sm rounded-3xl border border-white/20 p-6 flex flex-col self-stretch min-h-0">
-            <p className="text-amber-300 text-xs font-black uppercase tracking-widest mb-4 flex items-center gap-2 flex-shrink-0">
-              <Users className="w-4 h-4" /> Jogadores na sala
-            </p>
-            <div className="flex-1 space-y-2 overflow-y-auto min-h-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-              {players.length === 0 ? (
-                <div className="text-center py-14">
-                  <div className="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center mx-auto mb-4">
-                    <Sword className="w-7 h-7 text-amber-300" />
-                  </div>
-                  <p className="text-sky-300 text-lg">À espera de jogadores...</p>
-                </div>
-              ) : (
-                players.map((p) => (
-                  <div
-                    key={p.id}
-                    className="flex items-center gap-3 bg-white/5 rounded-xl px-3 py-2.5 animate-in slide-in-from-right-2 duration-300"
-                  >
-                    <PlayerAvatar
-                      name={p.displayName}
-                      avatarUrl={p.avatarUrl}
-                      className="w-10 h-10"
-                      textClassName="text-base"
-                      fallbackBg="bg-amber-500/40"
-                    />
-                    <span className="text-white font-semibold text-lg flex-1 truncate">{p.displayName}</span>
-                    {p.isGuest && (
-                      <span className="text-[11px] text-sky-300 bg-sky-500/10 rounded-full px-2 py-0.5">convidado</span>
-                    )}
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-        </div>
-
+      <ProjectorLobbyScreen
+        game="vana-espada"
+        sessionId={sessionId}
+        players={lobbyPlayers}
+        loaded={playersLoaded}
+        pin={session.pin}
+        joinUrl={joinUrl}
+        joinLabel={`${siteUrl.replace(/^https?:\/\//, '')}/jogos/vana-espada`}
+        logo={<img src="/images/VanaEspada.jpeg" alt="" className="w-14 h-14 object-contain rounded-xl drop-shadow-lg" />}
+        eyebrow="VanaEspada"
+        title="Onde Está?"
+        background="bg-gradient-to-br from-slate-950 via-sky-950 to-slate-900"
+        emptyIcon={<Sword className="w-7 h-7 text-amber-300" />}
+      >
         {qrZoomed && <QrZoomOverlay pin={session.pin} url={joinUrl} />}
-      </div>
+      </ProjectorLobbyScreen>
     )
   }
 

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useMemo, useState, useRef } from 'react'
 import { createClient } from '@/utils/supabase/client'
 import { QRCodeSVG } from 'qrcode.react'
 import { Users, Trophy, Zap, Flame, CheckCircle2 } from 'lucide-react'
@@ -8,6 +8,7 @@ import { PlayerAvatar } from './PlayerAvatar'
 import { useLiveSession } from './useLiveSession'
 import { getIntroSeconds, questionFontSize, optionFontSize } from '@/utils/vana-quest'
 import confetti from 'canvas-confetti'
+import { ProjectorLobbyScreen } from '@/components/game-lobby/ProjectorLobby'
 
 const OPTION_COLORS = ['bg-red-500', 'bg-blue-500', 'bg-yellow-400', 'bg-green-500']
 const OPTION_LABELS = ['▲', '●', '◆', '■']
@@ -63,6 +64,7 @@ export function Presentation({ sessionId, initialSession, questions, siteUrl }: 
   const supabase = createClient()
   const [session, setSession] = useState<Session>(initialSession)
   const [participants, setParticipants] = useState<Participant[]>([])
+  const [participantsLoaded, setParticipantsLoaded] = useState(false)
   const [answers, setAnswers] = useState<Answer[]>([])
   const [timeLeft, setTimeLeft] = useState(0)
   const [introCountdown, setIntroCountdown] = useState(4)
@@ -72,7 +74,6 @@ export function Presentation({ sessionId, initialSession, questions, siteUrl }: 
   const [audioUnlocked, setAudioUnlocked] = useState(false)
   const [answerPulseKey, setAnswerPulseKey] = useState(0)
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
-  const playersListRef = useRef<HTMLDivElement | null>(null)
   // Snapshot of points shown last time (per participant id) — used to animate from previous → new
   // Persistido em localStorage para sobreviver a refresh
   const prevPointsStorageKey = `vq-prevpts-${sessionId}`
@@ -102,6 +103,10 @@ export function Presentation({ sessionId, initialSession, questions, siteUrl }: 
     ? questions[session.current_question_index]
     : null
   const joinUrl = `${siteUrl}/jogos/vana-quest?pin=${session.pin}`
+  const lobbyPlayers = useMemo(
+    () => participants.map((p) => ({ id: p.id, name: p.display_name, avatarUrl: p.avatar_url, isGuest: p.is_guest })),
+    [participants]
+  )
 
   // Snapshot dos pontos quando a pergunta arranca → para o leaderboard mostrar delta + tocar SFX
   const snapshotTakenForRef = useRef<string>('')
@@ -118,46 +123,6 @@ export function Presentation({ sessionId, initialSession, questions, siteUrl }: 
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session.status, currentQuestion?.id])
-
-  // Auto-scroll suave da lista de jogadores no lobby (quando transborda)
-  useEffect(() => {
-    if (session.status !== 'waiting') return
-    const el = playersListRef.current
-    if (!el) return
-
-    let rafId: number
-    let direction = 1 // 1 = baixo, -1 = cima
-    let pos = 0 // posição acumulada em sub-pixels
-    let lastTime = performance.now()
-    let pauseUntil = lastTime + 1500 // pausa inicial
-    const speedPxPerSec = 20 // ~20 px/s — bem devagar
-
-    const tick = (now: number) => {
-      const dt = now - lastTime
-      lastTime = now
-      const overflow = el.scrollHeight - el.clientHeight
-      if (overflow > 4) {
-        if (now >= pauseUntil) {
-          pos += (speedPxPerSec * dt / 1000) * direction
-          if (pos >= overflow) {
-            pos = overflow
-            direction = -1
-            pauseUntil = now + 1800
-          } else if (pos <= 0) {
-            pos = 0
-            direction = 1
-            pauseUntil = now + 1800
-          }
-          el.scrollTop = pos
-        }
-      } else {
-        pos = 0
-      }
-      rafId = requestAnimationFrame(tick)
-    }
-    rafId = requestAnimationFrame(tick)
-    return () => cancelAnimationFrame(rafId)
-  }, [session.status, participants.length])
 
   // Broadcast listener (commands from control panel)
   useEffect(() => {
@@ -205,7 +170,10 @@ export function Presentation({ sessionId, initialSession, questions, siteUrl }: 
 
   useEffect(() => {
     supabase.from('vana_quest_participants').select('*').eq('session_id', sessionId)
-      .then(({ data }) => { if (data) setParticipants(data) })
+      .then(({ data }) => {
+        if (data) setParticipants(data)
+        setParticipantsLoaded(true)
+      })
   }, [sessionId])
 
   useEffect(() => {
@@ -441,75 +409,22 @@ export function Presentation({ sessionId, initialSession, questions, siteUrl }: 
   // ── WAITING LOBBY ─────────────────────────────────────────────
   if (session.status === 'waiting') {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-950 via-blue-900 to-indigo-900 flex flex-col">
-        <div className="flex items-center justify-between px-8 pt-6">
-          <div className="flex items-center gap-3">
-            <img src="/images/VanaQuest.png" alt="" className="w-12 h-12 object-contain drop-shadow-lg" />
-            <div>
-              <p className="text-white/50 text-xs font-semibold uppercase tracking-widest">VanaQuest</p>
-              <h1 className="text-white font-black text-2xl">{(initialSession.vana_quests as any)?.title}</h1>
-            </div>
-          </div>
-          <div className="flex items-center gap-2 bg-white/10 rounded-2xl px-4 py-2 border border-white/10">
-            <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
-            <span className="text-white font-bold">{participants.length} jogador{participants.length !== 1 ? 'es' : ''}</span>
-          </div>
-        </div>
-
-        <div className="flex-1 flex flex-col lg:flex-row items-center justify-center gap-8 px-6 py-8 max-w-7xl mx-auto w-full">
-          {/* PIN + QR */}
-          <div className="flex flex-col items-center gap-6 w-full max-w-md">
-            <div className="w-full bg-white/10 backdrop-blur-sm rounded-3xl border border-white/20 p-8 text-center overflow-hidden">
-              <p className="text-sky-300 text-xs font-black uppercase tracking-[0.2em] mb-3">Entra com o PIN</p>
-              <p className="text-6xl md:text-7xl font-black text-white tracking-wider tabular-nums">{session.pin}</p>
-              <p className="text-sky-400 text-sm mt-3">
-                em <span className="text-white font-semibold">{siteUrl.replace(/^https?:\/\//, '')}/jogos/vana-quest</span>
-              </p>
-            </div>
-
-            <div className="bg-white rounded-3xl p-6 shadow-2xl">
-              <QRCodeSVG value={joinUrl} size={200} />
-            </div>
-          </div>
-
-          {/* Players */}
-          <div className="w-full max-w-md bg-white/10 backdrop-blur-sm rounded-3xl border border-white/20 p-6 flex flex-col">
-            <p className="text-sky-300 text-xs font-black uppercase tracking-widest mb-4 flex items-center gap-2">
-              <Users className="w-3.5 h-3.5" /> Jogadores na sala
-            </p>
-            <div
-              ref={playersListRef}
-              className="flex-1 space-y-2 overflow-y-auto max-h-[28rem] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-              style={{ msOverflowStyle: 'none' }}
-            >
-              {participants.length === 0 ? (
-                <div className="text-center py-12">
-                  <div className="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center mx-auto mb-4">
-                    <Users className="w-7 h-7 text-sky-400" />
-                  </div>
-                  <p className="text-sky-300">À espera de jogadores...</p>
-                </div>
-              ) : (
-                participants.map((p) => (
-                  <div key={p.id} className="flex items-center gap-3 bg-white/5 rounded-xl px-3 py-2.5 animate-in slide-in-from-right-2 duration-300">
-                    <PlayerAvatar
-                      name={p.display_name}
-                      avatarUrl={p.avatar_url}
-                      className="w-9 h-9"
-                      textClassName="text-base"
-                      fallbackBg="bg-blue-500/40"
-                    />
-                    <span className="text-white font-semibold flex-1 truncate">{p.display_name}</span>
-                    {p.is_guest && <span className="text-[10px] text-sky-400 bg-blue-500/10 rounded-full px-2 py-0.5">convidado</span>}
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-        </div>
-
+      <ProjectorLobbyScreen
+        game="vana-quest"
+        sessionId={sessionId}
+        players={lobbyPlayers}
+        loaded={participantsLoaded}
+        pin={session.pin}
+        joinUrl={joinUrl}
+        joinLabel={`${siteUrl.replace(/^https?:\/\//, '')}/jogos/vana-quest`}
+        logo={<img src="/images/VanaQuest.png" alt="" className="w-14 h-14 object-contain drop-shadow-lg" />}
+        eyebrow="VanaQuest"
+        title={(initialSession.vana_quests as any)?.title || 'VanaQuest'}
+        background="bg-gradient-to-br from-blue-950 via-blue-900 to-indigo-900"
+        emptyIcon={<Users className="w-7 h-7 text-sky-400" />}
+      >
         {qrZoomed && <QrZoomOverlay pin={session.pin} url={joinUrl} />}
-      </div>
+      </ProjectorLobbyScreen>
     )
   }
 

@@ -4,6 +4,8 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { createClient } from '@/utils/supabase/client'
 import { ArrowUp, Check, Crown, Sword, Trophy } from 'lucide-react'
 import { PlayerAvatar } from '@/components/vana-quest/PlayerAvatar'
+import { LobbyReactionPad } from '@/components/game-lobby/LobbyReactionPad'
+import { LobbyTips } from '@/components/game-lobby/LobbyTips'
 import { useWakeLock } from '@/components/vana-camp/useWakeLock'
 import { getMyAnswer, setRewardsRecipient, skipRewards, submitLocate } from '@/lib/actions/vana-espada'
 import {
@@ -236,20 +238,26 @@ export function PlayerScreen({ sessionId, userId, initialSession, serverNow, all
   if (session.status === 'lobby') {
     return (
       <Shell>
-        <div className="text-center space-y-4">
-          <img src="/images/VanaEspada.jpeg" alt="" className="w-20 h-20 object-contain mx-auto" />
-          <div className="flex items-center justify-center gap-2.5 bg-white/10 rounded-2xl px-5 py-3">
+        <div className="w-full max-w-sm text-center space-y-5">
+          <div className="flex items-center gap-3 bg-white/10 rounded-2xl px-4 py-3 border border-white/15">
+            <img src="/images/VanaEspada.jpeg" alt="" className="w-11 h-11 object-contain rounded-lg" />
+            <div className="min-w-0 flex-1 text-left">
+              <p className="text-white font-black text-lg">Estás dentro!</p>
+              <p className="text-sky-200 text-xs flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse" />
+                À espera que o jogo comece...
+              </p>
+            </div>
             <PlayerAvatar
               name={me?.displayName || '?'}
               avatarUrl={me?.avatarUrl}
-              className="w-9 h-9"
+              className="w-10 h-10"
               textClassName="text-sm"
               fallbackBg="bg-amber-500/40"
             />
-            <p className="text-white font-black">{me?.displayName}</p>
           </div>
-          <p className="text-white font-black text-2xl">Estás dentro!</p>
-          <p className="text-sky-200 text-sm animate-pulse">Olha para o ecrã principal...</p>
+          <LobbyReactionPad game="vana-espada" sessionId={sessionId} playerId={playerId} />
+          <LobbyTips game="vana-espada" variant="phone" />
         </div>
       </Shell>
     )

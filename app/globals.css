@@ -264,3 +264,44 @@ html {
 @media (prefers-reduced-motion: reduce) {
   .cs-stage-in, .cs-enter, .cs-glow { animation: none; }
 }
+
+/* ── Jogos ao vivo · Sala de espera (VanaQuest + VanaEspada) ────── */
+/* Emoji enviado de um telemóvel a subir no projetor (--drift = desvio lateral). */
+@keyframes lobby-rise {
+  0% { opacity: 0; transform: translate(0, 0) scale(.5); }
+  12% { opacity: 1; transform: translate(calc(var(--drift, 0px) * .2), -8vh) scale(1.1); }
+  80% { opacity: 1; }
+  100% { opacity: 0; transform: translate(var(--drift, 0px), -70vh) scale(.9); }
+}
+/* Avatares da sala a flutuar devagar, cada um com o seu atraso. */
+@keyframes lobby-bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+/* Quem acabou de entrar aparece com um salto. */
+@keyframes lobby-pop {
+  0% { opacity: 0; transform: scale(.3); }
+  60% { opacity: 1; transform: scale(1.18); }
+  100% { opacity: 1; transform: scale(1); }
+}
+/* Faixas "X entrou!" e festas de nível / marcos a entrar. */
+@keyframes lobby-banner {
+  0% { opacity: 0; transform: translateY(-24px) scale(.85); }
+  12% { opacity: 1; transform: translateY(0) scale(1.05); }
+  20% { transform: scale(1); }
+  85% { opacity: 1; }
+  100% { opacity: 0; transform: translateY(-8px) scale(.97); }
+}
+/* No telemóvel: o emoji tocado salta do botão. */
+@keyframes lobby-tap {
+  0% { opacity: 1; transform: translate(-50%, 0) scale(.8); }
+  100% { opacity: 0; transform: translate(calc(-50% + var(--drift, 0px)), -90px) scale(1.4); }
+}
+/* Brilho a correr na barra de energia. */
+@keyframes lobby-shine { from { transform: translateX(-100%); } to { transform: translateX(250%); } }
+.lobby-rise { animation: lobby-rise var(--dur, 3.2s) cubic-bezier(.25, .7, .3, 1) forwards; }
+.lobby-bob { animation: lobby-bob 3.6s ease-in-out infinite; animation-delay: var(--d, 0ms); }
+.lobby-pop { animation: lobby-pop .6s cubic-bezier(.2, .8, .2, 1) both; }
+.lobby-banner { animation: lobby-banner var(--dur, 2.6s) cubic-bezier(.2, .8, .2, 1) forwards; }
+.lobby-tap { animation: lobby-tap .7s ease-out forwards; }
+.lobby-shine { animation: lobby-shine 2.4s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .lobby-bob, .lobby-shine { animation: none; }
+}
