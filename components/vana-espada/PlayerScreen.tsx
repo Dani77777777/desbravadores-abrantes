@@ -6,6 +6,7 @@ import { ArrowUp, Check, Crown, Sword, Trophy } from 'lucide-react'
 import { PlayerAvatar } from '@/components/vana-quest/PlayerAvatar'
 import { LobbyReactionPad } from '@/components/game-lobby/LobbyReactionPad'
 import { LobbyTips } from '@/components/game-lobby/LobbyTips'
+import { useStillInRoom } from '@/components/game-lobby/useStillInRoom'
 import { useWakeLock } from '@/components/vana-camp/useWakeLock'
 import { getMyAnswer, setRewardsRecipient, skipRewards, submitLocate } from '@/lib/actions/vana-espada'
 import {
@@ -104,6 +105,26 @@ export function PlayerScreen({ sessionId, userId, initialSession, serverNow, all
   }, [playerId, supabase])
 
   useEffect(() => { refreshMe() }, [refreshMe, session.status, session.currentRound])
+
+  // O refreshMe só corre quando o estado muda — na sala de espera, uma expulsão passava
+  // despercebida até o jogo começar. Confirma ao voltar ao ecrã / à rede e, na espera, a cada 5 s.
+  useStillInRoom({
+    enabled: !!playerId && !kicked,
+    pollMs: session.status === 'lobby' ? 5000 : 0,
+    exists: async () => {
+      const { data, error } = await supabase
+        .from('vanaespada_players')
+        .select('id')
+        .eq('id', playerId!)
+        .maybeSingle()
+      return error ? null : !!data
+    },
+    // No VanaEspada ninguém sai por inatividade: se desapareceu, foi o anfitrião.
+    onGone: () => {
+      try { localStorage.removeItem(`vana_espada_player_${sessionId}`) } catch {}
+      setKicked(true)
+    },
+  })
 
   // ── Classificação (posição + quanto falta para subir) ───────────
   useEffect(() => {
@@ -212,8 +233,11 @@ export function PlayerScreen({ sessionId, userId, initialSession, serverNow, all
           <p className="text-5xl">👋</p>
           <h1 className="text-white font-black text-2xl">Saíste desta sessão</h1>
           <p className="text-sky-200 text-sm">O anfitrião removeu-te do jogo.</p>
-          <a href="/jogos/vana-espada" className="text-amber-300 underline text-sm block pt-2">
-            Voltar ao VanaEspada
+          <a
+            href={`/jogos/vana-espada?pin=${session.pin}`}
+            className="block mt-4 rounded-2xl bg-amber-400 text-slate-950 font-black text-lg py-3.5 active:scale-95 transition-transform"
+          >
+            Voltar a entrar
           </a>
         </div>
       </Shell>

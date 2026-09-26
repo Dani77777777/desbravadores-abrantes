@@ -8,6 +8,7 @@ import { PlayerAvatar } from './PlayerAvatar'
 import { useLiveSession } from './useLiveSession'
 import { LobbyReactionPad } from '@/components/game-lobby/LobbyReactionPad'
 import { LobbyTips } from '@/components/game-lobby/LobbyTips'
+import { useStillInRoom, type RoomGoneReason } from '@/components/game-lobby/useStillInRoom'
 import { calcSessionRewards, streakMultiplier, MAX_SESSION_GOLD, MAX_SESSION_XP } from '@/utils/vana-quest'
 
 const OPTION_COLORS = [
@@ -34,6 +35,7 @@ interface QuestionData {
 interface Session {
   id: string
   status: string
+  pin: string
   current_question_index: number
   question_started_at: string | null
   vana_quests: { title: string } | null
@@ -85,6 +87,8 @@ export function PlayerScreen({ sessionId, userId, userProfile, initialSession, q
   const [pendingRecipient, setPendingRecipient] = useState<{ id: string; full_name: string; section: string; avatar_url?: string | null } | null>(null)
   // Foi expulso pelo host
   const [kicked, setKicked] = useState(false)
+  // Porque saiu: o anfitrião removeu-o, ou o telemóvel esteve bloqueado e perdeu o lugar na sala
+  const [kickReason, setKickReason] = useState<RoomGoneReason>('removed')
   // Posição na classificação (rank) + pontos para subir
   const [rankInfo, setRankInfo] = useState<{ rank: number; total: number; pointsToNext: number | null }>({ rank: 0, total: 0, pointsToNext: null })
   // Pontos do 1.º classificado — define a escala do limite de prémios (500🪙/1000⭐)
@@ -267,6 +271,28 @@ export function PlayerScreen({ sessionId, userId, userProfile, initialSession, q
     return () => { supabase.removeChannel(channel) }
   }, [sessionId, userId, participantId])
 
+  // O DELETE acima só chega com o websocket vivo. Se o telemóvel esteve bloqueado, o
+  // anfitrião remove-o da sala de espera (presença) e o aviso perde-se — por isso
+  // confirmamos na BD ao voltar ao ecrã, ao recuperar a rede e, na espera, a cada 5 s.
+  useStillInRoom({
+    enabled: !!participantId && !kicked,
+    pollMs: session.status === 'waiting' ? 5000 : 0,
+    exists: async () => {
+      const { data, error } = await supabase
+        .from('vana_quest_participants')
+        .select('id')
+        .eq('id', participantId!)
+        .maybeSingle()
+      return error ? null : !!data
+    },
+    onGone: (reason) => {
+      localStorage.removeItem(`vana_participant_${sessionId}`)
+      // A remoção automática só existe na sala de espera; a meio do jogo foi o anfitrião.
+      setKickReason(session.status === 'waiting' ? reason : 'removed')
+      setKicked(true)
+    },
+  })
+
   // Presença na sala de espera — marca este jogador como "online". Quando a ligação cai
   // (fechou o separador / saiu), o host deteta a ausência e remove-o da lista antes de o
   // jogo começar, evitando "jogadores mortos". Como a chave de presença é o participantId
@@ -422,18 +448,28 @@ export function PlayerScreen({ sessionId, userId, userProfile, initialSession, q
   const { gold: goldEarned, xp: xpEarned } = calcSessionRewards(totalPoints, topPoints)
   const rewardsCapped = Math.round(Math.max(totalPoints, topPoints)) > MAX_SESSION_GOLD
 
-  // ── EXPULSO PELO HOST ──────────────────────────────────────────
+  // ── FORA DA SESSÃO (removido pelo anfitrião ou por inatividade) ──
   if (kicked) {
+    const inactive = kickReason === 'inactive'
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-950 to-indigo-950 flex flex-col items-center justify-center p-6 gap-5 text-center">
-        <div className="w-20 h-20 rounded-full bg-red-500/20 border border-red-400/30 flex items-center justify-center">
-          <XCircle className="w-10 h-10 text-red-400" />
+        <div className={`w-20 h-20 rounded-full flex items-center justify-center ${inactive ? 'bg-amber-500/20 border border-amber-400/30' : 'bg-red-500/20 border border-red-400/30'}`}>
+          {inactive ? <span className="text-4xl">😴</span> : <XCircle className="w-10 h-10 text-red-400" />}
         </div>
-        <h2 className="text-2xl font-black text-white">Foste removido do jogo</h2>
+        <h2 className="text-2xl font-black text-white">
+          {inactive ? 'Saíste da sala de espera' : 'Foste removido do jogo'}
+        </h2>
         <p className="text-sky-200 text-sm max-w-xs">
-          O anfitrião removeu-te desta sessão. Se achas que foi um engano, fala com o anfitrião e volta a entrar.
+          {inactive
+            ? 'O telemóvel esteve bloqueado ou sem ligação durante algum tempo e perdeste o lugar na sala. Não faz mal — é só voltar a entrar!'
+            : 'O anfitrião removeu-te desta sessão. Se achas que foi um engano, fala com o anfitrião e volta a entrar.'}
         </p>
-        <a href="/jogos/vana-quest" className="text-sky-300 underline mt-2">Voltar a entrar</a>
+        <a
+          href={`/jogos/vana-quest?pin=${session.pin}`}
+          className="mt-2 w-full max-w-xs rounded-2xl bg-white text-blue-950 font-black text-lg py-3.5 active:scale-95 transition-transform"
+        >
+          Voltar a entrar
+        </a>
       </div>
     )
   }
