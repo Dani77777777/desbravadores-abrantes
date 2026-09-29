@@ -154,3 +154,11 @@ export function computeStoreEconomy(members: any[], events: any[]): StoreEconomy
     levelOf, levelBuckets, atOrAboveLevel, maxBucket,
   }
 }
+
+// ---------------------------------------------------------------------------
+// Cancelar a própria encomenda (engano) — enquanto não houver dinheiro envolvido:
+// por pagar, ou paga só com Gold e ainda por entregar. Igual a cancel_my_purchase.
+// ---------------------------------------------------------------------------
+
+export const canSelfCancel = (purchase: { status?: string; paid_at?: string | null; amount_due_eur?: number | string | null }) =>
+  purchase.status === 'pending' && (!purchase.paid_at || Number(purchase.amount_due_eur || 0) <= 0)

@@ -367,7 +367,7 @@ export function ProductManagement({ products, profile, members, events, goldRate
         </Dialog>
       </div>
 
-      <div className="grid gap-4">
+      <div className="grid grid-cols-1 gap-4">
         {products.length === 0 ? (
           <div className="text-center py-12 border-2 border-dashed rounded-xl bg-gray-50/50">
             <ShoppingBag className="w-12 h-12 text-gray-300 mx-auto mb-3" />

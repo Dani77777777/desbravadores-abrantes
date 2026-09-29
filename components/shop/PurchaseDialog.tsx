@@ -16,8 +16,9 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
-import { ShoppingBag, Coins, CheckCircle2, Copy, Key, AlertCircle, User, Banknote, CalendarClock, Minus, Plus } from 'lucide-react'
+import { ShoppingBag, Coins, CheckCircle2, Copy, Key, AlertCircle, User, Banknote, CalendarClock, Minus, Plus, Undo2 } from 'lucide-react'
 import { formatEur, goldCostFor, userMaxDiscountEur, formatDeadline } from '@/lib/store-economy'
+import { addGuestOrder, removeGuestOrder } from '@/lib/guest-orders'
 
 interface PurchaseDialogProps {
   product: any
@@ -32,6 +33,7 @@ export function PurchaseDialog({ product, userProfile, goldRate, disabled, reaso
   const router = useRouter()
   const [isOpen, setIsOpen] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [cancelling, setCancelling] = useState(false)
   const [result, setResult] = useState<any>(null)
   const [guestName, setGuestName] = useState('')
   const [discount, setDiscount] = useState(0)
@@ -51,14 +53,17 @@ export function PurchaseDialog({ product, userProfile, goldRate, disabled, reaso
   const changeQuantity = (next: number) => {
     const qty = Math.max(1, Math.min(maxQty, next))
     setQuantity(qty)
-    // Menos unidades ⇒ desconto máximo menor: não deixar o slider acima do novo limite.
+    // Quem está a usar todo o Gold continua a usar todo; senão, não deixar o slider
+    // acima do novo limite (menos unidades ⇒ desconto máximo menor).
     const nextMax = isGuest
       ? 0
       : userMaxDiscountEur({ price_eur: unitPrice * qty, max_discount_percent: product.max_discount_percent }, userProfile.current_gold || 0, goldRate)
-    setDiscount(d => Math.min(d, nextMax))
+    setDiscount(d => (d >= maxDisc ? nextMax : Math.min(d, nextMax)))
   }
   const goldCost = goldCostFor(discount, goldRate)
   const amountDue = Math.max(0, Math.round((priceEur - discount) * 100) / 100)
+  // Desconto por usar (o Gold vem todo aplicado por defeito; avisamos se o membro o baixar).
+  const unusedDiscount = Math.round((maxDisc - discount) * 100) / 100
 
   const handlePurchase = async () => {
     if (isGuest && guestName.trim().length < 3) {
@@ -78,6 +83,7 @@ export function PurchaseDialog({ product, userProfile, goldRate, disabled, reaso
       if (error) throw error
 
       if (data.success) {
+        if (data.cancel_token) addGuestOrder({ id: data.purchase_id, token: data.cancel_token })
         setResult(data)
         toast.success('Pedido registado!')
         router.refresh()
@@ -90,6 +96,28 @@ export function PurchaseDialog({ product, userProfile, goldRate, disabled, reaso
       setIsOpen(false)
     } finally {
       setLoading(false)
+    }
+  }
+
+  // Engano? Cancela logo: devolve o Gold, repõe o stock e apaga o registo.
+  const handleCancel = async () => {
+    if (!confirm('Cancelar este pedido? Foi engano e não o queres?')) return
+    setCancelling(true)
+    try {
+      const { data, error } = await supabase.rpc('cancel_my_purchase', {
+        p_purchase_id: result.purchase_id,
+        p_cancel_token: result.cancel_token ?? null,
+      })
+      if (error) throw error
+      if (!data?.success) throw new Error(data?.error || 'Não foi possível cancelar.')
+      removeGuestOrder(result.purchase_id)
+      toast.success(Number(data.gold_returned) > 0 ? `Pedido cancelado. Recebeste de volta ${data.gold_returned} 🪙.` : 'Pedido cancelado.')
+      resetAndClose()
+      router.refresh()
+    } catch (error: any) {
+      toast.error(error.message || 'Não foi possível cancelar.')
+    } finally {
+      setCancelling(false)
     }
   }
 
@@ -110,9 +138,13 @@ export function PurchaseDialog({ product, userProfile, goldRate, disabled, reaso
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => {
-      if (!loading) {
+      if (!loading && !cancelling) {
         if (!open) resetAndClose()
-        else setIsOpen(true)
+        else {
+          // Por defeito usa todo o Gold possível.
+          setDiscount(maxDisc)
+          setIsOpen(true)
+        }
       }
     }}>
       <DialogTrigger asChild>
@@ -200,6 +232,23 @@ export function PurchaseDialog({ product, userProfile, goldRate, disabled, reaso
                 <p className="text-[10px] text-yellow-600">
                   Este artigo aceita até {product.max_discount_percent}% de desconto. Tens {userProfile.current_gold} 🪙.
                 </p>
+              </div>
+            )}
+
+            {!isGuest && maxDisc > 0 && unusedDiscount > 0 && (
+              <div className="bg-amber-50 border border-amber-200 p-3 rounded-2xl text-[11px] text-amber-900 flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+                <span className="flex-1">
+                  {discount > 0 ? 'Não estás a usar todo o teu Gold.' : 'Não estás a usar Gold.'}{' '}
+                  Podes poupar mais <strong>{formatEur(unusedDiscount)}</strong>.
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setDiscount(maxDisc)}
+                  className="shrink-0 rounded-full bg-amber-500 px-3 py-1 font-black text-white hover:bg-amber-600"
+                >
+                  Usar
+                </button>
               </div>
             )}
 
@@ -349,12 +398,26 @@ export function PurchaseDialog({ product, userProfile, goldRate, disabled, reaso
               </div>
             )}
 
-            <Button
-              onClick={resetAndClose}
-              className="w-full bg-gray-900 hover:bg-black h-12 rounded-2xl font-bold shadow-md"
-            >
-              Fechar
-            </Button>
+            <div className="space-y-2">
+              <Button
+                onClick={resetAndClose}
+                className="w-full bg-gray-900 hover:bg-black h-12 rounded-2xl font-bold shadow-md"
+                disabled={cancelling}
+              >
+                Fechar
+              </Button>
+              {/* Digital já pago = chave revelada: aí só a direção pode reembolsar. */}
+              {!(product.type === 'digital' && result.paid) && (
+                <Button
+                  variant="ghost"
+                  onClick={handleCancel}
+                  className="w-full h-10 rounded-2xl text-red-600 hover:bg-red-50 hover:text-red-700 font-bold gap-1.5"
+                  disabled={cancelling}
+                >
+                  <Undo2 className="w-4 h-4" /> {cancelling ? 'A cancelar...' : 'Foi engano? Cancelar pedido'}
+                </Button>
+              )}
+            </div>
           </div>
         )}
       </DialogContent>

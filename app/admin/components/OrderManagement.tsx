@@ -7,7 +7,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
-import { CheckCircle2, RotateCcw, Clock, Check, Banknote, Key, UserX, Coins, CalendarClock } from 'lucide-react'
+import { CheckCircle2, RotateCcw, Clock, Check, Banknote, Key, UserX, Coins, CalendarClock, Trash2 } from 'lucide-react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { formatEur, formatDeadline, isPreorderOpen } from '@/lib/store-economy'
 
@@ -65,6 +65,16 @@ export function OrderManagement({ initialPurchases, profile, products }: OrderMa
       purchaseId,
       () => supabase.rpc('refund_purchase', { p_purchase_id: purchaseId }),
       isPaid ? 'Compra reembolsada!' : 'Pedido cancelado!'
+    )
+  }
+
+  // Limpar enganos: só registos já cancelados/reembolsados (o Gold já foi devolvido).
+  const handleDelete = (purchaseId: string) => {
+    if (!confirm('Apagar este registo do histórico? Usa isto só para enganos — não dá para desfazer.')) return
+    runAction(
+      purchaseId,
+      () => supabase.rpc('delete_purchase_record', { p_purchase_id: purchaseId }),
+      'Registo apagado!'
     )
   }
 
@@ -209,9 +219,9 @@ export function OrderManagement({ initialPurchases, profile, products }: OrderMa
           <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider flex items-center gap-2">
             <CalendarClock className="w-4 h-4" /> Reservas por Encomenda
           </h3>
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             {preorders.map(({ product, open, total, paid, delivered }) => (
-              <Card key={product.id} className="border-teal-100 bg-teal-50/30">
+              <Card key={product.id} className="min-w-0 border-teal-100 bg-teal-50/30">
                 <CardContent className="p-4 flex items-center gap-4">
                   <div className="text-center shrink-0 w-16">
                     <p className="text-3xl font-black text-teal-800 leading-none">{total}</p>
@@ -296,7 +306,7 @@ export function OrderManagement({ initialPurchases, profile, products }: OrderMa
                   <Badge variant="outline" className={`text-[10px] font-black ${order.status === 'delivered' ? 'bg-green-50 text-green-700 border-green-100' : 'bg-red-50 text-red-700 border-red-100'}`}>
                     {order.status === 'delivered' ? 'ENTREGUE' : 'REEMBOLSADO'}
                   </Badge>
-                  {order.status === 'delivered' && (
+                  {order.status === 'delivered' ? (
                     <Button
                       variant="ghost"
                       size="sm"
@@ -305,6 +315,18 @@ export function OrderManagement({ initialPurchases, profile, products }: OrderMa
                       disabled={loading === order.id}
                     >
                       Reembolsar
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      aria-label="Apagar registo"
+                      title="Apagar registo (engano)"
+                      className="h-7 w-7 text-gray-400 hover:text-red-600 hover:bg-red-50"
+                      onClick={() => handleDelete(order.id)}
+                      disabled={loading === order.id}
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
                     </Button>
                   )}
                 </div>

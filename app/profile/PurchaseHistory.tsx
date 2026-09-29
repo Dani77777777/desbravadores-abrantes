@@ -2,17 +2,40 @@
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { ShoppingBag, Key, Clock, CheckCircle2, XCircle, Eye, EyeOff, Banknote, Coins } from 'lucide-react'
+import { ShoppingBag, Key, Clock, CheckCircle2, XCircle, Eye, EyeOff, Banknote, Coins, Undo2 } from 'lucide-react'
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { toast } from 'sonner'
+import { createClient } from '@/utils/supabase/client'
 import { Button } from '@/components/ui/button'
-import { formatEur } from '@/lib/store-economy'
+import { canSelfCancel, formatEur } from '@/lib/store-economy'
 
 interface PurchaseHistoryProps {
   purchases: any[]
 }
 
 export function PurchaseHistory({ purchases }: PurchaseHistoryProps) {
+  const supabase = createClient()
+  const router = useRouter()
   const [visibleKeys, setVisibleKeys] = useState<Record<string, boolean>>({})
+  const [cancelling, setCancelling] = useState<string | null>(null)
+
+  // Engano? O próprio cancela enquanto não pagou: devolve o Gold e apaga o registo.
+  const handleCancel = async (purchase: any) => {
+    if (!confirm(`Cancelar o pedido de ${purchase.store_products?.name || 'este artigo'}?`)) return
+    setCancelling(purchase.id)
+    try {
+      const { data, error } = await supabase.rpc('cancel_my_purchase', { p_purchase_id: purchase.id })
+      if (error) throw error
+      if (!data?.success) throw new Error(data?.error || 'Não foi possível cancelar.')
+      toast.success(Number(data.gold_returned) > 0 ? `Pedido cancelado. Recebeste de volta ${data.gold_returned} 🪙.` : 'Pedido cancelado.')
+      router.refresh()
+    } catch (error: any) {
+      toast.error(error.message || 'Não foi possível cancelar.')
+    } finally {
+      setCancelling(null)
+    }
+  }
 
   const toggleKey = (id: string) => {
     setVisibleKeys(prev => ({ ...prev, [id]: !prev[id] }))
@@ -131,6 +154,18 @@ export function PurchaseHistory({ purchases }: PurchaseHistoryProps) {
                       </div>
                     )}
                   </div>
+                )}
+
+                {canSelfCancel(purchase) && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8 gap-1.5 text-xs border-red-100 text-red-600 hover:bg-red-50 hover:text-red-700 px-3"
+                    onClick={() => handleCancel(purchase)}
+                    disabled={cancelling === purchase.id}
+                  >
+                    <Undo2 className="w-3 h-3" /> {cancelling === purchase.id ? 'A cancelar...' : 'Cancelar'}
+                  </Button>
                 )}
 
                 {isDigital && !isPaid && status !== 'refunded' && (

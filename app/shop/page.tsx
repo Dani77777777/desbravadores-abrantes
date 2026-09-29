@@ -4,6 +4,7 @@ import { Navbar } from '@/components/layout/Navbar'
 import Link from 'next/link'
 import { ShoppingBag, Coins, Trophy, Sparkles, ArrowRight, MousePointerClick, Banknote, Star } from 'lucide-react'
 import { ProductGrid } from '@/components/shop/ProductGrid'
+import { MyOrders } from '@/components/shop/MyOrders'
 import type { GoldRateInfo } from '@/lib/store-economy'
 import { displayFont } from '@/components/landing/fonts'
 import { SiteFooter } from '@/components/landing/SiteFooter'
@@ -21,13 +22,20 @@ export default async function ShopPage() {
 
   // A loja é pública: visitantes podem comprar (pagam em dinheiro, sem desconto Gold).
   let profile = null
+  let myOrders: any[] | null = null
   if (user) {
-    const { data } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', user.id)
-      .single()
+    const [{ data }, { data: pending }] = await Promise.all([
+      supabase.from('profiles').select('*').eq('id', user.id).single(),
+      // Pedidos em aberto do membro (para poder cancelar um engano aqui mesmo).
+      supabase
+        .from('store_purchases')
+        .select('id, status, paid_at, created_at, quantity, amount_due_eur, store_products:product_id(name, is_preorder)')
+        .eq('user_id', user.id)
+        .eq('status', 'pending')
+        .order('created_at', { ascending: false }),
+    ])
     profile = data
+    myOrders = pending || []
   }
 
   const [{ data: products }, { data: keyStock }, { data: rateData }] = await Promise.all([
@@ -174,6 +182,7 @@ export default async function ShopPage() {
       </section>
 
       <main className="relative z-10 mx-auto -mt-20 max-w-7xl px-4 pb-24 sm:px-6 lg:px-8">
+        <MyOrders memberOrders={myOrders} />
         <ProductGrid
           products={productsWithKeys}
           userProfile={profile}

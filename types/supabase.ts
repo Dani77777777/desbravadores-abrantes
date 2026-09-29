@@ -238,6 +238,7 @@ export interface Database {
           gold_rate: number | null
           paid_at: string | null
           delivered_at: string | null
+          cancel_token: string | null
           created_at: string
           updated_at: string
         }
@@ -306,6 +307,18 @@ export interface Database {
         Returns: Json
       }
       refund_purchase: {
+        Args: { p_purchase_id: string }
+        Returns: undefined
+      }
+      cancel_my_purchase: {
+        Args: { p_purchase_id: string; p_cancel_token?: string | null }
+        Returns: Json
+      }
+      get_guest_purchases: {
+        Args: { p_tokens: string[] }
+        Returns: Json
+      }
+      delete_purchase_record: {
         Args: { p_purchase_id: string }
         Returns: undefined
       }
