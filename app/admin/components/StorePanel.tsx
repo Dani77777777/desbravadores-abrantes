@@ -55,6 +55,12 @@ export function StorePanel({ profile, products, initialPurchases, members, event
 
   const pendingCount = initialPurchases.filter(p => p.status === 'pending').length
 
+  // Reservas ativas por artigo (reembolsadas/canceladas não contam).
+  const reservationCounts: Record<string, number> = {}
+  for (const p of initialPurchases) {
+    if (p.status !== 'refunded') reservationCounts[p.product_id] = (reservationCounts[p.product_id] || 0) + 1
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -134,11 +140,11 @@ export function StorePanel({ profile, products, initialPurchases, members, event
         </TabsList>
 
         <TabsContent value="products" className="mt-6">
-          <ProductManagement products={products} profile={profile} members={members} events={events} goldRate={goldRate} />
+          <ProductManagement products={products} profile={profile} members={members} events={events} goldRate={goldRate} reservationCounts={reservationCounts} />
         </TabsContent>
 
         <TabsContent value="orders" className="mt-6">
-          <OrderManagement initialPurchases={initialPurchases} profile={profile} />
+          <OrderManagement initialPurchases={initialPurchases} profile={profile} products={products} />
         </TabsContent>
       </Tabs>
     </div>

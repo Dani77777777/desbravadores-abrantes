@@ -2,7 +2,7 @@
 
 import { Package, Coins } from 'lucide-react'
 import { PurchaseDialog } from './PurchaseDialog'
-import { formatEur, maxDiscountEur } from '@/lib/store-economy'
+import { formatEur, maxDiscountEur, isPreorderOpen, formatDeadline } from '@/lib/store-economy'
 import { displayFont } from '@/components/landing/fonts'
 
 interface ProductCardProps {
@@ -19,7 +19,10 @@ const SECTION_LABELS: Record<string, string> = {
 export function ProductCard({ product, userProfile, goldRate }: ProductCardProps) {
   const isDigital = product.type === 'digital'
   const digitalKeysCount = product.available_keys || 0
-  const isOutOfStock = isDigital ? digitalKeysCount <= 0 : product.stock <= 0
+  // Por encomenda: sem stock — só fecha quando passa o prazo das reservas.
+  const isPreorder = !isDigital && !!product.is_preorder
+  const preorderClosed = isPreorder && !isPreorderOpen(product)
+  const isOutOfStock = isDigital ? digitalKeysCount <= 0 : !isPreorder && product.stock <= 0
 
   // Níveis continuam a contar: artigos com nível mínimo são exclusivos de membros.
   // Membros registados começam no Nível 1, por isso min_level 1 = "só membros".
@@ -54,6 +57,11 @@ export function ProductCard({ product, userProfile, goldRate }: ProductCardProps
           <span className={`rounded-full px-3 py-1 text-[10px] font-extrabold uppercase tracking-wider text-white shadow-md ${isDigital ? 'bg-purple-600' : 'bg-blue-600'}`}>
             {isDigital ? 'Digital' : 'Físico'}
           </span>
+          {isPreorder && (
+            <span className="rounded-full bg-teal-600 px-3 py-1 text-[10px] font-extrabold uppercase tracking-wider text-white shadow-md">
+              Por encomenda
+            </span>
+          )}
           {requiresLevel && (
             <span className={`rounded-full px-3 py-1 text-[10px] font-extrabold uppercase tracking-wider text-white shadow-md ${hasLevel ? 'bg-indigo-600' : 'animate-pulse bg-red-600'}`}>
               Nível {product.min_level}+
@@ -72,7 +80,7 @@ export function ProductCard({ product, userProfile, goldRate }: ProductCardProps
           </div>
         )}
 
-        {!isDigital && product.stock <= 5 && product.stock > 0 && (
+        {!isDigital && !isPreorder && product.stock <= 5 && product.stock > 0 && (
           <span className="absolute bottom-3 left-3 -rotate-2 rounded-lg bg-orange-500 px-2.5 py-1 text-[10px] font-extrabold text-white shadow-md">
             🔥 Apenas {product.stock} restantes!
           </span>
@@ -82,6 +90,20 @@ export function ProductCard({ product, userProfile, goldRate }: ProductCardProps
           <span className="absolute bottom-3 left-3 -rotate-2 rounded-lg bg-purple-500 px-2.5 py-1 text-[10px] font-extrabold text-white shadow-md">
             ⚡ Apenas {digitalKeysCount} chaves!
           </span>
+        )}
+
+        {isPreorder && !preorderClosed && product.preorder_deadline && (
+          <span className="absolute bottom-3 left-3 -rotate-2 rounded-lg bg-teal-600 px-2.5 py-1 text-[10px] font-extrabold text-white shadow-md">
+            📅 Reservas até {formatDeadline(product.preorder_deadline)}
+          </span>
+        )}
+
+        {preorderClosed && (
+          <div className="absolute inset-0 flex items-center justify-center bg-blue-950/50 backdrop-blur-[2px]">
+            <span className="-rotate-6 rounded-xl bg-teal-700 px-6 py-2 text-sm font-extrabold tracking-wider text-white shadow-xl">
+              RESERVAS FECHADAS
+            </span>
+          </div>
         )}
 
         {isOutOfStock && (
@@ -122,8 +144,8 @@ export function ProductCard({ product, userProfile, goldRate }: ProductCardProps
           product={product}
           userProfile={userProfile}
           goldRate={goldRate}
-          disabled={isOutOfStock || !hasLevel}
-          reason={levelReason || (isOutOfStock ? 'Esgotado' : undefined)}
+          disabled={isOutOfStock || preorderClosed || !hasLevel}
+          reason={levelReason || (isOutOfStock ? 'Esgotado' : preorderClosed ? 'Reservas fechadas' : undefined)}
         />
       </div>
     </div>

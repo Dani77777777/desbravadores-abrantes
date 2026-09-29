@@ -79,6 +79,27 @@ export const userMaxDiscountEur = (
   return Math.max(0, Math.min(productMax, affordable))
 }
 
+// ---------------------------------------------------------------------------
+// Artigos por encomenda — sem stock, reservas até ao prazo; a direção encomenda
+// depois as unidades reservadas. O servidor (process_purchase) valida o prazo.
+// ---------------------------------------------------------------------------
+
+export const isPreorderOpen = (product: { is_preorder?: boolean; preorder_deadline?: string | null }) =>
+  !!product.is_preorder && (!product.preorder_deadline || new Date(product.preorder_deadline).getTime() > Date.now())
+
+export const formatDeadline = (deadline: string) =>
+  new Date(deadline).toLocaleDateString('pt-PT', { day: 'numeric', month: 'long' })
+
+// O prazo é escolhido como dia: fecha às 23:59 (hora local) desse dia.
+export const deadlineFromDateInput = (date: string) => new Date(`${date}T23:59:59`).toISOString()
+
+export const dateInputFromDeadline = (deadline: string | null | undefined) => {
+  if (!deadline) return ''
+  const d = new Date(deadline)
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+}
+
 export function computeStoreEconomy(members: any[], events: any[]): StoreEconomy {
   // Gold distribution (current balances) → suggests fair price points.
   const sortedGold = members.map(m => m.current_gold || 0).sort((a, b) => a - b)

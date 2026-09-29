@@ -38,7 +38,8 @@ export default async function ProfilePage() {
       store_products (
         name,
         type,
-        image_url
+        image_url,
+        is_preorder
       )
     `)
     .eq('user_id', user.id)

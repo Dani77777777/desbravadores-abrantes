@@ -84,6 +84,11 @@ export function PurchaseHistory({ purchases }: PurchaseHistoryProps) {
                 <Badge className={`border-none font-bold text-[10px] uppercase ${isDigital ? 'bg-purple-100 text-purple-700 hover:bg-purple-100' : 'bg-blue-100 text-blue-700 hover:bg-blue-100'}`}>
                   {isDigital ? 'Digital' : 'Físico'}
                 </Badge>
+                {product?.is_preorder && (
+                  <Badge className="border-none font-bold text-[10px] uppercase bg-teal-100 text-teal-700 hover:bg-teal-100">
+                    Reserva
+                  </Badge>
+                )}
 
                 {status === 'refunded' ? (
                   <Badge className="bg-red-100 text-red-700 hover:bg-red-100 border-none flex gap-1 font-bold text-[10px] uppercase">
@@ -99,7 +104,7 @@ export function PurchaseHistory({ purchases }: PurchaseHistoryProps) {
                   </Badge>
                 ) : (
                   <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-100 border-none flex gap-1 font-bold text-[10px] uppercase">
-                    <Clock className="w-3 h-3" /> Pago · por levantar
+                    <Clock className="w-3 h-3" /> {product?.is_preorder ? 'Pago · aguarda chegada' : 'Pago · por levantar'}
                   </Badge>
                 )}
 

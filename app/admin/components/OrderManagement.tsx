@@ -7,13 +7,14 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
-import { CheckCircle2, RotateCcw, Clock, Check, Banknote, Key, UserX, Coins } from 'lucide-react'
+import { CheckCircle2, RotateCcw, Clock, Check, Banknote, Key, UserX, Coins, CalendarClock } from 'lucide-react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { formatEur } from '@/lib/store-economy'
+import { formatEur, formatDeadline, isPreorderOpen } from '@/lib/store-economy'
 
 interface OrderManagementProps {
   initialPurchases: any[]
   profile: any
+  products: any[]
 }
 
 const SECTION_LABELS: Record<string, string> = {
@@ -21,7 +22,7 @@ const SECTION_LABELS: Record<string, string> = {
   companheiros: 'Companheiros', embaixadores: 'Embaixadores',
 }
 
-export function OrderManagement({ initialPurchases, profile }: OrderManagementProps) {
+export function OrderManagement({ initialPurchases, profile, products }: OrderManagementProps) {
   const supabase = createClient()
   const router = useRouter()
   const [loading, setLoading] = useState<string | null>(null)
@@ -54,10 +55,11 @@ export function OrderManagement({ initialPurchases, profile }: OrderManagementPr
       'Artigo marcado como entregue!'
     )
 
-  const handleRefund = (purchaseId: string, isPaid: boolean) => {
+  const handleRefund = (purchaseId: string, isPaid: boolean, isPreorder = false) => {
+    const restock = isPreorder ? '' : ' e o stock reposto'
     const msg = isPaid
-      ? 'Reembolsar esta compra? O Gold do desconto será devolvido e o stock reposto. O dinheiro tens de o devolver em mãos.'
-      : 'Cancelar este pedido? O Gold do desconto será devolvido e o stock reposto.'
+      ? `Reembolsar esta compra? O Gold do desconto será devolvido${restock}. O dinheiro tens de o devolver em mãos.`
+      : `Cancelar este pedido? O Gold do desconto será devolvido${restock}.`
     if (!confirm(msg)) return
     runAction(
       purchaseId,
@@ -70,12 +72,28 @@ export function OrderManagement({ initialPurchases, profile }: OrderManagementPr
   const awaitingDelivery = initialPurchases.filter(p => p.status === 'pending' && p.paid_at)
   const completedOrders = initialPurchases.filter(p => p.status !== 'pending')
 
+  // Artigos por encomenda: quantas unidades pedir (reservas ativas) e quantas já estão pagas.
+  const preorders = products
+    .filter(p => p.is_preorder)
+    .map(p => {
+      const active = initialPurchases.filter(o => o.product_id === p.id && o.status !== 'refunded')
+      return {
+        product: p,
+        open: isPreorderOpen(p),
+        total: active.length,
+        paid: active.filter(o => o.paid_at).length,
+        delivered: active.filter(o => o.status === 'delivered').length,
+      }
+    })
+    .sort((a, b) => Number(b.open) - Number(a.open))
+
   const buyerName = (order: any) => order.profiles?.full_name || order.buyer_name || 'Desconhecido'
 
   const OrderCard = ({ order, tone }: { order: any; tone: 'orange' | 'blue' }) => {
     const isGuest = !order.user_id
     const isPaid = !!order.paid_at
     const isDigital = order.store_products?.type === 'digital'
+    const isPreorder = !!order.store_products?.is_preorder
     const busy = loading === order.id
 
     return (
@@ -110,6 +128,7 @@ export function OrderManagement({ initialPurchases, profile }: OrderManagementPr
             <div className={`flex-1 px-4 py-2 rounded-lg border bg-white/60 ${tone === 'orange' ? 'border-orange-100/50' : 'border-blue-100/50'}`}>
               <p className={`text-[10px] font-black uppercase mb-0.5 ${tone === 'orange' ? 'text-orange-600' : 'text-blue-600'}`}>
                 {isPaid ? 'Pago — por entregar' : 'Aguarda pagamento'}
+                {isPreorder && <span className="ml-1.5 text-teal-600">· Reserva</span>}
               </p>
               <div className="flex items-center justify-between gap-2 flex-wrap">
                 <span className="font-bold text-gray-800">{order.store_products?.name}</span>
@@ -166,7 +185,7 @@ export function OrderManagement({ initialPurchases, profile }: OrderManagementPr
                 variant="outline"
                 size="sm"
                 className="text-red-600 border-red-100 hover:bg-red-50 gap-1.5 h-9"
-                onClick={() => handleRefund(order.id, isPaid)}
+                onClick={() => handleRefund(order.id, isPaid, isPreorder)}
                 disabled={busy}
               >
                 <RotateCcw className="w-4 h-4" /> {isPaid ? 'Reembolsar' : 'Cancelar'}
@@ -180,6 +199,40 @@ export function OrderManagement({ initialPurchases, profile }: OrderManagementPr
 
   return (
     <div className="space-y-6">
+      {/* Por encomenda: total a pedir ao fornecedor */}
+      {preorders.length > 0 && (
+        <div className="space-y-3">
+          <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider flex items-center gap-2">
+            <CalendarClock className="w-4 h-4" /> Reservas por Encomenda
+          </h3>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {preorders.map(({ product, open, total, paid, delivered }) => (
+              <Card key={product.id} className="border-teal-100 bg-teal-50/30">
+                <CardContent className="p-4 flex items-center gap-4">
+                  <div className="text-center shrink-0 w-16">
+                    <p className="text-3xl font-black text-teal-800 leading-none">{total}</p>
+                    <p className="text-[9px] font-black uppercase text-teal-600 mt-1">a pedir</p>
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="font-bold text-gray-900 truncate">{product.name}</p>
+                    <p className="text-[11px] font-bold text-gray-500">
+                      {product.preorder_deadline
+                        ? open
+                          ? <span className="text-teal-700">Aberta até {formatDeadline(product.preorder_deadline)}</span>
+                          : <span>Fechou a {formatDeadline(product.preorder_deadline)}</span>
+                        : <span className="text-teal-700">Sem prazo</span>}
+                    </p>
+                    <p className="text-[11px] text-gray-500 mt-0.5">
+                      {paid} pagas · {total - paid} por pagar{delivered > 0 && ` · ${delivered} entregues`}
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Awaiting payment */}
       <div className="space-y-3">
         <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider flex items-center gap-2">
@@ -242,7 +295,7 @@ export function OrderManagement({ initialPurchases, profile }: OrderManagementPr
                       variant="ghost"
                       size="sm"
                       className="h-7 text-[10px] text-gray-400 hover:text-red-600 hover:bg-red-50 font-bold"
-                      onClick={() => handleRefund(order.id, true)}
+                      onClick={() => handleRefund(order.id, true, !!order.store_products?.is_preorder)}
                       disabled={loading === order.id}
                     >
                       Reembolsar

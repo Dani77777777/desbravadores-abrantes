@@ -16,8 +16,8 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
-import { ShoppingBag, Coins, CheckCircle2, Copy, Key, AlertCircle, User, Banknote } from 'lucide-react'
-import { formatEur, goldCostFor, userMaxDiscountEur } from '@/lib/store-economy'
+import { ShoppingBag, Coins, CheckCircle2, Copy, Key, AlertCircle, User, Banknote, CalendarClock } from 'lucide-react'
+import { formatEur, goldCostFor, userMaxDiscountEur, formatDeadline } from '@/lib/store-economy'
 
 interface PurchaseDialogProps {
   product: any
@@ -37,6 +37,7 @@ export function PurchaseDialog({ product, userProfile, goldRate, disabled, reaso
   const [discount, setDiscount] = useState(0)
 
   const isGuest = !userProfile
+  const isPreorder = product.type === 'physical' && !!product.is_preorder
   const priceEur = product.price_eur || 0
   // Limite do slider: o máximo do artigo, cortado pelo Gold que o membro tem.
   const maxDisc = isGuest ? 0 : userMaxDiscountEur(product, userProfile.current_gold || 0, goldRate)
@@ -101,7 +102,7 @@ export function PurchaseDialog({ product, userProfile, goldRate, disabled, reaso
           className="bg-blue-950 hover:bg-yellow-400 hover:text-blue-950 text-white font-extrabold rounded-full h-auto min-h-11 min-w-0 shrink whitespace-normal py-2 px-5 text-center leading-tight shadow-md transition-all active:scale-95 disabled:bg-stone-100 disabled:text-stone-400 disabled:shadow-none"
           disabled={disabled}
         >
-          {reason || 'Comprar'}
+          {reason || (isPreorder ? 'Reservar' : 'Comprar')}
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-md rounded-3xl max-h-[90vh] overflow-y-auto">
@@ -111,13 +112,24 @@ export function PurchaseDialog({ product, userProfile, goldRate, disabled, reaso
               <div className="w-16 h-16 bg-blue-50 text-blue-900 rounded-2xl flex items-center justify-center mb-2 shadow-sm">
                 <ShoppingBag className="w-8 h-8" />
               </div>
-              <DialogTitle className="text-xl font-bold">Confirmar Compra</DialogTitle>
+              <DialogTitle className="text-xl font-bold">{isPreorder ? 'Confirmar Reserva' : 'Confirmar Compra'}</DialogTitle>
               <DialogDescription className="text-gray-500">
                 {isGuest
                   ? 'O pagamento é feito em dinheiro, junto da direção do clube.'
                   : 'Podes usar o teu Gold para baixar o preço. O resto pagas em dinheiro.'}
               </DialogDescription>
             </DialogHeader>
+
+            {isPreorder && (
+              <div className="bg-teal-50 border border-teal-100 p-3 rounded-2xl text-[11px] text-teal-800 flex items-start gap-2">
+                <CalendarClock className="w-4 h-4 text-teal-600 shrink-0 mt-0.5" />
+                <span>
+                  Este artigo é <strong>por encomenda</strong>: a direção só o encomenda depois de fechar as reservas
+                  {product.preorder_deadline ? <> (<strong>{formatDeadline(product.preorder_deadline)}</strong>)</> : null}.
+                  Levantas o teu quando chegar.
+                </span>
+              </div>
+            )}
 
             {isGuest && (
               <div className="space-y-2">
@@ -213,7 +225,11 @@ export function PurchaseDialog({ product, userProfile, goldRate, disabled, reaso
                 className="w-full bg-blue-900 hover:bg-black h-12 rounded-2xl font-bold shadow-lg"
                 disabled={loading || (isGuest && guestName.trim().length < 3)}
               >
-                {loading ? 'A processar...' : amountDue > 0 ? `Encomendar — ${formatEur(amountDue)} em dinheiro` : 'Confirmar (pago com Gold)'}
+                {loading
+                  ? 'A processar...'
+                  : amountDue > 0
+                    ? `${isPreorder ? 'Reservar' : 'Encomendar'} — ${formatEur(amountDue)} em dinheiro`
+                    : 'Confirmar (pago com Gold)'}
               </Button>
               <Button
                 variant="ghost"
@@ -231,7 +247,7 @@ export function PurchaseDialog({ product, userProfile, goldRate, disabled, reaso
               <div className="w-20 h-20 bg-green-50 text-green-600 rounded-full flex items-center justify-center mx-auto mb-4 animate-in zoom-in duration-300">
                 <CheckCircle2 className="w-10 h-10" />
               </div>
-              <h3 className="text-2xl font-black text-gray-900">Pedido feito!</h3>
+              <h3 className="text-2xl font-black text-gray-900">{isPreorder ? 'Reserva feita!' : 'Pedido feito!'}</h3>
               <p className="text-gray-500">{result.message}</p>
             </div>
 
@@ -275,7 +291,11 @@ export function PurchaseDialog({ product, userProfile, goldRate, disabled, reaso
                   <span>O que fazer agora?</span>
                 </div>
                 <div className="text-blue-800 text-sm">
-                  {Number(result.amount_due_eur) > 0 ? (
+                  {isPreorder ? (
+                    Number(result.amount_due_eur) > 0
+                      ? <>Paga a um elemento da <strong>direção</strong>. Quando o artigo chegar, levantas o teu com o <strong>coordenador</strong>.</>
+                      : <>A tua reserva ficou registada. Quando o artigo chegar, levantas o teu com o <strong>coordenador</strong>.</>
+                  ) : Number(result.amount_due_eur) > 0 ? (
                     <>Procura um elemento da <strong>direção</strong> para pagares{product.type === 'digital' ? ' e receberes a tua chave' : ' e levantares o artigo'}.</>
                   ) : (
                     <>A tua encomenda ficou registada. Dirige-te ao teu <strong>coordenador</strong> para levantar o artigo.</>

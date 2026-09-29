@@ -12,9 +12,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Badge } from '@/components/ui/badge'
 import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
-import { Plus, Edit, Trash2, Key, Image as ImageIcon, Package, Check, ShoppingBag, Upload, Loader2, X, Coins, Layers } from 'lucide-react'
+import { Plus, Edit, Trash2, Key, Image as ImageIcon, Package, Check, ShoppingBag, Upload, Loader2, X, Coins, Layers, CalendarClock } from 'lucide-react'
 import { DigitalKeyManager } from './DigitalKeyManager'
-import { computeStoreEconomy, formatEur, goldCostFor } from '@/lib/store-economy'
+import { computeStoreEconomy, formatEur, goldCostFor, isPreorderOpen, formatDeadline, deadlineFromDateInput, dateInputFromDeadline } from '@/lib/store-economy'
 
 interface ProductManagementProps {
   products: any[]
@@ -22,6 +22,8 @@ interface ProductManagementProps {
   members: any[]
   events: any[]
   goldRate: number
+  // Reservas ativas (não reembolsadas) por artigo — para os artigos por encomenda.
+  reservationCounts: Record<string, number>
 }
 
 const SECTION_OPTIONS = [
@@ -32,7 +34,7 @@ const SECTION_OPTIONS = [
   { value: 'embaixadores', label: 'Embaixadores' },
 ]
 
-export function ProductManagement({ products, profile, members, events, goldRate }: ProductManagementProps) {
+export function ProductManagement({ products, profile, members, events, goldRate, reservationCounts }: ProductManagementProps) {
   const supabase = createClient()
   const router = useRouter()
   const [isDialogOpen, setIsDialogOpen] = useState(false)
@@ -46,6 +48,8 @@ export function ProductManagement({ products, profile, members, events, goldRate
   const [maxDiscount, setMaxDiscount] = useState(0)
   const [type, setType] = useState<'physical' | 'digital'>('physical')
   const [stock, setStock] = useState(0)
+  const [isPreorder, setIsPreorder] = useState(false)
+  const [deadline, setDeadline] = useState('')
   const [imageUrl, setImageUrl] = useState('')
   const [restrictions, setRestrictions] = useState<string[]>([])
   const [minLevel, setMinLevel] = useState(0)
@@ -92,6 +96,8 @@ export function ProductManagement({ products, profile, members, events, goldRate
     setMaxDiscount(0)
     setType('physical')
     setStock(0)
+    setIsPreorder(false)
+    setDeadline('')
     setImageUrl('')
     setRestrictions([])
     setMinLevel(0)
@@ -106,6 +112,8 @@ export function ProductManagement({ products, profile, members, events, goldRate
     setMaxDiscount(product.max_discount_percent || 0)
     setType(product.type)
     setStock(product.stock)
+    setIsPreorder(!!product.is_preorder)
+    setDeadline(dateInputFromDeadline(product.preorder_deadline))
     setImageUrl(product.image_url || '')
     setRestrictions(product.restrictions || [])
     setMinLevel(product.min_level || 0)
@@ -114,6 +122,11 @@ export function ProductManagement({ products, profile, members, events, goldRate
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    const preorder = type === 'physical' && isPreorder
+    if (preorder && !deadline) {
+      toast.error('Define até quando se pode reservar.')
+      return
+    }
     setLoading(true)
     try {
       const productData = {
@@ -122,7 +135,9 @@ export function ProductManagement({ products, profile, members, events, goldRate
         price_eur: priceEur,
         max_discount_percent: maxDiscount,
         type,
-        stock: type === 'digital' ? 0 : stock,
+        stock: type === 'digital' || preorder ? 0 : stock,
+        is_preorder: preorder,
+        preorder_deadline: preorder ? deadlineFromDateInput(deadline) : null,
         image_url: imageUrl || null,
         restrictions,
         min_level: minLevel,
@@ -217,11 +232,34 @@ export function ProductManagement({ products, profile, members, events, goldRate
                     </SelectContent>
                   </Select>
                 </div>
-                {type === 'physical' && (
+                {type === 'physical' && !isPreorder && (
                   <div className="space-y-2">
                     <Label>Stock Atual</Label>
                     <Input type="number" min={0} value={stock} onChange={e => setStock(Number(e.target.value))} />
                   </div>
+                )}
+                {type === 'physical' && isPreorder && (
+                  <div className="space-y-2">
+                    <Label className="flex items-center gap-1.5"><CalendarClock className="w-3.5 h-3.5 text-teal-600" /> Reservas até</Label>
+                    <Input type="date" value={deadline} onChange={e => setDeadline(e.target.value)} required />
+                  </div>
+                )}
+                {/* Por encomenda: sem stock — a direção encomenda o que for reservado até ao prazo */}
+                {type === 'physical' && (
+                  <label className="col-span-2 flex items-start gap-3 rounded-xl border border-teal-100 bg-teal-50/40 p-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={isPreorder}
+                      onChange={e => setIsPreorder(e.target.checked)}
+                      className="mt-0.5 h-4 w-4 accent-teal-600 cursor-pointer"
+                    />
+                    <span className="space-y-0.5">
+                      <span className="block text-xs font-bold text-teal-800">Por encomenda (sem stock)</span>
+                      <span className="block text-[11px] text-teal-700/80 leading-relaxed">
+                        Os membros reservam até ao prazo e no fim vês quantas unidades tens de pedir. Ideal para pins, t-shirts, etc.
+                      </span>
+                    </span>
+                  </label>
                 )}
                 {/* Guia do desconto — mostra o impacto real do Gold ao preço/percentagem atuais */}
                 <div className="col-span-2 rounded-xl border border-blue-100 bg-blue-50/40 p-3 space-y-2.5">
@@ -353,15 +391,30 @@ export function ProductManagement({ products, profile, members, events, goldRate
                       <Badge variant="outline" className={`text-[10px] font-black uppercase ${product.type === 'digital' ? 'bg-purple-50 text-purple-700 border-purple-100' : 'bg-blue-50 text-blue-700 border-blue-100'}`}>
                         {product.type === 'digital' ? 'Digital' : 'Físico'}
                       </Badge>
+                      {product.is_preorder && (
+                        <Badge variant="outline" className="text-[10px] font-black uppercase bg-teal-50 text-teal-700 border-teal-100">
+                          Por encomenda
+                        </Badge>
+                      )}
                     </div>
-                    <div className="flex items-center gap-3 text-xs">
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs">
                       <span className="font-black text-blue-900 flex items-center gap-1">
                          {formatEur(Number(product.price_eur) || 0)}
                       </span>
                       {(product.max_discount_percent || 0) > 0 && (
                         <span className="font-bold text-yellow-700">• Gold até −{product.max_discount_percent}%</span>
                       )}
-                      {product.type === 'physical' && (
+                      {product.type === 'physical' && product.is_preorder && (
+                        <span className="font-bold flex items-center gap-1 text-teal-700">
+                          • {reservationCounts[product.id] || 0} reservas
+                          {product.preorder_deadline && (
+                            <span className={isPreorderOpen(product) ? 'text-teal-600/80' : 'text-gray-400'}>
+                              ({isPreorderOpen(product) ? 'até' : 'fechou a'} {formatDeadline(product.preorder_deadline)})
+                            </span>
+                          )}
+                        </span>
+                      )}
+                      {product.type === 'physical' && !product.is_preorder && (
                         <span className={`font-bold flex items-center gap-1 ${product.stock > 0 ? 'text-green-600' : 'text-red-600'}`}>
                           • Stock: {product.stock}
                         </span>

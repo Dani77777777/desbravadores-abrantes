@@ -131,6 +131,8 @@ export interface Database {
           restrictions: Json
           is_active: boolean
           min_level: number
+          is_preorder: boolean
+          preorder_deadline: string | null
           created_at: string
           updated_at: string
         }
@@ -147,6 +149,8 @@ export interface Database {
           restrictions?: Json
           is_active?: boolean
           min_level?: number
+          is_preorder?: boolean
+          preorder_deadline?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -163,6 +167,8 @@ export interface Database {
           restrictions?: Json
           is_active?: boolean
           min_level?: number
+          is_preorder?: boolean
+          preorder_deadline?: string | null
           created_at?: string
           updated_at?: string
         }
