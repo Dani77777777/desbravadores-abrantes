@@ -406,7 +406,7 @@ export function ProductManagement({ products, profile, members, events, goldRate
                       )}
                       {product.type === 'physical' && product.is_preorder && (
                         <span className="font-bold flex items-center gap-1 text-teal-700">
-                          • {reservationCounts[product.id] || 0} reservas
+                          • {reservationCounts[product.id] || 0} unid. reservadas
                           {product.preorder_deadline && (
                             <span className={isPreorderOpen(product) ? 'text-teal-600/80' : 'text-gray-400'}>
                               ({isPreorderOpen(product) ? 'até' : 'fechou a'} {formatDeadline(product.preorder_deadline)})

@@ -55,10 +55,10 @@ export function StorePanel({ profile, products, initialPurchases, members, event
 
   const pendingCount = initialPurchases.filter(p => p.status === 'pending').length
 
-  // Reservas ativas por artigo (reembolsadas/canceladas não contam).
+  // Unidades reservadas por artigo (reembolsadas/canceladas não contam).
   const reservationCounts: Record<string, number> = {}
   for (const p of initialPurchases) {
-    if (p.status !== 'refunded') reservationCounts[p.product_id] = (reservationCounts[p.product_id] || 0) + 1
+    if (p.status !== 'refunded') reservationCounts[p.product_id] = (reservationCounts[p.product_id] || 0) + (p.quantity || 1)
   }
 
   return (

@@ -136,7 +136,7 @@ export function OverviewPanel({
   const cashCollected = validPurchases.filter(p => p.paid_at).reduce((acc, p) => acc + Number(p.amount_due_eur || 0), 0)
   const discountsGiven = validPurchases.reduce((acc, p) => acc + Number(p.discount_eur || 0), 0)
   const goldSpent = validPurchases.reduce((acc, p) => acc + (p.gold_spent || 0), 0)
-  const itemsSold = validPurchases.length
+  const itemsSold = validPurchases.reduce((acc, p) => acc + (p.quantity || 1), 0)
   const deliveredCount = purchases.filter(p => p.status === 'delivered').length
 
   const handlePayAndDeliver = async (purchaseId: string) => {
@@ -501,7 +501,9 @@ export function OverviewPanel({
                         {isPaid ? <Package className="h-4 w-4" /> : <Banknote className="h-4 w-4" />}
                       </div>
                       <div className="min-w-0">
-                        <p className="truncate text-sm font-bold text-blue-950">{p.store_products?.name}</p>
+                        <p className="truncate text-sm font-bold text-blue-950">
+                          {p.store_products?.name}{(p.quantity || 1) > 1 && ` × ${p.quantity}`}
+                        </p>
                         <p className="truncate text-[11px] text-stone-500">
                           {buyer} • {buyerSub}
                           {Number(p.amount_due_eur) > 0 && (

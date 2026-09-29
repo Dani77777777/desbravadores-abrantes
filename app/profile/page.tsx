@@ -32,6 +32,7 @@ export default async function ProfilePage() {
       price_eur,
       discount_eur,
       amount_due_eur,
+      quantity,
       gold_spent,
       paid_at,
       delivered_at,

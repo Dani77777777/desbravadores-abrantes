@@ -233,6 +233,7 @@ export interface Database {
           price_eur: number
           discount_eur: number
           amount_due_eur: number
+          quantity: number
           gold_spent: number
           gold_rate: number | null
           paid_at: string | null
@@ -250,6 +251,7 @@ export interface Database {
           price_eur?: number
           discount_eur?: number
           amount_due_eur?: number
+          quantity?: number
           gold_spent?: number
           gold_rate?: number | null
           paid_at?: string | null
@@ -267,6 +269,7 @@ export interface Database {
           price_eur?: number
           discount_eur?: number
           amount_due_eur?: number
+          quantity?: number
           gold_spent?: number
           gold_rate?: number | null
           paid_at?: string | null

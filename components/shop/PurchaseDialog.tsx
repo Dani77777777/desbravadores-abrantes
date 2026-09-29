@@ -16,7 +16,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
-import { ShoppingBag, Coins, CheckCircle2, Copy, Key, AlertCircle, User, Banknote, CalendarClock } from 'lucide-react'
+import { ShoppingBag, Coins, CheckCircle2, Copy, Key, AlertCircle, User, Banknote, CalendarClock, Minus, Plus } from 'lucide-react'
 import { formatEur, goldCostFor, userMaxDiscountEur, formatDeadline } from '@/lib/store-economy'
 
 interface PurchaseDialogProps {
@@ -35,12 +35,28 @@ export function PurchaseDialog({ product, userProfile, goldRate, disabled, reaso
   const [result, setResult] = useState<any>(null)
   const [guestName, setGuestName] = useState('')
   const [discount, setDiscount] = useState(0)
+  const [quantity, setQuantity] = useState(1)
 
   const isGuest = !userProfile
   const isPreorder = product.type === 'physical' && !!product.is_preorder
-  const priceEur = product.price_eur || 0
-  // Limite do slider: o máximo do artigo, cortado pelo Gold que o membro tem.
-  const maxDisc = isGuest ? 0 : userMaxDiscountEur(product, userProfile.current_gold || 0, goldRate)
+  const unitPrice = product.price_eur || 0
+  // Até 10 unidades por encomenda (limite do servidor), cortado pelo stock; digitais sempre 1.
+  const maxQty = product.type === 'digital' ? 1 : isPreorder ? 10 : Math.max(1, Math.min(10, product.stock || 0))
+  const priceEur = Math.round(unitPrice * quantity * 100) / 100
+  // Limite do slider: o máximo do artigo (sobre o total), cortado pelo Gold que o membro tem.
+  const maxDisc = isGuest
+    ? 0
+    : userMaxDiscountEur({ price_eur: priceEur, max_discount_percent: product.max_discount_percent }, userProfile.current_gold || 0, goldRate)
+
+  const changeQuantity = (next: number) => {
+    const qty = Math.max(1, Math.min(maxQty, next))
+    setQuantity(qty)
+    // Menos unidades ⇒ desconto máximo menor: não deixar o slider acima do novo limite.
+    const nextMax = isGuest
+      ? 0
+      : userMaxDiscountEur({ price_eur: unitPrice * qty, max_discount_percent: product.max_discount_percent }, userProfile.current_gold || 0, goldRate)
+    setDiscount(d => Math.min(d, nextMax))
+  }
   const goldCost = goldCostFor(discount, goldRate)
   const amountDue = Math.max(0, Math.round((priceEur - discount) * 100) / 100)
 
@@ -56,6 +72,7 @@ export function PurchaseDialog({ product, userProfile, goldRate, disabled, reaso
         p_product_id: product.id,
         p_discount_eur: discount,
         p_buyer_name: isGuest ? guestName.trim() : null,
+        p_quantity: quantity,
       })
 
       if (error) throw error
@@ -86,6 +103,7 @@ export function PurchaseDialog({ product, userProfile, goldRate, disabled, reaso
     setTimeout(() => {
       setResult(null)
       setDiscount(0)
+      setQuantity(1)
       setGuestName('')
     }, 300)
   }
@@ -197,11 +215,38 @@ export function PurchaseDialog({ product, userProfile, goldRate, disabled, reaso
                 <span className="text-xs font-bold text-stone-400 uppercase">Artigo</span>
                 <span className="text-xs font-bold text-blue-900">{product.type === 'digital' ? 'DIGITAL' : 'FÍSICO'}</span>
               </div>
-              <p className="font-bold text-gray-900 text-lg mb-4">{product.name}</p>
+              <div className="flex items-center justify-between gap-3 mb-4">
+                <p className="font-bold text-gray-900 text-lg min-w-0">{product.name}</p>
+                {maxQty > 1 && (
+                  <div className="flex items-center gap-1 shrink-0 rounded-full bg-white border border-stone-200 p-1 shadow-sm">
+                    <button
+                      type="button"
+                      aria-label="Menos uma unidade"
+                      onClick={() => changeQuantity(quantity - 1)}
+                      disabled={quantity <= 1 || loading}
+                      className="h-8 w-8 rounded-full flex items-center justify-center text-blue-900 hover:bg-blue-50 disabled:text-stone-300 disabled:hover:bg-transparent"
+                    >
+                      <Minus className="w-4 h-4" />
+                    </button>
+                    <span className="w-6 text-center font-black text-blue-900 tabular-nums">{quantity}</span>
+                    <button
+                      type="button"
+                      aria-label="Mais uma unidade"
+                      onClick={() => changeQuantity(quantity + 1)}
+                      disabled={quantity >= maxQty || loading}
+                      className="h-8 w-8 rounded-full flex items-center justify-center text-blue-900 hover:bg-blue-50 disabled:text-stone-300 disabled:hover:bg-transparent"
+                    >
+                      <Plus className="w-4 h-4" />
+                    </button>
+                  </div>
+                )}
+              </div>
 
               <div className="space-y-2 pt-3 border-t border-stone-200 text-sm">
                 <div className="flex justify-between items-center">
-                  <span className="text-gray-500">Preço</span>
+                  <span className="text-gray-500">
+                    Preço{quantity > 1 && <span className="text-gray-400"> ({quantity} × {formatEur(unitPrice)})</span>}
+                  </span>
                   <span className="font-bold text-gray-800">{formatEur(priceEur)}</span>
                 </div>
                 {discount > 0 && (

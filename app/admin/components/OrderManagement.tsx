@@ -56,7 +56,7 @@ export function OrderManagement({ initialPurchases, profile, products }: OrderMa
     )
 
   const handleRefund = (purchaseId: string, isPaid: boolean, isPreorder = false) => {
-    const restock = isPreorder ? '' : ' e o stock reposto'
+    const restock = isPreorder ? '' : ' e as unidades voltam ao stock'
     const msg = isPaid
       ? `Reembolsar esta compra? O Gold do desconto será devolvido${restock}. O dinheiro tens de o devolver em mãos.`
       : `Cancelar este pedido? O Gold do desconto será devolvido${restock}.`
@@ -73,6 +73,7 @@ export function OrderManagement({ initialPurchases, profile, products }: OrderMa
   const completedOrders = initialPurchases.filter(p => p.status !== 'pending')
 
   // Artigos por encomenda: quantas unidades pedir (reservas ativas) e quantas já estão pagas.
+  const units = (orders: any[]) => orders.reduce((acc, o) => acc + (o.quantity || 1), 0)
   const preorders = products
     .filter(p => p.is_preorder)
     .map(p => {
@@ -80,9 +81,9 @@ export function OrderManagement({ initialPurchases, profile, products }: OrderMa
       return {
         product: p,
         open: isPreorderOpen(p),
-        total: active.length,
-        paid: active.filter(o => o.paid_at).length,
-        delivered: active.filter(o => o.status === 'delivered').length,
+        total: units(active),
+        paid: units(active.filter(o => o.paid_at)),
+        delivered: units(active.filter(o => o.status === 'delivered')),
       }
     })
     .sort((a, b) => Number(b.open) - Number(a.open))
@@ -131,7 +132,10 @@ export function OrderManagement({ initialPurchases, profile, products }: OrderMa
                 {isPreorder && <span className="ml-1.5 text-teal-600">· Reserva</span>}
               </p>
               <div className="flex items-center justify-between gap-2 flex-wrap">
-                <span className="font-bold text-gray-800">{order.store_products?.name}</span>
+                <span className="font-bold text-gray-800">
+                  {order.store_products?.name}
+                  {(order.quantity || 1) > 1 && <span className="ml-1.5 text-blue-700">× {order.quantity}</span>}
+                </span>
                 <div className="flex items-center gap-2 text-xs">
                   {Number(order.discount_eur) > 0 && (
                     <span className="font-bold text-yellow-700 flex items-center gap-1">
@@ -275,7 +279,9 @@ export function OrderManagement({ initialPurchases, profile, products }: OrderMa
                       <span className="font-bold text-gray-700">{buyerName(order)}</span>
                       {!order.user_id && <span className="ml-1 text-[9px] font-black text-gray-400 uppercase">(convidado)</span>}
                       <span className="mx-2 text-gray-300">•</span>
-                      <span className="text-gray-500">{order.store_products?.name}</span>
+                      <span className="text-gray-500">
+                        {order.store_products?.name}{(order.quantity || 1) > 1 && ` × ${order.quantity}`}
+                      </span>
                     </div>
                     {order.store_products?.type === 'digital' && order.status === 'delivered' && order.digital_key_delivered && (
                       <div className="flex items-center gap-1 text-[10px] text-purple-600 font-mono font-bold">
