@@ -19,6 +19,8 @@ import { fmtRsvpDeadline, summarizeRsvps, type RsvpRow } from '@/utils/event-rsv
 import { RsvpCountsButton, RsvpSettings, RsvpSummaryDialog } from './EventRsvpAdmin'
 import { EventAttendanceManager } from './EventAttendanceManager'
 import { EventShareDialog } from '@/components/events/EventShareDialog'
+import { LocationPicker } from '@/components/events/LocationPicker'
+import { googleMapsUrl, placeCoords, type Coords } from '@/utils/maps'
 import { displayFont } from '@/components/landing/fonts'
 import {
   SECTION_LABELS, attendanceByEvent, averageRate, daysUntil, fmtLong, fmtParts, fmtShort, relativeDayLabel,
@@ -66,6 +68,7 @@ export function EventPanel({ profile, members, events, attendance = [], rsvps = 
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [location, setLocation] = useState('')
+  const [coords, setCoords] = useState<Coords | null>(null)
   const [startAt, setStartAt] = useState('')
   const [endAt, setEndAt] = useState('')
   const [targetSection, setTargetSection] = useState<string>(defaultTarget)
@@ -117,6 +120,7 @@ export function EventPanel({ profile, members, events, attendance = [], rsvps = 
   const [editTitle, setEditTitle] = useState('')
   const [editDescription, setEditDescription] = useState('')
   const [editLocation, setEditLocation] = useState('')
+  const [editCoords, setEditCoords] = useState<Coords | null>(null)
   const [editXpReward, setEditXpReward] = useState(50)
   const [editGoldReward, setEditGoldReward] = useState(10)
   const [editLateDiscount, setEditLateDiscount] = useState(25)
@@ -169,6 +173,8 @@ export function EventPanel({ profile, members, events, attendance = [], rsvps = 
         title,
         description: description || null,
         location: location || null,
+        // Só envia as coordenadas quando há ponto (funciona mesmo antes da migração do mapa)
+        ...(coords ? { location_lat: coords.lat, location_lng: coords.lng } : {}),
         start_at: new_date_with_time(startAt),
         end_at: endAt ? new_date_with_time(endAt) : null,
         target_section: section,
@@ -257,6 +263,9 @@ export function EventPanel({ profile, members, events, attendance = [], rsvps = 
         title: editTitle.trim() || editingEvent.title,
         description: editDescription || null,
         location: editLocation || null,
+        ...(editCoords || placeCoords(editingEvent)
+          ? { location_lat: editCoords?.lat ?? null, location_lng: editCoords?.lng ?? null }
+          : {}),
         xp_reward: editXpReward,
         gold_reward: editGoldReward,
         late_discount_percent: editLateDiscount / 100,
@@ -320,6 +329,7 @@ export function EventPanel({ profile, members, events, attendance = [], rsvps = 
     setTitle('')
     setDescription('')
     setLocation('')
+    setCoords(null)
     setStartAt('')
     setEndAt('')
     setTargetSection(defaultTarget)
@@ -350,6 +360,7 @@ export function EventPanel({ profile, members, events, attendance = [], rsvps = 
     setTitle(event.title)
     setDescription(event.description || '')
     setLocation(event.location || '')
+    setCoords(placeCoords(event))
     setStartAt(toLocalInput(start))
     setEndAt(duration !== null ? toLocalInput(new Date(start.getTime() + duration)) : '')
     setTargetSection(isDirigente ? defaultTarget : (event.target_section || '__all__'))
@@ -372,6 +383,7 @@ export function EventPanel({ profile, members, events, attendance = [], rsvps = 
     setEditTitle(event.title || '')
     setEditDescription(event.description || '')
     setEditLocation(event.location || '')
+    setEditCoords(placeCoords(event))
     setEditXpReward(event.xp_reward)
     setEditGoldReward(event.gold_reward)
     setEditLateDiscount(Math.round((event.late_discount_percent ?? 0.25) * 100))
@@ -551,7 +563,13 @@ export function EventPanel({ profile, members, events, attendance = [], rsvps = 
                   </div>
                   <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-stone-500">
                     <span className="flex items-center gap-1"><Clock className="h-3.5 w-3.5" /> {p.time}{event.end_at ? ` – ${fmtParts(event.end_at).time}` : ''}</span>
-                    {event.location && <span className="flex items-center gap-1"><MapPin className="h-3.5 w-3.5" /> {event.location}</span>}
+                    {event.location && (placeCoords(event) ? (
+                      <a href={googleMapsUrl(event)!} target="_blank" rel="noopener noreferrer" title="Abrir no mapa" className="flex items-center gap-1 hover:text-blue-700 hover:underline">
+                        <MapPin className="h-3.5 w-3.5 text-red-500" /> {event.location}
+                      </a>
+                    ) : (
+                      <span className="flex items-center gap-1"><MapPin className="h-3.5 w-3.5" /> {event.location}</span>
+                    ))}
                   </div>
                   <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
                     <span className="rounded-full bg-stone-100 px-2.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wide text-stone-600">
@@ -710,14 +728,14 @@ export function EventPanel({ profile, members, events, attendance = [], rsvps = 
           <form onSubmit={handleCreateEvent} className="space-y-6 pt-1">
             <FormSection title="O quê">
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                <div className="space-y-2">
+                <div className="space-y-2 md:col-span-2">
                   <Label htmlFor="event-title">Título *</Label>
                   <Input id="event-title" value={title} onChange={e => setTitle(e.target.value)} required placeholder="Ex: Reunião de Sábado" />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="event-location">Local</Label>
-                  <Input id="event-location" value={location} onChange={e => setLocation(e.target.value)} placeholder="Ex: Sede do Agrupamento" />
-                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="event-location">Local <span className="font-normal text-stone-400">(escreve e/ou marca no mapa)</span></Label>
+                <LocationPicker id="event-location" text={location} onTextChange={setLocation} coords={coords} onCoordsChange={setCoords} />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="event-desc">Descrição</Label>
@@ -923,7 +941,7 @@ export function EventPanel({ profile, members, events, attendance = [], rsvps = 
             </div>
             <div className="space-y-2">
               <Label htmlFor="edit-location">Local</Label>
-              <Input id="edit-location" value={editLocation} onChange={e => setEditLocation(e.target.value)} placeholder="Ex: Sede do Agrupamento" />
+              <LocationPicker id="edit-location" text={editLocation} onTextChange={setEditLocation} coords={editCoords} onCoordsChange={setEditCoords} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="edit-desc">Descrição</Label>

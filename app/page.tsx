@@ -12,6 +12,7 @@ import { displayFont } from '@/components/landing/fonts'
 import { SiteFooter } from '@/components/landing/SiteFooter'
 
 import { LandingPage } from '@/components/landing/LandingPage'
+import type { PublicEvent } from '@/components/landing/NextEventCard'
 import { getJAEvents, filterJAEventsForSection } from '@/utils/ja-agenda'
 import { GAMES, fetchGameSettings, gameVisibilityFor } from '@/utils/games'
 
@@ -44,15 +45,19 @@ export default async function Dashboard() {
       const gameSettings = await fetchGameSettings(supabase)
       const gameVisibility = Object.fromEntries(GAMES.map((g) => [g.id, gameVisibilityFor(gameSettings[g.id], null)]))
       // Próximo evento aberto a todo o clube (sem secção) para mostrar aos visitantes
-      const { data: nextEvent } = await supabase
+      const nextEventQuery = (cols: string) => supabase
         .from('events')
-        .select('id, title, description, location, start_at, end_at')
+        .select(cols)
         .is('target_section', null)
         .eq('is_finished', false)
         .gte('start_at', new Date().toISOString())
         .order('start_at', { ascending: true })
         .limit(1)
-        .maybeSingle()
+        .maybeSingle<PublicEvent>()
+      const baseCols = 'id, title, description, location, start_at, end_at'
+      // Com o ponto no mapa; sem a migração do mapa, só com o texto do local
+      const withCoords = await nextEventQuery(`${baseCols}, location_lat, location_lng`)
+      const { data: nextEvent } = withCoords.error ? await nextEventQuery(baseCols) : withCoords
       return <LandingPage gameVisibility={gameVisibility} nextEvent={nextEvent} />
   }
 

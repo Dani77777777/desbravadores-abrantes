@@ -12,6 +12,9 @@ import { QrPanel } from './components/QrPanel'
 import { SurveyPanel } from './components/SurveyPanel'
 import { AuditPanel } from './components/AuditPanel'
 import { GamesPanel } from './components/GamesPanel'
+import { GameAnalyticsPanel } from './components/GameAnalyticsPanel'
+import { buildGameAnalytics, lastDays, type GameAnalytics, type GamePlay } from '@/utils/game-analytics'
+import { lisbonDateString } from '@/utils/vana-codigo/day'
 import { ToolsPanel } from './components/ToolsPanel'
 import { Users, ListChecks, Megaphone, MessageSquare, LayoutDashboard, CalendarDays, ShoppingBag, QrCode, Gamepad2, ClipboardList, ScrollText, Wrench } from 'lucide-react'
 import { effectiveRole, effectiveLeadershipSection, isHelper, helperLabel } from '@/utils/permissions'
@@ -195,6 +198,27 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
   // Disponibilidade dos jogos (aba "Jogos")
   const gameSettings = activeTab === 'games' ? await fetchGameSettings(supabase) : null
 
+  // Analítica dos jogos a solo: 14 dias (esta semana + a anterior, para comparar).
+  // A RLS já limita o dirigente à sua classe. null = tabela por criar (migração por correr).
+  let gameAnalytics: GameAnalytics | null = null
+  if (activeTab === 'games') {
+    const from = lastDays(lisbonDateString(), 14)[0]
+    const rows: GamePlay[] = []
+    let failed = false
+    for (let page = 0; page < 20; page++) {
+      const { data, error } = await supabase
+        .from('game_plays')
+        .select('game_id, user_id, mode, play_date, started_at, is_finished, is_won, attempts')
+        .gte('play_date', from)
+        .order('id')
+        .range(page * 1000, page * 1000 + 999)
+      if (error) { failed = true; break }
+      rows.push(...(data as GamePlay[]))
+      if (!data || data.length < 1000) break
+    }
+    gameAnalytics = failed ? null : buildGameAnalytics(rows)
+  }
+
   // Presenças dos últimos eventos concluídos (taxas de presença na Visão Geral e nos Eventos).
   // Limitado aos 15 mais recentes para ficar bem abaixo do limite de 1000 linhas por pedido.
   let attendance: any[] = []
@@ -351,7 +375,15 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
           <QrPanel profile={effProfile} />
         )}
 
-        {/* Games tab */}
+        {/* Games tab: analítica dos jogos a solo + disponibilidade */}
+        {activeTab === 'games' && (
+          <GameAnalyticsPanel
+            analytics={gameAnalytics}
+            memberNames={Object.fromEntries((members || []).map((m) => [m.id, m.full_name || 'Membro']))}
+            totalMembers={members?.length || 0}
+            scopeLabel={isCoordenador ? 'todo o clube' : `classe ${SECTION_LABELS[effLeadership || profile.section] || profile.section}`}
+          />
+        )}
         {activeTab === 'games' && gameSettings && (
           <GamesPanel
             initialSettings={gameSettings}

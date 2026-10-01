@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowRight, Clock, MapPin, Phone } from "lucide-react";
 import { displayFont } from "./fonts";
+import { googleMapsUrl } from "@/utils/maps";
 
 const D = displayFont.className;
 // Fuso fixo: o servidor e o browser formatam igual (sem avisos de hidratação)
@@ -14,6 +15,8 @@ export interface PublicEvent {
   title: string;
   description: string | null;
   location: string | null;
+  location_lat?: number | null;
+  location_lng?: number | null;
   start_at: string;
   end_at: string | null;
 }
@@ -114,10 +117,16 @@ export function NextEventCard({ event }: { event: PublicEvent }) {
               {endTime && (sameDay ? ` – ${endTime}` : ` até ${fmt(end!, { day: "numeric", month: "short" })} ${endTime}`)}
             </span>
             {event.location && (
-              <span className="inline-flex min-w-0 items-center gap-1.5">
+              <a
+                href={googleMapsUrl(event)!}
+                target="_blank"
+                rel="noopener noreferrer"
+                title="Ver no mapa"
+                className="inline-flex min-w-0 items-center gap-1.5 underline-offset-4 transition-colors hover:text-white hover:underline"
+              >
                 <MapPin className="h-4 w-4 shrink-0 text-yellow-300" />
                 <span className="truncate">{event.location}</span>
-              </span>
+              </a>
             )}
           </div>
           {event.description && (

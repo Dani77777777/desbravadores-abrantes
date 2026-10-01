@@ -14,6 +14,7 @@ import { SurveysSection } from '@/components/dashboard/SurveysSection'
 import { EventShareDialog } from './EventShareDialog'
 import { SECTION_LABELS } from '@/utils/permissions'
 import { EventRsvp, RsvpBadge } from './EventRsvp'
+import { EventLocation } from './EventLocation'
 
 interface EventDashboardProps {
   events: any[]
@@ -211,27 +212,18 @@ export function EventDashboard({ events, profile, surveys, userId, rsvps = {} }:
                 </div>
               )}
 
-              <div className="grid grid-cols-2 gap-4">
-                {viewingEvent.location && (
-                  <div className="space-y-1">
-                    <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Localização</h4>
-                    <div className="flex items-center gap-1.5 text-sm text-gray-700">
-                      <MapPin className="w-4 h-4 text-red-500" />
-                      {viewingEvent.location}
-                    </div>
-                  </div>
-                )}
-                <div className="space-y-1 text-right">
-                  <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Público Alvo</h4>
-                  <Badge variant="outline" className="mt-1 shadow-none">
-                    {viewingEvent.source === 'ja'
-                      ? viewingEvent.sections?.length
-                        ? viewingEvent.sections.map((s: string) => SECTION_LABELS[s] || s).join(' · ')
-                        : 'TODOS'
-                      : viewingEvent.target_section ? viewingEvent.target_section.toUpperCase() : 'TODOS'}
-                  </Badge>
-                </div>
+              <div className="flex items-center justify-between gap-3">
+                <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Público Alvo</h4>
+                <Badge variant="outline" className="shadow-none">
+                  {viewingEvent.source === 'ja'
+                    ? viewingEvent.sections?.length
+                      ? viewingEvent.sections.map((s: string) => SECTION_LABELS[s] || s).join(' · ')
+                      : 'TODOS'
+                    : viewingEvent.target_section ? viewingEvent.target_section.toUpperCase() : 'TODOS'}
+                </Badge>
               </div>
+
+              <EventLocation event={viewingEvent} />
 
               {viewingEvent.source !== 'ja' && viewingEvent.rsvp_enabled && (
                 <EventRsvp
