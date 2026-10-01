@@ -46,6 +46,8 @@ export function ProductManagement({ products, profile, members, events, goldRate
   const [description, setDescription] = useState('')
   const [priceEur, setPriceEur] = useState(0)
   const [maxDiscount, setMaxDiscount] = useState(0)
+  // Custo unitário (vazio = sem custo ⇒ sem desconto por quantidade).
+  const [costPrice, setCostPrice] = useState('')
   const [type, setType] = useState<'physical' | 'digital'>('physical')
   const [stock, setStock] = useState(0)
   const [isPreorder, setIsPreorder] = useState(false)
@@ -94,6 +96,7 @@ export function ProductManagement({ products, profile, members, events, goldRate
     setDescription('')
     setPriceEur(0)
     setMaxDiscount(0)
+    setCostPrice('')
     setType('physical')
     setStock(0)
     setIsPreorder(false)
@@ -110,6 +113,7 @@ export function ProductManagement({ products, profile, members, events, goldRate
     setDescription(product.description || '')
     setPriceEur(Number(product.price_eur) || 0)
     setMaxDiscount(product.max_discount_percent || 0)
+    setCostPrice(product.cost_price == null ? '' : String(Number(product.cost_price)))
     setType(product.type)
     setStock(product.stock)
     setIsPreorder(!!product.is_preorder)
@@ -134,6 +138,7 @@ export function ProductManagement({ products, profile, members, events, goldRate
         description,
         price_eur: priceEur,
         max_discount_percent: maxDiscount,
+        cost_price: costPrice.trim() === '' ? null : Math.max(0, Number(costPrice)),
         type,
         stock: type === 'digital' || preorder ? 0 : stock,
         is_preorder: preorder,
@@ -219,6 +224,13 @@ export function ProductManagement({ products, profile, members, events, goldRate
                 <div className="space-y-2 text-yellow-700">
                   <Label>Desconto máx. com Gold (%)</Label>
                   <Input type="number" min={0} max={100} value={maxDiscount} onChange={e => setMaxDiscount(Math.max(0, Math.min(100, Number(e.target.value))))} />
+                </div>
+                <div className="space-y-2 col-span-2 text-emerald-700">
+                  <Label>Custo unitário (€) — opcional</Label>
+                  <Input type="number" min={0} step={0.01} value={costPrice} onChange={e => setCostPrice(e.target.value)} placeholder="Ex: 2.50" />
+                  <p className="text-[11px] text-gray-500">
+                    Com custo: desconto por quantidade (5+ un. −5%, 10 un. −10%, só físicos) e o Gold nunca baixa o preço abaixo do custo. Vazio = sem desconto por quantidade.
+                  </p>
                 </div>
                 <div className="space-y-2">
                   <Label>Tipo</Label>
