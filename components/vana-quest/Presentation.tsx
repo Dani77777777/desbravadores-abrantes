@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState, useRef } from 'react'
+import { useEffect, useMemo, useState, useRef, type ReactNode } from 'react'
 import { createClient } from '@/utils/supabase/client'
 import { QRCodeSVG } from 'qrcode.react'
 import { Users, Trophy, Zap, Flame, CheckCircle2 } from 'lucide-react'
@@ -9,6 +9,7 @@ import { useLiveSession } from './useLiveSession'
 import { getIntroSeconds, questionFontSize, optionFontSize } from '@/utils/vana-quest'
 import confetti from 'canvas-confetti'
 import { ProjectorLobbyScreen } from '@/components/game-lobby/ProjectorLobby'
+import { GameReactionsOverlay } from '@/components/game-lobby/GameReactions'
 
 const OPTION_COLORS = ['bg-red-500', 'bg-blue-500', 'bg-yellow-400', 'bg-green-500']
 const OPTION_LABELS = ['▲', '●', '◆', '■']
@@ -428,10 +429,22 @@ export function Presentation({ sessionId, initialSession, questions, siteUrl }: 
     )
   }
 
+  /**
+   * Depois da sala de espera, as reações dos telemóveis continuam a subir pelas
+   * margens do ecrã (como no Kahoot). Raiz igual em todas as fases (<>ecrã + camada</>),
+   * por isso os emojis a meio do voo não desaparecem quando a fase muda.
+   */
+  const withReactions = (screen: ReactNode) => (
+    <>
+      {screen}
+      <GameReactionsOverlay game="vana-quest" sessionId={sessionId} players={lobbyPlayers} />
+    </>
+  )
+
   // ── QUEST INTRO (uma vez no arranque) ─────────────────────────
   if (session.status === 'quest_intro') {
     const title = (initialSession.vana_quests as any)?.title || 'VanaQuest'
-    return (
+    return withReactions(
       <div className="min-h-screen bg-gradient-to-br from-blue-950 via-blue-900 to-indigo-950 flex flex-col items-center justify-center p-8 relative overflow-hidden">
         {/* Spotlight */}
         <div
@@ -489,7 +502,7 @@ export function Presentation({ sessionId, initialSession, questions, siteUrl }: 
       const gradient = mult === 2
         ? 'from-yellow-300 via-yellow-400 to-orange-500'
         : 'from-orange-400 via-red-500 to-pink-600'
-      return (
+      return withReactions(
         <div className={`h-screen w-screen bg-gradient-to-br ${gradient} flex flex-col items-center justify-center p-8 relative overflow-hidden`}>
           {/* Raios dispersos no fundo */}
           {[...Array(8)].map((_, i) => (
@@ -537,7 +550,7 @@ export function Presentation({ sessionId, initialSession, questions, siteUrl }: 
     }
 
     // Fase 2: pergunta normal
-    return (
+    return withReactions(
       <div className="h-screen w-screen bg-gradient-to-br from-indigo-950 via-blue-900 to-blue-950 flex flex-col items-center justify-center p-8 md:p-12 relative">
         <div className="absolute top-6 left-6 flex items-center gap-2 bg-white/10 rounded-2xl px-4 py-2 border border-white/10">
           <span className="text-white/60 text-sm font-bold">{session.current_question_index + 1} / {questions.length}</span>
@@ -573,7 +586,7 @@ export function Presentation({ sessionId, initialSession, questions, siteUrl }: 
     const options = [currentQuestion.option_a, currentQuestion.option_b, currentQuestion.option_c, currentQuestion.option_d]
     const timerPct = (timeLeft / currentQuestion.time_seconds) * 100
 
-    return (
+    return withReactions(
       <div className="h-screen w-screen bg-gradient-to-br from-slate-950 to-indigo-950 flex flex-col p-4 md:p-6 gap-3 overflow-hidden relative">
         {/* Top bar */}
         <div className="flex items-center justify-between flex-shrink-0">
@@ -666,7 +679,7 @@ export function Presentation({ sessionId, initialSession, questions, siteUrl }: 
     const correctCount = currentAnswers.filter((a) => a.is_correct).length
     const maxCount = Math.max(...answerCounts, 1)
 
-    return (
+    return withReactions(
       <div className="min-h-screen bg-gradient-to-br from-slate-950 to-indigo-950 flex flex-col p-8 gap-6">
         <div className="text-center space-y-3 animate-in slide-in-from-top duration-500">
           <p className="text-sky-300 text-sm font-black uppercase tracking-[0.3em]">Resposta correcta</p>
@@ -699,12 +712,12 @@ export function Presentation({ sessionId, initialSession, questions, siteUrl }: 
 
   // ── LEADERBOARD ───────────────────────────────────────────────
   if (session.status === 'question_leaderboard') {
-    return <LeaderboardScreen participants={participants} prevPointsRef={prevPointsRef} />
+    return withReactions(<LeaderboardScreen participants={participants} prevPointsRef={prevPointsRef} />)
   }
 
   // ── FINISHED (cinematic podium) ───────────────────────────────
   if (session.status === 'finished') {
-    return <CinematicPodium participants={participants} />
+    return withReactions(<CinematicPodium participants={participants} />)
   }
 
   return null

@@ -7,6 +7,7 @@ import { PlayerAvatar } from '@/components/vana-quest/PlayerAvatar'
 import { lobbyTopic, LOBBY_EMOJIS, LOBBY_THEMES, type LobbyGame } from './content'
 import { LobbyTips } from './LobbyTips'
 import { useLobbyHype, type LobbyHype, type LobbyPlayer } from './useLobbyHype'
+import type { LobbyFloater } from './useReactionFloaters'
 
 // Sala de espera no PROJETOR, partilhada pelo VanaQuest e pelo VanaEspada.
 
@@ -258,22 +259,7 @@ export function LobbyOverlay({ game, hype }: { game: LobbyGame; hype: LobbyHype 
 
   return (
     <div className="fixed inset-0 z-40 pointer-events-none overflow-hidden">
-      {floaters.map((f) => (
-        <div
-          key={f.id}
-          className="lobby-rise absolute -bottom-4 flex flex-col items-center"
-          style={{ left: `${f.left}%`, '--drift': `${f.drift}px`, '--dur': `${f.dur}s` } as CSSProperties}
-        >
-          <span className="leading-none drop-shadow-[0_6px_14px_rgba(0,0,0,0.45)]" style={{ fontSize: `${f.size}rem` }}>
-            {f.emoji}
-          </span>
-          {f.name && (
-            <span className="mt-1 text-xs font-bold text-white bg-black/35 rounded-full px-2 py-0.5 whitespace-nowrap max-w-[10rem] truncate">
-              {f.name}
-            </span>
-          )}
-        </div>
-      ))}
+      <FloatingEmojis floaters={floaters} />
 
       {arrival && (
         <div className="absolute top-24 inset-x-0 flex justify-center">
@@ -326,5 +312,29 @@ export function LobbyOverlay({ game, hype }: { game: LobbyGame; hype: LobbyHype 
         </div>
       )}
     </div>
+  )
+}
+
+/** Os emojis a subir (sala de espera e durante o jogo). */
+export function FloatingEmojis({ floaters }: { floaters: LobbyFloater[] }) {
+  return (
+    <>
+      {floaters.map((f) => (
+        <div
+          key={f.id}
+          className="lobby-rise absolute -bottom-4 flex flex-col items-center"
+          style={{ left: `${f.left}%`, '--drift': `${f.drift}px`, '--dur': `${f.dur}s` } as CSSProperties}
+        >
+          <span className="leading-none drop-shadow-[0_6px_14px_rgba(0,0,0,0.45)]" style={{ fontSize: `${f.size}rem` }}>
+            {f.emoji}
+          </span>
+          {f.name && (
+            <span className="mt-1 text-xs font-bold text-white bg-black/35 rounded-full px-2 py-0.5 whitespace-nowrap max-w-[10rem] truncate">
+              {f.name}
+            </span>
+          )}
+        </div>
+      ))}
+    </>
   )
 }

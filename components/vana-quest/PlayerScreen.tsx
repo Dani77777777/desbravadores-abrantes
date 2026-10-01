@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, type ReactNode } from 'react'
 import { createClient } from '@/utils/supabase/client'
 import { submitAnswer, setRewardsRecipient, skipRewards } from '@/lib/actions/vana-quest'
 import { CheckCircle2, XCircle, Trophy, Zap, Flame, Users, ArrowUp, Crown } from 'lucide-react'
@@ -448,6 +448,18 @@ export function PlayerScreen({ sessionId, userId, userProfile, initialSession, q
   const { gold: goldEarned, xp: xpEarned } = calcSessionRewards(totalPoints, topPoints)
   const rewardsCapped = Math.round(Math.max(totalPoints, topPoints)) > MAX_SESSION_GOLD
 
+  /**
+   * Depois da sala de espera, a barra de emojis fica no fundo do ecrã durante o jogo
+   * todo (escondida só enquanto há botões de resposta). Todos os ecrãs do jogo têm a
+   * mesma raiz (<>ecrã + barra</>), por isso a barra não se desfaz entre fases.
+   */
+  const withReactions = (screen: ReactNode, show = true) => (
+    <>
+      {screen}
+      <LobbyReactionPad game="vana-quest" sessionId={sessionId} playerId={participantId} variant="bar" hidden={!show} />
+    </>
+  )
+
   // ── FORA DA SESSÃO (removido pelo anfitrião ou por inatividade) ──
   if (kicked) {
     const inactive = kickReason === 'inactive'
@@ -510,8 +522,8 @@ export function PlayerScreen({ sessionId, userId, userProfile, initialSession, q
 
   // ── QUEST INTRO (uma vez no arranque) ─────────────────────────
   if (session.status === 'quest_intro') {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-950 via-blue-900 to-indigo-950 flex flex-col items-center justify-center p-6 gap-5 text-center">
+    return withReactions(
+      <div className="min-h-screen pb-24 bg-gradient-to-br from-blue-950 via-blue-900 to-indigo-950 flex flex-col items-center justify-center p-6 gap-5 text-center">
         <img
           src="/images/VanaQuest.png"
           alt=""
@@ -547,8 +559,8 @@ export function PlayerScreen({ sessionId, userId, userProfile, initialSession, q
       const gradient = mult === 2
         ? 'from-yellow-300 via-yellow-400 to-orange-500'
         : 'from-orange-400 via-red-500 to-pink-600'
-      return (
-        <div className={`min-h-screen bg-gradient-to-br ${gradient} flex flex-col items-center justify-center p-6 text-center relative overflow-hidden`}>
+      return withReactions(
+        <div className={`min-h-screen pb-24 bg-gradient-to-br ${gradient} flex flex-col items-center justify-center p-6 text-center relative overflow-hidden`}>
           {[...Array(5)].map((_, i) => (
             <div
               key={i}
@@ -582,8 +594,8 @@ export function PlayerScreen({ sessionId, userId, userProfile, initialSession, q
       )
     }
 
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-indigo-950 via-blue-900 to-blue-950 flex flex-col items-center justify-center p-6 text-center">
+    return withReactions(
+      <div className="min-h-screen pb-24 bg-gradient-to-br from-indigo-950 via-blue-900 to-blue-950 flex flex-col items-center justify-center p-6 text-center">
         <p className="text-sky-300 text-xs font-black uppercase tracking-[0.3em] mb-2">Pergunta {session.current_question_index + 1}</p>
         <p className="text-white text-3xl font-black animate-pulse mb-6">Prepara-te...</p>
         <div className="flex items-center gap-2 text-sky-300">
@@ -598,8 +610,8 @@ export function PlayerScreen({ sessionId, userId, userProfile, initialSession, q
   if (session.status === 'question_active' && currentQuestion) {
     const timerPct = (timeLeft / currentQuestion.time_seconds) * 100
 
-    return (
-      <div className="min-h-screen bg-slate-900 flex flex-col p-3 gap-3 relative">
+    return withReactions(
+      <div className={`min-h-screen bg-slate-900 flex flex-col p-3 gap-3 relative ${answerResult ? 'pb-20' : ''}`}>
         {/* Top bar */}
         <div className="flex items-center justify-between text-xs">
           <div className="flex items-center gap-2">
@@ -685,14 +697,15 @@ export function PlayerScreen({ sessionId, userId, userProfile, initialSession, q
             animation: pointsBurst 1.5s ease-out forwards;
           }
         `}</style>
-      </div>
+      </div>,
+      !!answerResult,
     )
   }
 
   // ── RESULTS ────────────────────────────────────────────────────
   if (session.status === 'question_results') {
-    return (
-      <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-6 gap-5 text-center">
+    return withReactions(
+      <div className="min-h-screen pb-24 bg-slate-900 flex flex-col items-center justify-center p-6 gap-5 text-center">
         {answerResult ? (
           answerResult.isCorrect ? (
             <>
@@ -730,8 +743,8 @@ export function PlayerScreen({ sessionId, userId, userProfile, initialSession, q
   // ── LEADERBOARD (player view) ─────────────────────────────────
   if (session.status === 'question_leaderboard') {
     const isLeader = rankInfo.rank === 1
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-900 to-indigo-950 flex flex-col items-center justify-center p-6 gap-4 text-center">
+    return withReactions(
+      <div className="min-h-screen pb-24 bg-gradient-to-br from-blue-900 to-indigo-950 flex flex-col items-center justify-center p-6 gap-4 text-center">
         {isLeader ? <Crown className="w-16 h-16 text-yellow-400" /> : <Trophy className="w-14 h-14 text-yellow-400" />}
 
         {/* Posição em destaque */}
@@ -784,7 +797,7 @@ export function PlayerScreen({ sessionId, userId, userProfile, initialSession, q
   if (session.status === 'finished') {
     // Guest donation flow
     if (isGuest && !donationSuccess && !donationSkipped) {
-      return (
+      return withReactions(
         <div className="min-h-screen bg-gradient-to-br from-blue-900 to-indigo-900 flex flex-col p-6 gap-5 overflow-y-auto">
           <div className="text-center pt-4">
             <img src="/images/VanaQuest.png" alt="" className="w-14 h-14 object-contain mx-auto mb-2" />
@@ -931,13 +944,14 @@ export function PlayerScreen({ sessionId, userId, userProfile, initialSession, q
               <a href="/jogos/vana-quest" className="text-white underline block">Jogar novamente</a>
             </div>
           )}
-        </div>
+        </div>,
+        false,
       )
     }
 
     if (donationSuccess) {
-      return (
-        <div className="min-h-screen bg-gradient-to-br from-blue-900 to-indigo-900 flex flex-col items-center justify-center p-6 gap-5 text-center">
+      return withReactions(
+        <div className="min-h-screen pb-24 bg-gradient-to-br from-blue-900 to-indigo-900 flex flex-col items-center justify-center p-6 gap-5 text-center">
           <div className="w-20 h-20 rounded-full bg-green-500 flex items-center justify-center"><CheckCircle2 className="w-10 h-10 text-white" /></div>
           <h2 className="text-3xl font-black text-white">Enviado!</h2>
           <p className="text-sky-200">O teu desbravador receberá os prémios.</p>
@@ -946,8 +960,8 @@ export function PlayerScreen({ sessionId, userId, userProfile, initialSession, q
       )
     }
 
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-900 to-indigo-900 flex flex-col items-center justify-center p-6 gap-6 text-center">
+    return withReactions(
+      <div className="min-h-screen pb-24 bg-gradient-to-br from-blue-900 to-indigo-900 flex flex-col items-center justify-center p-6 gap-6 text-center">
         <img src="/images/VanaQuest.png" alt="" className="w-20 h-20 object-contain" />
         <h1 className="text-3xl font-black text-white">🏆 Concluído!</h1>
         <div className="bg-white/10 backdrop-blur rounded-3xl p-6 border border-white/20 w-full max-w-sm space-y-4">

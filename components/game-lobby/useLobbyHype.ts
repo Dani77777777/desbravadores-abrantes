@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import confetti from 'canvas-confetti'
-import { createClient } from '@/utils/supabase/client'
+import { onReactionTaps, parseTapBatch } from './reactions'
+import { useReactionFloaters } from './useReactionFloaters'
 
 /**
  * "Motor" da sala de espera no PROJETOR (VanaQuest + VanaEspada):
@@ -10,10 +11,8 @@ import { createClient } from '@/utils/supabase/client'
  *  - enche a barra "Energia da sala" (cada toque conta) e sobe de nível;
  *  - anuncia quem entra ("X entrou na sala!") e os marcos (5, 10, 20… jogadores).
  *
- * Realtime: só o projetor SUBSCREVE o tópico da sala. Os telemóveis enviam por
- * HTTP (httpSend) sem subscrever, por isso cada toque chega a UM cliente e não a
- * todos — o N² de mensagens que em junho saturou o realtime não pode voltar aqui.
- * Cada telemóvel junta os toques e envia no máximo um lote por segundo.
+ * Realtime: ver reactions.ts (os telemóveis só enviam, só o projetor ouve).
+ * As mesmas reações continuam durante o jogo (GameReactionsOverlay).
  */
 
 export interface LobbyPlayer {
@@ -21,16 +20,6 @@ export interface LobbyPlayer {
   name: string
   avatarUrl?: string | null
   isGuest?: boolean
-}
-
-export interface LobbyFloater {
-  id: number
-  emoji: string
-  name: string | null
-  left: number // % da largura
-  drift: number // px de desvio lateral durante a subida
-  dur: number // s
-  size: number // rem
 }
 
 type CelebrationKind = { kind: 'level'; level: number } | { kind: 'milestone'; count: number }
@@ -50,12 +39,6 @@ const MIN_LEVEL_TARGET = 60
 const DECAY_AFTER_MS = 2500
 const DECAY_PER_TICK = 0.005
 const TICK_MS = 100
-/** Limites anti-abuso por lote/telemóvel (o cliente já respeita, o projetor confirma). */
-const MAX_TAPS_PER_BATCH = 12
-const MIN_BATCH_GAP_MS = 700
-/** Máximo de emojis a voar ao mesmo tempo e por lote. */
-const MAX_FLOATERS = 45
-const MAX_FLOATERS_PER_BATCH = 4
 const ARRIVAL_MS = 1700
 const CELEBRATION_MS = 3200
 const FRESH_MS = 2600
@@ -81,7 +64,7 @@ export function useLobbyHype({
 }) {
   const [energy, setEnergy] = useState(0)
   const [level, setLevel] = useState(1)
-  const [floaters, setFloaters] = useState<LobbyFloater[]>([])
+  const { floaters, spawnBatch } = useReactionFloaters('full')
   const [arrival, setArrival] = useState<LobbyArrival | null>(null)
   const [celebration, setCelebration] = useState<LobbyCelebration | null>(null)
   const [freshIds, setFreshIds] = useState<Set<string>>(() => new Set())
@@ -95,7 +78,6 @@ export function useLobbyHype({
   const levelRef = useRef(1)
   const lastTapRef = useRef(0)
   const lastBatchRef = useRef<Map<string, number>>(new Map())
-  const floaterCountRef = useRef(0)
   const seqRef = useRef(0)
   const timersRef = useRef<Set<ReturnType<typeof setTimeout>>>(new Set())
 
@@ -192,57 +174,13 @@ export function useLobbyHype({
     return () => clearInterval(id)
   }, [])
 
-  // ── Emojis a voar ───────────────────────────────────────────────
-  const spawnFloater = useCallback((emoji: string, name: string | null) => {
-    if (floaterCountRef.current >= MAX_FLOATERS) return
-    floaterCountRef.current += 1
-    const f: LobbyFloater = {
-      id: ++seqRef.current,
-      emoji,
-      name,
-      left: 4 + Math.random() * 88,
-      drift: (Math.random() - 0.5) * 180,
-      dur: 2.8 + Math.random() * 1.4,
-      size: 3 + Math.random() * 1.8,
-    }
-    setFloaters((prev) => [...prev, f])
-    later(() => {
-      floaterCountRef.current -= 1
-      setFloaters((prev) => prev.filter((x) => x.id !== f.id))
-    }, f.dur * 1000 + 150)
-  }, [later])
-
   // ── Reações vindas dos telemóveis ───────────────────────────────
-  useEffect(() => {
-    const supabase = createClient()
-    const ch = supabase.channel(topic, { config: { broadcast: { self: false } } })
-    ch.on('broadcast', { event: 'tap' }, ({ payload }) => {
-      const pid = payload?.pid
-      const player = typeof pid === 'string' ? playersRef.current.get(pid) : undefined
-      if (!player || !Array.isArray(payload?.e)) return
-
-      const now = Date.now()
-      if (now - (lastBatchRef.current.get(pid) ?? 0) < MIN_BATCH_GAP_MS) return
-      lastBatchRef.current.set(pid, now)
-
-      const list = emojisRef.current
-      const taps = (payload.e as unknown[])
-        .slice(0, MAX_TAPS_PER_BATCH)
-        .filter((i): i is number => Number.isInteger(i) && (i as number) >= 0 && (i as number) < list.length)
-      if (!taps.length) return
-
-      addTaps(taps.length)
-
-      // Alguns emojis do lote, espalhados pelo segundo; o nome só no primeiro.
-      const shown = Math.min(MAX_FLOATERS_PER_BATCH, taps.length)
-      for (let k = 0; k < shown; k++) {
-        const idx = taps[Math.floor((k * taps.length) / shown)]
-        later(() => spawnFloater(list[idx], k === 0 ? player.name : null), k * 230)
-      }
-    })
-    ch.subscribe()
-    return () => { supabase.removeChannel(ch) }
-  }, [topic, addTaps, spawnFloater, later])
+  useEffect(() => onReactionTaps(topic, (payload) => {
+    const batch = parseTapBatch(payload, playersRef.current, lastBatchRef.current, emojisRef.current.length)
+    if (!batch) return
+    addTaps(batch.taps.length)
+    spawnBatch(batch.taps.map((i) => emojisRef.current[i]), batch.player.name)
+  }), [topic, addTaps, spawnBatch])
 
   // ── Entradas + marcos ───────────────────────────────────────────
   const showNextArrival = useCallback(() => {
