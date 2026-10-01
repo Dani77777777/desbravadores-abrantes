@@ -125,6 +125,7 @@ export interface Database {
           price: number
           price_eur: number
           max_discount_percent: number
+          cost_price: number | null
           type: 'physical' | 'digital'
           stock: number
           image_url: string | null
@@ -143,6 +144,7 @@ export interface Database {
           price?: number
           price_eur?: number
           max_discount_percent?: number
+          cost_price?: number | null
           type: 'physical' | 'digital'
           stock?: number
           image_url?: string | null
@@ -161,6 +163,7 @@ export interface Database {
           price?: number
           price_eur?: number
           max_discount_percent?: number
+          cost_price?: number | null
           type?: 'physical' | 'digital'
           stock?: number
           image_url?: string | null
@@ -232,6 +235,8 @@ export interface Database {
           digital_key_delivered: string | null
           price_eur: number
           discount_eur: number
+          volume_discount_percent: number
+          volume_discount_eur: number
           amount_due_eur: number
           quantity: number
           gold_spent: number
@@ -251,6 +256,8 @@ export interface Database {
           digital_key_delivered?: string | null
           price_eur?: number
           discount_eur?: number
+          volume_discount_percent?: number
+          volume_discount_eur?: number
           amount_due_eur?: number
           quantity?: number
           gold_spent?: number
@@ -269,6 +276,8 @@ export interface Database {
           digital_key_delivered?: string | null
           price_eur?: number
           discount_eur?: number
+          volume_discount_percent?: number
+          volume_discount_eur?: number
           amount_due_eur?: number
           quantity?: number
           gold_spent?: number

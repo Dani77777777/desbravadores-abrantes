@@ -1,8 +1,9 @@
 'use client'
 
-import { Package, Coins } from 'lucide-react'
+import { Package, Coins, BadgePercent } from 'lucide-react'
 import { PurchaseDialog } from './PurchaseDialog'
-import { formatEur, maxDiscountEur, isPreorderOpen, formatDeadline } from '@/lib/store-economy'
+import { formatEur, isPreorderOpen, formatDeadline } from '@/lib/store-economy'
+import { computePurchasePricing, volumeTiersLabel } from '@/lib/store-pricing'
 import { displayFont } from '@/components/landing/fonts'
 
 interface ProductCardProps {
@@ -33,7 +34,11 @@ export function ProductCard({ product, userProfile, goldRate }: ProductCardProps
     ? (userProfile ? `Nível ${product.min_level} necessário` : `Só membros Nível ${product.min_level}+`)
     : undefined
 
-  const maxDisc = maxDiscountEur(product)
+  // Teto do Gold para 1 unidade — com custo definido, nunca abaixo do custo.
+  const unitPricing = computePurchasePricing(product, 1, null, goldRate)
+  const maxDisc = unitPricing.goldCapEur
+  // Só artigos físicos com custo definido (e escalões que o stock permite).
+  const volumeLabel = volumeTiersLabel(product)
 
   return (
     <div className="group flex flex-col overflow-hidden rounded-[1.75rem] bg-white shadow-md shadow-blue-950/5 ring-1 ring-stone-200 transition-all duration-300 hover:-translate-y-1.5 hover:shadow-2xl hover:shadow-blue-950/15">
@@ -122,12 +127,24 @@ export function ProductCard({ product, userProfile, goldRate }: ProductCardProps
         <p className="line-clamp-2 min-h-[2.5rem] text-sm text-stone-500">
           {product.description || 'Sem descrição disponível.'}
         </p>
-        {maxDisc > 0 && (
-          <div className="mt-auto flex items-center gap-1.5 self-start rounded-full bg-yellow-100 px-3 py-1">
-            <Coins className="h-3.5 w-3.5 shrink-0 text-amber-600" />
-            <span className="text-[11px] font-bold text-amber-800">
-              Até {product.max_discount_percent}% com Gold (−{formatEur(maxDisc)})
-            </span>
+        {(maxDisc > 0 || volumeLabel) && (
+          <div className="mt-auto flex flex-wrap items-center gap-1.5">
+            {maxDisc > 0 && (
+              <div className="flex items-center gap-1.5 rounded-full bg-yellow-100 px-3 py-1">
+                <Coins className="h-3.5 w-3.5 shrink-0 text-amber-600" />
+                <span className="text-[11px] font-bold text-amber-800">
+                  {unitPricing.goldLimitedByCost
+                    ? <>Até −{formatEur(maxDisc)} com Gold</>
+                    : <>Até {product.max_discount_percent}% com Gold (−{formatEur(maxDisc)})</>}
+                </span>
+              </div>
+            )}
+            {volumeLabel && (
+              <div className="flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 ring-1 ring-emerald-100">
+                <BadgePercent className="h-3 w-3 shrink-0 text-emerald-600" />
+                <span className="text-[10px] font-bold text-emerald-800">{volumeLabel}</span>
+              </div>
+            )}
           </div>
         )}
       </div>

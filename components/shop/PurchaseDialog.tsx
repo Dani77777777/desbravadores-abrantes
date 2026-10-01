@@ -16,8 +16,9 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
-import { ShoppingBag, Coins, CheckCircle2, Copy, Key, AlertCircle, User, Banknote, CalendarClock, Minus, Plus, Undo2 } from 'lucide-react'
-import { formatEur, goldCostFor, userMaxDiscountEur, formatDeadline } from '@/lib/store-economy'
+import { ShoppingBag, Coins, CheckCircle2, Copy, Key, AlertCircle, User, Banknote, CalendarClock, Minus, Plus, Undo2, BadgePercent } from 'lucide-react'
+import { formatEur, goldCostFor, formatDeadline } from '@/lib/store-economy'
+import { computePurchasePricing, amountDueFor, nextVolumeTier, maxQuantityFor, toCents } from '@/lib/store-pricing'
 import { addGuestOrder, removeGuestOrder } from '@/lib/guest-orders'
 
 interface PurchaseDialogProps {
@@ -43,27 +44,28 @@ export function PurchaseDialog({ product, userProfile, goldRate, disabled, reaso
   const isPreorder = product.type === 'physical' && !!product.is_preorder
   const unitPrice = product.price_eur || 0
   // Até 10 unidades por encomenda (limite do servidor), cortado pelo stock; digitais sempre 1.
-  const maxQty = product.type === 'digital' ? 1 : isPreorder ? 10 : Math.max(1, Math.min(10, product.stock || 0))
-  const priceEur = Math.round(unitPrice * quantity * 100) / 100
-  // Limite do slider: o máximo do artigo (sobre o total), cortado pelo Gold que o membro tem.
-  const maxDisc = isGuest
-    ? 0
-    : userMaxDiscountEur({ price_eur: priceEur, max_discount_percent: product.max_discount_percent }, userProfile.current_gold || 0, goldRate)
+  const maxQty = maxQuantityFor(product)
+  // Pré-visualização (o servidor recalcula tudo): desconto por quantidade e teto do Gold,
+  // que nunca deixa o total abaixo do custo.
+  const userGold = isGuest ? null : userProfile.current_gold || 0
+  const pricing = computePurchasePricing(product, quantity, userGold, goldRate)
+  const priceEur = pricing.baseEur
+  // Limite do slider: o teto do artigo, cortado pelo Gold que o membro tem.
+  const maxDisc = pricing.userGoldMaxEur
+  const nextTier = nextVolumeTier(product, quantity)
 
   const changeQuantity = (next: number) => {
     const qty = Math.max(1, Math.min(maxQty, next))
     setQuantity(qty)
     // Quem está a usar todo o Gold continua a usar todo; senão, não deixar o slider
-    // acima do novo limite (menos unidades ⇒ desconto máximo menor).
-    const nextMax = isGuest
-      ? 0
-      : userMaxDiscountEur({ price_eur: unitPrice * qty, max_discount_percent: product.max_discount_percent }, userProfile.current_gold || 0, goldRate)
+    // acima do novo limite (o máximo muda com as unidades e o desconto por quantidade).
+    const nextMax = computePurchasePricing(product, qty, userGold, goldRate).userGoldMaxEur
     setDiscount(d => (d >= maxDisc ? nextMax : Math.min(d, nextMax)))
   }
   const goldCost = goldCostFor(discount, goldRate)
-  const amountDue = Math.max(0, Math.round((priceEur - discount) * 100) / 100)
+  const amountDue = amountDueFor(pricing, discount)
   // Desconto por usar (o Gold vem todo aplicado por defeito; avisamos se o membro o baixar).
-  const unusedDiscount = Math.round((maxDisc - discount) * 100) / 100
+  const unusedDiscount = toCents(maxDisc - discount)
 
   const handlePurchase = async () => {
     if (isGuest && guestName.trim().length < 3) {
@@ -230,7 +232,10 @@ export function PurchaseDialog({ product, userProfile, goldRate, disabled, reaso
                   </button>
                 </div>
                 <p className="text-[10px] text-yellow-600">
-                  Este artigo aceita até {product.max_discount_percent}% de desconto. Tens {userProfile.current_gold} 🪙.
+                  {pricing.goldLimitedByCost
+                    ? <>Aqui o Gold desconta até {formatEur(pricing.goldCapEur)} (não pode baixar o preço abaixo do custo).</>
+                    : <>Este artigo aceita até {product.max_discount_percent}% de desconto.</>}{' '}
+                  Tens {userProfile.current_gold} 🪙.
                 </p>
               </div>
             )}
@@ -252,7 +257,7 @@ export function PurchaseDialog({ product, userProfile, goldRate, disabled, reaso
               </div>
             )}
 
-            {!isGuest && maxDisc <= 0 && (product.max_discount_percent || 0) > 0 && (
+            {!isGuest && maxDisc <= 0 && pricing.goldCapEur > 0 && (
               <div className="bg-stone-50 border border-stone-100 p-3 rounded-2xl text-[11px] text-gray-500 flex items-center gap-2">
                 <Coins className="w-4 h-4 text-gray-400 shrink-0" />
                 Ainda não tens Gold suficiente para aplicar desconto ({goldRate} 🪙 por cada 1 €). Participa nas atividades para ganhar mais!
@@ -290,6 +295,11 @@ export function PurchaseDialog({ product, userProfile, goldRate, disabled, reaso
                   </div>
                 )}
               </div>
+              {nextTier && (
+                <p className="-mt-2 mb-3 text-[11px] font-semibold text-emerald-700">
+                  Mais {nextTier.unitsMissing} {nextTier.unitsMissing === 1 ? 'unidade' : 'unidades'} para {nextTier.percent}% de desconto
+                </p>
+              )}
 
               <div className="space-y-2 pt-3 border-t border-stone-200 text-sm">
                 <div className="flex justify-between items-center">
@@ -298,6 +308,14 @@ export function PurchaseDialog({ product, userProfile, goldRate, disabled, reaso
                   </span>
                   <span className="font-bold text-gray-800">{formatEur(priceEur)}</span>
                 </div>
+                {pricing.volumeEur > 0 && (
+                  <div className="flex justify-between items-center gap-2">
+                    <span className="text-emerald-700 flex items-center gap-1">
+                      <BadgePercent className="w-3.5 h-3.5 shrink-0" /> Desconto por quantidade (−{pricing.volumePercent}%)
+                    </span>
+                    <span className="font-bold text-emerald-700 shrink-0">−{formatEur(pricing.volumeEur)}</span>
+                  </div>
+                )}
                 {discount > 0 && (
                   <div className="flex justify-between items-center">
                     <span className="text-yellow-700 flex items-center gap-1"><Coins className="w-3.5 h-3.5" /> Desconto Gold</span>
@@ -349,6 +367,11 @@ export function PurchaseDialog({ product, userProfile, goldRate, disabled, reaso
               <div className="bg-green-50 border border-green-100 rounded-2xl py-4 px-5 text-center">
                 <p className="text-[10px] font-black uppercase text-green-700 mb-1">Total a pagar em dinheiro</p>
                 <p className="text-3xl font-black text-green-800">{formatEur(Number(result.amount_due_eur))}</p>
+                {Number(result.volume_discount_eur) > 0 && (
+                  <p className="text-[11px] font-bold text-emerald-700 mt-1">
+                    Poupaste {formatEur(Number(result.volume_discount_eur))} pela quantidade (−{Number(result.volume_discount_percent)}%)
+                  </p>
+                )}
                 {Number(result.gold_spent) > 0 && (
                   <p className="text-[11px] font-bold text-yellow-700 mt-1">
                     Já poupaste {formatEur(Number(result.discount_eur))} com {result.gold_spent} 🪙

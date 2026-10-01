@@ -97,6 +97,11 @@ export function PurchaseHistory({ purchases }: PurchaseHistoryProps) {
                   <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-gray-500 font-medium">
                     <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> {date}</span>
                     <span className="font-bold text-gray-700">{formatEur(amountDue)}</span>
+                    {Number(purchase.volume_discount_eur) > 0 && (
+                      <span className="text-emerald-700 font-bold">
+                        −{formatEur(Number(purchase.volume_discount_eur))} qtd. ({Number(purchase.volume_discount_percent)}%)
+                      </span>
+                    )}
                     {discount > 0 && (
                       <span className="flex items-center gap-0.5 text-yellow-700 font-bold">
                         <Coins className="w-3 h-3" /> −{formatEur(discount)} ({purchase.gold_spent} 🪙)

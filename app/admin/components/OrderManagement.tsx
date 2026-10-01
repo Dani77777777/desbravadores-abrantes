@@ -147,6 +147,11 @@ export function OrderManagement({ initialPurchases, profile, products }: OrderMa
                   {(order.quantity || 1) > 1 && <span className="ml-1.5 text-blue-700">× {order.quantity}</span>}
                 </span>
                 <div className="flex items-center gap-2 text-xs">
+                  {Number(order.volume_discount_eur) > 0 && (
+                    <span className="font-bold text-emerald-700" title="Desconto por quantidade">
+                      −{formatEur(Number(order.volume_discount_eur))} qtd. ({Number(order.volume_discount_percent)}%)
+                    </span>
+                  )}
                   {Number(order.discount_eur) > 0 && (
                     <span className="font-bold text-yellow-700 flex items-center gap-1">
                       <Coins className="w-3 h-3" /> −{formatEur(Number(order.discount_eur))} ({order.gold_spent} 🪙)
