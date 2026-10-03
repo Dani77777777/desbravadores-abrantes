@@ -3,7 +3,7 @@ import { createClient } from '@/utils/supabase/server';
 import { Navbar } from '@/components/layout/Navbar';
 import { Gamepad2, Trophy, Lock, LogIn, Ban, Settings, Coins, Play, Zap, Sparkles, ArrowRight } from 'lucide-react';
 import Link from 'next/link';
-import { GAMES, fetchGameSettings, gameAvailabilitySummary, gameVisibilityFor } from '@/utils/games';
+import { GAMES, fetchGameSettings, formatMultiplier, gameAvailabilitySummary, gameVisibilityFor, multiplierStatus } from '@/utils/games';
 import { effectiveRole } from '@/utils/permissions';
 import { displayFont } from '@/components/landing/fonts';
 import { SiteFooter } from '@/components/landing/SiteFooter';
@@ -34,9 +34,12 @@ export default async function GamesHubPage() {
     const visibility = gameVisibilityFor(setting, role);
     // Escondido (surpresa): quem não pode jogar nem sabe que o jogo existe.
     if (visibility === 'hidden') return [];
+    const bonus = multiplierStatus(setting);
     return [{
       ...game,
       available: visibility === 'available',
+      // Campanha de pontos multiplicados a decorrer (só jogos de um jogador)
+      bonus: bonus.state === 'active' ? bonus : null,
       // Mostrado a quem pode jogar quando o jogo não está aberto a todos (ex.: "Só liderança")
       restriction: setting.enabled ? gameAvailabilitySummary(setting) : null,
     }];
@@ -201,11 +204,25 @@ export default async function GamesHubPage() {
                         <><Zap className="h-3 w-3" /> Disponível</>
                       )}
                     </span>
+
+                    {isAvailable && game.bonus && (
+                      <span className="absolute left-3 top-3 z-20 inline-flex items-center gap-1 rounded-full bg-amber-400 px-2.5 py-1 text-[11px] font-black uppercase tracking-wider text-amber-950 shadow-lg">
+                        <Sparkles className="h-3 w-3" /> Pontos ×{formatMultiplier(game.bonus.multiplier)}
+                      </span>
+                    )}
                   </div>
 
                   <div className="flex flex-1 flex-col p-6">
                     <h2 className={`${D} text-2xl font-extrabold text-white`}>{game.title}</h2>
                     <p className="mt-2 min-h-[3rem] text-sm leading-relaxed text-blue-100/70">{game.description}</p>
+
+                    {isAvailable && game.bonus && (
+                      <p className="mt-3 flex items-center gap-1.5 text-xs font-bold text-amber-300">
+                        <Sparkles className="h-3 w-3" />
+                        Pontos a {game.bonus.multiplier === 2 ? 'dobrar' : `×${formatMultiplier(game.bonus.multiplier)}`}
+                        {game.bonus.endsAt && ` até ${game.bonus.endsAt.toLocaleString('pt-PT', { timeZone: 'Europe/Lisbon', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}`}
+                      </p>
+                    )}
 
                     {isAvailable && game.restriction && game.restriction.tone !== 'green' && (
                       <p className="mt-3 flex items-center gap-1.5 text-xs font-semibold text-amber-300">

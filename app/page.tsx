@@ -14,7 +14,7 @@ import { SiteFooter } from '@/components/landing/SiteFooter'
 import { LandingPage } from '@/components/landing/LandingPage'
 import type { PublicEvent } from '@/components/landing/NextEventCard'
 import { getJAEvents, filterJAEventsForSection } from '@/utils/ja-agenda'
-import { GAMES, fetchGameSettings, gameVisibilityFor } from '@/utils/games'
+import { GAMES, activeMultiplier, fetchGameSettings, gameVisibilityFor } from '@/utils/games'
 
 const D = displayFont.className
 
@@ -58,7 +58,8 @@ export default async function Dashboard() {
       // Com o ponto no mapa; sem a migração do mapa, só com o texto do local
       const withCoords = await nextEventQuery(`${baseCols}, location_lat, location_lng`)
       const { data: nextEvent } = withCoords.error ? await nextEventQuery(baseCols) : withCoords
-      return <LandingPage gameVisibility={gameVisibility} nextEvent={nextEvent} />
+      const gameMultipliers = Object.fromEntries(GAMES.map((g) => [g.id, activeMultiplier(gameSettings[g.id])]))
+      return <LandingPage gameVisibility={gameVisibility} nextEvent={nextEvent} gameMultipliers={gameMultipliers} />
   }
 
   const { data: profile } = await supabase

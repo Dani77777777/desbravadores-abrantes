@@ -59,7 +59,9 @@ AS $$
 DECLARE
   v_amount integer;
   v_desc text;
+  v_desc_base text;
   v_mode_label text;
+  v_multiplier numeric := 1;
 BEGIN
   -- Só o próprio pode reclamar as suas recompensas
   IF p_user_id IS DISTINCT FROM auth.uid() THEN
@@ -78,7 +80,8 @@ BEGIN
   END IF;
 
   v_mode_label := initcap(p_mode);
-  v_desc := 'VanaCódigo — Desafio Diário (' || v_mode_label || ')';
+  v_desc_base := 'VanaCódigo — Desafio Diário (' || v_mode_label || ')';
+  v_desc := v_desc_base;
 
   -- A vitória tem de existir na sessão de hoje
   IF NOT EXISTS (
@@ -92,11 +95,11 @@ BEGIN
     RETURN jsonb_build_object('awarded', false, 'message', null);
   END IF;
 
-  -- Uma recompensa por modo por dia
+  -- Uma recompensa por modo por dia (o sufixo do multiplicador não conta)
   IF EXISTS (
     SELECT 1 FROM public.points_log
     WHERE target_user_id = p_user_id
-      AND description = v_desc
+      AND description LIKE v_desc_base || '%'
       AND created_at >= public.vana_codigo_day_start()
   ) THEN
     RETURN jsonb_build_object(
@@ -105,12 +108,22 @@ BEGIN
     );
   END IF;
 
+  -- Campanha de pontos a dobrar (Gestão -> Jogos).
+  -- Precisa de supabase-migration-game-points-multiplier.sql.
+  v_multiplier := public.game_points_multiplier('vana-codigo');
+  IF v_multiplier > 1 THEN
+    v_amount := public.apply_points_multiplier(v_amount, v_multiplier);
+    v_desc := v_desc || ' (pontos ' || public.points_multiplier_label(v_multiplier) || ')';
+  END IF;
+
   INSERT INTO public.points_log (target_user_id, awarded_by_user_id, amount_xp, amount_gold, description)
   VALUES (p_user_id, p_user_id, v_amount, v_amount, v_desc);
 
   RETURN jsonb_build_object(
     'awarded', true,
+    'multiplier', v_multiplier,
     'message', 'Mensagem decifrada! Ganhaste ' || v_amount || ' XP e ' || v_amount || ' Gold 🪙'
+      || CASE WHEN v_multiplier > 1 THEN ' (' || public.points_multiplier_label(v_multiplier) || '!)' ELSE '' END
   );
 END;
 $$;

@@ -7,6 +7,7 @@ import { Check, ChevronRight, ExternalLink, EyeOff, Gamepad2, Info, Lock } from 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Switch } from '@/components/ui/switch'
 import { updateGameSetting } from '@/lib/actions/games'
+import { GamePointsMultiplier } from './GamePointsMultiplier'
 import {
   GAMES,
   GAME_ROLES,
@@ -202,6 +203,16 @@ export function GamesPanel({
                   <p className="flex items-center gap-2 text-sm text-gray-500">
                     <Lock className="h-4 w-4" /> Só a coordenação altera a disponibilidade.
                   </p>
+                )}
+
+                {/* Nos jogos ao vivo quem paga é o anfitrião, no fim da sessão. */}
+                {game.singlePlayer && (
+                  <GamePointsMultiplier
+                    game={game}
+                    setting={setting}
+                    canEdit={canEdit}
+                    onSaved={(next) => setSettings((s) => ({ ...s, [game.id]: next }))}
+                  />
                 )}
               </div>
 

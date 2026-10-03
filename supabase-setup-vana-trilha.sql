@@ -204,6 +204,7 @@ DECLARE
   v_perfect boolean := false;
   v_station_name text;
   v_desc text;
+  v_multiplier numeric := 1;
 BEGIN
   -- FOR UPDATE: dois pedidos em simultâneo não conseguem pagar duas vezes.
   SELECT * INTO v_run FROM public.vanatrilha_daily_runs WHERE id = p_run_id FOR UPDATE;
@@ -234,6 +235,15 @@ BEGIN
             CASE WHEN v_perfect THEN ' (Jornada Perfeita)' ELSE '' END ||
             CASE WHEN COALESCE(v_run.bonus_gold, 0) > 0 THEN ' + Milagre' ELSE '' END;
 
+  -- Campanha de pontos a dobrar (Gestão -> Jogos).
+  -- Precisa de supabase-migration-game-points-multiplier.sql.
+  v_multiplier := public.game_points_multiplier('vana-trilha');
+  IF v_multiplier > 1 THEN
+    v_xp   := public.apply_points_multiplier(v_xp, v_multiplier);
+    v_gold := public.apply_points_multiplier(v_gold, v_multiplier);
+    v_desc := v_desc || ' (pontos ' || public.points_multiplier_label(v_multiplier) || ')';
+  END IF;
+
   INSERT INTO public.points_log (target_user_id, awarded_by_user_id, amount_xp, amount_gold, description)
   VALUES (v_run.user_id, v_run.user_id, v_xp, v_gold, v_desc);
 
@@ -248,7 +258,8 @@ BEGIN
     'xp', v_xp,
     'gold', v_gold,
     'perfect', v_perfect,
-    'bonus_gold', COALESCE(v_run.bonus_gold, 0)
+    'bonus_gold', COALESCE(v_run.bonus_gold, 0),
+    'multiplier', v_multiplier
   );
 END;
 $$;

@@ -22,7 +22,7 @@ import {
   Lock,
   Star,
 } from "lucide-react";
-import { GAMES, type GameVisibility } from "@/utils/games";
+import { GAMES, formatMultiplier, type GameVisibility } from "@/utils/games";
 import { displayFont } from "./fonts";
 import { SiteFooter } from "./SiteFooter";
 import { NextEventCard, type PublicEvent } from "./NextEventCard";
@@ -47,13 +47,16 @@ const delay = (ms: number) => ({ "--d": `${ms}ms` }) as CSSProperties;
 /**
  * gameVisibility: id do jogo → estado para visitantes sem conta (jogos escondidos não aparecem).
  * nextEvent: próximo evento aberto a todo o clube (null = não há, a secção não aparece).
+ * gameMultipliers: id do jogo → multiplicador de pontos a decorrer (1 = pontuação normal).
  */
 export function LandingPage({
   gameVisibility = {},
   nextEvent = null,
+  gameMultipliers = {},
 }: {
   gameVisibility?: Record<string, GameVisibility>;
   nextEvent?: PublicEvent | null;
+  gameMultipliers?: Record<string, number>;
 }) {
   const router = useRouter();
   const rootRef = useRef<HTMLDivElement>(null);
@@ -623,6 +626,7 @@ export function LandingPage({
               const available =
                 (gameVisibility[game.id] ?? "available") === "available";
               const href = game.requiresAuth ? game.loginHref : game.href;
+              const multiplier = gameMultipliers[game.id] ?? 1;
 
               const card = (
                 <div
@@ -672,6 +676,11 @@ export function LandingPage({
                         </>
                       )}
                     </span>
+                    {available && multiplier > 1 && (
+                      <span className="absolute left-3 top-3 z-20 inline-flex items-center gap-1 rounded-full bg-amber-400 px-2.5 py-1 text-[11px] font-black uppercase tracking-wider text-amber-950 shadow-lg">
+                        <Sparkles className="h-3 w-3" /> Pontos ×{formatMultiplier(multiplier)}
+                      </span>
+                    )}
                   </div>
                   <div className="p-5">
                     <h3 className={`${D} text-xl font-extrabold text-white`}>
