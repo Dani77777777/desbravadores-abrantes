@@ -294,6 +294,92 @@
 .vantur-victory-btn:hover  { background: #1e293b; }
 .vantur-victory-btn:active { transform: scale(0.97); }
 
+.vantur-victory-btn.secondary {
+  background: #f1f5f9;
+  color: #0f172a;
+  border: 1px solid #e2e8f0;
+}
+.vantur-victory-btn.secondary:hover { background: #e2e8f0; }
+
+/* ---- Rever jogada ---- */
+.vantur-replay-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.55);
+  backdrop-filter: blur(12px);
+  z-index: 50;
+  overflow-y: auto;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 1rem;
+}
+
+.vantur-replay-panel {
+  background: #fafaf9;
+  border-radius: 1.5rem;
+  width: 100%;
+  max-width: 900px;
+  margin: auto 0;
+  padding: 1rem 0.75rem 1.25rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.6rem;
+  box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25);
+}
+
+.vantur-replay-top {
+  position: relative;
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 36px;
+}
+
+.vantur-replay-close {
+  position: absolute;
+  right: 0.25rem;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 36px;
+  height: 36px;
+  border-radius: 99px;
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  color: #475569;
+  font-weight: 900;
+  cursor: pointer;
+}
+.vantur-replay-close:hover { background: #f1f5f9; }
+
+.vantur-replay-progress {
+  font-weight: 800;
+  color: #334155;
+  font-size: 0.95rem;
+  text-align: center;
+}
+
+.vantur-replay-keyboard {
+  width: 100%;
+  pointer-events: none;
+}
+
+.vantur-replay-controls {
+  display: flex;
+  gap: 0.75rem;
+  width: 100%;
+  max-width: 420px;
+}
+
+@media (max-width: 640px) {
+  .vantur-replay-overlay { padding: 0.5rem; }
+  .vantur-replay-panel   { padding: 0.75rem 0.25rem 1rem; border-radius: 1rem; }
+  .vantur-replay-controls { padding: 0 0.5rem; }
+  .vantur-replay-controls .vantur-victory-btn { padding: 0.8rem; font-size: 0.8rem; }
+}
+
 /* ---- Animations ---- */
 @keyframes cellPop {
   0%   { transform: scale(1.15); }

@@ -6,6 +6,8 @@ import { ChevronLeft, Brain, Zap, Layers } from 'lucide-react';
 import { Navbar } from '@/components/layout/Navbar';
 import VanturGame from '@/components/vantur/VanturGame';
 import VanturHowToPlay from '@/components/vantur/VanturHowToPlay';
+import VanturReplayButton from '@/components/vantur/VanturReplayButton';
+import type { VanturReplaySession } from '@/components/vantur/VanturReplay';
 import { gameUnavailableError } from '@/utils/game-access';
 
 interface ModeCardProps {
@@ -16,9 +18,10 @@ interface ModeCardProps {
   userId: string;
   action: (formData: FormData) => Promise<void>;
   isFinished?: boolean;
+  finishedSession?: VanturReplaySession;
 }
 
-function ModeCard({ title, description, mode, icon, userId, action, isFinished }: ModeCardProps) {
+function ModeCard({ title, description, mode, icon, userId, action, isFinished, finishedSession }: ModeCardProps) {
   return (
     <div className={`bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-100 flex flex-col items-center text-center gap-6 transition-all hover:shadow-xl hover:-translate-y-1 ${isFinished ? 'opacity-75 grayscale-[0.5]' : ''}`}>
       <div className={`w-24 h-24 rounded-3xl flex items-center justify-center mb-2 ${isFinished ? 'bg-slate-50' : 'bg-blue-50/50'}`}>
@@ -30,8 +33,13 @@ function ModeCard({ title, description, mode, icon, userId, action, isFinished }
       </div>
       
       {isFinished ? (
-        <div className="w-full py-4 bg-slate-100 text-slate-400 rounded-2xl font-bold cursor-not-allowed">
-          CONCLUÍDO HOJE
+        <div className="w-full flex flex-col gap-3">
+          <div className="w-full py-4 bg-slate-100 text-slate-400 rounded-2xl font-bold cursor-not-allowed">
+            CONCLUÍDO HOJE
+          </div>
+          {finishedSession && finishedSession.attempts.length > 0 && (
+            <VanturReplayButton session={finishedSession} />
+          )}
         </div>
       ) : (
         <form action={action} className="w-full">
@@ -77,7 +85,12 @@ export default async function VanturGamePage() {
     .gte('updated_at', todayStart.toISOString());
 
   // Check which modes are finished or active
-  const finishedModes = (sessions || []).filter(s => s.is_finished).map(s => s.mode);
+  const finishedSessions = (sessions || []).filter(s => s.is_finished);
+  const finishedModes = finishedSessions.map(s => s.mode);
+  const finishedSessionFor = (mode: string): VanturReplaySession | undefined => {
+    const s = finishedSessions.find(f => f.mode === mode);
+    return s ? { secret_words: s.secret_words, attempts: s.attempts ?? [], mode: s.mode } : undefined;
+  };
   const activeSessions = (sessions || []).filter(s => !s.is_finished);
 
   async function startVantur(formData: FormData) {
@@ -172,6 +185,7 @@ export default async function VanturGamePage() {
                 userId={user.id}
                 action={startVantur}
                 isFinished={finishedModes.includes('solo')}
+                finishedSession={finishedSessionFor('solo')}
               />
               <ModeCard 
                 title="Mix" 
@@ -181,6 +195,7 @@ export default async function VanturGamePage() {
                 userId={user.id}
                 action={startVantur}
                 isFinished={finishedModes.includes('mix')}
+                finishedSession={finishedSessionFor('mix')}
               />
               <ModeCard 
                 title="Plex" 
@@ -190,6 +205,7 @@ export default async function VanturGamePage() {
                 userId={user.id}
                 action={startVantur}
                 isFinished={finishedModes.includes('plex')}
+                finishedSession={finishedSessionFor('plex')}
               />
             </div>
             

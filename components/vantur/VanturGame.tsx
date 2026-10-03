@@ -8,6 +8,8 @@ import { toast } from 'sonner';
 import WordleGrid from './WordleGrid';
 import VanturKeyboard from './VanturKeyboard';
 import VanturHowToPlay from './VanturHowToPlay';
+import VanturReplay from './VanturReplay';
+import { computeKeyStatusesPerGrid, cleanSecretWord, maxAttemptsForMode } from './key-statuses';
 import './Vantur.css';
 
 interface VanturSession {
@@ -38,18 +40,17 @@ const VanturGame: React.FC<VanturGameProps> = ({ initialSession, userId }) => {
   const [shakeRow, setShakeRow] = useState(false);
   const [revealingAttemptIndex, setRevealingAttemptIndex] = useState<number | null>(null);
   const [celebratingInfo, setCelebratingInfo] = useState<{ attemptIdx: number; gridIdx: number } | null>(null);
+  const [showReplay, setShowReplay] = useState(false);
   const [fadedGridIndices, setFadedGridIndices] = useState<number[]>(initialSession.completed_indices);
   const isRevealing = revealingAttemptIndex !== null;
   const isCelebrating = celebratingInfo !== null;
 
   const cleanSecretWords = useMemo(() => {
-    return session.secret_words.map(w =>
-      w.replace(/[^a-zA-ZáàâãéèêíïóôõöúçÁÀÂÃÉÈÊÍÏÓÔÕÖÚÇ]/g, '').toUpperCase()
-    );
+    return session.secret_words.map(cleanSecretWord);
   }, [session.secret_words]);
 
   const wordLength = cleanSecretWords[0]?.length || 5;
-  const maxAttempts = session.mode === 'solo' ? 6 : session.mode === 'mix' ? 7 : 9;
+  const maxAttempts = maxAttemptsForMode(session.mode);
 
   // currentGuess is a fixed-length array — each slot is '' or a letter
   const emptyGuess = useMemo(() => Array(wordLength).fill('') as string[], [wordLength]);
@@ -57,40 +58,13 @@ const VanturGame: React.FC<VanturGameProps> = ({ initialSession, userId }) => {
   const [cursorPos, setCursorPos] = useState(0);
 
   // Per-grid key statuses
-  const getKeyStatusesPerGrid = useCallback((): Array<Record<string, 'correct' | 'present' | 'absent' | ''>> => {
+  const getKeyStatusesPerGrid = useCallback(() => {
     // Durante a revelação, o teclado não mostra as cores da tentativa ainda a revelar
     const attemptsForKeyboard = revealingAttemptIndex !== null
       ? session.attempts.slice(0, revealingAttemptIndex)
       : session.attempts;
-
-    return cleanSecretWords.map((secret, gridIndex) => {
-      const statuses: Record<string, 'correct' | 'present' | 'absent' | ''> = {};
-      const gridDone = session.completed_indices.includes(gridIndex) ||
-        attemptsForKeyboard.some(a => normalizeText(a) === normalizeText(secret));
-
-      let attemptsToCheck = attemptsForKeyboard;
-      if (gridDone) {
-        const winIdx = session.attempts.findIndex(a => normalizeText(a) === normalizeText(secret));
-        if (winIdx >= 0) attemptsToCheck = session.attempts.slice(0, winIdx + 1);
-      }
-
-      attemptsToCheck.forEach((attempt) => {
-        const attemptClean = normalizeText(attempt);
-        const secretClean = normalizeText(secret);
-        for (let i = 0; i < attemptClean.length; i++) {
-          const char = attemptClean[i];
-          if (char === secretClean[i]) {
-            statuses[char] = 'correct';
-          } else if (secretClean.includes(char) && statuses[char] !== 'correct') {
-            statuses[char] = 'present';
-          } else if (!statuses[char]) {
-            statuses[char] = 'absent';
-          }
-        }
-      });
-      return statuses;
-    });
-  }, [session.attempts, session.completed_indices, cleanSecretWords, revealingAttemptIndex]);
+    return computeKeyStatusesPerGrid(cleanSecretWords, attemptsForKeyboard);
+  }, [session.attempts, cleanSecretWords, revealingAttemptIndex]);
 
   const getCombinedKeyStatuses = useCallback(() => {
     const perGrid = getKeyStatusesPerGrid();
@@ -318,7 +292,7 @@ const VanturGame: React.FC<VanturGameProps> = ({ initialSession, userId }) => {
         keyStatusesPerGrid={getKeyStatusesPerGrid()}
       />
 
-      {session.is_finished && !isRevealing && !isCelebrating && (
+      {session.is_finished && !isRevealing && !isCelebrating && !showReplay && (
         <div className="vantur-victory-overlay">
           <div className="vantur-victory-card">
             <div style={{ fontSize: '3rem', lineHeight: 1 }}>{won ? '🎉' : '😔'}</div>
@@ -338,6 +312,13 @@ const VanturGame: React.FC<VanturGameProps> = ({ initialSession, userId }) => {
             </div>
 
             <button
+              className="vantur-victory-btn secondary"
+              onClick={() => setShowReplay(true)}
+            >
+              ▶ Rever jogada
+            </button>
+
+            <button
               className="vantur-victory-btn"
               onClick={() => (window.location.href = '/jogos/vantur')}
             >
@@ -345,6 +326,10 @@ const VanturGame: React.FC<VanturGameProps> = ({ initialSession, userId }) => {
             </button>
           </div>
         </div>
+      )}
+
+      {showReplay && (
+        <VanturReplay session={session} onClose={() => setShowReplay(false)} />
       )}
     </div>
   );
