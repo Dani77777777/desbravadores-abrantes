@@ -36,15 +36,19 @@ export default async function TripsPage() {
   if (section) membersQuery = membersQuery.eq('section', section)
 
   const { from, to } = eventWindow()
-  let eventsQuery = supabase
-    .from('events')
-    .select('id, title, start_at, end_at, target_section, location, rsvp_enabled')
-    .gte('start_at', from)
-    .lte('start_at', to)
-    .order('start_at', { ascending: true })
-  if (section) eventsQuery = eventsQuery.eq('target_section', section)
+  const eventsQuery = (cols: string) => {
+    let q = supabase.from('events').select(cols).gte('start_at', from).lte('start_at', to).order('start_at', { ascending: true })
+    if (section) q = q.eq('target_section', section)
+    return q
+  }
+  const baseCols = 'id, title, start_at, end_at, target_section, location, rsvp_enabled'
+  // Com o ponto do evento no mapa (destino das boleias); sem a migração do mapa, só o texto
+  const loadEvents = async () => {
+    const withCoords = await eventsQuery(`${baseCols}, location_lat, location_lng`)
+    return withCoords.error ? await eventsQuery(baseCols) : withCoords
+  }
 
-  const [{ data: members }, { data: events }] = await Promise.all([membersQuery, eventsQuery])
+  const [{ data: members }, { data: events }] = await Promise.all([membersQuery, loadEvents()])
 
   return (
     <div className="min-h-screen bg-stone-50">
@@ -52,7 +56,7 @@ export default async function TripsPage() {
       <TripsClient
         userId={user.id}
         members={(members || []) as TripMember[]}
-        events={(events || []) as TripEvent[]}
+        events={(events || []) as unknown as TripEvent[]}
         canConfirmGender={role === 'coordenador'}
       />
     </div>

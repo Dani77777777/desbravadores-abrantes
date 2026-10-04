@@ -1,5 +1,17 @@
 import { describe, expect, test } from 'bun:test'
-import { autoFillCars, autoFillTents, genderInfo, tentIssues, type TripCar, type TripMember, type TripTent } from './trips'
+import {
+  autoFillCars,
+  autoFillTents,
+  carStops,
+  genderInfo,
+  pointIdOf,
+  routeUrl,
+  tentIssues,
+  type TripCar,
+  type TripMember,
+  type TripPlanData,
+  type TripTent,
+} from './trips'
 
 const m = (id: string, over: Partial<TripMember> = {}): TripMember => ({
   id, full_name: id, avatar_url: null, role: 'desbravador', section: 'ticoes', leadership_section: null,
@@ -47,10 +59,66 @@ test('autoFillCars respeita os lugares e a direção', () => {
     { id: 'c1', direction: 'ida', driver: '', seats: 1, meetingPoint: '', departAt: '', passengers: [] },
     { id: 'c2', direction: 'volta', driver: '', seats: 3, meetingPoint: '', departAt: '', passengers: [] },
   ]
-  const res = autoFillCars(cars, 'ida', [m('a'), m('b')])
+  const res = autoFillCars(cars, 'ida', [m('a'), m('b')], { points: [], personPoints: {} })
   expect(res.cars.find((c) => c.id === 'c1')!.passengers).toHaveLength(1)
   expect(res.cars.find((c) => c.id === 'c2')!.passengers).toHaveLength(0)
   expect(res.unplaced).toHaveLength(1)
+})
+
+describe('pontos de encontro', () => {
+  const plan: Pick<TripPlanData, 'points' | 'personPoints'> = {
+    points: [
+      { id: 'centro', name: 'Centro', lat: 39.46, lng: -8.19 },
+      { id: 'alf', name: 'Alferrarede', lat: 39.47, lng: -8.17 },
+    ],
+    personPoints: {
+      manel: { ida: 'centro' },
+      maria: { ida: 'alf', volta: 'centro' },
+      rui: { ida: 'centro', volta: '' },
+      ana: { ida: 'apagado' },
+    },
+  }
+  const car = (over: Partial<TripCar> = {}): TripCar => ({
+    id: 'c', direction: 'ida', driver: '', seats: 4, meetingPoint: 'Sede', departAt: '2026-10-10T08:30', passengers: [], ...over,
+  })
+
+  test('pointIdOf: volta igual à ida por defeito, "" = sem ponto, ponto apagado = sem ponto', () => {
+    expect(pointIdOf(plan, 'manel', 'volta')).toBe('centro')
+    expect(pointIdOf(plan, 'maria', 'volta')).toBe('centro')
+    expect(pointIdOf(plan, 'rui', 'volta')).toBeNull()
+    expect(pointIdOf(plan, 'ana', 'ida')).toBeNull()
+    expect(pointIdOf(plan, 'ninguem', 'ida')).toBeNull()
+  })
+
+  test('carStops: agrupa por ponto, ordena pela hora e deixa quem não tem ponto no fim', () => {
+    const stops = carStops(car({ passengers: ['ana', 'manel', 'maria', 'rui'], stopTimes: { alf: '08:00', centro: '08:20' } }), plan)
+    expect(stops.map((s) => [s.point?.id ?? null, s.time, s.passengers])).toEqual([
+      ['alf', '08:00', ['maria']],
+      ['centro', '08:20', ['manel', 'rui']],
+      [null, '', ['ana']],
+    ])
+  })
+
+  test('autoFillCars junta quem tem o mesmo ponto', () => {
+    const p2 = { points: plan.points, personPoints: { a: { ida: 'centro' }, b: { ida: 'alf' }, c: { ida: 'centro' }, d: { ida: 'alf' } } }
+    const cars = [car({ id: 'x', seats: 2 }), car({ id: 'y', seats: 2 })]
+    const res = autoFillCars(cars, 'ida', [m('a'), m('b'), m('c'), m('d')], p2)
+    const groups = res.cars.map((c) => [...c.passengers].sort())
+    expect(groups).toContainEqual(['a', 'c'])
+    expect(groups).toContainEqual(['b', 'd'])
+  })
+
+  test('routeUrl: ida acaba no evento, volta começa no evento', () => {
+    const stops = carStops(car({ passengers: ['manel', 'maria'], stopTimes: { alf: '08:00', centro: '08:20' } }), plan)
+    const dest = { name: 'Acampamento', lat: 39.5, lng: -8.0 }
+    const ida = new URL(routeUrl('ida', stops, dest)!)
+    expect(ida.searchParams.get('destination')).toBe('39.5,-8')
+    expect(ida.searchParams.get('waypoints')).toBe('39.47,-8.17|39.46,-8.19')
+    const volta = new URL(routeUrl('volta', stops, dest)!)
+    expect(volta.searchParams.get('origin')).toBe('39.5,-8')
+    expect(volta.searchParams.get('destination')).toBe('39.46,-8.19')
+    expect(routeUrl('ida', [], dest)).toBeNull()
+  })
 })
 
 test('tentIssues: excesso e sexo errado', () => {

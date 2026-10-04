@@ -24,6 +24,8 @@ export type TripEvent = {
   end_at: string | null
   target_section: string | null
   location: string | null
+  location_lat?: number | null
+  location_lng?: number | null
   rsvp_enabled?: boolean | null
 }
 
@@ -47,11 +49,31 @@ export type TripCar = {
   driverId?: string | null
   /** Lugares para passageiros (sem contar o condutor). */
   seats: number
+  /** Ponto geral do carro: vale para quem não tem um ponto de encontro escolhido. */
   meetingPoint: string
   /** 'AAAA-MM-DDTHH:MM' (hora local, como o input datetime-local) ou ''. */
   departAt: string
   passengers: string[]
+  /** Hora ('HH:MM') a que este carro passa em cada ponto (id do ponto → hora). Vazio = hora de partida. */
+  stopTimes?: Record<string, string>
 }
+
+/** Ponto de encontro partilhado (vários membros e carros podem usar o mesmo). */
+export type TripPoint = {
+  id: string
+  name: string
+  lat: number | null
+  lng: number | null
+}
+
+/**
+ * Ponto de cada pessoa: onde é apanhada na ida e onde é deixada na volta.
+ * `volta` em falta = igual à ida; '' = sem ponto (vale o ponto geral do carro).
+ */
+export type PersonPoints = { ida?: string; volta?: string }
+
+/** Destino (local do evento), guardado ao publicar para o percurso dos condutores. */
+export type TripDestination = { name: string; lat: number | null; lng: number | null }
 
 /** Rascunho guardado em `trip_plans.draft`. */
 export type TripPlanData = {
@@ -60,12 +82,15 @@ export type TripPlanData = {
   cars: TripCar[]
   /** Membros acrescentados à mão (além de quem disse "Vou" e das presenças do evento). */
   extraIds: string[]
+  points: TripPoint[]
+  /** id do membro → pontos de ida e volta. */
+  personPoints: Record<string, PersonPoints>
 }
 
 /** Versão publicada (`trip_plans.published`): o rascunho + nomes para os membros verem. */
-export type TripPublished = TripPlanData & { names: Record<string, string> }
+export type TripPublished = TripPlanData & { names: Record<string, string>; dest?: TripDestination | null }
 
-export const EMPTY_PLAN: TripPlanData = { v: 1, tents: [], cars: [], extraIds: [] }
+export const EMPTY_PLAN: TripPlanData = { v: 1, tents: [], cars: [], extraIds: [], points: [], personPoints: {} }
 
 export const TENT_KIND_LABELS: Record<TentKind, string> = { m: 'Rapazes', f: 'Raparigas', misto: 'Mista' }
 export const DIRECTION_LABELS: Record<TripDirection, string> = { ida: 'Ida', volta: 'Volta' }
@@ -77,7 +102,92 @@ export function normalizePlan(raw: unknown): TripPlanData {
     tents: Array.isArray(p.tents) ? p.tents : [],
     cars: Array.isArray(p.cars) ? p.cars : [],
     extraIds: Array.isArray(p.extraIds) ? p.extraIds : [],
+    points: Array.isArray(p.points) ? p.points : [],
+    personPoints: p.personPoints && typeof p.personPoints === 'object' && !Array.isArray(p.personPoints) ? p.personPoints : {},
   }
+}
+
+/** Cor de cada ponto (pela posição na lista), igual no mapa, nos carros e no Painel. */
+const POINT_COLORS = ['#dc2626', '#2563eb', '#16a34a', '#d97706', '#9333ea', '#0891b2', '#db2777', '#65a30d', '#4f46e5', '#ea580c']
+
+export function pointColor(index: number): string {
+  return POINT_COLORS[((index % POINT_COLORS.length) + POINT_COLORS.length) % POINT_COLORS.length]
+}
+
+/** Id do ponto de uma pessoa nessa direção (null = sem ponto, vale o ponto geral do carro). */
+export function pointIdOf(plan: Pick<TripPlanData, 'personPoints' | 'points'>, memberId: string, dir: TripDirection): string | null {
+  const pp = plan.personPoints[memberId]
+  if (!pp) return null
+  const id = dir === 'ida' ? pp.ida : pp.volta ?? pp.ida
+  return id && plan.points.some((p) => p.id === id) ? id : null
+}
+
+export type CarStop = {
+  /** null = quem não tem ponto escolhido (ponto geral do carro). */
+  point: TripPoint | null
+  /** 'HH:MM' desta paragem neste carro ('' sem hora). */
+  time: string
+  passengers: string[]
+}
+
+/** 'HH:MM' do datetime-local da partida. */
+export function departTime(car: Pick<TripCar, 'departAt'>): string {
+  return car.departAt.split('T')[1]?.slice(0, 5) || ''
+}
+
+/**
+ * Paragens de um carro: os passageiros agrupados pelo seu ponto, por ordem de hora
+ * (sem hora, pela ordem da lista de pontos). Quem não tem ponto fica no fim (ponto geral).
+ */
+export function carStops(car: TripCar, plan: Pick<TripPlanData, 'personPoints' | 'points'>): CarStop[] {
+  const groups = new Map<string | null, string[]>()
+  for (const id of car.passengers) {
+    const pid = pointIdOf(plan, id, car.direction)
+    groups.set(pid, [...(groups.get(pid) || []), id])
+  }
+  const fallback = departTime(car)
+  return [...groups.entries()]
+    .map(([pid, passengers]) => ({
+      point: pid ? plan.points.find((p) => p.id === pid) ?? null : null,
+      time: (pid && car.stopTimes?.[pid]) || '',
+      passengers,
+      rank: pid ? plan.points.findIndex((p) => p.id === pid) : Infinity,
+    }))
+    .sort((a, b) => {
+      if (!a.point !== !b.point) return a.point ? -1 : 1
+      const ta = a.time || fallback
+      const tb = b.time || fallback
+      if (ta !== tb) return ta < tb ? -1 : 1
+      return a.rank - b.rank
+    })
+    .map(({ point, time, passengers }) => ({ point, time, passengers }))
+}
+
+type LatLng = { lat: number; lng: number }
+
+const hasCoords = (p: { lat: number | null; lng: number | null } | null | undefined): p is LatLng =>
+  !!p && p.lat != null && p.lng != null
+
+/**
+ * Percurso do condutor no Google Maps, pelas paragens com ponto no mapa.
+ * Ida: paragens → destino (o local do evento); volta: do evento → paragens.
+ */
+export function routeUrl(dir: TripDirection, stops: CarStop[], dest: TripDestination | null | undefined): string | null {
+  const pts: LatLng[] = stops.flatMap((s) => (hasCoords(s.point) ? [{ lat: s.point.lat, lng: s.point.lng }] : []))
+  if (pts.length === 0) return null
+  const at = (p: LatLng) => `${p.lat},${p.lng}`
+  const params = new URLSearchParams({ api: '1', travelmode: 'driving' })
+  let waypoints: string[]
+  if (dir === 'ida' && hasCoords(dest)) {
+    params.set('destination', at(dest))
+    waypoints = pts.map(at)
+  } else {
+    if (dir === 'volta' && hasCoords(dest)) params.set('origin', at(dest))
+    params.set('destination', at(pts[pts.length - 1]))
+    waypoints = pts.slice(0, -1).map(at)
+  }
+  if (waypoints.length > 0) params.set('waypoints', waypoints.join('|'))
+  return `https://www.google.com/maps/dir/?${params}`
 }
 
 /** Sexo a usar: o confirmado, ou o palpite pelo primeiro nome. */
@@ -121,14 +231,33 @@ export function fillGroups(
   groups: Group[],
   people: TripMember[],
   sectionOf: (id: string) => string | null,
+  /** Boleias: junta primeiro quem tem o mesmo ponto de encontro (menos paragens por carro). */
+  points?: { of: (id: string) => string | null; rank: (pointId: string | null) => number },
 ): { groups: Group[]; unplaced: TripMember[] } {
   const out = groups.map((g) => ({ ...g, ids: [...g.ids] }))
   const unplaced: TripMember[] = []
-  for (const p of [...people].sort(fillOrder)) {
+  const sorted = [...people].sort((a, b) => {
+    const d = points ? points.rank(points.of(a.id)) - points.rank(points.of(b.id)) : 0
+    return d !== 0 ? d : fillOrder(a, b)
+  })
+  for (const p of sorted) {
     const free = out.filter((g) => g.ids.length < g.capacity)
     if (free.length === 0) {
       unplaced.push(p)
       continue
+    }
+    // Com ponto: um carro que já passe nesse ponto, senão um carro vazio
+    const pt = points?.of(p.id) ?? null
+    if (pt) {
+      const samePoint = free
+        .map((g) => ({ g, n: g.ids.filter((id) => points!.of(id) === pt).length }))
+        .filter((x) => x.n > 0)
+        .sort((a, b) => b.n - a.n)[0]?.g
+      const target = samePoint ?? free.find((g) => g.ids.length === 0)
+      if (target) {
+        target.ids.push(p.id)
+        continue
+      }
     }
     const sameSection = free
       .map((g) => ({ g, n: g.ids.filter((id) => sectionOf(id) === p.section).length }))
@@ -168,13 +297,24 @@ export function autoFillTents(tents: TripTent[], people: TripMember[]) {
   return { tents: next, unplaced }
 }
 
-export function autoFillCars(cars: TripCar[], direction: TripDirection, people: TripMember[]) {
+export function autoFillCars(
+  cars: TripCar[],
+  direction: TripDirection,
+  people: TripMember[],
+  plan: Pick<TripPlanData, 'personPoints' | 'points'>,
+) {
   const byId = new Map(people.map((p) => [p.id, p]))
   const sectionOf = (id: string) => byId.get(id)?.section ?? null
   const groups = cars
     .filter((c) => c.direction === direction)
     .map((c) => ({ id: c.id, capacity: c.seats, ids: [...c.passengers] }))
-  const res = fillGroups(groups, people, sectionOf)
+  const res = fillGroups(groups, people, sectionOf, {
+    of: (id) => pointIdOf(plan, id, direction),
+    rank: (pid) => {
+      const i = pid ? plan.points.findIndex((p) => p.id === pid) : -1
+      return i === -1 ? plan.points.length : i
+    },
+  })
   const filled = new Map(res.groups.map((x) => [x.id, x.ids]))
   return {
     cars: cars.map((c) => (filled.has(c.id) ? { ...c, passengers: filled.get(c.id)! } : c)),
@@ -204,10 +344,11 @@ export function toLocalInput(iso: string | null): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
 
-/** "sáb., 12/10 às 08:30" a partir do valor do datetime-local. */
-export function formatDepart(value: string): string {
+/** "sáb., 12/10 às 08:30" a partir do valor do datetime-local (`timeOverride`: a hora da paragem). */
+export function formatDepart(value: string, timeOverride?: string): string {
   if (!value) return ''
-  const [date, time] = value.split('T')
+  const [date, ownTime] = value.split('T')
+  const time = timeOverride || ownTime
   const [y, m, d] = date.split('-').map(Number)
   if (!y || !m || !d) return value
   const day = new Date(y, m - 1, d).toLocaleDateString('pt-PT', { weekday: 'short', day: '2-digit', month: '2-digit' })

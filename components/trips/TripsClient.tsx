@@ -12,6 +12,7 @@ import {
   Copy,
   EyeOff,
   Loader2,
+  MapPin,
   Minus,
   Plus,
   RotateCcw,
@@ -39,28 +40,35 @@ import {
   TENT_KIND_LABELS,
   autoFillCars,
   autoFillTents,
+  carStops,
   genderInfo,
   isLeader,
   newTripId,
   normalizePlan,
+  pointIdOf,
   tentIssues,
   toLocalInput,
+  type CarStop,
   type TentKind,
   type TripCar,
   type TripDirection,
   type TripEvent,
   type TripMember,
   type TripPlanData,
+  type TripPoint,
   type TripPublished,
   type TripTent,
 } from '@/utils/trips'
 import { SECTION_DOT } from '@/app/admin/components/member-constants'
 import { GenderBadge } from './GenderBadge'
+import { PointBadge, TripPointsPanel } from './TripPointsPanel'
 
 type Tab = 'tents' | TripDirection
 type SaveState = 'idle' | 'saving' | 'saved' | 'error' | 'conflict'
 
 const LAST_EVENT_KEY = 'trips:last-event'
+/** No seletor do ponto da volta: "igual à ida". */
+const SAME_AS_IDA = '__ida'
 const SAVE_DELAY_MS = 900
 
 function eventLabel(e: TripEvent) {
@@ -400,6 +408,7 @@ export function TripsClient({
         passengers: c.passengers.filter((x) => x !== id),
         driverId: c.driverId === id ? null : c.driverId ?? null,
       })),
+      personPoints: Object.fromEntries(Object.entries(p.personPoints).filter(([k]) => k !== id)),
     }))
     setSelectedId(null)
   }
@@ -514,6 +523,7 @@ export function TripsClient({
             direction: 'volta' as const,
             departAt: toLocalInput(event?.end_at ?? null),
             passengers: [...c.passengers],
+            stopTimes: {},
           })),
       ],
     }))
@@ -523,11 +533,74 @@ export function TripsClient({
       toast.error('Acrescenta primeiro os carros.')
       return
     }
-    const res = autoFillCars(plan.cars, dir, unassigned)
+    const res = autoFillCars(plan.cars, dir, unassigned, plan)
     edit((p) => ({ ...p, cars: res.cars }))
     if (res.unplaced.length > 0) toast.warning(`${res.unplaced.length} ficaram sem lugar — faltam carros ou lugares.`)
     else toast.success(`${unassigned.length} distribuídos pelos carros`)
   }
+
+  // ── Pontos de encontro ─────────────────────────────────────
+  const addPoint = () => {
+    const id = newTripId()
+    edit((p) => ({ ...p, points: [...p.points, { id, name: '', lat: null, lng: null }] }))
+    return id
+  }
+  const updatePoint = (id: string, patch: Partial<TripPoint>) =>
+    edit((p) => ({ ...p, points: p.points.map((x) => (x.id === id ? { ...x, ...patch } : x)) }))
+  const removePoint = (id: string) =>
+    edit((p) => ({
+      ...p,
+      points: p.points.filter((x) => x.id !== id),
+      // Quem o usava fica sem ponto; na volta, "igual à ida" continua a valer para quem o tinha só na ida
+      personPoints: Object.fromEntries(
+        Object.entries(p.personPoints).map(([k, v]) => {
+          const next = { ...v }
+          if (next.ida === id) delete next.ida
+          if (next.volta === id) next.volta = ''
+          return [k, next]
+        }),
+      ),
+      cars: p.cars.map((c) => {
+        if (!c.stopTimes?.[id]) return c
+        const stopTimes = { ...c.stopTimes }
+        delete stopTimes[id]
+        return { ...c, stopTimes }
+      }),
+    }))
+
+  /** Ponto da pessoa: na ida o id ('' = sem ponto); na volta também SAME_AS_IDA. */
+  const setPersonPoint = (memberId: string, dir: TripDirection, value: string) =>
+    edit((p) => {
+      const cur = { ...(p.personPoints[memberId] || {}) }
+      if (dir === 'ida') {
+        if (value) cur.ida = value
+        else delete cur.ida
+      } else if (value === SAME_AS_IDA) delete cur.volta
+      else cur.volta = value
+      const personPoints = { ...p.personPoints }
+      if (cur.ida === undefined && cur.volta === undefined) delete personPoints[memberId]
+      else personPoints[memberId] = cur
+      return { ...p, personPoints }
+    })
+
+  const pointCounts = useMemo(() => {
+    const m = new Map<string, { ida: number; volta: number }>(plan.points.map((x) => [x.id, { ida: 0, volta: 0 }]))
+    for (const person of people) {
+      for (const dir of ['ida', 'volta'] as const) {
+        const pid = pointIdOf(plan, person.id, dir)
+        if (pid) m.get(pid)![dir] += 1
+      }
+    }
+    return m
+  }, [plan, people])
+
+  const destination = useMemo(
+    () =>
+      event?.location_lat != null && event?.location_lng != null
+        ? { name: event.location || event.title, lat: event.location_lat, lng: event.location_lng }
+        : null,
+    [event],
+  )
 
   const clearTab = () => {
     if (!confirm(tab === 'tents' ? 'Tirar toda a gente das tendas?' : `Tirar toda a gente dos carros da ${DIRECTION_LABELS[tab].toLowerCase()}?`))
@@ -555,7 +628,8 @@ export function TripsClient({
     }
     const names = Object.fromEntries([...ids].map((id) => [id, shortDisplayName(memberById.get(id)?.full_name, 'Membro')]))
     setBusy(true)
-    const ok = await persist(plan, { ...plan, names })
+    const dest = event ? { name: event.location || event.title, lat: event.location_lat ?? null, lng: event.location_lng ?? null } : null
+    const ok = await persist(plan, { ...plan, names, dest })
     setBusy(false)
     if (ok) toast.success('Publicado — cada participante já vê a sua tenda e boleia no Painel.')
   }
@@ -573,8 +647,10 @@ export function TripsClient({
   const carsOf = (dir: TripDirection) => plan.cars.filter((c) => c.direction === dir)
   const unassignedM = unassigned.filter((p) => genderInfo(p).gender === 'm').length
 
-  const personChip = (p: TripMember, opts: { tent?: TripTent; responsible?: boolean } = {}) => {
+  const personChip = (p: TripMember, opts: { tent?: TripTent; responsible?: boolean; showPoint?: boolean } = {}) => {
     const g = genderInfo(p)
+    const pid = opts.showPoint && tab !== 'tents' ? pointIdOf(plan, p.id, tab) : null
+    const pIndex = pid ? plan.points.findIndex((x) => x.id === pid) : -1
     const isSel = selectedId === p.id
     const leader = isLeader(p)
     const saidNo = rsvpAnswers[p.id] === false && !presentIds.includes(p.id)
@@ -589,6 +665,7 @@ export function TripsClient({
         <button type="button" onClick={() => setSelectedId(isSel ? null : p.id)} className="flex min-w-0 flex-1 items-center gap-2">
           <span className={`h-2 w-2 flex-shrink-0 rounded-full ${p.section ? SECTION_DOT[p.section] || 'bg-gray-300' : 'bg-gray-300'}`} />
           <span className="min-w-0 flex-1 truncate text-sm font-bold">{shortDisplayName(p.full_name, 'Membro')}</span>
+          {pIndex >= 0 && <PointBadge index={pIndex} small title={plan.points[pIndex].name || 'Ponto sem nome'} />}
           {leader && (
             <span
               className={`flex-shrink-0 rounded px-1 text-[10px] font-bold ${isSel ? 'bg-white/20' : 'bg-violet-100 text-violet-700'}`}
@@ -844,7 +921,9 @@ export function TripsClient({
                         Toda a gente tem {tab === 'tents' ? 'tenda' : 'lugar'} 🎉
                       </p>
                     ) : (
-                      <div className="flex max-h-[26rem] flex-col gap-1.5 overflow-y-auto">{unassigned.map((p) => personChip(p))}</div>
+                      <div className="flex max-h-[26rem] flex-col gap-1.5 overflow-y-auto">
+                        {unassigned.map((p) => personChip(p, { showPoint: true }))}
+                      </div>
                     )}
 
                     <div className="space-y-2 border-t border-gray-100 pt-3">
@@ -965,6 +1044,14 @@ export function TripsClient({
                   </>
                 ) : (
                   <>
+                    <TripPointsPanel
+                      points={plan.points}
+                      counts={pointCounts}
+                      destination={destination}
+                      onAdd={addPoint}
+                      onChange={updatePoint}
+                      onRemove={removePoint}
+                    />
                     <div className="flex flex-wrap gap-2">
                       <button
                         type="button"
@@ -995,7 +1082,7 @@ export function TripsClient({
                     {carsOf(tab).length === 0 && (
                       <EmptyBox icon={<Car className="h-8 w-8" />}>
                         Acrescenta os carros da {DIRECTION_LABELS[tab].toLowerCase()}: quem conduz (alguém da lista ou escrito à mão), quantos
-                        lugares livres, onde e a que horas se encontram.
+                        lugares livres e a que horas partem.
                       </EmptyBox>
                     )}
                     <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
@@ -1003,6 +1090,9 @@ export function TripsClient({
                         <CarCard
                           key={c.id}
                           car={c}
+                          stops={carStops(c, plan)}
+                          pointIndex={(id) => plan.points.findIndex((x) => x.id === id)}
+                          hasPoints={plan.points.length > 0}
                           driverPerson={c.driverId ? memberById.get(c.driverId) ?? null : null}
                           selected={selected}
                           onDrop={() => moveToCar(c.id)}
@@ -1014,10 +1104,10 @@ export function TripsClient({
                             removeCar(c.id)
                           }}
                         >
-                          {c.passengers.map((id) => {
+                          {(id) => {
                             const p = memberById.get(id)
                             return p ? personChip(p) : null
-                          })}
+                          }}
                         </CarCard>
                       ))}
                     </div>
@@ -1045,6 +1135,40 @@ export function TripsClient({
               {tab === 'tents' ? 'toca na tenda para onde vai.' : 'toca no carro para onde vai, ou em "Pôr a conduzir".'}
               {tab === 'tents' && tentOf.get(selected.id) && <span className="text-gray-500"> (está na {tentOf.get(selected.id)!.name})</span>}
             </p>
+            {tab !== 'tents' && plan.points.length > 0 && (
+              <label className="flex w-full items-center gap-2 text-sm sm:w-auto">
+                <MapPin className="h-4 w-4 flex-shrink-0 text-emerald-700" />
+                <span className="flex-shrink-0 font-bold text-gray-700">{tab === 'ida' ? 'Apanhado em' : 'Deixado em'}</span>
+                <select
+                  value={
+                    tab === 'ida'
+                      ? pointIdOf(plan, selected.id, 'ida') ?? ''
+                      : plan.personPoints[selected.id]?.volta === undefined
+                        ? SAME_AS_IDA
+                        : pointIdOf(plan, selected.id, 'volta') ?? ''
+                  }
+                  onChange={(e) => setPersonPoint(selected.id, tab, e.target.value)}
+                  className="h-10 min-w-0 flex-1 rounded-xl border border-gray-200 bg-white px-2 text-sm font-medium text-gray-800 sm:w-56 sm:flex-none"
+                >
+                  {tab === 'volta' && (
+                    <option value={SAME_AS_IDA}>
+                      Igual à ida
+                      {(() => {
+                        const pid = pointIdOf(plan, selected.id, 'ida')
+                        const pt = pid ? plan.points.find((x) => x.id === pid) : null
+                        return pt ? ` (${pt.name || 'sem nome'})` : ' (sem ponto)'
+                      })()}
+                    </option>
+                  )}
+                  {plan.points.map((pt, i) => (
+                    <option key={pt.id} value={pt.id}>
+                      {i + 1}. {pt.name || 'Ponto sem nome'}
+                    </option>
+                  ))}
+                  <option value="">Sem ponto (o geral do carro)</option>
+                </select>
+              </label>
+            )}
             {(tab === 'tents' ? tentOf.has(selected.id) : carOf(tab).has(selected.id)) && (
               <button
                 type="button"
@@ -1232,6 +1356,9 @@ function TentCard({
 
 function CarCard({
   car,
+  stops,
+  pointIndex,
+  hasPoints,
   driverPerson,
   selected,
   onDrop,
@@ -1250,9 +1377,20 @@ function CarCard({
   onClearDriver: () => void
   onChange: (patch: Partial<TripCar>) => void
   onRemove: () => void
-  children: React.ReactNode
+  stops: CarStop[]
+  pointIndex: (pointId: string) => number
+  /** Há pontos de encontro no plano (senão o carro funciona só com o ponto geral). */
+  hasPoints: boolean
+  children: (memberId: string) => React.ReactNode
 }) {
   const over = car.passengers.length > car.seats
+  const ida = car.direction === 'ida'
+  const setStopTime = (pointId: string, time: string) => {
+    const stopTimes = { ...(car.stopTimes || {}) }
+    if (time) stopTimes[pointId] = time
+    else delete stopTimes[pointId]
+    onChange({ stopTimes })
+  }
   const selectedIsDriver = !!selected && car.driverId === selected.id
   return (
     <div className="space-y-3 rounded-2xl border border-t-4 border-gray-200 border-t-emerald-500 bg-white p-4 shadow-sm">
@@ -1295,9 +1433,9 @@ function CarCard({
         <input
           value={car.meetingPoint}
           onChange={(e) => onChange({ meetingPoint: e.target.value.slice(0, 80) })}
-          placeholder="Ponto de encontro"
+          placeholder={hasPoints ? 'Ponto geral (quem não tem ponto)' : 'Ponto de encontro'}
           className="h-9 rounded-lg border border-gray-200 px-2 text-sm"
-          aria-label="Ponto de encontro"
+          aria-label={hasPoints ? 'Ponto geral do carro' : 'Ponto de encontro'}
         />
         <input
           type="datetime-local"
@@ -1305,13 +1443,46 @@ function CarCard({
           onChange={(e) => onChange({ departAt: e.target.value })}
           className="h-9 rounded-lg border border-gray-200 px-2 text-sm"
           aria-label="Hora de partida"
+          title="Hora de partida"
         />
       </div>
       <p className="flex items-center gap-1.5 text-xs font-bold text-gray-500">
         Lugares livres (sem o condutor) <MiniStepper value={car.seats} min={1} max={8} onChange={(seats) => onChange({ seats })} />
       </p>
-      <div className="flex flex-col gap-1.5">
-        {children}
+      <div className="flex flex-col gap-2">
+        {stops.map((stop) => {
+          const showHeader = stop.point || stops.length > 1
+          return (
+            <div key={stop.point?.id ?? 'geral'} className={showHeader ? 'space-y-1.5 rounded-xl bg-stone-50 p-2' : 'flex flex-col gap-1.5'}>
+              {showHeader && (
+                <div className="flex items-center gap-2">
+                  {stop.point ? (
+                    <PointBadge index={pointIndex(stop.point.id)} small />
+                  ) : (
+                    <MapPin className="h-4 w-4 flex-shrink-0 text-gray-400" />
+                  )}
+                  <span className="min-w-0 flex-1 truncate text-xs font-black text-gray-700">
+                    {stop.point ? stop.point.name || 'Ponto sem nome' : car.meetingPoint || 'Sem ponto escolhido'}
+                  </span>
+                  {stop.point && (
+                    <label className="flex flex-shrink-0 items-center gap-1 text-[11px] font-bold text-gray-500">
+                      {ida ? 'apanha às' : 'deixa às'}
+                      <input
+                        type="time"
+                        value={stop.time}
+                        onChange={(e) => setStopTime(stop.point!.id, e.target.value)}
+                        className={`h-8 rounded-lg border border-gray-200 bg-white px-1.5 text-xs ${stop.time ? 'font-bold text-gray-900' : 'text-gray-400'}`}
+                        aria-label={`Hora em ${stop.point.name || 'este ponto'}`}
+                        title="Sem hora, vale a hora de partida do carro"
+                      />
+                    </label>
+                  )}
+                </div>
+              )}
+              {stop.passengers.map((id) => children(id))}
+            </div>
+          )
+        })}
         {car.passengers.length === 0 && !selected && <p className="py-2 text-center text-xs text-gray-400">Sem passageiros</p>}
       </div>
       <DropTarget

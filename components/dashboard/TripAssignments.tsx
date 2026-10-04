@@ -1,5 +1,15 @@
-import { Car, MapPin, Star, Tent } from 'lucide-react'
-import { DIRECTION_LABELS, formatDepart, normalizePlan, type TripDirection, type TripPublished } from '@/utils/trips'
+import { Car, MapPin, Route, Star, Tent } from 'lucide-react'
+import {
+  DIRECTION_LABELS,
+  carStops,
+  formatDepart,
+  normalizePlan,
+  pointColor,
+  routeUrl,
+  type TripDirection,
+  type TripPublished,
+} from '@/utils/trips'
+import { TripStopMap } from './TripStopMap'
 
 export type TripAssignmentRow = {
   event_id: string
@@ -23,7 +33,7 @@ export function TripAssignments({ rows, userId, displayClass }: { rows: TripAssi
         dir,
         car: plan.cars.find((c) => c.direction === dir && (c.passengers.includes(userId) || c.driverId === userId)) ?? null,
       }))
-      return { r, tent, cars, nameOf }
+      return { r, plan, tent, cars, nameOf }
     })
     .filter((t) => t.tent || t.cars.some((c) => c.car))
 
@@ -38,7 +48,7 @@ export function TripAssignments({ rows, userId, displayClass }: { rows: TripAssi
         A tua saída
       </h2>
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        {trips.map(({ r, tent, cars, nameOf }) => (
+        {trips.map(({ r, plan, tent, cars, nameOf }) => (
           <article key={r.event_id} className="space-y-4 rounded-[1.5rem] bg-white p-5 shadow-sm ring-1 ring-stone-200">
             <div>
               <h3 className="font-extrabold text-blue-950">{r.title}</h3>
@@ -79,6 +89,10 @@ export function TripAssignments({ rows, userId, displayClass }: { rows: TripAssi
               const driving = car.driverId === userId
               const driverName = car.driverId ? nameOf(car.driverId) : car.driver
               const others = car.passengers.filter((id) => id !== userId)
+              const stops = carStops(car, plan)
+              const myStop = stops.find((s) => s.point && s.passengers.includes(userId)) ?? null
+              const route = driving ? routeUrl(dir, stops, r.published?.dest) : null
+              const colorOf = (id: string) => pointColor(plan.points.findIndex((x) => x.id === id))
               return (
                 <div key={dir} className="rounded-2xl bg-stone-50 p-4 ring-1 ring-inset ring-stone-200">
                   <p className="flex items-center gap-2 text-sm font-extrabold text-blue-950">
@@ -89,13 +103,61 @@ export function TripAssignments({ rows, userId, displayClass }: { rows: TripAssi
                       driverName && <span className="font-bold text-stone-600">· com {driverName}</span>
                     )}
                   </p>
-                  {(car.meetingPoint || car.departAt) && (
-                    <p className="mt-1 flex items-center gap-1.5 text-sm text-stone-700">
-                      <MapPin className="h-3.5 w-3.5 flex-shrink-0 text-stone-400" />
-                      {[car.meetingPoint, formatDepart(car.departAt)].filter(Boolean).join(' · ')}
-                    </p>
+                  {myStop?.point ? (
+                    <div className="mt-1">
+                      <p className="flex items-center gap-1.5 text-sm text-stone-700">
+                        <MapPin className="h-3.5 w-3.5 flex-shrink-0" style={{ color: colorOf(myStop.point.id) }} />
+                        <span>
+                          {dir === 'ida' ? 'Apanhado em' : 'Deixado em'} <b>{myStop.point.name || 'ponto de encontro'}</b>
+                          {car.departAt && ` · ${formatDepart(car.departAt, myStop.time)}`}
+                        </span>
+                      </p>
+                      {myStop.point.lat != null && myStop.point.lng != null && (
+                        <TripStopMap coords={{ lat: myStop.point.lat, lng: myStop.point.lng }} />
+                      )}
+                    </div>
+                  ) : (
+                    (car.meetingPoint || car.departAt) && (
+                      <p className="mt-1 flex items-center gap-1.5 text-sm text-stone-700">
+                        <MapPin className="h-3.5 w-3.5 flex-shrink-0 text-stone-400" />
+                        {[car.meetingPoint, formatDepart(car.departAt)].filter(Boolean).join(' · ')}
+                      </p>
+                    )
                   )}
-                  {others.length > 0 && (
+                  {driving && stops.some((s) => s.point) && (
+                    <div className="mt-3 space-y-2">
+                      <ol className="space-y-1.5">
+                        {stops.map((s) => (
+                          <li key={s.point?.id ?? 'geral'} className="flex items-start gap-2 text-sm">
+                            <span
+                              className="mt-1 h-2.5 w-2.5 flex-shrink-0 rounded-full"
+                              style={{ backgroundColor: s.point ? colorOf(s.point.id) : '#a8a29e' }}
+                            />
+                            <span className="min-w-0 flex-1">
+                              <span className="font-bold text-blue-950">
+                                {s.time && <span className="tabular-nums">{s.time} · </span>}
+                                {s.point ? s.point.name || 'Ponto de encontro' : car.meetingPoint || 'Sem ponto marcado'}
+                              </span>
+                              <span className="block text-xs text-stone-500">
+                                {dir === 'ida' ? 'Apanhas' : 'Deixas'} {s.passengers.map(nameOf).join(', ')}
+                              </span>
+                            </span>
+                          </li>
+                        ))}
+                      </ol>
+                      {route && (
+                        <a
+                          href={route}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1.5 rounded-xl bg-blue-950 px-3 py-2 text-xs font-bold text-white hover:bg-blue-900"
+                        >
+                          <Route className="h-3.5 w-3.5" /> Abrir percurso no Google Maps
+                        </a>
+                      )}
+                    </div>
+                  )}
+                  {others.length > 0 && !(driving && stops.some((s) => s.point)) && (
                     <p className="mt-2 text-xs text-stone-500">
                       {driving ? 'Levas' : 'Vais com'} {others.map(nameOf).join(', ')}
                     </p>
