@@ -72,3 +72,33 @@ test('changePercent', () => {
   expect(changePercent(5, 10)).toBe(-50)
   expect(changePercent(3, 0)).toBeNull()
 })
+
+describe('período de 30 dias e VanaSentinela', () => {
+  const rows: GamePlay[] = [
+    play({ play_date: '2026-09-10' }), // dentro dos 30 dias
+    play({ play_date: '2026-08-20', user_id: 'z' }), // período anterior
+    play({ game_id: 'vana-sentinela', mode: 'abrantes', attempts: 3, is_won: true }),
+    play({ game_id: 'vana-sentinela', mode: 'abrantes', user_id: 'b', attempts: 1, is_won: false }),
+    play({ game_id: 'vana-sentinela', mode: 'nova-cidade', user_id: 'c', attempts: 2, is_won: false }),
+  ]
+  const a = buildGameAnalytics(rows, NOW, 30)
+
+  test('30 dias comparados com os 30 anteriores', () => {
+    expect(a.periodDays).toBe(30)
+    expect(a.days).toHaveLength(30)
+    expect(a.week.players).toBe(3)
+    expect(a.previous.players).toBe(1)
+  })
+
+  test('VanaSentinela: só os packs jogados, rondas por dia sobre todas as partidas', () => {
+    const s = a.games.find((g) => g.gameId === 'vana-sentinela')!
+    expect(s.modes.map((m) => m.label)).toEqual(['Abrantes', 'Nova-cidade'])
+    expect(s.modes[0]).toMatchObject({ plays: 2, won: 1, avgAttempts: 2 })
+    expect(s.attemptsTotal).toBe(6)
+  })
+
+  test('dias da semana (0 = segunda)', () => {
+    // 2026-10-01 é quinta-feira
+    expect(a.weekdays[3]).toBe(4)
+  })
+})

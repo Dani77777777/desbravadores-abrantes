@@ -13,7 +13,7 @@ import { SurveyPanel } from './components/SurveyPanel'
 import { AuditPanel } from './components/AuditPanel'
 import { GamesPanel } from './components/GamesPanel'
 import { GameAnalyticsPanel } from './components/GameAnalyticsPanel'
-import { buildGameAnalytics, lastDays, type GameAnalytics, type GamePlay } from '@/utils/game-analytics'
+import { ANALYTICS_PERIODS, buildGameAnalytics, lastDays, type AnalyticsPeriod, type GameAnalytics, type GamePlay } from '@/utils/game-analytics'
 import { lisbonDateString } from '@/utils/vana-codigo/day'
 import { ToolsPanel } from './components/ToolsPanel'
 import { Users, ListChecks, Megaphone, MessageSquare, LayoutDashboard, CalendarDays, ShoppingBag, QrCode, Gamepad2, ClipboardList, ScrollText, Wrench } from 'lucide-react'
@@ -198,11 +198,13 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
   // Disponibilidade dos jogos (aba "Jogos")
   const gameSettings = activeTab === 'games' ? await fetchGameSettings(supabase) : null
 
-  // Analítica dos jogos a solo: 14 dias (esta semana + a anterior, para comparar).
-  // A RLS já limita o dirigente à sua classe. null = tabela por criar (migração por correr).
-  let gameAnalytics: GameAnalytics | null = null
+  // Analítica dos jogos a solo: 7 e 30 dias, cada um comparado com o período anterior
+  // (por isso 60 dias de dados). A RLS já limita o dirigente à sua classe.
+  // null = tabela por criar (migração por correr).
+  let gameAnalytics: Record<AnalyticsPeriod, GameAnalytics> | null = null
+  let sentinelaGuestRounds: Record<AnalyticsPeriod, number> | null = null
   if (activeTab === 'games') {
-    const from = lastDays(lisbonDateString(), 14)[0]
+    const from = lastDays(lisbonDateString(), 60)[0]
     const rows: GamePlay[] = []
     let failed = false
     for (let page = 0; page < 20; page++) {
@@ -216,7 +218,27 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
       rows.push(...(data as GamePlay[]))
       if (!data || data.length < 1000) break
     }
-    gameAnalytics = failed ? null : buildGameAnalytics(rows)
+    gameAnalytics = failed
+      ? null
+      : (Object.fromEntries(ANALYTICS_PERIODS.map((p) => [p, buildGameAnalytics(rows, new Date(), p)])) as Record<AnalyticsPeriod, GameAnalytics>)
+
+    // Rondas de convidados (sem conta) no VanaSentinela — não entram em game_plays.
+    // Só a coordenação as consegue ler (RLS da tabela de pontuações).
+    if (isCoordenador) {
+      const counts = await Promise.all(
+        ANALYTICS_PERIODS.map(async (p) => {
+          const { count, error } = await supabase
+            .from('vana_sentinela_scores')
+            .select('id', { count: 'exact', head: true })
+            .is('user_id', null)
+            .gte('created_at', `${lastDays(lisbonDateString(), p)[0]}T00:00:00Z`)
+          return error ? null : count ?? 0
+        }),
+      )
+      if (counts.every((c) => c !== null)) {
+        sentinelaGuestRounds = Object.fromEntries(ANALYTICS_PERIODS.map((p, i) => [p, counts[i]])) as Record<AnalyticsPeriod, number>
+      }
+    }
   }
 
   // Presenças dos últimos eventos concluídos (taxas de presença na Visão Geral e nos Eventos).
@@ -379,6 +401,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
         {activeTab === 'games' && (
           <GameAnalyticsPanel
             analytics={gameAnalytics}
+            sentinelaGuestRounds={sentinelaGuestRounds}
             memberNames={Object.fromEntries((members || []).map((m) => [m.id, m.full_name || 'Membro']))}
             totalMembers={members?.length || 0}
             scopeLabel={isCoordenador ? 'todo o clube' : `classe ${SECTION_LABELS[effLeadership || profile.section] || profile.section}`}
