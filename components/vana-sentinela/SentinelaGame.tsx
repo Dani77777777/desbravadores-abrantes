@@ -1,16 +1,21 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Volume2, VolumeX, Flame, Play, ArrowLeft, ArrowRight } from 'lucide-react'
+import Link from 'next/link'
+import { Volume2, VolumeX, Flame, Play, ArrowLeft, ArrowRight, Coins } from 'lucide-react'
 import type { Carta, Pack } from '@/utils/vana-sentinela/types'
 import {
+  ALCUNHA_KEY,
+  ALCUNHA_MAX,
   CARTAS_POR_RONDA,
+  CONVIDADO_ID_KEY,
   ESTADO_INICIAL,
   SOM_KEY,
   TEMPO_CARTA_MS,
   recordeLocalKey,
   formatarPontos,
   multiplicadorCombo,
+  normalizarAlcunha,
   responder,
   sortearRonda,
   type EstadoRonda,
@@ -20,10 +25,13 @@ import {
 import SwipeCard, { type Lado, type Saida } from './SwipeCard'
 import Results from './Results'
 import { playSentinelaSound, unlockSentinelaSound } from './sound'
-import { guardar, useGuardado, useNumeroGuardado, useReducedMotion } from './storage'
+import { guardar, obterConvidadoId, useGuardado, useNumeroGuardado, useReducedMotion } from './storage'
 import './VanaSentinela.css'
 
 type Fase = 'pronto' | 'jogar' | 'feedback' | 'fim'
+
+/** Convidado sem conta: entra no ranking com uma alcunha e um id anónimo deste browser. */
+export type Convidado = { id: string; nome: string }
 
 /** Tempo do selo nos acertos (os erros esperam pelo "Continuar"). */
 const FEEDBACK_ACERTO_MS = 1200
@@ -41,7 +49,7 @@ export default function SentinelaGame({
   recordeInicial,
 }: {
   pack: Pack
-  /** Membro com sessão: grava no ranking e o recorde vem do Supabase. */
+  /** Membro com sessão: ganha XP/Gold e o recorde vem do Supabase. Os convidados jogam com alcunha. */
   isMember: boolean
   isCoordinator: boolean
   /** Melhor pontuação do membro neste pack (null = ainda não jogou / visitante). */
@@ -58,6 +66,13 @@ export default function SentinelaGame({
   const [pulso, setPulso] = useState(0)
   const som = useGuardado(SOM_KEY) === '1'
   const [anuncio, setAnuncio] = useState('')
+
+  // Convidados: alcunha pedida antes de jogar (guardada no browser para a próxima).
+  const alcunhaGuardada = useGuardado(ALCUNHA_KEY)
+  const [alcunhaEscrita, setAlcunhaEscrita] = useState<string | null>(null)
+  const alcunha = alcunhaEscrita ?? alcunhaGuardada ?? ''
+  const [erroAlcunha, setErroAlcunha] = useState<string | null>(null)
+  const [convidado, setConvidado] = useState<Convidado | null>(null)
 
   // Refs para os temporizadores não lerem estado antigo
   const estadoRef = useRef(estado)
@@ -119,6 +134,22 @@ export default function SentinelaGame({
     setFase('jogar')
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }, [pack.cartas])
+
+  /** Botão "Começar": os convidados têm de ter uma alcunha válida. */
+  const iniciar = useCallback(() => {
+    if (!isMember) {
+      const nome = normalizarAlcunha(alcunha)
+      if (!nome) {
+        setErroAlcunha('Escreve uma alcunha de 2 a 20 letras ou números.')
+        return
+      }
+      guardar(ALCUNHA_KEY, nome)
+      setAlcunhaEscrita(null)
+      setErroAlcunha(null)
+      setConvidado({ id: obterConvidadoId(CONVIDADO_ID_KEY), nome })
+    }
+    comecar()
+  }, [isMember, alcunha, comecar])
 
   const avancar = useCallback(() => {
     limparTimers()
@@ -192,7 +223,7 @@ export default function SentinelaGame({
       } else if (confirmar && !emControlo) {
         if (fase === 'pronto') {
           e.preventDefault()
-          comecar()
+          iniciar()
         } else if (fase === 'feedback' && ultima && !ultima.certa) {
           e.preventDefault()
           avancar()
@@ -201,7 +232,7 @@ export default function SentinelaGame({
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [fase, ultima, responderCarta, comecar, avancar])
+  }, [fase, ultima, responderCarta, iniciar, avancar])
 
   const decidir = (lado: Lado) => responderCarta(lado)
 
@@ -238,6 +269,8 @@ export default function SentinelaGame({
           pack={pack}
           estado={estado}
           isMember={isMember}
+          convidado={convidado}
+          onMudarAlcunha={() => setFase('pronto')}
           isCoordinator={isCoordinator}
           recordeAnterior={recorde}
           onNovoRecorde={novoRecorde}
@@ -267,13 +300,57 @@ export default function SentinelaGame({
             </div>
           </div>
           <p className="mt-4 text-sm text-blue-100/60">Acertos seguidos multiplicam os pontos até ×4. Responder depressa dá bónus.</p>
+
+          {isMember ? (
+            <p className="mt-4 inline-flex items-center gap-1.5 rounded-full bg-yellow-400/15 px-3 py-1.5 text-sm font-bold text-yellow-200">
+              <Coins className="h-4 w-4" /> A primeira ronda de hoje dá XP e Gold
+            </p>
+          ) : (
+            <div className="mt-5 text-left">
+              <label htmlFor="vs-alcunha" className="text-sm font-extrabold text-white">
+                A tua alcunha para o ranking
+              </label>
+              <input
+                id="vs-alcunha"
+                value={alcunha}
+                onChange={(e) => {
+                  setAlcunhaEscrita(e.target.value)
+                  setErroAlcunha(null)
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault()
+                    iniciar()
+                  }
+                }}
+                maxLength={ALCUNHA_MAX}
+                autoComplete="nickname"
+                placeholder="Ex.: Leão Veloz"
+                aria-invalid={!!erroAlcunha}
+                aria-describedby="vs-alcunha-ajuda"
+                className="mt-1.5 w-full rounded-2xl bg-white px-4 py-3.5 text-lg font-bold text-slate-900 outline-none ring-4 ring-transparent placeholder:font-semibold placeholder:text-slate-400 focus:ring-yellow-400/60"
+              />
+              <p id="vs-alcunha-ajuda" className={`mt-1.5 text-xs ${erroAlcunha ? 'font-bold text-orange-300' : 'text-blue-100/60'}`}>
+                {erroAlcunha ?? 'Aparece no ranking com a etiqueta "Convidado". Tens conta no clube? Inicia sessão para ganhar XP e Gold.'}
+              </p>
+            </div>
+          )}
+
           <button
             type="button"
-            onClick={comecar}
+            onClick={iniciar}
             className="mt-6 flex w-full items-center justify-center gap-2 rounded-2xl bg-yellow-400 py-4 text-lg font-black text-blue-950 shadow-[0_12px_30px_-12px_rgba(250,204,21,.7)] transition hover:bg-yellow-300 active:scale-[0.98]"
           >
             <Play className="h-5 w-5 fill-current" /> Começar
           </button>
+          {!isMember && (
+            <Link
+              href={`/login?next=${encodeURIComponent(`/jogos/vana-sentinela/${pack.slug}`)}`}
+              className="mt-3 inline-block text-sm font-bold text-yellow-300 hover:underline"
+            >
+              Entrar com a conta do clube
+            </Link>
+          )}
         </div>
       </div>
     )

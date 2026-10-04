@@ -2,11 +2,11 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { Play, Lock, Timer, Flame, Zap, Trophy, MapPin } from 'lucide-react'
+import { Play, Lock, Timer, Flame, Zap, Trophy, MapPin, Coins } from 'lucide-react'
 import type { Pack } from '@/utils/vana-sentinela/types'
-import { CARTAS_POR_RONDA, TEMPO_CARTA_MS, formatarPontos, recordeLocalKey } from '@/utils/vana-sentinela/game'
+import { CARTAS_POR_RONDA, CONVIDADO_ID_KEY, TEMPO_CARTA_MS, formatarPontos, recordeLocalKey } from '@/utils/vana-sentinela/game'
 import Ranking from './Ranking'
-import { useNumeroGuardado } from './storage'
+import { useGuardado, useNumeroGuardado } from './storage'
 
 /** Só o que o ecrã inicial precisa de cada pack (sem as cartas). */
 export type PackResumo = Pick<Pack, 'slug' | 'cidade' | 'titulo' | 'orador' | 'disponivel'> & { numCartas: number }
@@ -17,6 +17,8 @@ const REGRAS = [
   { icon: Timer, texto: `${TEMPO_CARTA_MS / 1000} segundos por carta. Se o tempo acabar, conta como errada.` },
   { icon: Zap, texto: 'Cada acerto vale 100 pontos, mais um bónus até +50 por rapidez.' },
   { icon: Flame, texto: 'Acertos seguidos multiplicam: 3 → ×2, 6 → ×3, 10 → ×4.' },
+  { icon: Trophy, texto: 'Toda a gente entra no ranking: os membros com o nome, os convidados com uma alcunha.' },
+  { icon: Coins, texto: 'Membros do clube: a primeira ronda do dia em cada cidade dá XP e Gold (1, 2 com 11 certas, 3 com 14).' },
 ]
 
 export default function PackLobby({
@@ -37,6 +39,8 @@ export default function PackLobby({
   // Visitantes: recorde guardado neste browser.
   const recordeLocal = useNumeroGuardado(recordeLocalKey(pack?.slug ?? ''))
   const recorde = pack ? (isMember ? recordes[pack.slug] : recordeLocal ?? undefined) : undefined
+  // Convidado que já jogou neste browser: destaca a linha dele no ranking.
+  const convidadoId = useGuardado(CONVIDADO_ID_KEY)
 
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1.1fr_0.9fr]">
@@ -102,7 +106,7 @@ export default function PackLobby({
             </Link>
             {!isMember && (
               <p className="mt-3 text-center text-xs text-blue-100/60">
-                Podes jogar sem conta. O ranking é só para membros do clube com sessão iniciada.
+                Podes jogar sem conta, com uma alcunha. Com a conta do clube também ganhas XP e Gold.
               </p>
             )}
           </section>
@@ -129,7 +133,12 @@ export default function PackLobby({
 
       {pack?.disponivel && (
         <div>
-          <Ranking pack={pack.slug} cidade={pack.cidade} isCoordinator={isCoordinator} />
+          <Ranking
+            pack={pack.slug}
+            cidade={pack.cidade}
+            isCoordinator={isCoordinator}
+            convidadoId={isMember ? null : convidadoId}
+          />
         </div>
       )}
     </div>

@@ -15,6 +15,7 @@ type Linha = {
   rank_position: number
   full_name: string | null
   avatar_url: string | null
+  is_guest: boolean
   points: number
   correct: number
   total: number
@@ -33,23 +34,26 @@ export default function Ranking({
   cidade,
   refreshKey = 0,
   isCoordinator = false,
+  convidadoId = null,
 }: {
   pack: string
   cidade: string
   refreshKey?: number
   isCoordinator?: boolean
+  /** Id anónimo do convidado que está a ver (para destacar a linha dele). */
+  convidadoId?: string | null
 }) {
   const [periodo, setPeriodo] = useState<Periodo>('semana')
   const [reload, setReload] = useState(0)
   const [apagando, startApagar] = useTransition()
   // O resultado guarda o pedido a que responde: se não bater certo, está a carregar.
-  const chave = `${pack}|${periodo}|${refreshKey}|${reload}`
+  const chave = `${pack}|${periodo}|${refreshKey}|${reload}|${convidadoId ?? ''}`
   const [resultado, setResultado] = useState<{ chave: string; linhas: Linha[]; erro: boolean } | null>(null)
 
   useEffect(() => {
     let cancel = false
     createClient()
-      .rpc('get_vana_sentinela_ranking', { p_pack: pack, p_period: periodo, p_limit: 10 })
+      .rpc('get_vana_sentinela_ranking', { p_pack: pack, p_period: periodo, p_limit: 10, p_guest_id: convidadoId })
       .then(({ data, error }) => {
         if (cancel) return
         if (error) console.error('VanaSentinela: erro no ranking', error)
@@ -62,7 +66,7 @@ export default function Ranking({
     return () => {
       cancel = true
     }
-  }, [chave, pack, periodo])
+  }, [chave, pack, periodo, convidadoId])
 
   const linhas = resultado?.chave === chave ? resultado.linhas : null
   const erro = resultado?.chave === chave && resultado.erro
@@ -108,8 +112,13 @@ export default function Ranking({
       )}
       <div className="min-w-0 flex-1">
         <p className="truncate font-bold text-white">
-          {shortDisplayName(l.full_name)}
+          {l.is_guest ? l.full_name ?? 'Convidado' : shortDisplayName(l.full_name)}
           {l.is_me && <span className="ml-1.5 text-xs font-black uppercase text-yellow-300">(tu)</span>}
+          {l.is_guest && (
+            <span className="ml-1.5 rounded-full bg-white/10 px-1.5 py-0.5 align-middle text-[10px] font-extrabold uppercase tracking-wider text-blue-100/70">
+              Convidado
+            </span>
+          )}
         </p>
         <p className="text-xs text-blue-100/60">
           {l.correct}/{l.total} certas · {formatarDuracao(l.duration_ms)}

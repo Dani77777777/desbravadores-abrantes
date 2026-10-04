@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
-import { RotateCcw, Trophy, Share2, CheckCircle2, Loader2, AlertCircle, PlayCircle, Sparkles, LogIn } from 'lucide-react'
+import { RotateCcw, Trophy, Share2, CheckCircle2, Loader2, AlertCircle, PlayCircle, Sparkles, LogIn, Coins, Pencil } from 'lucide-react'
 import { toast } from 'sonner'
 import type { Pack } from '@/utils/vana-sentinela/types'
 import {
@@ -14,8 +14,13 @@ import {
 } from '@/utils/vana-sentinela/game'
 import Ranking from './Ranking'
 import { playSentinelaSound } from './sound'
+import type { Convidado } from './SentinelaGame'
+import type { Recompensa } from '@/lib/vana-sentinela/score-handler'
 
-type Gravacao = { estado: 'a-gravar' } | { estado: 'gravado' } | { estado: 'erro'; mensagem: string }
+type Gravacao =
+  | { estado: 'a-gravar' }
+  | { estado: 'gravado'; recompensa: Recompensa | null }
+  | { estado: 'erro'; mensagem: string }
 
 async function celebrar() {
   const confetti = (await import('canvas-confetti')).default
@@ -31,6 +36,8 @@ export default function Results({
   pack,
   estado,
   isMember,
+  convidado,
+  onMudarAlcunha,
   isCoordinator,
   recordeAnterior,
   onNovoRecorde,
@@ -40,6 +47,9 @@ export default function Results({
   pack: Pack
   estado: EstadoRonda
   isMember: boolean
+  /** Convidado sem conta (alcunha + id anónimo); null para membros. */
+  convidado: Convidado | null
+  onMudarAlcunha: () => void
   isCoordinator: boolean
   /** Recorde antes desta ronda (Supabase para membros, localStorage para visitantes). */
   recordeAnterior: number | null
@@ -53,7 +63,8 @@ export default function Results({
   const [recorde] = useState(recordeAnterior)
   const bateuRecorde = estado.pontos > 0 && (recorde === null || estado.pontos > recorde)
 
-  const [gravacao, setGravacao] = useState<Gravacao | null>(isMember ? { estado: 'a-gravar' } : null)
+  const podeGravar = isMember || !!convidado
+  const [gravacao, setGravacao] = useState<Gravacao | null>(podeGravar ? { estado: 'a-gravar' } : null)
   const [rankingKey, setRankingKey] = useState(0)
   const feito = useRef(false)
 
@@ -67,8 +78,8 @@ export default function Results({
       if (somAtivo) playSentinelaSound('recorde')
     }
 
-    // Só os membros com sessão gravam. Visitantes: nenhum pedido à API.
-    if (!isMember) return
+    // Membros gravam com a sessão; convidados com a alcunha.
+    if (!podeGravar) return
     fetch('/api/jogos/vana-sentinela/pontuacao', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -79,11 +90,13 @@ export default function Results({
         total,
         comboMax: estado.comboMax,
         duracaoMs: estado.duracaoMs,
+        ...(isMember ? {} : { convidado }),
       }),
     })
       .then(async (res) => {
         if (res.ok) {
-          setGravacao({ estado: 'gravado' })
+          const body = (await res.json().catch(() => null)) as { recompensa?: Recompensa | null } | null
+          setGravacao({ estado: 'gravado', recompensa: body?.recompensa ?? null })
           setRankingKey((k) => k + 1)
           return
         }
@@ -164,9 +177,23 @@ export default function Results({
             </p>
           )}
           {gravacao?.estado === 'gravado' && (
-            <p className="inline-flex items-center gap-2 font-bold text-emerald-300">
-              <CheckCircle2 className="h-4 w-4" /> Gravado no ranking!
-            </p>
+            <div className="space-y-2">
+              <p className="inline-flex items-center gap-2 font-bold text-emerald-300">
+                <CheckCircle2 className="h-4 w-4" />
+                {convidado && !isMember ? `Gravado no ranking como ${convidado.nome}!` : 'Gravado no ranking!'}
+              </p>
+              {gravacao.recompensa?.awarded && (
+                <p className="mx-auto flex w-fit items-center gap-1.5 rounded-full bg-yellow-400 px-4 py-1.5 font-black text-blue-950">
+                  <Coins className="h-4 w-4" /> +{gravacao.recompensa.xp} XP · +{gravacao.recompensa.gold} Gold
+                  {(gravacao.recompensa.multiplier ?? 1) > 1 && (
+                    <span className="text-xs">(×{String(gravacao.recompensa.multiplier).replace('.', ',')})</span>
+                  )}
+                </p>
+              )}
+              {gravacao.recompensa && !gravacao.recompensa.awarded && gravacao.recompensa.message && (
+                <p className="text-indigo-100/80">{gravacao.recompensa.message}</p>
+              )}
+            </div>
           )}
           {gravacao?.estado === 'erro' && (
             <p className="inline-flex items-center gap-2 font-semibold text-orange-200">
@@ -174,13 +201,22 @@ export default function Results({
             </p>
           )}
           {!isMember && (
-            <p className="mx-auto max-w-sm text-indigo-100/80">
-              O ranking é só para membros do clube. Se és desbravador,{' '}
-              <Link href={loginHref} className="inline-flex items-center gap-1 font-bold text-yellow-300 underline-offset-2 hover:underline">
-                <LogIn className="h-3.5 w-3.5" /> inicia sessão
-              </Link>{' '}
-              para a tua pontuação contar.
-            </p>
+            <div className="mt-2 space-y-1.5">
+              <button
+                type="button"
+                onClick={onMudarAlcunha}
+                className="inline-flex items-center gap-1 text-xs font-bold text-indigo-100/70 hover:text-white"
+              >
+                <Pencil className="h-3 w-3" /> Mudar alcunha
+              </button>
+              <p className="mx-auto max-w-sm text-indigo-100/80">
+                És do clube?{' '}
+                <Link href={loginHref} className="inline-flex items-center gap-1 font-bold text-yellow-300 underline-offset-2 hover:underline">
+                  <LogIn className="h-3.5 w-3.5" /> Inicia sessão
+                </Link>{' '}
+                para ganhares XP e Gold a jogar.
+              </p>
+            </div>
           )}
         </div>
       </section>
@@ -273,7 +309,13 @@ export default function Results({
       )}
 
       <div id="ranking" className="scroll-mt-24">
-        <Ranking pack={pack.slug} cidade={pack.cidade} refreshKey={rankingKey} isCoordinator={isCoordinator} />
+        <Ranking
+          pack={pack.slug}
+          cidade={pack.cidade}
+          refreshKey={rankingKey}
+          isCoordinator={isCoordinator}
+          convidadoId={isMember ? null : convidado?.id ?? null}
+        />
       </div>
     </div>
   )

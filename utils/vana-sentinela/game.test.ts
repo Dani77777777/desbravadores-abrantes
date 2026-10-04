@@ -9,6 +9,8 @@ import {
   minutoParaSegundos,
   motivoPontuacaoImpossivel,
   multiplicadorCombo,
+  normalizarAlcunha,
+  recompensaPorAcertos,
   pontosAcerto,
   pontosMaximosPara,
   pontuacaoMaxima,
@@ -237,5 +239,22 @@ describe('ecrã final', () => {
     expect(linkMinuto(undefined, '0:12:00')).toBeNull()
     expect(linkMinuto('https://youtu.be/abc', '0:12:00')).toBe('https://youtu.be/abc?t=720')
     expect(linkMinuto('https://www.youtube.com/watch?v=abc', '1:00:01')).toBe('https://www.youtube.com/watch?v=abc&t=3601')
+  })
+})
+
+describe('membros e convidados', () => {
+  test('prémio da primeira ronda do dia', () => {
+    expect([0, 10, 11, 13, 14, 15].map(recompensaPorAcertos)).toEqual([1, 1, 2, 2, 3, 3])
+  })
+
+  test('alcunhas aceites e recusadas', () => {
+    expect(normalizarAlcunha('  João   Leão ')).toBe('João Leão')
+    expect(normalizarAlcunha("Ana_D'Ávila-2")).toBe("Ana_D'Ávila-2")
+    expect(normalizarAlcunha('A')).toBeNull()
+    expect(normalizarAlcunha('x'.repeat(21))).toBeNull()
+    expect(normalizarAlcunha('www.site.com/abc')).toBeNull()
+    expect(normalizarAlcunha('<script>')).toBeNull()
+    expect(normalizarAlcunha('---')).toBeNull()
+    expect(normalizarAlcunha(42)).toBeNull()
   })
 })

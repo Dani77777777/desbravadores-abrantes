@@ -165,8 +165,7 @@ export const GAMES: GameDefinition[] = [
     color: 'from-emerald-500 via-indigo-800 to-orange-500',
     requiresAuth: false,
     adminCoordOnly: false,
-    // Não dá XP/Gold (só ranking), por isso fica fora das campanhas de pontos multiplicados.
-    singlePlayer: false,
+    singlePlayer: true,
     isNew: true,
   },
 ]

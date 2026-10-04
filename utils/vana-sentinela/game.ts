@@ -266,7 +266,37 @@ export function motivoPontuacaoImpossivel(p: PontuacaoEnviada): string | null {
   return null
 }
 
-// ── Recorde local (visitantes) e preferências ───────────────────────────────
+// ── Prémios dos membros ─────────────────────────────────────────────────────
+// Só a primeira ronda do dia em cada pack (dia de Lisboa). Os valores têm de bater
+// certo com award_vana_sentinela_rewards em supabase-setup-vana-sentinela.sql.
+
+/** XP e Gold (iguais) pela primeira ronda do dia, conforme as certas. */
+export function recompensaPorAcertos(acertos: number): number {
+  if (acertos >= 14) return 3
+  if (acertos >= 11) return 2
+  return 1
+}
+
+// ── Convidados ──────────────────────────────────────────────────────────────
+
+export const ALCUNHA_MIN = 2
+export const ALCUNHA_MAX = 20
+
+/** Alcunha limpa (espaços colapsados) ou null se não for aceite. */
+export function normalizarAlcunha(nome: unknown): string | null {
+  if (typeof nome !== 'string') return null
+  const limpo = nome.normalize('NFC').replace(/\s+/g, ' ').trim()
+  if (limpo.length < ALCUNHA_MIN || limpo.length > ALCUNHA_MAX) return null
+  // Letras (com acentos), números, espaço e . _ ' - — nada de links nem símbolos.
+  if (!/^[\p{L}\p{N} ._'-]+$/u.test(limpo)) return null
+  if (!/[\p{L}\p{N}]/u.test(limpo)) return null
+  return limpo
+}
+
+// ── localStorage: recorde local, alcunha e preferências ─────────────────────
 
 export const recordeLocalKey = (pack: string) => `vana-sentinela:recorde:${pack}`
 export const SOM_KEY = 'vana-sentinela:som'
+export const ALCUNHA_KEY = 'vana-sentinela:alcunha'
+/** Identificador anónimo do convidado neste browser (junta as rondas dele no ranking). */
+export const CONVIDADO_ID_KEY = 'vana-sentinela:convidado-id'
