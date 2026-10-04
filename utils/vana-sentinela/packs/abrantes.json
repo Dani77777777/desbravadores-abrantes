@@ -1,0 +1,497 @@
+{
+  "slug": "abrantes",
+  "cidade": "Abrantes",
+  "titulo": "Vivendo no Lugar Santíssimo — Parte 1: A Verdade Presente",
+  "orador": "Evangelista Jefferson Araújo",
+  "fraseChave": "Em cada geração Deus enviou uma verdade presente. Nós vivemos na geração da última — e o combustível da missão é o amor pelas almas que perecem.",
+  "disponivel": true,
+  "cartas": [
+    {
+      "id": "abr-01",
+      "afirmacao": "Jesus chamou à mensagem certa para cada época \"alimento a seu tempo\".",
+      "verdade": true,
+      "explicacao": "Em Mateus 24:45, o servo fiel dá o sustento \"a seu tempo\": uma mensagem certa para cada geração.",
+      "citacao": "É o que ele chama de alimento para o seu tempo.",
+      "referencia": "Mateus 24:45-46",
+      "minuto": "0:12:00",
+      "dificuldade": 1
+    },
+    {
+      "id": "abr-02",
+      "afirmacao": "Na parábola do servo fiel, a \"casa\" representa o nosso planeta.",
+      "verdade": true,
+      "explicacao": "Jesus é o Senhor da casa, que é a Terra, e voltou ao céu deixando os servos com uma missão.",
+      "citacao": "Onde a casa é o nosso planeta. Ele é o Senhor desta casa.",
+      "referencia": "Mateus 24:45",
+      "minuto": "0:11:03",
+      "dificuldade": 2
+    },
+    {
+      "id": "abr-03",
+      "afirmacao": "Na parábola, os servos encarregados de alimentar a casa são os anjos.",
+      "verdade": false,
+      "explicacao": "Os servos deixados na Terra com a missão de dar o alimento somos nós.",
+      "citacao": "Ele deixa aqui na terra um grupo de escravos encarregados de uma missão, que são seus servos. Somos nós.",
+      "referencia": "Mateus 24:45",
+      "minuto": "0:11:16",
+      "dificuldade": 1
+    },
+    {
+      "id": "abr-04",
+      "afirmacao": "Segundo a pregação, a ideia de uma mensagem especial para cada época foi inventada pelos adventistas depois de 1844.",
+      "verdade": false,
+      "explicacao": "É isso que alguns críticos dizem, mas o pregador mostrou que o conceito vem do próprio Jesus, em Mateus 24.",
+      "citacao": "Não é uma ideia nossa. Foi o próprio Jesus [...] alimento para o seu tempo.",
+      "referencia": "Mateus 24:45",
+      "minuto": "0:16:25",
+      "dificuldade": 2
+    },
+    {
+      "id": "abr-05",
+      "afirmacao": "O apóstolo Pedro chama ao \"alimento a seu tempo\" a \"verdade presente\".",
+      "verdade": true,
+      "explicacao": "Em 2 Pedro 1:12, Pedro fala de estarmos \"confirmados na presente verdade\".",
+      "citacao": "O alimento para o seu tempo é a verdade presente.",
+      "referencia": "2 Pedro 1:12",
+      "minuto": "0:17:31",
+      "dificuldade": 1
+    },
+    {
+      "id": "abr-06",
+      "afirmacao": "Pedro disse que falaria da verdade presente uma única vez, para não cansar a igreja.",
+      "verdade": false,
+      "explicacao": "Pedro disse o contrário: repetiria quantas vezes fosse preciso, até a igreja estar confirmada.",
+      "citacao": "Pedro vai dizer que repetiria quantas vezes fossem necessárias para a igreja, até que a igreja estivesse confirmada.",
+      "referencia": "2 Pedro 1:12",
+      "minuto": "0:18:15",
+      "dificuldade": 1
+    },
+    {
+      "id": "abr-07",
+      "afirmacao": "Para estarmos confirmados na verdade presente, precisamos de a conhecer, vivê-la e pregá-la.",
+      "verdade": true,
+      "explicacao": "São as três coisas que o pregador apontou: conhecer, viver e pregar.",
+      "citacao": "Nós precisamos conhecê-la, vivê-la e pregá-la. Três coisas.",
+      "minuto": "0:18:33",
+      "dificuldade": 2
+    },
+    {
+      "id": "abr-08",
+      "afirmacao": "Para estarmos confirmados na verdade presente, basta conhecê-la bem.",
+      "verdade": false,
+      "explicacao": "Conhecer não chega. O pregador falou de três coisas: conhecer, viver e pregar.",
+      "citacao": "Nós precisamos conhecê-la, vivê-la e pregá-la.",
+      "minuto": "0:18:33",
+      "dificuldade": 2
+    },
+    {
+      "id": "abr-09",
+      "afirmacao": "Segundo o pregador, pregar o evangelho hoje é igual a pregá-lo há 30 anos.",
+      "verdade": false,
+      "explicacao": "Ele disse que o mundo mudou de maneira absurda, sobretudo na Europa, com o secularismo.",
+      "citacao": "Pregar o evangelho hoje não é a mesma coisa do que há 30 anos. O mundo mudou de maneira absurda.",
+      "minuto": "0:19:16",
+      "dificuldade": 1
+    },
+    {
+      "id": "abr-10",
+      "afirmacao": "O pregador disse que na Europa o secularismo já existe há muito tempo, enquanto no Brasil está só a começar.",
+      "verdade": true,
+      "explicacao": "No Brasil sentem-se só \"os respingos\" do secularismo; na Europa ele já está instalado há muito.",
+      "citacao": "Nós já estamos começando a experimentar lá no meu país os respingos do secularismo. Só que aqui isso já existe há muito tempo.",
+      "minuto": "0:19:29",
+      "dificuldade": 2
+    },
+    {
+      "id": "abr-11",
+      "afirmacao": "Segundo o pregador, o mundo está à espera de ouvir teologia da prosperidade.",
+      "verdade": false,
+      "explicacao": "Ele disse o contrário: o mundo não espera teologia de coach nem da prosperidade, espera a mensagem da verdade presente.",
+      "citacao": "O mundo não está esperando para ouvir teologia do coach, teologia da prosperidade [...] O mundo está esperando para ouvir a mensagem da verdade presente.",
+      "minuto": "0:20:42",
+      "dificuldade": 1
+    },
+    {
+      "id": "abr-12",
+      "afirmacao": "O provérbio citado diz: de manhã come como um rei, ao almoço como um príncipe e à noite como um mendigo.",
+      "verdade": true,
+      "explicacao": "Serviu para ilustrar que cada momento tem o seu alimento, tal como cada época tem a sua mensagem.",
+      "citacao": "Pela manhã as pessoas deveriam comer como reis, no almoço como príncipes e à noite como mendigos.",
+      "minuto": "0:12:36",
+      "dificuldade": 1
+    },
+    {
+      "id": "abr-13",
+      "afirmacao": "No Nordeste do Brasil, o pequeno-almoço costuma ser leve, com fruta e granola.",
+      "verdade": false,
+      "explicacao": "O pequeno-almoço leve é o do sul, de onde vem o pregador. No Nordeste come-se mandioca, inhame, batata-doce e cuscuz.",
+      "citacao": "No Nordeste eles começam o dia comendo raízes, carboidratos [...] começa-se o dia comendo comida pesada.",
+      "minuto": "0:13:38",
+      "dificuldade": 3
+    },
+    {
+      "id": "abr-14",
+      "afirmacao": "O \"combustível\" que fazia a igreja do passado tão missionária era o amor pelas almas que perecem.",
+      "verdade": true,
+      "explicacao": "Saber que quem não conhece Jesus está perdido levava os crentes à missão.",
+      "citacao": "Este era o combustível da igreja [...] Amor pelas almas que perecem.",
+      "referencia": "Romanos 10:13",
+      "minuto": "0:24:57",
+      "dificuldade": 1
+    },
+    {
+      "id": "abr-15",
+      "afirmacao": "Segundo o pregador, o amor pelas almas perdidas nasce naturalmente no coração humano.",
+      "verdade": false,
+      "explicacao": "Ele foi claro: esse amor não nasce em nós. No máximo amamos a família, e temos de pedir a Deus que nos ensine a amar.",
+      "citacao": "Amor, e isto não se engane, não nasce no coração do ser humano.",
+      "minuto": "0:25:42",
+      "dificuldade": 2
+    },
+    {
+      "id": "abr-16",
+      "afirmacao": "Pluralismo religioso é a ideia de que não existe uma verdade, mas várias verdades.",
+      "verdade": true,
+      "explicacao": "É a ideia de que \"todos os caminhos levam a Deus\", e o pregador contestou-a.",
+      "citacao": "Pluralismo religioso [...] Não existe uma verdade. Existem várias verdades.",
+      "minuto": "0:26:47",
+      "dificuldade": 1
+    },
+    {
+      "id": "abr-17",
+      "afirmacao": "Para o pregador, a história dos cegos e do elefante prova que cada pessoa tem a sua própria verdade.",
+      "verdade": false,
+      "explicacao": "Ele usou a história ao contrário: havia alguém de fora que via o elefante inteiro. A verdade absoluta existe.",
+      "citacao": "Ou seja, a verdade absoluta existe.",
+      "referencia": "João 14:6",
+      "minuto": "0:28:29",
+      "dificuldade": 2
+    },
+    {
+      "id": "abr-18",
+      "afirmacao": "Na história do elefante, o pormenor decisivo é haver alguém que não era cego e sabia o que era o elefante.",
+      "verdade": true,
+      "explicacao": "É por causa desse pormenor que a história não prova que a verdade seja relativa.",
+      "citacao": "Estava enxergando do lado de fora e sabia o que era o elefante de verdade.",
+      "minuto": "0:28:48",
+      "dificuldade": 2
+    },
+    {
+      "id": "abr-19",
+      "afirmacao": "Hudson Taylor foi para a China à procura de uma vida mais confortável.",
+      "verdade": false,
+      "explicacao": "Deixou o conforto e a família e foi perseguido e humilhado, porque acreditava que os chineses estavam perdidos sem Cristo.",
+      "citacao": "Eu jamais pensaria em ir para a China se eu não acreditasse que os chineses estão perdidos e necessitados de Cristo.",
+      "minuto": "0:29:39",
+      "dificuldade": 1
+    },
+    {
+      "id": "abr-20",
+      "afirmacao": "John Knox foi missionário na China.",
+      "verdade": false,
+      "explicacao": "O missionário na China era Hudson Taylor. John Knox foi o reformador da Escócia.",
+      "citacao": "John Knox, reformador da Escócia.",
+      "minuto": "0:30:20",
+      "dificuldade": 1
+    },
+    {
+      "id": "abr-21",
+      "afirmacao": "John Knox orou: \"Deus, dá-me a Escócia, ou eu morro.\"",
+      "verdade": true,
+      "explicacao": "Disse-o durante um jejum de vários dias, quando a esposa o chamou para comer.",
+      "citacao": "Como posso eu comer com o meu povo padecendo? [...] Deus, dá-me a Escócia ou eu morro.",
+      "minuto": "0:31:09",
+      "dificuldade": 1
+    },
+    {
+      "id": "abr-22",
+      "afirmacao": "John Knox era católico até ler livros de Martinho Lutero.",
+      "verdade": true,
+      "explicacao": "Os livros de Lutero chegaram-lhe às mãos e ele aceitou a mensagem da Reforma.",
+      "citacao": "Ele era católico e alguns livros de Lutero chegaram a ele.",
+      "minuto": "0:30:23",
+      "dificuldade": 3
+    },
+    {
+      "id": "abr-23",
+      "afirmacao": "O pregador aconselhou a igreja de Abrantes a contentar-se com os convertidos que já tem.",
+      "verdade": false,
+      "explicacao": "Pediu o contrário: \"Não se contentem com meia dúzia, com 30 convertidos\". Orem por Abrantes como Knox orou pela Escócia.",
+      "citacao": "Não se contentem com meia dúzia, com 30 convertidos. Não se contentem.",
+      "minuto": "0:31:39",
+      "dificuldade": 1
+    },
+    {
+      "id": "abr-24",
+      "afirmacao": "John N. Andrews foi o primeiro missionário adventista enviado para fora dos EUA, e foi para a Europa.",
+      "verdade": true,
+      "explicacao": "Foi enviado para a Europa, o continente de onde tinha saído o protestantismo.",
+      "citacao": "O primeiro missionário da igreja enviado para fora dos Estados Unidos. Sabe pra onde? Pra Europa!",
+      "minuto": "0:32:28",
+      "dificuldade": 1
+    },
+    {
+      "id": "abr-25",
+      "afirmacao": "Os irmãos europeus escreveram cartas a pedir um pastor, porque não havia ninguém que os pudesse batizar.",
+      "verdade": true,
+      "explicacao": "Já criam na volta de Jesus, no Santuário e no sábado, mas não tinham quem os batizasse.",
+      "citacao": "Nós cremos no sábado do Senhor, só que não há ninguém aqui que possa nos batizar.",
+      "minuto": "0:33:08",
+      "dificuldade": 2
+    },
+    {
+      "id": "abr-26",
+      "afirmacao": "Foi Ellen White quem leu as cartas dos irmãos europeus na assembleia da Conferência Geral.",
+      "verdade": false,
+      "explicacao": "Foi Tiago White que leu as dezenas de cartas e perguntou quem atenderia ao chamado.",
+      "citacao": "Foi a experiência do Tiago White em uma assembleia da Conferência Geral.",
+      "minuto": "0:33:24",
+      "dificuldade": 2
+    },
+    {
+      "id": "abr-27",
+      "afirmacao": "A igreja pagou a viagem e uma casa a John N. Andrews para ir para a Europa.",
+      "verdade": false,
+      "explicacao": "Foi ele que gastou as economias e vendeu a casa para pagar as passagens dele e dos dois filhos.",
+      "citacao": "Gastou as suas economias, vendeu a sua casa para comprar as passagens dele, da sua filha e do seu filho.",
+      "minuto": "0:34:07",
+      "dificuldade": 2
+    },
+    {
+      "id": "abr-28",
+      "afirmacao": "Na Europa, Andrews viveu num porão que partilhava com uma máquina impressora barulhenta.",
+      "verdade": true,
+      "explicacao": "A máquina trabalhava dia e noite, e ele pregava até três vezes por dia e escrevia folhetos à noite.",
+      "citacao": "Dividindo o porão dessa casa com uma máquina impressora [...] imensa, barulhenta.",
+      "minuto": "0:34:27",
+      "dificuldade": 2
+    },
+    {
+      "id": "abr-29",
+      "afirmacao": "A família Andrews comia bem na Europa, e isso deu-lhe saúde para pregar muitos anos.",
+      "verdade": false,
+      "explicacao": "Comiam sobretudo batatas, repolho e algumas uvas. Com essa vida insalubre, Andrews apanhou tuberculose pouco depois.",
+      "citacao": "Comendo basicamente batatas, repolhos e de vez em quando algumas uvas [...] contraiu tuberculose.",
+      "minuto": "0:35:11",
+      "dificuldade": 2
+    },
+    {
+      "id": "abr-30",
+      "afirmacao": "A verdade presente não é exclusiva da nossa geração: Deus enviou uma em cada época.",
+      "verdade": true,
+      "explicacao": "Da Queda a 1844, cada geração recebeu a sua mensagem especial.",
+      "citacao": "Em cada geração Deus enviou uma mensagem especial.",
+      "minuto": "0:37:01",
+      "dificuldade": 1
+    },
+    {
+      "id": "abr-31",
+      "afirmacao": "A primeira verdade presente veio logo após a Queda, e os teólogos chamam-lhe \"protoevangelho\".",
+      "verdade": true,
+      "explicacao": "É o evangelho \"em miniatura\" de Génesis 3:15, a promessa da vitória sobre a serpente.",
+      "citacao": "Os teólogos chamam de protoevangelho. É um evangelho em protótipo, miniatura, resumido.",
+      "referencia": "Génesis 3:15",
+      "minuto": "0:37:28",
+      "dificuldade": 3
+    },
+    {
+      "id": "abr-32",
+      "afirmacao": "A verdade presente no tempo de Noé era a promessa de que dele sairia uma grande nação.",
+      "verdade": false,
+      "explicacao": "A grande nação foi a promessa a Abraão. A mensagem de Noé, pregada durante 120 anos, era o dilúvio.",
+      "citacao": "A verdade presente na época de Noé que ele pregou durante 120 anos, qual era? O dilúvio.",
+      "referencia": "Génesis 6–7",
+      "minuto": "0:37:58",
+      "dificuldade": 2
+    },
+    {
+      "id": "abr-33",
+      "afirmacao": "Jeremias mandava o povo ir para a Babilónia; 70 anos depois, Esdras e Neemias mandavam sair de lá.",
+      "verdade": true,
+      "explicacao": "Mensagens opostas, cada uma certa para o seu tempo: a verdade presente é \"uma fatia da verdade\" para cada época.",
+      "citacao": "Enquanto Jeremias dizia vá para a Babilônia, Esdras e Neemias diziam saiam de Babilônia, voltem para Jerusalém.",
+      "referencia": "Jeremias 29; Esdras 1",
+      "minuto": "0:39:08",
+      "dificuldade": 2
+    },
+    {
+      "id": "abr-34",
+      "afirmacao": "Jeremias, Esdras e Neemias pregaram exatamente a mesma mensagem, em épocas diferentes.",
+      "verdade": false,
+      "explicacao": "As mensagens eram diametralmente opostas: ir para a Babilónia e, mais tarde, sair dela.",
+      "citacao": "A mensagem de Esdras e Neemias era diametralmente oposta.",
+      "minuto": "0:39:08",
+      "dificuldade": 1
+    },
+    {
+      "id": "abr-35",
+      "afirmacao": "A verdade presente pregada por Martinho Lutero foi a salvação pela fé, um dom gratuito.",
+      "verdade": true,
+      "explicacao": "Não era preciso comprar o perdão com indulgências, porque a salvação é de graça.",
+      "citacao": "Salvação pela fé [...] porque a salvação é um dom gratuito.",
+      "referencia": "Efésios 2:8",
+      "minuto": "0:40:04",
+      "dificuldade": 1
+    },
+    {
+      "id": "abr-36",
+      "afirmacao": "Em 1844, a grande mensagem de Guilherme Miller foi a salvação pela fé.",
+      "verdade": false,
+      "explicacao": "A salvação pela fé foi a mensagem de Lutero. Em 1844, Miller e outros anunciavam a volta de Jesus.",
+      "citacao": "E aí chegamos em 1844 [...] a volta de Jesus.",
+      "minuto": "0:40:24",
+      "dificuldade": 2
+    },
+    {
+      "id": "abr-37",
+      "afirmacao": "Para o pregador, desde 1844 vivemos na geração da ÚLTIMA verdade presente.",
+      "verdade": true,
+      "explicacao": "Por isso o ministério dele se chama \"Última Verdade Presente\", e ele diz que o nome não é uma pretensão.",
+      "citacao": "Desde 1844 nós entramos na época em que Deus enviou literalmente a última verdade presente para a história deste mundo.",
+      "minuto": "0:41:37",
+      "dificuldade": 2
+    },
+    {
+      "id": "abr-38",
+      "afirmacao": "\"Se tens compromisso com a missão, precisas de conhecer a tua geração.\"",
+      "verdade": true,
+      "explicacao": "É o conselho que ele dá por onde passa, e pediu à igreja que estude os portugueses.",
+      "citacao": "Se você tem compromisso com a missão, você precisa conhecer a sua geração.",
+      "minuto": "0:42:21",
+      "dificuldade": 1
+    },
+    {
+      "id": "abr-39",
+      "afirmacao": "No método de Cristo, o primeiro passo era dizer \"Segue-me\".",
+      "verdade": false,
+      "explicacao": "\"Segue-me\" era o último passo. Primeiro Jesus misturava-Se com as pessoas e supria as suas necessidades. Nós é que costumamos saltar logo para o fim.",
+      "citacao": "O último passo de Jesus era fazer o quê? Convidar: siga-me. E geralmente a gente já vai pro último passo.",
+      "minuto": "0:42:52",
+      "dificuldade": 2
+    },
+    {
+      "id": "abr-40",
+      "afirmacao": "\"Sal dentro do saleiro não vale absolutamente nada.\"",
+      "verdade": true,
+      "explicacao": "Quer dizer que temos de aprender a misturar-nos com a sociedade.",
+      "citacao": "Sal dentro do saleiro não vale absolutamente nada. A gente tem que aprender a se misturar com a sociedade.",
+      "referencia": "Mateus 5:13",
+      "minuto": "0:43:05",
+      "dificuldade": 1
+    },
+    {
+      "id": "abr-41",
+      "afirmacao": "Os fariseus chamavam \"asceta\" a Jesus por causa da Sua dieta rigorosa.",
+      "verdade": false,
+      "explicacao": "O asceta era João Batista. A Jesus chamavam \"comilão e beberrão\", porque Se sentava à mesa com as pessoas.",
+      "citacao": "Enquanto João Batista era chamado asceta [...] o que os fariseus chamavam Jesus? Comilão e beberrão.",
+      "referencia": "Mateus 11:18-19",
+      "minuto": "0:43:24",
+      "dificuldade": 3
+    },
+    {
+      "id": "abr-42",
+      "afirmacao": "Uma das estratégias preferidas de Jesus era sentar-Se à mesa e partilhar uma refeição com as pessoas.",
+      "verdade": true,
+      "explicacao": "\"Há mais religião num pão bem feito do que muitos pensam.\" A mesa quebra barreiras e aproxima as pessoas.",
+      "citacao": "Uma das grandes estratégias de Jesus [...] sentar numa boa mesa e compartilhar uma refeição com as pessoas.",
+      "minuto": "0:43:46",
+      "dificuldade": 1
+    },
+    {
+      "id": "abr-43",
+      "afirmacao": "Mateus 24:14 e Apocalipse 14:6 formam um \"paralelo linguístico\": um é o eco do outro.",
+      "verdade": true,
+      "explicacao": "O \"evangelho do Reino\" de Jesus e o \"evangelho eterno\" de João falam da mesma mensagem.",
+      "citacao": "Existe um paralelo linguístico entre Mateus 24:14 e Apocalipse 14:6.",
+      "referencia": "Mateus 24:14; Apocalipse 14:6",
+      "minuto": "0:46:23",
+      "dificuldade": 2
+    },
+    {
+      "id": "abr-44",
+      "afirmacao": "O \"evangelho eterno\" de Apocalipse 14 é uma mensagem diferente do evangelho do Reino de Mateus 24:14.",
+      "verdade": false,
+      "explicacao": "Para o pregador são a mesma mensagem: Apocalipse 14 é o eco de Mateus 24:14.",
+      "citacao": "Então Apocalipse 14 é um eco de Mateus 24:14.",
+      "referencia": "Mateus 24:14; Apocalipse 14:6",
+      "minuto": "0:47:13",
+      "dificuldade": 3
+    },
+    {
+      "id": "abr-45",
+      "afirmacao": "O evangelho que deve ser pregado a todas as nações antes do fim é a mensagem dos três anjos.",
+      "verdade": true,
+      "explicacao": "É a tríplice mensagem angélica de Apocalipse 14:6-12, \"o último apelo do céu\".",
+      "citacao": "O Evangelho do Reino, que deve ser pregado a todas as nações para o fim chegar, é a mensagem que está em Apocalipse 14.",
+      "referencia": "Apocalipse 14:6-12",
+      "minuto": "0:47:24",
+      "dificuldade": 2
+    },
+    {
+      "id": "abr-46",
+      "afirmacao": "Segundo o pregador, como estamos no século XXI, a missão adventista tem de mudar.",
+      "verdade": false,
+      "explicacao": "A geração mudou, mas a missão está inalterada. O que muda são as estratégias.",
+      "citacao": "A missão está inalterada. A única coisa que nós precisamos é entender as estratégias.",
+      "minuto": "0:49:12",
+      "dificuldade": 2
+    },
+    {
+      "id": "abr-47",
+      "afirmacao": "A filósofa Hannah Arendt, citada no sermão, diz que as pessoas perderam a noção de que um dia estarão diante de um tribunal.",
+      "verdade": true,
+      "explicacao": "O pregador ligou isto à mensagem do juízo: Deus vê até o que fazemos longe dos olhos dos outros.",
+      "citacao": "As pessoas perderam a noção de que um dia elas vão se assentar diante de um tribunal.",
+      "minuto": "0:49:35",
+      "dificuldade": 3
+    },
+    {
+      "id": "abr-48",
+      "afirmacao": "A profecia das 2300 tardes e manhãs, ligada ao projeto One Voice 27, aponta para a saída do Egito.",
+      "verdade": false,
+      "explicacao": "Segundo o pregador, a profecia das 2300 tardes e manhãs aponta para o juízo.",
+      "citacao": "A profecia das 2300 tardes e manhãs aponta para o quê? Pro juízo!",
+      "referencia": "Daniel 8:14",
+      "minuto": "0:51:07",
+      "dificuldade": 2
+    },
+    {
+      "id": "abr-49",
+      "afirmacao": "Segundo o pregador, os apelos existem porque Deus precisa de saber o que vai no nosso coração.",
+      "verdade": false,
+      "explicacao": "Deus já sabe. Os apelos são para anjos, demónios e pessoas verem de que lado nos colocamos, no grande conflito.",
+      "citacao": "Deus não precisa de apelos [...] são por causa dos anjos, dos demônios e dos seres humanos.",
+      "minuto": "0:56:21",
+      "dificuldade": 2
+    },
+    {
+      "id": "abr-50",
+      "afirmacao": "Os amigos de Daniel não se ajoelharam diante da estátua porque tinham de mostrar de que lado estavam.",
+      "verdade": true,
+      "explicacao": "Num grande conflito não basta o coração: a decisão tem de se ver. Foi o exemplo usado no apelo.",
+      "citacao": "Eles sabiam que vivendo num grande conflito eles têm que mostrar a seres humanos, a demônios e aos anjos que eles se posicionam ao lado de Deus.",
+      "referencia": "Daniel 3",
+      "minuto": "0:56:57",
+      "dificuldade": 2
+    },
+    {
+      "id": "abr-51",
+      "afirmacao": "Nem todos são chamados a pregar no púlpito, mas cada um tem algum talento para alcançar a sua cidade.",
+      "verdade": true,
+      "explicacao": "O apelo foi para não nos conformarmos com o mínimo e usarmos o talento que Deus nos deu.",
+      "citacao": "Cada um de vocês tem algum talento, alguma vocação, alguma coisa para alcançar as pessoas dessa cidade.",
+      "minuto": "0:55:07",
+      "dificuldade": 1
+    },
+    {
+      "id": "abr-52",
+      "afirmacao": "O pregador disse que a Igreja Adventista é a única igreja onde Deus tem um povo fiel.",
+      "verdade": false,
+      "explicacao": "Disse o contrário: a Igreja de Deus é universal, com um povo fiel em todas as denominações. Os adventistas têm um papel profético, não exclusivista.",
+      "citacao": "Isso não faça da Igreja Adventista do Sétimo Dia uma igreja exclusivista [...] uma igreja que tem um povo fiel em todas as denominações.",
+      "minuto": "0:06:10",
+      "dificuldade": 2
+    }
+  ]
+}

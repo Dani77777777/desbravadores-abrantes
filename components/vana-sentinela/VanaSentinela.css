@@ -1,0 +1,40 @@
+/* VanaSentinela — animações do jogo (o resto é Tailwind). */
+
+/* Barra do tempo: esvazia em 8 s e passa a laranja/vermelho no fim. */
+@keyframes vs-timer {
+  0% { transform: scaleX(1); background-color: #34d399; }
+  60% { background-color: #facc15; }
+  85% { background-color: #fb923c; }
+  100% { transform: scaleX(0); background-color: #ef4444; }
+}
+.vs-timer {
+  transform-origin: left center;
+  animation: vs-timer var(--vs-time, 8000ms) linear forwards;
+}
+
+/* O combo "pulsa" quando sobe de nível. */
+@keyframes vs-pulse {
+  0% { transform: scale(1); }
+  30% { transform: scale(1.35) rotate(-4deg); }
+  60% { transform: scale(0.95) rotate(2deg); }
+  100% { transform: scale(1); }
+}
+.vs-pulse { animation: vs-pulse 600ms cubic-bezier(.34, 1.56, .64, 1); }
+
+/* Selo do feedback. */
+@keyframes vs-seal {
+  0% { transform: scale(.4) rotate(-12deg); opacity: 0; }
+  60% { transform: scale(1.08) rotate(3deg); opacity: 1; }
+  100% { transform: scale(1) rotate(0); opacity: 1; }
+}
+.vs-seal { animation: vs-seal 380ms cubic-bezier(.34, 1.56, .64, 1) both; }
+
+@keyframes vs-fade-up {
+  from { transform: translateY(12px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+.vs-fade-up { animation: vs-fade-up 300ms ease-out both; }
+
+@media (prefers-reduced-motion: reduce) {
+  .vs-pulse, .vs-seal, .vs-fade-up { animation: none; }
+}

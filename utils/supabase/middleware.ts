@@ -85,6 +85,9 @@ export async function updateSession(request: NextRequest) {
     !request.nextUrl.pathname.startsWith('/codes') &&
     !request.nextUrl.pathname.startsWith('/jogos/vana-quest') &&
     !request.nextUrl.pathname.startsWith('/jogos/vana-espada') &&
+    !request.nextUrl.pathname.startsWith('/jogos/vana-sentinela') &&
+    // A rota responde 401 sozinha (sem redirecionar para o login)
+    !request.nextUrl.pathname.startsWith('/api/jogos/vana-sentinela') &&
     !request.nextUrl.pathname.startsWith('/jogos/vana-trilha/como-jogar') &&
     !request.nextUrl.pathname.startsWith('/jogos/indisponivel') &&
     !request.nextUrl.pathname.startsWith('/embed') &&

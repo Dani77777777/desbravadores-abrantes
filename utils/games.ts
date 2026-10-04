@@ -46,6 +46,8 @@ export interface GameDefinition {
    * nos jogos ao vivo quem paga é o anfitrião, no fim da sessão.
    */
   singlePlayer: boolean
+  /** Mostra a etiqueta "Novo" no Centro de Jogos e na página inicial. */
+  isNew?: boolean
 }
 
 export const GAMES: GameDefinition[] = [
@@ -152,6 +154,20 @@ export const GAMES: GameDefinition[] = [
     requiresAuth: true,
     adminCoordOnly: false,
     singlePlayer: true,
+  },
+  {
+    id: 'vana-sentinela',
+    title: 'VanaSentinela',
+    description: 'Verdade ou Distorção? Arrasta as cartas e mostra que estiveste atento à pregação!',
+    image: '/images/VanaSentinela.jpeg',
+    href: '/jogos/vana-sentinela',
+    loginHref: '/jogos/vana-sentinela',
+    color: 'from-emerald-500 via-indigo-800 to-orange-500',
+    requiresAuth: false,
+    adminCoordOnly: false,
+    // Não dá XP/Gold (só ranking), por isso fica fora das campanhas de pontos multiplicados.
+    singlePlayer: false,
+    isNew: true,
   },
 ]
 

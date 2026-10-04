@@ -681,6 +681,11 @@ export function LandingPage({
                         <Sparkles className="h-3 w-3" /> Pontos ×{formatMultiplier(multiplier)}
                       </span>
                     )}
+                    {available && multiplier <= 1 && game.isNew && (
+                      <span className="absolute left-3 top-3 z-20 inline-flex items-center gap-1 rounded-full bg-pink-500 px-2.5 py-1 text-[11px] font-black uppercase tracking-wider text-white shadow-lg">
+                        <Sparkles className="h-3 w-3" /> Novo
+                      </span>
+                    )}
                   </div>
                   <div className="p-5">
                     <h3 className={`${D} text-xl font-extrabold text-white`}>

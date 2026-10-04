@@ -210,6 +210,11 @@ export default async function GamesHubPage() {
                         <Sparkles className="h-3 w-3" /> Pontos ×{formatMultiplier(game.bonus.multiplier)}
                       </span>
                     )}
+                    {isAvailable && !game.bonus && game.isNew && (
+                      <span className="absolute left-3 top-3 z-20 inline-flex items-center gap-1 rounded-full bg-pink-500 px-2.5 py-1 text-[11px] font-black uppercase tracking-wider text-white shadow-lg">
+                        <Sparkles className="h-3 w-3" /> Novo
+                      </span>
+                    )}
                   </div>
 
                   <div className="flex flex-1 flex-col p-6">
