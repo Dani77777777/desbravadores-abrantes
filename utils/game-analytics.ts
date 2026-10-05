@@ -128,7 +128,7 @@ export type GameAnalytics = {
   top: TopPlayer[]
   /** Partidas começadas por hora do dia (0–23, Lisboa). */
   hours: number[]
-  /** Partidas por dia da semana (0 = segunda … 6 = domingo). */
+  /** Partidas por dia da semana (0 = domingo … 6 = sábado). */
   weekdays: number[]
 }
 
@@ -142,9 +142,9 @@ function lisbonHour(iso: string): number {
   )
 }
 
-/** 0 = segunda … 6 = domingo. */
+/** 0 = domingo … 6 = sábado (a semana começa ao domingo). */
 function weekdayOf(isoDate: string): number {
-  return (new Date(`${isoDate}T12:00:00Z`).getUTCDay() + 6) % 7
+  return new Date(`${isoDate}T12:00:00Z`).getUTCDay()
 }
 
 function modeLabel(gameId: SingleplayerGameId, mode: string): string {

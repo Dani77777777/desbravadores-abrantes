@@ -97,8 +97,8 @@ describe('período de 30 dias e VanaSentinela', () => {
     expect(s.attemptsTotal).toBe(6)
   })
 
-  test('dias da semana (0 = segunda)', () => {
+  test('dias da semana (0 = domingo)', () => {
     // 2026-10-01 é quinta-feira
-    expect(a.weekdays[3]).toBe(4)
+    expect(a.weekdays[4]).toBe(4)
   })
 })

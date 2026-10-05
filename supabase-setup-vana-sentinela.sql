@@ -70,7 +70,7 @@ CREATE POLICY "vana_sentinela_scores_delete_coord" ON public.vana_sentinela_scor
 --    Top N + a linha de quem está a ver, se estiver fora do Top.
 --    Público (anon incluído), mas só expõe o que o ranking precisa.
 --    Desempate: mais acertos, depois menos tempo, depois a mais antiga.
---    p_period: 'semana' (desde segunda-feira, hora de Lisboa) ou 'sempre'.
+--    p_period: 'semana' (desde domingo, hora de Lisboa) ou 'sempre'.
 --    p_guest_id: o id anónimo do convidado que está a ver (para destacar a linha dele).
 DROP FUNCTION IF EXISTS public.get_vana_sentinela_ranking(text, text, integer);
 DROP FUNCTION IF EXISTS public.get_vana_sentinela_ranking(text, text, integer, uuid);
@@ -100,7 +100,9 @@ AS $$
   WITH since AS (
     SELECT CASE
       WHEN p_period = 'semana'
-        THEN date_trunc('week', now() AT TIME ZONE 'Europe/Lisbon') AT TIME ZONE 'Europe/Lisbon'
+        -- A semana começa ao domingo (EXTRACT(DOW) dá 0 ao domingo).
+        THEN ((now() AT TIME ZONE 'Europe/Lisbon')::date
+              - EXTRACT(DOW FROM now() AT TIME ZONE 'Europe/Lisbon')::int)::timestamp AT TIME ZONE 'Europe/Lisbon'
       ELSE NULL
     END AS t
   ),

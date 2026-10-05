@@ -57,7 +57,9 @@ AS $$
   WITH since AS (
     SELECT CASE
       WHEN p_period = 'semana'
-        THEN date_trunc('week', now() AT TIME ZONE 'Europe/Lisbon') AT TIME ZONE 'Europe/Lisbon'
+        -- A semana começa ao domingo (EXTRACT(DOW) dá 0 ao domingo).
+        THEN ((now() AT TIME ZONE 'Europe/Lisbon')::date
+              - EXTRACT(DOW FROM now() AT TIME ZONE 'Europe/Lisbon')::int)::timestamp AT TIME ZONE 'Europe/Lisbon'
       ELSE NULL
     END AS t
   ),

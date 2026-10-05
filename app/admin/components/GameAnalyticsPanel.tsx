@@ -25,8 +25,8 @@ const GAME_COLOR: Record<SingleplayerGameId, string> = {
 }
 const TOTAL_COLOR = '#57534e'
 
-const WEEKDAYS = ['seg', 'ter', 'qua', 'qui', 'sex', 'sáb', 'dom']
-const WEEKDAYS_LONG = ['segunda-feira', 'terça-feira', 'quarta-feira', 'quinta-feira', 'sexta-feira', 'sábado', 'domingo']
+const WEEKDAYS = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb']
+const WEEKDAYS_LONG = ['domingo', 'segunda-feira', 'terça-feira', 'quarta-feira', 'quinta-feira', 'sexta-feira', 'sábado']
 
 const pct = (x: number | null) => (x === null ? '—' : `${Math.round(x * 100)}%`)
 const dec = (x: number | null) => (x === null ? '—' : x.toFixed(1).replace('.', ','))
@@ -317,7 +317,8 @@ function insights(a: GameAnalytics, totalMembers: number, guestRounds: number | 
 
   const peakDay = a.weekdays.indexOf(Math.max(...a.weekdays))
   const peakHour = a.hours.indexOf(Math.max(...a.hours))
-  out.push(`Joga-se mais à ${WEEKDAYS_LONG[peakDay]}, entre as ${peakHour}h e as ${peakHour + 1}h.`)
+  const peakDayPrep = peakDay === 0 || peakDay === 6 ? 'ao' : 'à'
+  out.push(`Joga-se mais ${peakDayPrep} ${WEEKDAYS_LONG[peakDay]}, entre as ${peakHour}h e as ${peakHour + 1}h.`)
 
   if (totalMembers > 0) {
     const share = Math.round((a.week.players / totalMembers) * 100)
