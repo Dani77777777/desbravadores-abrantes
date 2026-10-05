@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
-import { Calendar as CalendarIcon, MapPin, Trophy, Coins, ChevronRight, Clock, Info, User, Share2, ExternalLink, AlarmClock } from 'lucide-react'
+import { Calendar as CalendarIcon, MapPin, Trophy, Coins, ChevronRight, Clock, Info, User, Share2, ExternalLink, AlarmClock, Video } from 'lucide-react'
 import Link from 'next/link'
 import { CalendarUI } from './CalendarUI'
 import { CodeEntryDialog } from '@/components/dashboard/CodeEntryDialog'
@@ -15,6 +15,7 @@ import { EventShareDialog } from './EventShareDialog'
 import { SECTION_LABELS } from '@/utils/permissions'
 import { EventRsvp, RsvpBadge } from './EventRsvp'
 import { EventLocation } from './EventLocation'
+import { isOnlineEvent, onlineLabel } from '@/utils/online-event'
 
 interface EventDashboardProps {
   events: any[]
@@ -134,7 +135,12 @@ export function EventDashboard({ events, profile, surveys, userId, rsvps = {} }:
                                 {startDate.toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })}
                               </span>
                             )}
-                            {event.location && (
+                            {isOnlineEvent(event) ? (
+                              <span className="flex items-center gap-1 font-medium text-blue-600">
+                                <Video className="w-3 h-3" />
+                                {onlineLabel(event)}
+                              </span>
+                            ) : event.location && (
                               <span className="flex items-center gap-1">
                                 <MapPin className="w-3 h-3" />
                                 {event.location}

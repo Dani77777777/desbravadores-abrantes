@@ -2,12 +2,13 @@
 
 import { useRef, useState, useEffect, type ReactNode } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { AlarmClock, Calendar, Clock, Coins, Download, MapPin, Share2, Trophy, Loader2 } from 'lucide-react'
+import { AlarmClock, Calendar, Clock, Coins, Download, MapPin, Share2, Trophy, Loader2, Video } from 'lucide-react'
 import { toast } from 'sonner'
 import { QRCodeCanvas } from 'qrcode.react'
 import { displayFont } from '@/components/landing/fonts'
 import { isRsvpOpen } from '@/utils/event-rsvp'
 import { googleMapsUrl } from '@/utils/maps'
+import { isOnlineEvent, onlineLabel } from '@/utils/online-event'
 
 interface Event {
   id: string
@@ -16,6 +17,8 @@ interface Event {
   location?: string | null
   location_lat?: number | null
   location_lng?: number | null
+  is_online?: boolean | null
+  online_url?: string | null
   start_at: string
   end_at?: string | null
   target_section?: string | null
@@ -103,6 +106,25 @@ function rsvpText(r: RsvpInfo) {
 }
 
 const truncate = (s: string, n: number) => (s.length > n ? s.slice(0, n).trimEnd() + '…' : s)
+
+/**
+ * Linha do local: "Online · Zoom" ou o texto do local físico. null sem local.
+ * A imagem é pública (redes sociais), por isso o link da reunião fica só no Painel.
+ */
+function PlaceRow({ e, size, max }: { e: Event; size: number; max: number }) {
+  if (isOnlineEvent(e)) {
+    return (
+      <InfoRow size={size} icon={<Video size={size} strokeWidth={2.4} />}>
+        {onlineLabel(e)}
+        <span style={{ display: 'block', fontSize: size * 0.68, fontWeight: 600, color: C.muted, marginTop: size * 0.1 }}>
+          Link para entrar no Painel do site
+        </span>
+      </InfoRow>
+    )
+  }
+  if (!e.location) return null
+  return <InfoRow size={size} icon={<MapPin size={size} strokeWidth={2.4} />}>{truncate(e.location, max)}</InfoRow>
+}
 
 async function fetchLogoAsDataUrl(): Promise<string> {
   const url = window.location.origin + '/images/Logo%20Desbravadores.png'
@@ -293,9 +315,7 @@ const WideCard = ({ event, logoDataUrl, qrDataUrl }: CardProps) => {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 18, marginTop: 6 }}>
               <InfoRow size={32} icon={<Calendar size={32} strokeWidth={2.4} />}>{dateLine(event)}</InfoRow>
               <InfoRow size={32} icon={<Clock size={32} strokeWidth={2.4} />}>{timeLine(event)}</InfoRow>
-              {event.location && (
-                <InfoRow size={32} icon={<MapPin size={32} strokeWidth={2.4} />}>{truncate(event.location, 60)}</InfoRow>
-              )}
+              <PlaceRow e={event} size={32} max={60} />
             </div>
           </div>
 
@@ -372,9 +392,7 @@ const SquareCard = ({ event, logoDataUrl }: CardProps) => {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
             <InfoRow size={27} icon={<Calendar size={27} strokeWidth={2.4} />}>{dateLine(event)}</InfoRow>
             <InfoRow size={27} icon={<Clock size={27} strokeWidth={2.4} />}>{timeLine(event)}</InfoRow>
-            {event.location && (
-              <InfoRow size={27} icon={<MapPin size={27} strokeWidth={2.4} />}>{truncate(event.location, 48)}</InfoRow>
-            )}
+            <PlaceRow e={event} size={27} max={48} />
           </div>
         </div>
 
@@ -437,9 +455,13 @@ export function EventShareDialog({ event, open, onOpenChange }: EventShareDialog
 
   const buildShareText = () => {
     const lines = [`📅 ${event.title}`, `${dateLine(event)} · ${timeLine(event)}`]
-    if (event.location) lines.push(`📍 ${event.location}`)
-    const map = googleMapsUrl(event)
-    if (map && event.location_lat != null) lines.push(`🗺️ ${map}`)
+    if (isOnlineEvent(event)) {
+      lines.push(`💻 ${onlineLabel(event)} · link para entrar no Painel`)
+    } else {
+      if (event.location) lines.push(`📍 ${event.location}`)
+      const map = googleMapsUrl(event)
+      if (map && event.location_lat != null) lines.push(`🗺️ ${map}`)
+    }
     const rsvp = rsvpInfo(event)
     if (rsvp) lines.push('', `⏰ ${rsvpText(rsvp)} (no Painel: Vou / Não vou)`)
     lines.push('', `Ganha ${event.xp_reward} XP e ${event.gold_reward} Gold por participares!`, '', `🌐 ${SITE_URL}`)

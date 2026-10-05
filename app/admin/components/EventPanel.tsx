@@ -13,14 +13,15 @@ import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
 import {
   Plus, Trophy, Coins, Calendar, MapPin, Trash2, ListChecks, Pencil, Share2, AlertTriangle, RotateCcw,
-  Loader2, Copy, Megaphone, Search, Globe, CalendarClock, Activity, Clock, Info, CheckCircle2,
+  Loader2, Copy, Megaphone, Search, Globe, CalendarClock, Activity, Clock, Info, CheckCircle2, Video,
 } from 'lucide-react'
 import { fmtRsvpDeadline, summarizeRsvps, type RsvpRow } from '@/utils/event-rsvp'
 import { RsvpCountsButton, RsvpSettings, RsvpSummaryDialog } from './EventRsvpAdmin'
 import { EventAttendanceManager } from './EventAttendanceManager'
 import { EventShareDialog } from '@/components/events/EventShareDialog'
-import { LocationPicker } from '@/components/events/LocationPicker'
-import { googleMapsUrl, placeCoords, type Coords } from '@/utils/maps'
+import { EventPlaceField } from '@/components/events/EventPlaceField'
+import { googleMapsUrl, placeCoords, type Coords, type EventPlace } from '@/utils/maps'
+import { isOnlineEvent, normalizeUrl, onlineLabel, onlinePlatform, type OnlinePlace } from '@/utils/online-event'
 import { displayFont } from '@/components/landing/fonts'
 import {
   SECTION_LABELS, attendanceByEvent, averageRate, daysUntil, fmtLong, fmtParts, fmtShort, relativeDayLabel,
@@ -42,10 +43,15 @@ type Filter = 'upcoming' | 'overdue' | 'history'
 /** Texto automático do comunicado de um evento novo. */
 function newEventAnnouncement(f: {
   title: string; startAt: string; location: string; description: string; xp: number; gold: number; rsvp: boolean; rsvpDeadline: string
+  online: boolean; onlineUrl: string
 }) {
   const when = f.startAt ? fmtLong(new Date(f.startAt).toISOString()) : '(data por definir)'
-  const parts = [`${f.title || 'Novo evento'} — ${when}${f.location ? `, em ${f.location}` : ''}.`]
+  const url = f.online ? normalizeUrl(f.onlineUrl) : null
+  const platform = onlinePlatform(url)
+  const where = f.online ? `, online${platform ? ` (${platform})` : ''}` : f.location ? `, em ${f.location}` : ''
+  const parts = [`${f.title || 'Novo evento'} — ${when}${where}.`]
   if (f.description.trim()) parts.push(f.description.trim())
+  if (f.online) parts.push(url ? `Link para entrar: ${url}` : 'O link para entrar vai estar no Painel.')
   if (f.xp > 0 || f.gold > 0) parts.push(`Recompensas: ${f.xp} XP e ${f.gold} Gold.`)
   if (f.rsvp) {
     parts.push(
@@ -69,6 +75,8 @@ export function EventPanel({ profile, members, events, attendance = [], rsvps = 
   const [description, setDescription] = useState('')
   const [location, setLocation] = useState('')
   const [coords, setCoords] = useState<Coords | null>(null)
+  const [online, setOnline] = useState(false)
+  const [onlineUrl, setOnlineUrl] = useState('')
   const [startAt, setStartAt] = useState('')
   const [endAt, setEndAt] = useState('')
   const [targetSection, setTargetSection] = useState<string>(defaultTarget)
@@ -121,6 +129,8 @@ export function EventPanel({ profile, members, events, attendance = [], rsvps = 
   const [editDescription, setEditDescription] = useState('')
   const [editLocation, setEditLocation] = useState('')
   const [editCoords, setEditCoords] = useState<Coords | null>(null)
+  const [editOnline, setEditOnline] = useState(false)
+  const [editOnlineUrl, setEditOnlineUrl] = useState('')
   const [editXpReward, setEditXpReward] = useState(50)
   const [editGoldReward, setEditGoldReward] = useState(10)
   const [editLateDiscount, setEditLateDiscount] = useState(25)
@@ -139,9 +149,32 @@ export function EventPanel({ profile, members, events, attendance = [], rsvps = 
   // Texto automático do comunicado (até ser editado à mão)
   const autoAnn = newEventAnnouncement({
     title, startAt, location, description, xp: xpReward, gold: goldReward, rsvp: rsvpEnabled, rsvpDeadline,
+    online, onlineUrl,
   })
   const shownAnnTitle = annEdited ? annTitle : autoAnn.title
   const shownAnnMessage = annEdited ? annMessage : autoAnn.message
+
+  /**
+   * Campos do local para gravar: presencial (texto + ponto) ou online (link).
+   * Os de "online" só vão quando contam, para funcionar antes da migração.
+   */
+  const placeFields = (p: { online: boolean; location: string; coords: Coords | null; url: string; before?: EventPlace & OnlinePlace }) => {
+    const hadCoords = !!(p.before && placeCoords(p.before))
+    if (p.online) {
+      return {
+        location: null,
+        ...(hadCoords ? { location_lat: null, location_lng: null } : {}),
+        is_online: true,
+        online_url: normalizeUrl(p.url),
+      }
+    }
+    return {
+      location: p.location || null,
+      // Só envia as coordenadas quando há ponto (funciona mesmo antes da migração do mapa)
+      ...(p.coords || hadCoords ? { location_lat: p.coords?.lat ?? null, location_lng: p.coords?.lng ?? null } : {}),
+      ...(p.before && isOnlineEvent(p.before) ? { is_online: false, online_url: null } : {}),
+    }
+  }
 
   /** Envia um comunicado para o público do evento (todos ou a classe). Devolve nº de destinatários. */
   const sendEventAnnouncement = async (section: string | null, annT: string, annM: string) => {
@@ -166,15 +199,17 @@ export function EventPanel({ profile, members, events, attendance = [], rsvps = 
       toast.error('O prazo para responder tem de ser antes do início do evento.')
       return
     }
+    if (online && onlineUrl.trim() && !normalizeUrl(onlineUrl)) {
+      toast.error('O link da reunião não é válido.')
+      return
+    }
     setCreating(true)
     try {
       const section = targetSection === '__all__' ? null : targetSection
       const { error } = await supabase.from('events').insert({
         title,
         description: description || null,
-        location: location || null,
-        // Só envia as coordenadas quando há ponto (funciona mesmo antes da migração do mapa)
-        ...(coords ? { location_lat: coords.lat, location_lng: coords.lng } : {}),
+        ...placeFields({ online, location, coords, url: onlineUrl }),
         start_at: new_date_with_time(startAt),
         end_at: endAt ? new_date_with_time(endAt) : null,
         target_section: section,
@@ -257,15 +292,16 @@ export function EventPanel({ profile, members, events, attendance = [], rsvps = 
       toast.error('O prazo para responder tem de ser antes do início do evento.')
       return
     }
+    if (editOnline && editOnlineUrl.trim() && !normalizeUrl(editOnlineUrl)) {
+      toast.error('O link da reunião não é válido.')
+      return
+    }
     setUpdating(true)
     try {
       const { error } = await supabase.from('events').update({
         title: editTitle.trim() || editingEvent.title,
         description: editDescription || null,
-        location: editLocation || null,
-        ...(editCoords || placeCoords(editingEvent)
-          ? { location_lat: editCoords?.lat ?? null, location_lng: editCoords?.lng ?? null }
-          : {}),
+        ...placeFields({ online: editOnline, location: editLocation, coords: editCoords, url: editOnlineUrl, before: editingEvent }),
         xp_reward: editXpReward,
         gold_reward: editGoldReward,
         late_discount_percent: editLateDiscount / 100,
@@ -330,6 +366,8 @@ export function EventPanel({ profile, members, events, attendance = [], rsvps = 
     setDescription('')
     setLocation('')
     setCoords(null)
+    setOnline(false)
+    setOnlineUrl('')
     setStartAt('')
     setEndAt('')
     setTargetSection(defaultTarget)
@@ -361,6 +399,8 @@ export function EventPanel({ profile, members, events, attendance = [], rsvps = 
     setDescription(event.description || '')
     setLocation(event.location || '')
     setCoords(placeCoords(event))
+    setOnline(isOnlineEvent(event))
+    setOnlineUrl(event.online_url || '')
     setStartAt(toLocalInput(start))
     setEndAt(duration !== null ? toLocalInput(new Date(start.getTime() + duration)) : '')
     setTargetSection(isDirigente ? defaultTarget : (event.target_section || '__all__'))
@@ -384,6 +424,8 @@ export function EventPanel({ profile, members, events, attendance = [], rsvps = 
     setEditDescription(event.description || '')
     setEditLocation(event.location || '')
     setEditCoords(placeCoords(event))
+    setEditOnline(isOnlineEvent(event))
+    setEditOnlineUrl(event.online_url || '')
     setEditXpReward(event.xp_reward)
     setEditGoldReward(event.gold_reward)
     setEditLateDiscount(Math.round((event.late_discount_percent ?? 0.25) * 100))
@@ -438,7 +480,8 @@ export function EventPanel({ profile, members, events, attendance = [], rsvps = 
     : []
 
   const q = search.trim().toLowerCase()
-  const matches = (e: any) => !q || [e.title, e.location, e.description].some((v: string | null) => v?.toLowerCase().includes(q))
+  const matches = (e: any) =>
+    !q || [e.title, e.location, e.description, isOnlineEvent(e) ? onlineLabel(e) : null].some((v: string | null) => v?.toLowerCase().includes(q))
   const listed = (filter === 'history' ? pastEvents : filter === 'overdue' ? overdueEvents : upcomingEvents).filter(matches)
 
   const summary = [
@@ -563,7 +606,13 @@ export function EventPanel({ profile, members, events, attendance = [], rsvps = 
                   </div>
                   <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-stone-500">
                     <span className="flex items-center gap-1"><Clock className="h-3.5 w-3.5" /> {p.time}{event.end_at ? ` – ${fmtParts(event.end_at).time}` : ''}</span>
-                    {event.location && (placeCoords(event) ? (
+                    {isOnlineEvent(event) ? (event.online_url ? (
+                      <a href={event.online_url} target="_blank" rel="noopener noreferrer" title="Abrir o link da reunião" className="flex items-center gap-1 hover:text-blue-700 hover:underline">
+                        <Video className="h-3.5 w-3.5 text-blue-600" /> {onlineLabel(event)}
+                      </a>
+                    ) : (
+                      <span className="flex items-center gap-1 text-amber-700" title="Falta o link — acrescenta-o em Editar"><Video className="h-3.5 w-3.5" /> Online · sem link</span>
+                    )) : event.location && (placeCoords(event) ? (
                       <a href={googleMapsUrl(event)!} target="_blank" rel="noopener noreferrer" title="Abrir no mapa" className="flex items-center gap-1 hover:text-blue-700 hover:underline">
                         <MapPin className="h-3.5 w-3.5 text-red-500" /> {event.location}
                       </a>
@@ -734,8 +783,13 @@ export function EventPanel({ profile, members, events, attendance = [], rsvps = 
                 </div>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="event-location">Local <span className="font-normal text-stone-400">(escreve e/ou marca no mapa)</span></Label>
-                <LocationPicker id="event-location" text={location} onTextChange={setLocation} coords={coords} onCoordsChange={setCoords} />
+                <EventPlaceField
+                  id="event-location"
+                  online={online} onOnlineChange={setOnline}
+                  text={location} onTextChange={setLocation}
+                  coords={coords} onCoordsChange={setCoords}
+                  url={onlineUrl} onUrlChange={setOnlineUrl}
+                />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="event-desc">Descrição</Label>
@@ -778,7 +832,7 @@ export function EventPanel({ profile, members, events, attendance = [], rsvps = 
                   </Select>
                   {targetSection === '__all__' && (
                     <p className="flex items-start gap-1 text-[11px] text-sky-700">
-                      <Globe className="mt-0.5 h-3 w-3 shrink-0" /> Aparece também na página inicial do site para visitantes (título, data, local e descrição).
+                      <Globe className="mt-0.5 h-3 w-3 shrink-0" /> Aparece também na página inicial do site para visitantes (título, data, local e descrição{online ? '; o link da reunião fica só para os membros no Painel' : ''}).
                     </p>
                   )}
                 </div>
@@ -940,8 +994,13 @@ export function EventPanel({ profile, members, events, attendance = [], rsvps = 
               <Input id="edit-title" value={editTitle} onChange={e => setEditTitle(e.target.value)} required />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="edit-location">Local</Label>
-              <LocationPicker id="edit-location" text={editLocation} onTextChange={setEditLocation} coords={editCoords} onCoordsChange={setEditCoords} />
+              <EventPlaceField
+                id="edit-location"
+                online={editOnline} onOnlineChange={setEditOnline}
+                text={editLocation} onTextChange={setEditLocation}
+                coords={editCoords} onCoordsChange={setEditCoords}
+                url={editOnlineUrl} onUrlChange={setEditOnlineUrl}
+              />
             </div>
             <div className="space-y-2">
               <Label htmlFor="edit-desc">Descrição</Label>

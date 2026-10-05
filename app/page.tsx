@@ -55,9 +55,13 @@ export default async function Dashboard() {
         .limit(1)
         .maybeSingle<PublicEvent>()
       const baseCols = 'id, title, description, location, start_at, end_at'
-      // Com o ponto no mapa; sem a migração do mapa, só com o texto do local
-      const withCoords = await nextEventQuery(`${baseCols}, location_lat, location_lng`)
-      const { data: nextEvent } = withCoords.error ? await nextEventQuery(baseCols) : withCoords
+      // Com o ponto no mapa e se é online (o link fica só no Painel; o anon nem o consegue ler).
+      // Sem essas migrações, cai para menos colunas.
+      const coordCols = `${baseCols}, location_lat, location_lng`
+      let result = await nextEventQuery(`${coordCols}, is_online`)
+      if (result.error) result = await nextEventQuery(coordCols)
+      if (result.error) result = await nextEventQuery(baseCols)
+      const nextEvent = result.data
       const gameMultipliers = Object.fromEntries(GAMES.map((g) => [g.id, activeMultiplier(gameSettings[g.id])]))
       return <LandingPage gameVisibility={gameVisibility} nextEvent={nextEvent} gameMultipliers={gameMultipliers} />
   }

@@ -2,9 +2,10 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, Clock, MapPin, Phone } from "lucide-react";
+import { ArrowRight, Clock, MapPin, Phone, Video } from "lucide-react";
 import { displayFont } from "./fonts";
 import { googleMapsUrl } from "@/utils/maps";
+import { isOnlineEvent } from "@/utils/online-event";
 
 const D = displayFont.className;
 // Fuso fixo: o servidor e o browser formatam igual (sem avisos de hidratação)
@@ -17,6 +18,7 @@ export interface PublicEvent {
   location: string | null;
   location_lat?: number | null;
   location_lng?: number | null;
+  is_online?: boolean | null;
   start_at: string;
   end_at: string | null;
 }
@@ -116,7 +118,13 @@ export function NextEventCard({ event }: { event: PublicEvent }) {
               {time}
               {endTime && (sameDay ? ` – ${endTime}` : ` até ${fmt(end!, { day: "numeric", month: "short" })} ${endTime}`)}
             </span>
-            {event.location && (
+            {isOnlineEvent(event) ? (
+              // Visitantes só sabem que é online; o link está no Painel
+              <span className="inline-flex items-center gap-1.5">
+                <Video className="h-4 w-4 shrink-0 text-yellow-300" />
+                Online
+              </span>
+            ) : event.location && (
               <a
                 href={googleMapsUrl(event)!}
                 target="_blank"
