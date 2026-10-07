@@ -87,14 +87,14 @@ function OnlineLocation({ event }: { event: OnlinePlace }) {
   }
 
   return (
-    <div className="space-y-2">
+    <div className="min-w-0 space-y-2">
       <h4 className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Evento online</h4>
-      <div className="space-y-3 rounded-2xl bg-blue-50 p-3.5 ring-1 ring-inset ring-blue-100">
-        <p className="flex items-center gap-2 text-sm font-bold text-blue-950">
+      <div className="space-y-3 rounded-2xl bg-blue-50 p-3.5 ring-1 ring-inset ring-blue-100 [contain:inline-size]">
+        <p className="flex min-w-0 items-center gap-2 text-sm font-bold text-blue-950">
           <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-blue-600 text-white">
             <Video className="h-4 w-4" />
           </span>
-          <span className="min-w-0">
+          <span className="min-w-0 flex-1">
             <span className="block">{platform ?? 'Reunião online'}</span>
             {url && <span className="block truncate text-xs font-medium text-blue-700/80">{shortUrl(url)}</span>}
           </span>

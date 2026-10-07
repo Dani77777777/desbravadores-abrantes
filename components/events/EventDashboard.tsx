@@ -208,7 +208,7 @@ export function EventDashboard({ events, profile, surveys, userId, rsvps = {} }:
               </DialogDescription>
             </DialogHeader>
 
-            <div className="space-y-6 py-4">
+            <div className="min-w-0 space-y-6 py-4">
               {viewingEvent.description && (
                 <div className="space-y-2">
                   <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider">Descrição</h4>
