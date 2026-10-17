@@ -54,7 +54,10 @@ export async function createFamilyAccount(data: {
   })
   if (authError || !created.user) return { error: `Não foi possível criar a conta: ${authError?.message || 'erro desconhecido'}` }
 
-  const { error: profileError } = await admin.from('profiles').insert({
+  // Alguns projetos Supabase criam o perfil automaticamente através de um trigger
+  // em auth.users. O upsert funciona tanto com esse trigger como sem ele, sem tentar
+  // inserir o mesmo id uma segunda vez.
+  const { error: profileError } = await admin.from('profiles').upsert({
     id: created.user.id,
     full_name: data.fullName.trim(),
     birth_date: data.birthDate,
@@ -64,7 +67,7 @@ export async function createFamilyAccount(data: {
     total_xp: 0,
     current_gold: 0,
     is_invested: false,
-  })
+  }, { onConflict: 'id' })
   if (profileError) {
     await admin.auth.admin.deleteUser(created.user.id)
     return { error: `A conta foi criada, mas o perfil falhou: ${profileError.message}` }
