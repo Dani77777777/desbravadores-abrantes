@@ -1,6 +1,7 @@
 import { createClient } from '@/utils/supabase/server'
 import { redirect } from 'next/navigation'
 import ProfileSettings from './ProfileSettings'
+import { getFamilyAccountSummary } from '@/lib/family-accounts'
 
 export default async function ProfilePage() {
   const supabase = await createClient()
@@ -54,11 +55,14 @@ export default async function ProfilePage() {
     .select('station')
     .eq('user_id', user.id)
 
+  const familyAccounts = await getFamilyAccountSummary(user.id)
+
   return <ProfileSettings 
     profile={profile} 
     user={user} 
     userEmail={user.email || ''} 
     purchases={purchases || []}
     vanaTrilhaStations={new Set((trilhaProgress || []).map((r) => r.station)).size}
+    familyAccounts={familyAccounts}
   />
 }

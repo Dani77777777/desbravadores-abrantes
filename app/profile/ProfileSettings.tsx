@@ -19,6 +19,8 @@ import { PurchaseHistory } from './PurchaseHistory'
 import { DeleteAccountCard } from './DeleteAccountCard'
 import { GenderChoice } from '@/components/profile/GenderChoice'
 import type { Gender } from '@/utils/name-gender'
+import type { FamilyAccountSummary } from '@/lib/family-accounts'
+import { FamilyAccountsPanel } from '@/components/profile/FamilyAccountsPanel'
 
 const D = displayFont.className
 
@@ -38,6 +40,7 @@ interface ProfileSettingsProps {
   userEmail: string
   purchases: any[]
   vanaTrilhaStations?: number
+  familyAccounts: FamilyAccountSummary
 }
 
 const SECTION_COLORS: Record<string, string> = {
@@ -76,7 +79,7 @@ function Panel({ icon: Icon, iconClass, title, description, children, className 
   )
 }
 
-export default function ProfileSettings({ profile, user, userEmail, purchases, vanaTrilhaStations = 0 }: ProfileSettingsProps) {
+export default function ProfileSettings({ profile, user, userEmail, purchases, vanaTrilhaStations = 0, familyAccounts }: ProfileSettingsProps) {
   const [fullName, setFullName] = useState(profile.full_name)
   const [avatar, setAvatar] = useState<AvatarChoice>({ file: null, url: profile.avatar_url || '' })
   const savedGender: Gender | null = profile.gender === 'm' || profile.gender === 'f' ? profile.gender : null
@@ -385,6 +388,8 @@ export default function ProfileSettings({ profile, user, userEmail, purchases, v
 
           {/* Histórico de compras */}
           <PurchaseHistory purchases={purchases} />
+
+          <FamilyAccountsPanel summary={familyAccounts} />
 
           {/* Alterar email */}
           <Panel icon={Mail} iconClass="bg-violet-500" title="Alterar Email" description="Será enviado um email de confirmação para o novo endereço.">

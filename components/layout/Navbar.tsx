@@ -12,7 +12,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { Menu, X, LogOut, User, Shield, MessageSquare, Trophy, Phone, ShoppingBag, Gamepad2, Home, Coins, ChevronDown, type LucideIcon } from 'lucide-react'
+import { Menu, X, LogOut, User, Shield, MessageSquare, Trophy, Phone, ShoppingBag, Gamepad2, Home, Coins, ChevronDown, ArrowLeftRight, Loader2, type LucideIcon } from 'lucide-react'
 import { PushNotificationButton } from '@/components/notifications/PushNotificationButton'
 import { createClient } from '@/utils/supabase/client'
 import { usePathname, useRouter } from 'next/navigation'
@@ -58,10 +58,41 @@ export function Navbar({ user, profile }: NavbarProps) {
   const router = useRouter()
   const pathname = usePathname()
   const supabase = createClient()
+  const userId = user?.id as string | undefined
+  const [familyAccount, setFamilyAccount] = useState<{ id: string; fullName: string; avatarUrl: string | null; relation: 'owner' | 'associated' } | null>(null)
+  const [switchingAccount, setSwitchingAccount] = useState(false)
 
   const handleLogout = async () => {
     await supabase.auth.signOut()
     router.refresh()
+  }
+
+  useEffect(() => {
+    if (!userId) return
+    let cancelled = false
+    fetch('/api/family-accounts', { cache: 'no-store' })
+      .then((response) => response.ok ? response.json() : null)
+      .then((data) => { if (!cancelled) setFamilyAccount(data?.linkedAccount || null) })
+      .catch(() => { if (!cancelled) setFamilyAccount(null) })
+    return () => { cancelled = true }
+  }, [userId])
+
+  const switchFamilyAccount = async () => {
+    if (!familyAccount || switchingAccount) return
+    setSwitchingAccount(true)
+    try {
+      const response = await fetch('/api/family-accounts', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ targetId: familyAccount.id }),
+      })
+      const result = await response.json().catch(() => null)
+      if (!response.ok || !result?.ok) throw new Error(result?.error || 'Não foi possível mudar de conta.')
+      window.location.assign('/')
+    } catch (error: unknown) {
+      setSwitchingAccount(false)
+      alert(error instanceof Error ? error.message : 'Não foi possível mudar de conta.')
+    }
   }
 
   // Fundo translúcido só depois de descer mais do que a altura da barra (64px).
@@ -196,6 +227,15 @@ export function Navbar({ user, profile }: NavbarProps) {
                         <Coins className="mr-2 h-4 w-4" /> {profile?.current_gold ?? 0} Gold · Histórico
                       </Link>
                     </DropdownMenuItem>
+                    {familyAccount && (
+                      <>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem disabled={switchingAccount} onSelect={(event) => { event.preventDefault(); switchFamilyAccount() }} className="cursor-pointer rounded-lg text-fuchsia-700 focus:text-fuchsia-700">
+                          {switchingAccount ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ArrowLeftRight className="mr-2 h-4 w-4" />}
+                          <span className="truncate">Mudar para {familyAccount.fullName}</span>
+                        </DropdownMenuItem>
+                      </>
+                    )}
                     <DropdownMenuSeparator />
                     <DropdownMenuItem onClick={handleLogout} className="cursor-pointer rounded-lg text-red-600 focus:text-red-600">
                       <LogOut className="mr-2 h-4 w-4" />
@@ -271,25 +311,32 @@ export function Navbar({ user, profile }: NavbarProps) {
             </div>
 
             {user && (
-              <div className="mt-6 flex items-center gap-4 rounded-3xl bg-white/[0.07] p-4 ring-1 ring-inset ring-white/10">
-                <div className="relative">
-                  <Avatar className="h-14 w-14 ring-2 ring-yellow-400 ring-offset-2 ring-offset-blue-950">
-                    <AvatarImage src={avatarSrc} alt={profile?.full_name} className="object-cover" />
-                    <AvatarFallback className="bg-blue-700 text-xl font-bold text-white">{profile?.full_name?.charAt(0) || 'D'}</AvatarFallback>
-                  </Avatar>
-                  <span className="absolute -bottom-0.5 -right-0.5 h-4 w-4 rounded-full border-2 border-blue-950 bg-emerald-500" />
+              <div className="mt-6 space-y-3">
+                <div className="flex items-center gap-4 rounded-3xl bg-white/[0.07] p-4 ring-1 ring-inset ring-white/10">
+                  <div className="relative">
+                    <Avatar className="h-14 w-14 ring-2 ring-yellow-400 ring-offset-2 ring-offset-blue-950">
+                      <AvatarImage src={avatarSrc} alt={profile?.full_name} className="object-cover" />
+                      <AvatarFallback className="bg-blue-700 text-xl font-bold text-white">{profile?.full_name?.charAt(0) || 'D'}</AvatarFallback>
+                    </Avatar>
+                    <span className="absolute -bottom-0.5 -right-0.5 h-4 w-4 rounded-full border-2 border-blue-950 bg-emerald-500" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-lg font-bold leading-tight">{profile?.full_name}</p>
+                    <p className="truncate text-sm capitalize text-blue-300">{roleLabel}</p>
+                  </div>
+                  <Link
+                    href="/points-history"
+                    onClick={() => setIsOpen(false)}
+                    className="flex shrink-0 items-center gap-1 rounded-full bg-yellow-400 px-3 py-1.5 text-sm font-extrabold text-blue-950"
+                  >
+                    <Coins className="h-4 w-4" /> {profile?.current_gold ?? 0}
+                  </Link>
                 </div>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-lg font-bold leading-tight">{profile?.full_name}</p>
-                  <p className="truncate text-sm capitalize text-blue-300">{roleLabel}</p>
-                </div>
-                <Link
-                  href="/points-history"
-                  onClick={() => setIsOpen(false)}
-                  className="flex shrink-0 items-center gap-1 rounded-full bg-yellow-400 px-3 py-1.5 text-sm font-extrabold text-blue-950"
-                >
-                  <Coins className="h-4 w-4" /> {profile?.current_gold ?? 0}
-                </Link>
+                {familyAccount && (
+                  <button type="button" disabled={switchingAccount} onClick={switchFamilyAccount} className="flex w-full items-center justify-center gap-2 rounded-2xl bg-fuchsia-500/20 px-4 py-3 text-sm font-extrabold text-fuchsia-100 ring-1 ring-inset ring-fuchsia-300/25 disabled:opacity-60">
+                    {switchingAccount ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowLeftRight className="h-4 w-4" />} Mudar para {familyAccount.fullName}
+                  </button>
+                )}
               </div>
             )}
 
