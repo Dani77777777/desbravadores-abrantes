@@ -43,6 +43,30 @@ function makeRequestCode() {
   return crypto.randomBytes(6).toString('base64url').toUpperCase().replace(/[-_]/g, 'A').slice(0, 8)
 }
 
+function isValidBirthDate(value: string) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false
+  const date = new Date(`${value}T12:00:00Z`)
+  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value && date <= new Date()
+}
+
+async function hasDuplicateFamilyProfile(ownerUserId: string, fullName: string, birthDate: string) {
+  const admin = createServiceClient()
+  const { data: links } = await admin
+    .from('family_account_links')
+    .select('associated_user_id')
+    .eq('owner_user_id', ownerUserId)
+  const childIds = (links || []).map((link) => link.associated_user_id)
+  if (!childIds.length) return false
+  const { data } = await admin
+    .from('profiles')
+    .select('id')
+    .in('id', childIds)
+    .ilike('full_name', fullName.trim())
+    .eq('birth_date', birthDate)
+    .limit(1)
+  return !!data?.length
+}
+
 export async function createFamilyAccount(data: {
   fullName: string
   birthDate: string
@@ -50,11 +74,14 @@ export async function createFamilyAccount(data: {
 }): Promise<Result> {
   const ownerUserId = await currentUserId()
   if (!ownerUserId) return { error: 'A tua sessão expirou. Entra novamente.' }
-  if (!data.fullName.trim() || !/^\d{4}-\d{2}-\d{2}$/.test(data.birthDate) || !['m', 'f'].includes(data.gender)) {
+  if (!data.fullName.trim() || !isValidBirthDate(data.birthDate) || !['m', 'f'].includes(data.gender)) {
     return { error: 'Preenche o nome, data de nascimento e sexo da nova conta.' }
   }
   if (!await canOwnFamilyAccounts(ownerUserId)) {
     return { error: 'Esta conta já está associada a outra conta familiar.' }
+  }
+  if (await hasDuplicateFamilyProfile(ownerUserId, data.fullName, data.birthDate)) {
+    return { error: 'Já tens um familiar com este nome e data de nascimento. Confirma a lista antes de criar outra conta.' }
   }
 
   const admin = createServiceClient()
@@ -180,5 +207,47 @@ export async function revokeFamilyAssociationRequest(): Promise<Result> {
     .eq('owner_user_id', userId).eq('status', 'pending')
   if (error) return { error: 'Não foi possível cancelar o pedido.' }
   revalidatePath('/profile')
+  return { success: true }
+}
+
+export async function updateFamilyAccountBirthDate(associatedUserId: string, birthDate: string): Promise<Result> {
+  const ownerUserId = await currentUserId()
+  if (!ownerUserId) return { error: 'A tua sessão expirou. Entra novamente.' }
+  if (!isValidBirthDate(birthDate)) return { error: 'Indica uma data de nascimento válida, que não seja futura.' }
+
+  const admin = createServiceClient()
+  const { data: link } = await admin.from('family_account_links')
+    .select('associated_user_id')
+    .eq('owner_user_id', ownerUserId)
+    .eq('associated_user_id', associatedUserId)
+    .maybeSingle()
+  if (!link) return { error: 'Não tens permissão para alterar esta conta.' }
+
+  const { error } = await admin.from('profiles').update({ birth_date: birthDate }).eq('id', associatedUserId)
+  if (error) return { error: `Não foi possível guardar a data: ${error.message}` }
+  revalidatePath('/profile')
+  revalidatePath('/')
+  return { success: true }
+}
+
+export async function deleteFamilyAccount(associatedUserId: string): Promise<Result> {
+  const ownerUserId = await currentUserId()
+  if (!ownerUserId) return { error: 'A tua sessão expirou. Entra novamente.' }
+  const admin = createServiceClient()
+  const { data: link } = await admin.from('family_account_links')
+    .select('associated_user_id')
+    .eq('owner_user_id', ownerUserId)
+    .eq('associated_user_id', associatedUserId)
+    .maybeSingle()
+  if (!link) return { error: 'Não tens permissão para apagar esta conta.' }
+
+  const { data: target, error: targetError } = await admin.auth.admin.getUserById(associatedUserId)
+  if (targetError || !target.user?.app_metadata?.family_account) {
+    return { error: 'Só podes apagar contas criadas como familiares. Contas existentes mantêm-se por segurança.' }
+  }
+  const { error } = await admin.auth.admin.deleteUser(associatedUserId)
+  if (error) return { error: `Não foi possível apagar a conta: ${error.message}` }
+  revalidatePath('/profile')
+  revalidatePath('/')
   return { success: true }
 }

@@ -5,6 +5,7 @@ export type FamilyAccountSummary = {
     id: string
     fullName: string
     avatarUrl: string | null
+    birthDate: string | null
     relation: 'owner' | 'associated'
   }>
   pendingRequest: {
@@ -28,7 +29,7 @@ export async function getFamilyAccountSummary(userId: string): Promise<FamilyAcc
   const { data: counterparts } = counterpartIds.length > 0
     ? await admin
       .from('profiles')
-      .select('id, full_name, avatar_url')
+      .select('id, full_name, avatar_url, birth_date')
       .in('id', counterpartIds)
     : { data: [] }
 
@@ -40,6 +41,7 @@ export async function getFamilyAccountSummary(userId: string): Promise<FamilyAcc
       id: counterpart.id,
       fullName: counterpart.full_name || 'Conta familiar',
       avatarUrl: counterpart.avatar_url,
+      birthDate: counterpart.birth_date,
       relation: link.owner_user_id === userId ? 'owner' as const : 'associated' as const,
     }] : []
   })

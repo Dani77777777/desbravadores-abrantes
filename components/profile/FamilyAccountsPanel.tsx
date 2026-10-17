@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Baby, CheckCircle2, Copy, Loader2, UsersRound } from 'lucide-react'
+import { Baby, CalendarDays, CheckCircle2, Copy, Loader2, Pencil, Trash2, UsersRound } from 'lucide-react'
 import { toast } from 'sonner'
 import type { FamilyAccountSummary } from '@/lib/family-accounts'
 import {
@@ -10,6 +10,8 @@ import {
   createFamilyAssociationRequest,
   inspectFamilyAssociationCode,
   revokeFamilyAssociationRequest,
+  updateFamilyAccountBirthDate,
+  deleteFamilyAccount,
 } from '@/app/profile/family-actions'
 
 type Props = { summary: FamilyAccountSummary }
@@ -23,6 +25,9 @@ export function FamilyAccountsPanel({ summary }: Props) {
   const [approvalCode, setApprovalCode] = useState('')
   const [parentName, setParentName] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const [editingAccountId, setEditingAccountId] = useState<string | null>(null)
+  const [birthDate, setBirthDate] = useState('')
+  const [deletingAccountId, setDeletingAccountId] = useState<string | null>(null)
   const canManageAccounts = summary.linkedAccounts.every((account) => account.relation === 'owner')
 
   const copyCode = async () => {
@@ -87,6 +92,30 @@ export function FamilyAccountsPanel({ summary }: Props) {
     toast.success('Pedido cancelado.')
   }
 
+  const startEditingBirthDate = (accountId: string, currentBirthDate: string | null) => {
+    setEditingAccountId(accountId)
+    setBirthDate(currentBirthDate || '')
+  }
+
+  const saveBirthDate = async (accountId: string) => {
+    setBusy(true)
+    const result = await updateFamilyAccountBirthDate(accountId, birthDate)
+    setBusy(false)
+    if (result.error) return toast.error(result.error)
+    toast.success('Data de nascimento atualizada.')
+    window.location.reload()
+  }
+
+  const removeFamilyAccount = async (accountId: string, name: string) => {
+    if (!window.confirm(`Apagar definitivamente a conta de ${name}? Esta ação remove também os dados desta conta.`)) return
+    setDeletingAccountId(accountId)
+    const result = await deleteFamilyAccount(accountId)
+    setDeletingAccountId(null)
+    if (result.error) return toast.error(result.error)
+    toast.success('Conta familiar apagada.')
+    window.location.reload()
+  }
+
   if (!canManageAccounts) {
     return (
       <section className="rounded-[1.75rem] bg-white p-6 shadow-md shadow-blue-950/5 ring-1 ring-stone-200 sm:p-7">
@@ -126,9 +155,20 @@ export function FamilyAccountsPanel({ summary }: Props) {
       {summary.linkedAccounts.length > 0 && (
         <div className="mt-6 space-y-3">
           {summary.linkedAccounts.map((account) => (
-            <div key={account.id} className="flex items-center gap-3 rounded-2xl bg-fuchsia-50 p-4 ring-1 ring-inset ring-fuchsia-100">
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-fuchsia-600 font-extrabold text-white">{account.fullName.charAt(0).toUpperCase()}</div>
-              <div><p className="font-bold text-blue-950">{account.fullName}</p><p className="text-sm text-fuchsia-700">Conta associada à tua conta</p></div>
+            <div key={account.id} className="rounded-2xl bg-fuchsia-50 p-4 ring-1 ring-inset ring-fuchsia-100">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-fuchsia-600 font-extrabold text-white">{account.fullName.charAt(0).toUpperCase()}</div>
+                <div className="min-w-0 flex-1"><p className="truncate font-bold text-blue-950">{account.fullName}</p><p className="text-sm text-fuchsia-700">Conta associada à tua conta</p></div>
+                <button type="button" onClick={() => startEditingBirthDate(account.id, account.birthDate)} className="rounded-lg p-2 text-fuchsia-700 hover:bg-white" title="Corrigir data de nascimento"><Pencil className="h-4 w-4" /></button>
+                <button type="button" disabled={deletingAccountId === account.id} onClick={() => removeFamilyAccount(account.id, account.fullName)} className="rounded-lg p-2 text-red-600 hover:bg-white disabled:opacity-50" title="Apagar conta criada"><Trash2 className="h-4 w-4" /></button>
+              </div>
+              {editingAccountId === account.id && (
+                <div className="mt-4 border-t border-fuchsia-200 pt-4">
+                  <label className="flex items-center gap-2 text-sm font-bold text-blue-950"><CalendarDays className="h-4 w-4 text-fuchsia-600" /> Data de nascimento correta</label>
+                  <div className="mt-2 flex flex-wrap gap-2"><input type="date" required value={birthDate} onChange={(event) => setBirthDate(event.target.value)} className={fieldClass} /><button type="button" disabled={busy || !birthDate} onClick={() => saveBirthDate(account.id)} className="rounded-xl bg-blue-950 px-4 py-2 text-sm font-extrabold text-white disabled:opacity-50">Guardar</button><button type="button" onClick={() => setEditingAccountId(null)} className="px-2 text-sm font-bold text-stone-500">Cancelar</button></div>
+                  <p className="mt-2 text-xs text-stone-500">A data é obrigatória e determina a classe do desbravador.</p>
+                </div>
+              )}
             </div>
           ))}
         </div>
@@ -154,7 +194,7 @@ export function FamilyAccountsPanel({ summary }: Props) {
           <div className="flex items-center gap-2 text-sm font-bold text-blue-950"><Baby className="h-4 w-4 text-fuchsia-600" /> Nova conta de familiar</div>
           <input name="fullName" required placeholder="Nome completo" className={fieldClass} />
           <div className="grid gap-3 sm:grid-cols-2">
-            <label className="text-sm font-semibold text-blue-950">Data de nascimento<input name="birthDate" type="date" required className={`${fieldClass} mt-1.5`} /></label>
+            <label className="text-sm font-semibold text-blue-950">Data de nascimento<input name="birthDate" type="date" required max={new Date().toISOString().slice(0, 10)} className={`${fieldClass} mt-1.5`} /></label>
             <label className="text-sm font-semibold text-blue-950">Sexo<select name="gender" required defaultValue="" className={`${fieldClass} mt-1.5`}><option value="" disabled>Selecionar</option><option value="m">Masculino</option><option value="f">Feminino</option></select></label>
           </div>
           <p className="text-xs text-stone-500">O familiar poderá adicionar um e-mail próprio mais tarde, se quiser entrar diretamente.</p>
