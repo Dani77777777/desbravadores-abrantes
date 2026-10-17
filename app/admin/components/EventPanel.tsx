@@ -66,6 +66,9 @@ function newEventAnnouncement(f: {
 export function EventPanel({ profile, members, events, attendance = [], rsvps = [] }: EventPanelProps) {
   const supabase = createClient()
   const router = useRouter()
+  // Mantém o resumo actualizado logo após a liderança responder por alguém.
+  // O router.refresh() posterior confirma estes dados no servidor.
+  const [rsvpRows, setRsvpRows] = useState<RsvpRow[]>(rsvps)
   const isDirigente = profile.role === 'dirigente'
   const defaultTarget = isDirigente ? (profile.leadership_section || profile.section) : '__all__'
 
@@ -145,6 +148,10 @@ export function EventPanel({ profile, members, events, attendance = [], rsvps = 
   // Lista
   const [filter, setFilter] = useState<Filter>('upcoming')
   const [search, setSearch] = useState('')
+
+  useEffect(() => {
+    setRsvpRows(rsvps)
+  }, [rsvps])
 
   // Texto automático do comunicado (até ser editado à mão)
   const autoAnn = newEventAnnouncement({
@@ -634,7 +641,7 @@ export function EventPanel({ profile, members, events, attendance = [], rsvps = 
                   </div>
                   {event.rsvp_enabled && (
                     <RsvpCountsButton
-                      summary={summarizeRsvps(event.id, rsvps, audienceOf(event).map((m) => m.id))}
+                      summary={summarizeRsvps(event.id, rsvpRows, audienceOf(event).map((m) => m.id))}
                       deadline={event.rsvp_deadline}
                       onClick={() => setRsvpEvent(event)}
                     />
@@ -1045,7 +1052,15 @@ export function EventPanel({ profile, members, events, attendance = [], rsvps = 
         event={rsvpEvent}
         onOpenChange={(v) => { if (!v) setRsvpEvent(null) }}
         members={members}
-        summary={rsvpEvent ? summarizeRsvps(rsvpEvent.id, rsvps, audienceOf(rsvpEvent).map((m) => m.id)) : null}
+        summary={rsvpEvent ? summarizeRsvps(rsvpEvent.id, rsvpRows, audienceOf(rsvpEvent).map((m) => m.id)) : null}
+        onAnswerSet={(userId, going) => {
+          if (!rsvpEvent) return
+          setRsvpRows((previous) => [
+            ...previous.filter((row) => !(row.event_id === rsvpEvent.id && row.user_id === userId)),
+            { event_id: rsvpEvent.id, user_id: userId, going },
+          ])
+          router.refresh()
+        }}
       />
 
       {sharingEvent && (

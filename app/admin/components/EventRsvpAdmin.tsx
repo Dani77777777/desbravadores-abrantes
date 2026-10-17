@@ -1,11 +1,15 @@
 'use client'
 
-import { CalendarCheck, Check, HelpCircle, X } from 'lucide-react'
+import { useState } from 'react'
+import { CalendarCheck, Check, HelpCircle, Loader2, X } from 'lucide-react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
+import { toast } from 'sonner'
+import { createClient } from '@/utils/supabase/client'
 import type { RsvpSummary } from '@/utils/event-rsvp'
 import { SECTION_LABELS, fmtShort } from './event-utils'
 
@@ -77,7 +81,7 @@ export function RsvpCountsButton({
       type="button"
       onClick={onClick}
       className="mt-1 flex w-fit cursor-pointer flex-wrap items-center gap-x-1.5 gap-y-0.5 rounded-lg bg-violet-50 px-2.5 py-1.5 text-[11px] font-bold text-violet-800 ring-1 ring-inset ring-violet-200 transition-colors hover:bg-violet-100"
-      title="Ver quem vai"
+      title="Ver e completar respostas"
     >
       <CalendarCheck className="h-3.5 w-3.5 shrink-0" />
       <span className="text-emerald-700">{summary.going.length} vão</span>
@@ -98,12 +102,16 @@ export function RsvpSummaryDialog({
   onOpenChange,
   members,
   summary,
+  onAnswerSet,
 }: {
-  event: { title: string; rsvp_deadline?: string | null; start_at: string } | null
+  event: { id: string; title: string; rsvp_deadline?: string | null; start_at: string } | null
   onOpenChange: (v: boolean) => void
   members: Member[]
   summary: RsvpSummary | null
+  onAnswerSet: (userId: string, going: boolean) => void
 }) {
+  const [supabase] = useState(() => createClient())
+  const [savingId, setSavingId] = useState<string | null>(null)
   const byId = new Map(members.map((m) => [m.id, m]))
   const groups = summary
     ? ([
@@ -113,13 +121,32 @@ export function RsvpSummaryDialog({
       ] as const)
     : []
 
+  const setAnswerForMember = async (userId: string, going: boolean) => {
+    if (!event || savingId) return
+    setSavingId(userId)
+    const { error } = await supabase.rpc('set_event_rsvp_for_member', {
+      p_event_id: event.id,
+      p_user_id: userId,
+      p_going: going,
+    })
+    setSavingId(null)
+
+    if (error) {
+      toast.error(error.message || 'Não foi possível guardar a resposta.')
+      return
+    }
+
+    onAnswerSet(userId, going)
+    toast.success(`${byId.get(userId)?.full_name || 'Membro'} ficou marcado como ${going ? '"Vai"' : '"Não vai"'}.`)
+  }
+
   return (
     <Dialog open={!!event} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[88vh] overflow-y-auto rounded-[1.75rem] sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle className="text-xl font-extrabold text-blue-950">Quem vai · {event?.title}</DialogTitle>
+          <DialogTitle className="text-xl font-extrabold text-blue-950">Confirmações · {event?.title}</DialogTitle>
           <DialogDescription>
-            É o que cada um disse no Painel
+            Vê o que cada um disse no Painel
             {event?.rsvp_deadline ? ` (responder até ${fmtShort(event.rsvp_deadline)})` : ' (podem responder até o evento começar)'}. A presença
             real marcas nas Presenças.
           </DialogDescription>
@@ -133,24 +160,58 @@ export function RsvpSummaryDialog({
                 </span>
                 {g.label} <span className="rounded-full bg-stone-100 px-1.5 text-[10px] text-stone-600">{g.ids.length}</span>
               </h4>
+              {g.key === 'noAnswer' && g.ids.length > 0 && (
+                <p className="pl-7 text-xs text-stone-500">
+                  Ainda não responderam? Marca aqui, em nome deles, se vão ou não vão.
+                </p>
+              )}
               {g.ids.length === 0 ? (
                 <p className="pl-7 text-xs text-stone-400">Ninguém.</p>
               ) : (
-                <ul className="flex flex-wrap gap-1.5 pl-7">
+                <ul className={g.key === 'noAnswer' ? 'space-y-2 pl-7' : 'flex flex-wrap gap-1.5 pl-7'}>
                   {g.ids
                     .map((id) => byId.get(id) ?? { id, full_name: 'Membro' })
                     .sort((a, b) => (a.full_name || '').localeCompare(b.full_name || '', 'pt'))
                     .map((m) => (
                       <li
                         key={m.id}
-                        className="inline-flex items-center gap-1.5 rounded-full bg-white py-0.5 pl-0.5 pr-2.5 text-xs font-bold text-blue-950 ring-1 ring-inset ring-stone-200"
+                        className={g.key === 'noAnswer'
+                          ? 'flex flex-wrap items-center justify-between gap-2 rounded-xl bg-white p-1.5 pl-2 text-xs font-bold text-blue-950 ring-1 ring-inset ring-stone-200'
+                          : 'inline-flex items-center gap-1.5 rounded-full bg-white py-0.5 pl-0.5 pr-2.5 text-xs font-bold text-blue-950 ring-1 ring-inset ring-stone-200'}
                         title={m.section ? SECTION_LABELS[m.section] : undefined}
                       >
-                        <Avatar className="h-6 w-6">
-                          <AvatarImage src={m.avatar_url || undefined} className="object-cover" />
-                          <AvatarFallback className="bg-stone-200 text-[10px] font-bold text-stone-600">{m.full_name?.charAt(0)}</AvatarFallback>
-                        </Avatar>
-                        {m.full_name}
+                        <span className="inline-flex items-center gap-1.5">
+                          <Avatar className="h-6 w-6">
+                            <AvatarImage src={m.avatar_url || undefined} className="object-cover" />
+                            <AvatarFallback className="bg-stone-200 text-[10px] font-bold text-stone-600">{m.full_name?.charAt(0)}</AvatarFallback>
+                          </Avatar>
+                          {m.full_name}
+                        </span>
+                        {g.key === 'noAnswer' && (
+                          <span className="flex gap-1">
+                            <Button
+                              type="button"
+                              size="sm"
+                              className="h-7 bg-emerald-600 px-2 text-[10px] font-bold hover:bg-emerald-700"
+                              disabled={savingId !== null}
+                              onClick={() => setAnswerForMember(m.id, true)}
+                            >
+                              {savingId === m.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" strokeWidth={3} />}
+                              Vai
+                            </Button>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              className="h-7 border-stone-300 px-2 text-[10px] font-bold text-stone-600 hover:bg-stone-100"
+                              disabled={savingId !== null}
+                              onClick={() => setAnswerForMember(m.id, false)}
+                            >
+                              {savingId === m.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <X className="h-3 w-3" strokeWidth={3} />}
+                              Não vai
+                            </Button>
+                          </span>
+                        )}
                       </li>
                     ))}
                 </ul>
