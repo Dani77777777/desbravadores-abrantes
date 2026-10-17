@@ -59,8 +59,8 @@ export function Navbar({ user, profile }: NavbarProps) {
   const pathname = usePathname()
   const supabase = createClient()
   const userId = user?.id as string | undefined
-  const [familyAccount, setFamilyAccount] = useState<{ id: string; fullName: string; avatarUrl: string | null; relation: 'owner' | 'associated' } | null>(null)
-  const [switchingAccount, setSwitchingAccount] = useState(false)
+  const [familyAccounts, setFamilyAccounts] = useState<Array<{ id: string; fullName: string; avatarUrl: string | null; relation: 'owner' | 'associated' }>>([])
+  const [switchingAccountId, setSwitchingAccountId] = useState<string | null>(null)
 
   const handleLogout = async () => {
     await supabase.auth.signOut()
@@ -72,25 +72,25 @@ export function Navbar({ user, profile }: NavbarProps) {
     let cancelled = false
     fetch('/api/family-accounts', { cache: 'no-store' })
       .then((response) => response.ok ? response.json() : null)
-      .then((data) => { if (!cancelled) setFamilyAccount(data?.linkedAccount || null) })
-      .catch(() => { if (!cancelled) setFamilyAccount(null) })
+      .then((data) => { if (!cancelled) setFamilyAccounts(data?.linkedAccounts || []) })
+      .catch(() => { if (!cancelled) setFamilyAccounts([]) })
     return () => { cancelled = true }
   }, [userId])
 
-  const switchFamilyAccount = async () => {
-    if (!familyAccount || switchingAccount) return
-    setSwitchingAccount(true)
+  const switchFamilyAccount = async (targetId: string) => {
+    if (switchingAccountId) return
+    setSwitchingAccountId(targetId)
     try {
       const response = await fetch('/api/family-accounts', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ targetId: familyAccount.id }),
+        body: JSON.stringify({ targetId }),
       })
       const result = await response.json().catch(() => null)
       if (!response.ok || !result?.ok) throw new Error(result?.error || 'Não foi possível mudar de conta.')
       window.location.assign('/')
     } catch (error: unknown) {
-      setSwitchingAccount(false)
+      setSwitchingAccountId(null)
       alert(error instanceof Error ? error.message : 'Não foi possível mudar de conta.')
     }
   }
@@ -227,13 +227,13 @@ export function Navbar({ user, profile }: NavbarProps) {
                         <Coins className="mr-2 h-4 w-4" /> {profile?.current_gold ?? 0} Gold · Histórico
                       </Link>
                     </DropdownMenuItem>
-                    {familyAccount && (
+                    {familyAccounts.length > 0 && (
                       <>
                         <DropdownMenuSeparator />
-                        <DropdownMenuItem disabled={switchingAccount} onSelect={(event) => { event.preventDefault(); switchFamilyAccount() }} className="cursor-pointer rounded-lg text-fuchsia-700 focus:text-fuchsia-700">
-                          {switchingAccount ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ArrowLeftRight className="mr-2 h-4 w-4" />}
+                        {familyAccounts.map((familyAccount) => <DropdownMenuItem key={familyAccount.id} disabled={!!switchingAccountId} onSelect={(event) => { event.preventDefault(); switchFamilyAccount(familyAccount.id) }} className="cursor-pointer rounded-lg text-fuchsia-700 focus:text-fuchsia-700">
+                          {switchingAccountId === familyAccount.id ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ArrowLeftRight className="mr-2 h-4 w-4" />}
                           <span className="truncate">Mudar para {familyAccount.fullName}</span>
-                        </DropdownMenuItem>
+                        </DropdownMenuItem>)}
                       </>
                     )}
                     <DropdownMenuSeparator />
@@ -332,11 +332,11 @@ export function Navbar({ user, profile }: NavbarProps) {
                     <Coins className="h-4 w-4" /> {profile?.current_gold ?? 0}
                   </Link>
                 </div>
-                {familyAccount && (
-                  <button type="button" disabled={switchingAccount} onClick={switchFamilyAccount} className="flex w-full items-center justify-center gap-2 rounded-2xl bg-fuchsia-500/20 px-4 py-3 text-sm font-extrabold text-fuchsia-100 ring-1 ring-inset ring-fuchsia-300/25 disabled:opacity-60">
-                    {switchingAccount ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowLeftRight className="h-4 w-4" />} Mudar para {familyAccount.fullName}
+                {familyAccounts.map((familyAccount) => (
+                  <button key={familyAccount.id} type="button" disabled={!!switchingAccountId} onClick={() => switchFamilyAccount(familyAccount.id)} className="flex w-full items-center justify-center gap-2 rounded-2xl bg-fuchsia-500/20 px-4 py-3 text-sm font-extrabold text-fuchsia-100 ring-1 ring-inset ring-fuchsia-300/25 disabled:opacity-60">
+                    {switchingAccountId === familyAccount.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowLeftRight className="h-4 w-4" />} Mudar para {familyAccount.fullName}
                   </button>
-                )}
+                ))}
               </div>
             )}
 

@@ -23,13 +23,13 @@ function jsonWithSessionCookies(data: unknown, sessionResponse: NextResponse, in
 }
 
 export async function GET(request: NextRequest) {
-  const response = NextResponse.json({ linkedAccount: null })
+  const response = NextResponse.json({ linkedAccounts: [] })
   const supabase = sessionClient(request, response)
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
 
   const summary = await getFamilyAccountSummary(user.id)
-  return jsonWithSessionCookies({ linkedAccount: summary.linkedAccount }, response)
+  return jsonWithSessionCookies({ linkedAccounts: summary.linkedAccounts }, response)
 }
 
 /** Alterna a sessão para a conta familiar ligada. Não é impersonação por cookie:

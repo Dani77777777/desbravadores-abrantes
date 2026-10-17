@@ -16,12 +16,25 @@ async function currentUserId() {
   return user?.id ?? null
 }
 
-async function isAvailableForFamilyLink(userId: string) {
+/** Uma conta já associada como familiar não pode gerir outros perfis. */
+async function canOwnFamilyAccounts(userId: string) {
+  const admin = createServiceClient()
+  const { data } = await admin
+    .from('family_account_links')
+    .select('owner_user_id')
+    .eq('associated_user_id', userId)
+    .maybeSingle()
+  return !data
+}
+
+/** Para aceitar um pedido, a conta ainda não pode pertencer a nenhuma família. */
+async function canBecomeAssociatedAccount(userId: string) {
   const admin = createServiceClient()
   const { data } = await admin
     .from('family_account_links')
     .select('owner_user_id')
     .or(`owner_user_id.eq.${userId},associated_user_id.eq.${userId}`)
+    .limit(1)
     .maybeSingle()
   return !data
 }
@@ -40,8 +53,8 @@ export async function createFamilyAccount(data: {
   if (!data.fullName.trim() || !/^\d{4}-\d{2}-\d{2}$/.test(data.birthDate) || !['m', 'f'].includes(data.gender)) {
     return { error: 'Preenche o nome, data de nascimento e sexo da nova conta.' }
   }
-  if (!await isAvailableForFamilyLink(ownerUserId)) {
-    return { error: 'Esta conta já tem uma conta familiar associada.' }
+  if (!await canOwnFamilyAccounts(ownerUserId)) {
+    return { error: 'Esta conta já está associada a outra conta familiar.' }
   }
 
   const admin = createServiceClient()
@@ -89,7 +102,7 @@ export async function createFamilyAccount(data: {
 export async function createFamilyAssociationRequest(): Promise<Result> {
   const ownerUserId = await currentUserId()
   if (!ownerUserId) return { error: 'A tua sessão expirou. Entra novamente.' }
-  if (!await isAvailableForFamilyLink(ownerUserId)) return { error: 'Esta conta já tem uma conta familiar associada.' }
+  if (!await canOwnFamilyAccounts(ownerUserId)) return { error: 'Esta conta já está associada a outra conta familiar.' }
 
   const summary = await getFamilyAccountSummary(ownerUserId)
   if (summary.pendingRequest) return { success: true, code: summary.pendingRequest.code }
@@ -115,7 +128,7 @@ export async function createFamilyAssociationRequest(): Promise<Result> {
 export async function inspectFamilyAssociationCode(rawCode: string): Promise<Result> {
   const userId = await currentUserId()
   if (!userId) return { error: 'A tua sessão expirou. Entra novamente.' }
-  if (!await isAvailableForFamilyLink(userId)) return { error: 'A tua conta já tem uma associação familiar.' }
+  if (!await canBecomeAssociatedAccount(userId)) return { error: 'A tua conta já tem uma associação familiar.' }
   const code = rawCode.trim().toUpperCase()
   const admin = createServiceClient()
   const { data: request } = await admin
@@ -134,7 +147,7 @@ export async function inspectFamilyAssociationCode(rawCode: string): Promise<Res
 export async function acceptFamilyAssociationCode(rawCode: string): Promise<Result> {
   const associatedUserId = await currentUserId()
   if (!associatedUserId) return { error: 'A tua sessão expirou. Entra novamente.' }
-  if (!await isAvailableForFamilyLink(associatedUserId)) return { error: 'A tua conta já tem uma associação familiar.' }
+  if (!await canBecomeAssociatedAccount(associatedUserId)) return { error: 'A tua conta já tem uma associação familiar.' }
   const code = rawCode.trim().toUpperCase()
   const admin = createServiceClient()
   const { data: request } = await admin

@@ -23,6 +23,7 @@ export function FamilyAccountsPanel({ summary }: Props) {
   const [approvalCode, setApprovalCode] = useState('')
   const [parentName, setParentName] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const canManageAccounts = summary.linkedAccounts.every((account) => account.relation === 'owner')
 
   const copyCode = async () => {
     try {
@@ -86,8 +87,7 @@ export function FamilyAccountsPanel({ summary }: Props) {
     toast.success('Pedido cancelado.')
   }
 
-  if (summary.linkedAccount) {
-    const account = summary.linkedAccount
+  if (!canManageAccounts) {
     return (
       <section className="rounded-[1.75rem] bg-white p-6 shadow-md shadow-blue-950/5 ring-1 ring-stone-200 sm:p-7">
         <div className="flex gap-3">
@@ -97,15 +97,17 @@ export function FamilyAccountsPanel({ summary }: Props) {
             <p className="mt-0.5 text-sm text-stone-500">As duas contas continuam independentes, mas podes alternar entre elas.</p>
           </div>
         </div>
-        <div className="mt-6 flex items-center gap-3 rounded-2xl bg-fuchsia-50 p-4 ring-1 ring-inset ring-fuchsia-100">
-          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-fuchsia-600 font-extrabold text-white">
-            {account.fullName.charAt(0).toUpperCase()}
+        {summary.linkedAccounts.map((account) => (
+          <div key={account.id} className="mt-6 flex items-center gap-3 rounded-2xl bg-fuchsia-50 p-4 ring-1 ring-inset ring-fuchsia-100">
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-fuchsia-600 font-extrabold text-white">
+              {account.fullName.charAt(0).toUpperCase()}
+            </div>
+            <div>
+              <p className="font-bold text-blue-950">{account.fullName}</p>
+              <p className="text-sm text-fuchsia-700">Conta principal associada à tua</p>
+            </div>
           </div>
-          <div>
-            <p className="font-bold text-blue-950">{account.fullName}</p>
-            <p className="text-sm text-fuchsia-700">{account.relation === 'owner' ? 'Conta associada à tua conta' : 'Conta principal associada à tua'}</p>
-          </div>
-        </div>
+        ))}
         <p className="mt-4 text-sm text-stone-500">Usa o menu do teu avatar, no topo da página, para mudar de conta.</p>
       </section>
     )
@@ -117,15 +119,26 @@ export function FamilyAccountsPanel({ summary }: Props) {
         <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-fuchsia-500 text-white shadow-md"><UsersRound className="h-5 w-5" /></span>
         <div>
           <h2 className="text-xl font-extrabold text-blue-950">Contas familiares</h2>
-          <p className="mt-0.5 text-sm text-stone-500">Cria uma conta para um familiar ou associa uma conta que já exista.</p>
+          <p className="mt-0.5 text-sm text-stone-500">Cria e gere os perfis da tua família a partir desta conta.</p>
         </div>
       </div>
+
+      {summary.linkedAccounts.length > 0 && (
+        <div className="mt-6 space-y-3">
+          {summary.linkedAccounts.map((account) => (
+            <div key={account.id} className="flex items-center gap-3 rounded-2xl bg-fuchsia-50 p-4 ring-1 ring-inset ring-fuchsia-100">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-fuchsia-600 font-extrabold text-white">{account.fullName.charAt(0).toUpperCase()}</div>
+              <div><p className="font-bold text-blue-950">{account.fullName}</p><p className="text-sm text-fuchsia-700">Conta associada à tua conta</p></div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {!creating && !code && (
         <div className="mt-6 grid gap-3 sm:grid-cols-2">
           <button type="button" onClick={() => setCreating(true)} className="rounded-2xl bg-blue-950 p-4 text-left text-white transition hover:bg-blue-900">
             <Baby className="h-5 w-5 text-yellow-300" />
-            <p className="mt-3 font-extrabold">Criar conta de familiar</p>
+            <p className="mt-3 font-extrabold">{summary.linkedAccounts.length ? 'Adicionar conta de familiar' : 'Criar conta de familiar'}</p>
             <p className="mt-1 text-sm text-blue-200">Sem e-mail nem palavra-passe próprios.</p>
           </button>
           <button type="button" onClick={generateRequest} disabled={requesting} className="rounded-2xl bg-fuchsia-50 p-4 text-left text-blue-950 ring-1 ring-inset ring-fuchsia-200 transition hover:bg-fuchsia-100 disabled:opacity-60">

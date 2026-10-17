@@ -1,47 +1,50 @@
 import { createServiceClient } from '@/utils/supabase/service'
 
 export type FamilyAccountSummary = {
-  linkedAccount: {
+  linkedAccounts: Array<{
     id: string
     fullName: string
     avatarUrl: string | null
     relation: 'owner' | 'associated'
-  } | null
+  }>
   pendingRequest: {
     code: string
     expiresAt: string
   } | null
 }
 
-/** Devolve a única conta ligada e, para a conta principal, um pedido ainda pendente. */
+/** Devolve as contas ligadas e, para a conta principal, um pedido ainda pendente. */
 export async function getFamilyAccountSummary(userId: string): Promise<FamilyAccountSummary> {
   const admin = createServiceClient()
-  const { data: link } = await admin
+  const { data: links } = await admin
     .from('family_account_links')
     .select('owner_user_id, associated_user_id')
     .or(`owner_user_id.eq.${userId},associated_user_id.eq.${userId}`)
-    .maybeSingle()
 
-  let linkedAccount: FamilyAccountSummary['linkedAccount'] = null
-  if (link) {
-    const counterpartId = link.owner_user_id === userId ? link.associated_user_id : link.owner_user_id
-    const { data: counterpart } = await admin
+
+  const counterpartIds = (links || []).map((link) =>
+    link.owner_user_id === userId ? link.associated_user_id : link.owner_user_id
+  )
+  const { data: counterparts } = counterpartIds.length > 0
+    ? await admin
       .from('profiles')
       .select('id, full_name, avatar_url')
-      .eq('id', counterpartId)
-      .maybeSingle()
+      .in('id', counterpartIds)
+    : { data: [] }
 
-    if (counterpart) {
-      linkedAccount = {
-        id: counterpart.id,
-        fullName: counterpart.full_name || 'Conta familiar',
-        avatarUrl: counterpart.avatar_url,
-        relation: link.owner_user_id === userId ? 'owner' : 'associated',
-      }
-    }
-  }
+  const profilesById = new Map((counterparts || []).map((profile) => [profile.id, profile]))
+  const linkedAccounts = (links || []).flatMap((link) => {
+    const counterpartId = link.owner_user_id === userId ? link.associated_user_id : link.owner_user_id
+    const counterpart = profilesById.get(counterpartId)
+    return counterpart ? [{
+      id: counterpart.id,
+      fullName: counterpart.full_name || 'Conta familiar',
+      avatarUrl: counterpart.avatar_url,
+      relation: link.owner_user_id === userId ? 'owner' as const : 'associated' as const,
+    }] : []
+  })
 
-  const { data: request } = !linkedAccount
+  const { data: request } = linkedAccounts.every((account) => account.relation === 'owner')
     ? await admin
         .from('family_account_requests')
         .select('code, expires_at')
@@ -52,7 +55,7 @@ export async function getFamilyAccountSummary(userId: string): Promise<FamilyAcc
     : { data: null }
 
   return {
-    linkedAccount,
+    linkedAccounts,
     pendingRequest: request ? { code: request.code, expiresAt: request.expires_at } : null,
   }
 }
