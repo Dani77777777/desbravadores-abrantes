@@ -110,6 +110,7 @@ O coração do sistema reside no arquivo `supabase-setup.sql`. Execute este scri
 Ficheiros SQL adicionais:
 - `supabase-setup-store.sql` — Configuração da loja (produtos, compras, entregas).
 - `supabase-push-setup.sql` — Configuração de notificações push.
+- `supabase-setup-vantur.sql` — VANTUR (sessões, dicionários e RPCs de sorteio). Correr antes de `supabase-setup-game-analytics.sql` e de `supabase-migration-game-points-multiplier.sql`.
 
 ---
 
