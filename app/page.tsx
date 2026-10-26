@@ -1,4 +1,5 @@
 import { createClient } from '@/utils/supabase/server'
+import { redirect } from 'next/navigation'
 import { Navbar } from '@/components/layout/Navbar'
 import Link from 'next/link'
 import { GoldTransferDialog } from '@/components/profile/GoldTransferDialog'
@@ -34,14 +35,19 @@ const SECTION_LABELS = {
     embaixadores: 'Embaixadores'
 }
 
-export default async function Dashboard() {
+export default async function Dashboard({ searchParams }: { searchParams: Promise<{ evento?: string }> }) {
   const supabase = await createClient()
 
   const {
     data: { user },
   } = await supabase.auth.getUser()
 
+  // Link do convite por email (/?evento=<id>): abre o evento no Painel, entrando primeiro se for preciso.
+  const { evento } = await searchParams
+  const openEventId = evento && /^[0-9a-f-]{36}$/i.test(evento) ? evento : undefined
+
   if (!user) {
+    if (openEventId) redirect(`/login?next=${encodeURIComponent(`/?evento=${openEventId}`)}`)
       const gameSettings = await fetchGameSettings(supabase)
       const gameVisibility = Object.fromEntries(GAMES.map((g) => [g.id, gameVisibilityFor(gameSettings[g.id], null)]))
       // Próximo evento aberto a todo o clube (sem secção) para mostrar aos visitantes
@@ -314,7 +320,7 @@ export default async function Dashboard() {
 
             {/* Agenda e calendário */}
             <div id="agenda" className="scroll-mt-24">
-              <EventDashboard events={allEvents} profile={profile} surveys={surveys || []} userId={user.id} rsvps={myRsvps} />
+              <EventDashboard events={allEvents} profile={profile} surveys={surveys || []} userId={user.id} rsvps={myRsvps} openEventId={openEventId} />
             </div>
           </div>
 

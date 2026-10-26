@@ -351,6 +351,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
             adminProfile={profile}
             clubMembers={clubMembers}
             sectionSuggestions={sectionSuggestions || []}
+            events={events || []}
           />
         )}
 

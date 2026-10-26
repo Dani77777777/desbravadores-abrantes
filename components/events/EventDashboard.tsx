@@ -24,13 +24,15 @@ interface EventDashboardProps {
   userId?: string
   /** Respostas do membro ("Vou"/"Não vou") por evento. */
   rsvps?: Record<string, boolean>
+  /** Evento a abrir logo ao entrar (link do convite por email). */
+  openEventId?: string
 }
 
-export function EventDashboard({ events, profile, surveys, userId, rsvps = {} }: EventDashboardProps) {
+export function EventDashboard({ events, profile, surveys, userId, rsvps = {}, openEventId }: EventDashboardProps) {
   const [selectedDate, setSelectedDate] = useState<Date | null>(null)
   const [myRsvps, setMyRsvps] = useState<Record<string, boolean>>(rsvps)
   const [now] = useState(() => Date.now())
-  const [viewingEvent, setViewingEvent] = useState<any>(null)
+  const [viewingEvent, setViewingEvent] = useState<any>(() => (openEventId && events.find((e) => e.id === openEventId)) || null)
   const [sharingEvent, setSharingEvent] = useState<any>(null)
 
   const filteredEvents = selectedDate

@@ -91,6 +91,9 @@ export async function updateSession(request: NextRequest) {
     !request.nextUrl.pathname.startsWith('/jogos/vana-trilha/como-jogar') &&
     !request.nextUrl.pathname.startsWith('/jogos/indisponivel') &&
     !request.nextUrl.pathname.startsWith('/embed') &&
+    // Deixar de receber convites por email (link assinado, sem sessão)
+    !request.nextUrl.pathname.startsWith('/convites/sair') &&
+    !request.nextUrl.pathname.startsWith('/api/convites/sair') &&
     !request.nextUrl.pathname.includes('/present') &&
     request.nextUrl.pathname !== '/jogos'
   ) {

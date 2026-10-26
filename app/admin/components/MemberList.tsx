@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import {
   ArrowDownUp, Cake, Coins, Download, LayoutGrid, List, Search, Settings2, ShieldCheck, Trophy, UserCheck, UserX,
-  Users, X, Crown, AlertCircle,
+  Users, X, Crown, AlertCircle, Mail,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
@@ -17,6 +17,7 @@ import { ManageMemberDialog } from './ManageMemberDialog'
 import { DeleteMemberDialog } from './DeleteMemberDialog'
 import { SectionSuggestions, type SectionSuggestion } from './SectionSuggestions'
 import { GenderReview } from './GenderReview'
+import { InviteEventDialog } from './InviteEventDialog'
 import { SECTION_LABELS, helperLabel } from '@/utils/permissions'
 import { ROLE_LABELS, SECTION_DOT, SECTION_RING } from './member-constants'
 import { displayFont } from '@/components/landing/fonts'
@@ -29,6 +30,8 @@ interface MemberListProps {
   adminProfile: any
   clubMembers?: any[]
   sectionSuggestions?: SectionSuggestion[]
+  /** Eventos visíveis para a liderança (para os convites por email). */
+  events?: any[]
 }
 
 type SortKey = 'name' | 'xp' | 'gold' | 'recent'
@@ -66,7 +69,7 @@ function ageOf(birthDate: string | null | undefined): number | null {
 
 const levelOf = (xp: number) => Math.floor((xp || 0) / 1000) + 1
 
-export function MemberList({ members, currentUserRole, adminProfile, clubMembers = [], sectionSuggestions = [] }: MemberListProps) {
+export function MemberList({ members, currentUserRole, adminProfile, clubMembers = [], sectionSuggestions = [], events = [] }: MemberListProps) {
   const canAssignHelpers = currentUserRole === 'coordenador' || currentUserRole === 'dirigente'
   const router = useRouter()
   const supabase = createClient()
@@ -81,6 +84,7 @@ export function MemberList({ members, currentUserRole, adminProfile, clubMembers
 
   const [manageId, setManageId] = useState<string | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<any>(null)
+  const [inviteOpen, setInviteOpen] = useState(false)
   // Atualização otimista do estado de investidura.
   const [investedOverride, setInvestedOverride] = useState<Record<string, boolean>>({})
 
@@ -224,15 +228,27 @@ export function MemberList({ members, currentUserRole, adminProfile, clubMembers
           <h2 className={`${D} text-3xl font-extrabold tracking-tight text-blue-950`}>Membros</h2>
           <p className="text-sm text-stone-500">Pesquisa, filtra e gere pontos, cargos, investiduras e contas.</p>
         </div>
-        <button
-          type="button"
-          onClick={exportCsv}
-          disabled={filtered.length === 0}
-          className="flex h-10 shrink-0 cursor-pointer items-center justify-center gap-2 rounded-2xl bg-white px-4 text-sm font-bold text-blue-950 shadow-sm ring-1 ring-stone-200 transition-colors hover:bg-stone-50 disabled:opacity-50"
-          title="Descarregar a lista (com os filtros atuais) para abrir no Excel"
-        >
-          <Download className="h-4 w-4" /> Exportar ({filtered.length})
-        </button>
+        <div className="flex shrink-0 flex-wrap gap-2">
+          {stats.pending > 0 && (
+            <button
+              type="button"
+              onClick={() => setInviteOpen(true)}
+              className="flex h-10 cursor-pointer items-center justify-center gap-2 rounded-2xl bg-orange-500 px-4 text-sm font-bold text-white shadow-sm transition-colors hover:bg-orange-600"
+              title="Enviar por email um convite para um evento aos membros por investir"
+            >
+              <Mail className="h-4 w-4" /> Convidar por investir
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={exportCsv}
+            disabled={filtered.length === 0}
+            className="flex h-10 shrink-0 cursor-pointer items-center justify-center gap-2 rounded-2xl bg-white px-4 text-sm font-bold text-blue-950 shadow-sm ring-1 ring-stone-200 transition-colors hover:bg-stone-50 disabled:opacity-50"
+            title="Descarregar a lista (com os filtros atuais) para abrir no Excel"
+          >
+            <Download className="h-4 w-4" /> Exportar ({filtered.length})
+          </button>
+        </div>
       </div>
 
       {/* ── Resumo ─────────────────────────────────────────────── */}
@@ -512,6 +528,13 @@ export function MemberList({ members, currentUserRole, adminProfile, clubMembers
           setManageId(null)
           setDeleteTarget(m)
         }}
+      />
+
+      <InviteEventDialog
+        open={inviteOpen}
+        onOpenChange={setInviteOpen}
+        members={members.filter((m) => !isInvested(m))}
+        events={events}
       />
 
       <DeleteMemberDialog
