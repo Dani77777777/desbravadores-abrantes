@@ -127,6 +127,24 @@ CREATE TABLE IF NOT EXISTS public.vanasketch_guesses (
 CREATE INDEX IF NOT EXISTS vanasketch_guesses_session_round
   ON public.vanasketch_guesses (session_id, round_number, created_at);
 
+-- Um só palpite certo por jogador e ronda (dois envios rápidos não pontuam a dobrar)
+CREATE UNIQUE INDEX IF NOT EXISTS vanasketch_guesses_one_correct
+  ON public.vanasketch_guesses (session_id, round_number, player_id)
+  WHERE is_correct;
+
+-- ── Pontuação atómica (palpites certos em simultâneo não perdem pontos) ──
+CREATE OR REPLACE FUNCTION public.vanasketch_add_score(p_player_id uuid, p_delta int)
+RETURNS void
+LANGUAGE sql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  UPDATE public.vanasketch_players SET score = score + p_delta WHERE id = p_player_id;
+$$;
+
+REVOKE EXECUTE ON FUNCTION public.vanasketch_add_score(uuid, int) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.vanasketch_add_score(uuid, int) TO service_role;
+
 -- ── RPC: informação do desenhador (opções + palavra escolhida) ──
 -- Só o desenhador da ronda actual e o host podem ver a palavra.
 CREATE OR REPLACE FUNCTION public.get_vanasketch_drawer_info(p_session_id uuid)

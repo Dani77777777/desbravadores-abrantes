@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createClient } from '@/utils/supabase/client'
-import { chooseSketchWord, submitSketchGuess } from '@/lib/actions/vana-sketch'
+import { chooseSketchWord, submitSketchGuess, endSketchRound } from '@/lib/actions/vana-sketch'
 import type { VanaSketchSession, VanaSketchPlayer, VanaSketchGuess } from '@/types/vana-sketch'
 import { useSketchSession, useSketchPlayers, useSketchGuesses } from './useSketchSession'
 import { DrawingCanvas } from './DrawingCanvas'
@@ -216,6 +216,19 @@ function DrawerView({ session }: { session: VanaSketchSession }) {
     return () => { cancelled = true; clearInterval(t) }
   }, [session.id, session.round_number])
 
+  // Watchdog de reserva (o principal está no HostControl): se o ecrã do host
+  // bloquear, é o telemóvel do desenhador que fecha a ronda quando o tempo acaba
+  const left = useCountdown(session.round_ends_at)
+  const timeoutFiredRef = useRef(false)
+  useEffect(() => {
+    if (left !== 0 || timeoutFiredRef.current) return
+    timeoutFiredRef.current = true
+    endSketchRound(session.id, 'timeout').then((res) => {
+      // Relógio do telemóvel adiantado → o servidor recusa; tenta outra vez
+      if (res?.error) setTimeout(() => { timeoutFiredRef.current = false }, 2000)
+    })
+  }, [left, session.id])
+
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between rounded-2xl border px-4 py-2" style={{ background: 'rgba(255,93,162,.1)', borderColor: 'rgba(255,93,162,.35)' }}>
@@ -248,6 +261,7 @@ function GuesserView({
   const [guess, setGuess] = useState('')
   const [sending, setSending] = useState(false)
   const [flash, setFlash] = useState<'correct' | 'wrong' | null>(null)
+  const [sendError, setSendError] = useState<string | null>(null)
   const feedRef = useRef<HTMLDivElement | null>(null)
   const left = useCountdown(session.round_ends_at)
 
@@ -260,11 +274,16 @@ function GuesserView({
     const text = guess.trim()
     if (!text || sending) return
     setSending(true)
+    setSendError(null)
     setGuess('')
     const res = await submitSketchGuess(session.id, text, asBotId)
     if (res.correct) {
       setFlash('correct')
-    } else if (!res.error) {
+    } else if (res.error) {
+      // Sem isto o palpite desaparecia sem explicação
+      setSendError(res.error)
+      setGuess(text)
+    } else {
       setFlash('wrong')
       setTimeout(() => setFlash(null), 600)
     }
@@ -333,6 +352,9 @@ function GuesserView({
             <Send className="h-5 w-5" />
           </button>
         </form>
+      )}
+      {sendError && !iGuessedCorrect && flash !== 'correct' && (
+        <p className="text-center text-sm text-red-400">{sendError}</p>
       )}
     </div>
   )

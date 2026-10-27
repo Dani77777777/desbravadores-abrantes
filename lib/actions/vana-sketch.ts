@@ -15,6 +15,24 @@ import { effectiveRole } from '@/utils/permissions'
 import { gameUnavailableError } from '@/utils/game-access'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
+// Palpite certo ignora acentos, maiúsculas, espaços e hífens ("arco iris" = "Arco-íris")
+function sameWord(a: string, b: string): boolean {
+  const clean = (s: string) => normalizeText(s).replace(/[^a-z0-9]/g, '')
+  return clean(a) === clean(b)
+}
+
+// Soma pontos de forma atómica (RPC). Sem a migração aplicada, cai para
+// ler-e-escrever — funciona, mas palpites em simultâneo podem perder pontos.
+async function addScore(service: SupabaseClient, playerId: string, delta: number) {
+  const { error } = await service.rpc('vanasketch_add_score', { p_player_id: playerId, p_delta: delta })
+  if (!error) return
+  const { data: p } = await service.from('vanasketch_players').select('score').eq('id', playerId).maybeSingle()
+  if (p) await service.from('vanasketch_players').update({ score: p.score + delta }).eq('id', playerId)
+}
+
+// Margem para a latência entre o fim do relógio e o palpite chegar ao servidor
+const GUESS_GRACE_MS = 1500
+
 // ── Criar sessão (admin/host) ─────────────────────────────────
 export async function createVanaSketchSession(isTest = false): Promise<string> {
   const supabase = await createClient()
@@ -165,7 +183,8 @@ async function startRound(
     drawer_player_id: drawer.id,
     word_options: options,
   })
-  if (roundError) return { error: roundError.message }
+  // 23505 = a ronda já existe: outro pedido (duplo clique) já a arrancou
+  if (roundError) return roundError.code === '23505' ? {} : { error: roundError.message }
 
   // Limpar traços de rondas anteriores (o quadro começa em branco)
   await service.from('vanasketch_strokes').delete().eq('session_id', sessionId)
@@ -219,6 +238,17 @@ export async function startVanaSketchGame(
   const roundsPerPlayer = Math.min(3, Math.max(1, Math.floor(opts.roundsPerPlayer) || 1))
   const drawSeconds = Math.min(300, Math.max(30, Math.floor(opts.drawSeconds) || 90))
 
+  // Passar a 'playing' só se ainda estiver no lobby — um duplo clique voltava a
+  // baralhar a ordem depois de a ronda 1 já ter desenhador
+  const { data: claimed } = await service.from('vanasketch_sessions').update({
+    status: 'playing',
+    total_rounds: players.length * roundsPerPlayer,
+    rounds_per_player: roundsPerPlayer,
+    draw_seconds: drawSeconds,
+    started_at: new Date().toISOString(),
+  }).eq('id', sessionId).eq('status', 'lobby').select('id')
+  if (!claimed?.length) return { error: 'O jogo já começou.' }
+
   // Baralhar a ordem de desenho
   const shuffled = [...players].sort(() => Math.random() - 0.5)
   await Promise.all(
@@ -226,14 +256,6 @@ export async function startVanaSketchGame(
       service.from('vanasketch_players').update({ draw_order: i }).eq('id', p.id)
     )
   )
-
-  await service.from('vanasketch_sessions').update({
-    status: 'playing',
-    total_rounds: players.length * roundsPerPlayer,
-    rounds_per_player: roundsPerPlayer,
-    draw_seconds: drawSeconds,
-    started_at: new Date().toISOString(),
-  }).eq('id', sessionId)
 
   return startRound(service, sessionId, 1)
 }
@@ -288,10 +310,13 @@ export async function chooseSketchWord(
     : Math.floor(Math.random() * options.length)
   const word = options[idx]
 
-  await service.from('vanasketch_rounds').update({
+  // Só grava se ainda ninguém escolheu (desenhador e host ao mesmo tempo:
+  // o desenhador podia ficar a ver uma palavra e os outros a adivinhar outra)
+  const { data: picked } = await service.from('vanasketch_rounds').update({
     word,
     started_at: new Date().toISOString(),
-  }).eq('id', round.id)
+  }).eq('id', round.id).is('word', null).select('id')
+  if (!picked?.length) return { error: 'A palavra já foi escolhida.' }
 
   await service.from('vanasketch_sessions').update({
     phase: 'drawing',
@@ -324,6 +349,10 @@ export async function submitSketchGuess(
 
   if (!session || session.status !== 'playing' || session.phase !== 'drawing') {
     return { error: 'Não é altura de palpitar.' }
+  }
+  // O relógio acabou mas a ronda ainda não fechou (ex.: watchdog atrasado)
+  if (session.round_ends_at && Date.now() > new Date(session.round_ends_at).getTime() + GUESS_GRACE_MS) {
+    return { error: 'O tempo acabou!' }
   }
 
   let me: { id: string; score: number }
@@ -372,7 +401,7 @@ export async function submitSketchGuess(
     .maybeSingle()
   if (!round?.word) return { error: 'Ronda inválida.' }
 
-  const isCorrect = normalizeText(clean) === normalizeText(round.word)
+  const isCorrect = sameWord(clean, round.word)
 
   let points = 0
   if (isCorrect) {
@@ -382,7 +411,7 @@ export async function submitSketchGuess(
     points = guesserPoints(msLeft, session.draw_seconds)
   }
 
-  await service.from('vanasketch_guesses').insert({
+  const { error: guessError } = await service.from('vanasketch_guesses').insert({
     session_id: sessionId,
     round_number: session.round_number,
     player_id: me.id,
@@ -391,23 +420,15 @@ export async function submitSketchGuess(
     is_correct: isCorrect,
     points,
   })
+  if (guessError) {
+    // 23505 = índice único de acerto: o mesmo jogador enviou duas vezes seguidas
+    return { error: guessError.code === '23505' ? 'Já acertaste nesta ronda!' : 'Não foi possível enviar o palpite.' }
+  }
 
   if (isCorrect) {
-    await service.from('vanasketch_players')
-      .update({ score: me.score + points })
-      .eq('id', me.id)
-
+    await addScore(service, me.id, points)
     // Bónus do desenhador por cada acerto
-    const { data: drawer } = await service
-      .from('vanasketch_players')
-      .select('id, score')
-      .eq('id', round.drawer_player_id)
-      .maybeSingle()
-    if (drawer) {
-      await service.from('vanasketch_players')
-        .update({ score: drawer.score + DRAWER_POINTS_PER_GUESS })
-        .eq('id', drawer.id)
-    }
+    await addScore(service, round.drawer_player_id, DRAWER_POINTS_PER_GUESS)
 
     // Toda a gente acertou? → terminar a ronda
     const [{ data: allPlayers }, { data: correctGuesses }] = await Promise.all([
@@ -443,10 +464,12 @@ async function finishRound(
     .maybeSingle()
   if (!round || round.ended_at) return
 
-  await service.from('vanasketch_rounds').update({
+  // Fecho condicional: "todos acertaram" e o fim do relógio podem chegar juntos
+  const { data: closed } = await service.from('vanasketch_rounds').update({
     ended_at: new Date().toISOString(),
     end_reason: reason,
-  }).eq('id', round.id)
+  }).eq('id', round.id).is('ended_at', null).select('id')
+  if (!closed?.length) return
 
   await service.from('vanasketch_sessions').update({
     phase: 'round_end',
@@ -467,11 +490,24 @@ export async function endSketchRound(
   const service = createServiceClient()
   const { data: session } = await service
     .from('vanasketch_sessions')
-    .select('host_id, status, phase, round_number, round_ends_at')
+    .select('host_id, status, phase, round_number, round_ends_at, drawer_player_id')
     .eq('id', sessionId)
     .maybeSingle()
 
-  if (!session || session.host_id !== user.id) return { error: 'Sem permissão' }
+  if (!session) return { error: 'Sem permissão' }
+  if (session.host_id !== user.id) {
+    // O desenhador também pode fechar a ronda quando o relógio acaba — se o
+    // telemóvel do host bloquear o ecrã, o watchdog dele pára e a ronda ficava
+    // presa a 0s. Saltar a ronda continua a ser só do host.
+    if (reason !== 'timeout') return { error: 'Sem permissão' }
+    const { data: me } = await service
+      .from('vanasketch_players')
+      .select('id')
+      .eq('session_id', sessionId)
+      .eq('user_id', user.id)
+      .maybeSingle()
+    if (!me || me.id !== session.drawer_player_id) return { error: 'Sem permissão' }
+  }
   if (session.status !== 'playing') return { error: 'Estado inválido' }
   if (session.phase !== 'drawing' && session.phase !== 'choosing') {
     return { error: 'A ronda já terminou.' }
@@ -543,6 +579,16 @@ export async function awardVanaSketchPoints(sessionId: string): Promise<{ error?
   if (session.status !== 'finished') return { error: 'O jogo ainda não terminou.' }
   if (session.rewards_awarded) return { error: 'Pontos já atribuídos.' }
 
+  // Marcar primeiro, de forma condicional — dois cliques/separadores não dão
+  // XP e Gold a dobrar. Se a inserção falhar, desfaz-se a marca.
+  const { data: claimed } = await service
+    .from('vanasketch_sessions')
+    .update({ rewards_awarded: true })
+    .eq('id', sessionId)
+    .eq('rewards_awarded', false)
+    .select('id')
+  if (!claimed?.length) return { error: 'Pontos já atribuídos.' }
+
   // Bots (user_id null) não recebem recompensas, mas contam para o pódio —
   // por isso o índice é calculado sobre a lista completa ordenada.
   const { data: players } = await service
@@ -570,14 +616,12 @@ export async function awardVanaSketchPoints(sessionId: string): Promise<{ error?
       .filter((r): r is typeof r & { target_user_id: string } => !!r.target_user_id)
     if (rewards.length > 0) {
       const { error: logError } = await service.from('points_log').insert(rewards)
-      if (logError) return { error: logError.message }
+      if (logError) {
+        await service.from('vanasketch_sessions').update({ rewards_awarded: false }).eq('id', sessionId)
+        return { error: logError.message }
+      }
     }
   }
-
-  await service
-    .from('vanasketch_sessions')
-    .update({ rewards_awarded: true })
-    .eq('id', sessionId)
 
   return {}
 }
