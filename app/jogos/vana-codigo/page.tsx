@@ -152,7 +152,7 @@ export default async function VanaCodigoGamePage() {
               <div className="mx-auto w-32 h-32 mb-6 pointer-events-none">
                 <img src="/images/VanaCodigo.png" alt="VanaCódigo Logo" className="w-full h-full object-contain" />
               </div>
-              <h1 className="text-6xl font-black text-emerald-900 tracking-tighter">VANACÓDIGO</h1>
+              <h1 className="text-[2.75rem] leading-none sm:text-6xl font-black text-emerald-900 tracking-tighter">VANACÓDIGO</h1>
               <p className="text-gray-500 max-w-md mx-auto text-lg">
                 Desafio diário de decifração. Morse, Semáforo e Cifras — treina as tuas especialidades!
               </p>

@@ -60,6 +60,13 @@ const VanaCodigoGame: React.FC<VanaCodigoGameProps> = ({ initialSession, userId 
     }));
   }, [session.secret_text]);
 
+  // As palavras não partem a meio — o tamanho das casas ajusta-se à mais longa
+  // para caber no ecrã do telemóvel (ver --vc-cell no CSS).
+  const longestWord = useMemo(
+    () => Math.max(...words.map(word => word.letters.length)),
+    [words]
+  );
+
   const secretLetters = useMemo(
     () => session.secret_text.replace(/ /g, '').split(''),
     [session.secret_text]
@@ -95,6 +102,16 @@ const VanaCodigoGame: React.FC<VanaCodigoGameProps> = ({ initialSession, userId 
     return 0;
   });
 
+  // Depois de uma tentativa, a casa do cursor pode ter ficado bloqueada (letra
+  // certa ou pista) — nesse caso o cursor passa para a primeira casa por resolver.
+  const activeCursor = useMemo(() => {
+    if (isEditable(cursorPos)) return cursorPos;
+    for (let i = 0; i < totalLetters; i++) {
+      if (isEditable(i)) return i;
+    }
+    return cursorPos;
+  }, [cursorPos, isEditable, totalLetters]);
+
   const showMessage = (msg: string, duration = 1800) => {
     setMessage(msg);
     setTimeout(() => setMessage(''), duration);
@@ -122,26 +139,26 @@ const VanaCodigoGame: React.FC<VanaCodigoGameProps> = ({ initialSession, userId 
   const onKey = useCallback((key: string) => {
     if (session.is_finished || isLoading || isCelebrating) return;
     const char = key.toUpperCase();
-    if (!/^[A-Z]$/.test(char) || !isEditable(cursorPos)) return;
+    if (!/^[A-Z]$/.test(char) || !isEditable(activeCursor)) return;
     setCurrentGuess(prev => {
       const next = [...prev];
-      next[cursorPos] = char;
+      next[activeCursor] = char;
       return next;
     });
-    const after = nextEditable(cursorPos + 1);
-    if (after > cursorPos) setCursorPos(after);
-  }, [cursorPos, session.is_finished, isLoading, isCelebrating, isEditable, nextEditable]);
+    const after = nextEditable(activeCursor + 1);
+    setCursorPos(after > activeCursor ? after : activeCursor);
+  }, [activeCursor, session.is_finished, isLoading, isCelebrating, isEditable, nextEditable]);
 
   const onDelete = useCallback(() => {
     if (session.is_finished || isLoading || isCelebrating) return;
-    if (isEditable(cursorPos) && currentGuess[cursorPos]) {
+    if (isEditable(activeCursor) && currentGuess[activeCursor]) {
       setCurrentGuess(prev => {
         const next = [...prev];
-        next[cursorPos] = '';
+        next[activeCursor] = '';
         return next;
       });
     } else {
-      const prevPos = prevEditable(cursorPos - 1);
+      const prevPos = prevEditable(activeCursor - 1);
       if (prevPos >= 0) {
         setCursorPos(prevPos);
         setCurrentGuess(prev => {
@@ -151,7 +168,7 @@ const VanaCodigoGame: React.FC<VanaCodigoGameProps> = ({ initialSession, userId 
         });
       }
     }
-  }, [currentGuess, cursorPos, session.is_finished, isLoading, isCelebrating, isEditable, prevEditable]);
+  }, [currentGuess, activeCursor, session.is_finished, isLoading, isCelebrating, isEditable, prevEditable]);
 
   const onEnter = useCallback(async () => {
     if (session.is_finished || isLoading || isCelebrating) return;
@@ -264,19 +281,19 @@ const VanaCodigoGame: React.FC<VanaCodigoGameProps> = ({ initialSession, userId 
       if (e.ctrlKey || e.altKey || e.metaKey) return;
       if (e.key === 'Enter') onEnter();
       else if (e.key === 'Backspace') onDelete();
-      else if (e.key === 'ArrowLeft') setCursorPos(p => {
-        const prev = prevEditable(p - 1);
-        return prev >= 0 ? prev : p;
-      });
-      else if (e.key === 'ArrowRight') setCursorPos(p => {
-        const next = nextEditable(p + 1);
-        return next > p ? next : p;
-      });
+      else if (e.key === 'ArrowLeft') {
+        const prev = prevEditable(activeCursor - 1);
+        if (prev >= 0) setCursorPos(prev);
+      }
+      else if (e.key === 'ArrowRight') {
+        const next = nextEditable(activeCursor + 1);
+        if (next > activeCursor) setCursorPos(next);
+      }
       else onKey(e.key);
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onEnter, onDelete, onKey, prevEditable, nextEditable]);
+  }, [onEnter, onDelete, onKey, prevEditable, nextEditable, activeCursor]);
 
   const renderCell = (letter: string, index: number) => {
     const locked = lockedIndices.has(index);
@@ -291,7 +308,7 @@ const VanaCodigoGame: React.FC<VanaCodigoGameProps> = ({ initialSession, userId 
     else if (revealed) className += ' hint';
     else if (wrong) className += ' wrong';
     else if (value) className += ' filled';
-    if (!session.is_finished && !locked && !revealed && index === cursorPos) className += ' cursor';
+    if (!session.is_finished && !locked && !revealed && index === activeCursor) className += ' cursor';
     if (isCelebrating) className += ' celebrate';
 
     return (
@@ -308,7 +325,7 @@ const VanaCodigoGame: React.FC<VanaCodigoGameProps> = ({ initialSession, userId 
 
   const renderSymbol = (letter: string) => {
     if (session.code_type === 'semaforo') {
-      return <SemaphoreChar letter={letter} size={44} />;
+      return <SemaphoreChar letter={letter} size={44} className="vanacodigo-semaphore" />;
     }
     const symbolClass =
       session.code_type === 'morse' ? 'morse'
@@ -343,7 +360,10 @@ const VanaCodigoGame: React.FC<VanaCodigoGameProps> = ({ initialSession, userId 
         ))}
       </div>
 
-      <div className="vanacodigo-board">
+      <div
+        className="vanacodigo-board"
+        style={{ '--vc-letters': longestWord } as React.CSSProperties}
+      >
         {words.map((word, wIdx) => (
           <div key={wIdx} className="vanacodigo-word">
             {word.letters.map(({ letter, index }) => (

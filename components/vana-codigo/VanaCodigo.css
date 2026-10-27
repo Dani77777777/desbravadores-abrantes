@@ -88,6 +88,15 @@
   gap: 1.25rem 1.75rem;
   padding: 1rem 0.5rem 1.25rem;
   width: 100%;
+  box-sizing: border-box;
+  /* As palavras não partem a meio: as casas encolhem até a palavra mais longa
+     (--vc-letters, posto pelo componente) caber na largura do tabuleiro. */
+  container-type: inline-size;
+  --vc-cell-max: 44px;
+  --vc-cell: min(
+    var(--vc-cell-max),
+    calc((100cqi - (var(--vc-letters, 1) - 1) * 5px) / var(--vc-letters, 1))
+  );
 }
 
 .vanacodigo-word {
@@ -128,19 +137,25 @@
 }
 
 .vanacodigo-symbol.numeros {
-  font-size: 1.15rem;
+  font-size: min(1.15rem, calc(var(--vc-cell) * 0.5));
   color: #0369a1;
+}
+
+/* o desenho do semáforo acompanha a largura da casa */
+.vanacodigo-semaphore {
+  width: var(--vc-cell);
+  height: calc(var(--vc-cell) * 1.1);
 }
 
 /* ---- Célula de resposta ---- */
 .vanacodigo-cell {
-  width: 44px;
-  height: 44px;
+  width: var(--vc-cell);
+  height: var(--vc-cell);
   border: 2px solid #d1d5db;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.25rem;
+  font-size: min(1.25rem, calc(var(--vc-cell) * 0.46));
   font-weight: 900;
   text-transform: uppercase;
   border-radius: 6px;
@@ -398,12 +413,11 @@
   .vanacodigo-board {
     gap: 1rem 1.1rem;
     padding: 0.75rem 0.25rem 1rem;
+    --vc-cell-max: 36px;
   }
 
   .vanacodigo-cell {
-    width: 36px;
-    height: 36px;
-    font-size: 1.05rem;
+    font-size: min(1.05rem, calc(var(--vc-cell) * 0.46));
     border-radius: 5px;
   }
 
@@ -416,7 +430,8 @@
 }
 
 @media (max-width: 380px) {
-  .vanacodigo-cell { width: 30px; height: 30px; font-size: 0.9rem; }
+  .vanacodigo-board { --vc-cell-max: 30px; }
+  .vanacodigo-cell { font-size: min(0.9rem, calc(var(--vc-cell) * 0.46)); }
   .vanacodigo-key { height: 40px; max-width: 30px; font-size: 0.65rem; }
   .vanacodigo-key.wide { max-width: 48px; font-size: 0.55rem; }
 }

@@ -6,6 +6,7 @@ import { getSemaphoreAngles } from '@/utils/vana-codigo/codecs';
 interface SemaphoreCharProps {
   letter: string;
   size?: number;
+  className?: string;
 }
 
 const CX = 50;
@@ -36,11 +37,11 @@ function Flag({ angle }: { angle: number }) {
 }
 
 /** Sinaleiro de semáforo: figura com duas bandeiras nas posições da letra. */
-export default function SemaphoreChar({ letter, size = 64 }: SemaphoreCharProps) {
+export default function SemaphoreChar({ letter, size = 64, className }: SemaphoreCharProps) {
   const [a1, a2] = getSemaphoreAngles(letter);
 
   return (
-    <svg viewBox="0 0 100 110" width={size} height={size * 1.1} aria-label={`Sinal de semáforo`}>
+    <svg viewBox="0 0 100 110" width={size} height={size * 1.1} className={className} aria-label={`Sinal de semáforo`}>
       {/* corpo */}
       <circle cx={CX} cy={38} r={9} fill="#64748b" />
       <line x1={CX} y1={47} x2={CX} y2={82} stroke="#64748b" strokeWidth={6} strokeLinecap="round" />
