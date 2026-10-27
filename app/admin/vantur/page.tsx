@@ -26,11 +26,6 @@ function isDrawable(word: string): boolean {
   return word.normalize('NFC') === word && word.length === 5;
 }
 
-// Os palpites são validados pela lista fixa do código + as palavras secretas do dia
-function inLexicon(word: string): boolean {
-  return WORD_LIST[normalizeText(word)] !== undefined;
-}
-
 export default async function VanturAdminPage({ searchParams }: { searchParams: Promise<{ qBib?: string, qDict?: string }> }) {
   const supabase = await createClient();
   const params = await searchParams;
@@ -67,7 +62,6 @@ export default async function VanturAdminPage({ searchParams }: { searchParams: 
 
   const bib = bibWords ?? [];
   const notDrawable = bib.filter((w) => !isDrawable(w.word));
-  const outOfLexicon = bib.filter((w) => isDrawable(w.word) && !inLexicon(w.word));
 
   return (
     <div className="min-h-screen bg-stone-50">
@@ -132,20 +126,10 @@ export default async function VanturAdminPage({ searchParams }: { searchParams: 
                 )}
               </form>
 
-              {(notDrawable.length > 0 || outOfLexicon.length > 0) && (
-                <div className="space-y-1.5 rounded-2xl border border-amber-100 bg-amber-50/60 p-4 text-xs font-medium text-amber-800">
-                  {notDrawable.length > 0 && (
-                    <p>
-                      <span className="mr-1.5 inline-block h-2 w-2 rounded-full bg-red-500" />
-                      <strong>{notDrawable.length}</strong> nunca sai{notDrawable.length !== 1 ? 'em' : ''} no sorteio porque não tem 5 letras — apaga e volta a escrever.
-                    </p>
-                  )}
-                  {outOfLexicon.length > 0 && (
-                    <p>
-                      <span className="mr-1.5 inline-block h-2 w-2 rounded-full bg-amber-500" />
-                      <strong>{outOfLexicon.length}</strong> não {outOfLexicon.length !== 1 ? 'estão' : 'está'} na lista de palavras do jogo: só {outOfLexicon.length !== 1 ? 'são aceites' : 'é aceite'} como palpite no dia em que {outOfLexicon.length !== 1 ? 'são' : 'é'} a palavra secreta.
-                    </p>
-                  )}
+              {notDrawable.length > 0 && (
+                <div className="rounded-2xl border border-red-100 bg-red-50/60 p-4 text-xs font-medium text-red-800">
+                  <span className="mr-1.5 inline-block h-2 w-2 rounded-full bg-red-500" />
+                  <strong>{notDrawable.length}</strong> nunca sai{notDrawable.length !== 1 ? 'em' : ''} no sorteio porque não tem 5 letras — apaga e volta a escrever.
                 </div>
               )}
 
@@ -157,18 +141,15 @@ export default async function VanturAdminPage({ searchParams }: { searchParams: 
                 <div className="flex max-h-[28rem] flex-wrap gap-2 overflow-y-auto pr-1">
                   {bib.map((w) => {
                     const drawable = isDrawable(w.word);
-                    const known = inLexicon(w.word);
                     return (
                       <div
                         key={w.id}
                         className={`flex items-center gap-1.5 rounded-xl border py-1.5 pl-3 pr-1 ${
                           !drawable ? 'border-red-200 bg-red-50' : 'border-slate-100 bg-slate-50'
                         }`}
-                        title={!drawable ? 'Não tem 5 letras: nunca sai no sorteio' : !known ? 'Fora da lista de palavras do jogo' : undefined}
+                        title={!drawable ? 'Não tem 5 letras: nunca sai no sorteio' : undefined}
                       >
-                        {(!drawable || !known) && (
-                          <span className={`h-2 w-2 rounded-full ${!drawable ? 'bg-red-500' : 'bg-amber-500'}`} />
-                        )}
+                        {!drawable && <span className="h-2 w-2 rounded-full bg-red-500" />}
                         <span className="font-bold tracking-widest text-slate-700">{w.word}</span>
                         <DeleteWordButton target="biblical" wordKey={w.id} label={w.word} />
                       </div>
@@ -202,7 +183,7 @@ export default async function VanturAdminPage({ searchParams }: { searchParams: 
                 <p>
                   Só é usado quando não há palavras bíblicas suficientes para o modo escolhido (o Plex pede 4).
                   Os palpites dos jogadores <strong>não</strong> são validados por esta tabela, mas pela lista
-                  de {LEXICON_SIZE.toLocaleString('pt-PT')} palavras que vem com o jogo, mais as palavras secretas do dia.
+                  de {LEXICON_SIZE.toLocaleString('pt-PT')} palavras que vem com o jogo, mais todas as palavras bíblicas.
                 </p>
               </div>
 

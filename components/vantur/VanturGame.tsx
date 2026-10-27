@@ -25,6 +25,8 @@ interface VanturSession {
 interface VanturGameProps {
   initialSession: VanturSession;
   userId: string;
+  /** Palavras bíblicas fora do WORD_LIST (forma limpa → forma com acentos), sempre aceites como palpite */
+  extraWords?: Record<string, string>;
 }
 
 const REVEAL_DELAY_MS = 300;
@@ -32,7 +34,7 @@ const REVEAL_DURATION_MS = 500;
 const CELEBRATE_DELAY_MS = 70;
 const CELEBRATE_DURATION_MS = 500;
 
-const VanturGame: React.FC<VanturGameProps> = ({ initialSession, userId }) => {
+const VanturGame: React.FC<VanturGameProps> = ({ initialSession, userId, extraWords = {} }) => {
   const supabase = createClient();
   const [session, setSession] = useState<VanturSession>(initialSession);
   const [message, setMessage] = useState('');
@@ -106,7 +108,7 @@ const VanturGame: React.FC<VanturGameProps> = ({ initialSession, userId }) => {
 
     try {
       const secretWordsNormalized = cleanSecretWords.map(w => normalizeText(w));
-      const wordDisplay = WORD_LIST[normalizedGuess];
+      const wordDisplay = WORD_LIST[normalizedGuess] ?? extraWords[normalizedGuess];
       const isValidWord = wordDisplay !== undefined || secretWordsNormalized.includes(normalizedGuess);
 
       if (!isValidWord) {
@@ -196,7 +198,7 @@ const VanturGame: React.FC<VanturGameProps> = ({ initialSession, userId }) => {
     } finally {
       setIsLoading(false);
     }
-  }, [currentGuess, session, cleanSecretWords, wordLength, maxAttempts, supabase, userId, isLoading, isRevealing, isCelebrating, emptyGuess]);
+  }, [currentGuess, session, cleanSecretWords, wordLength, maxAttempts, supabase, userId, isLoading, isRevealing, isCelebrating, emptyGuess, extraWords]);
 
   const onDelete = useCallback(() => {
     if (session.is_finished || isLoading || isRevealing || isCelebrating) return;

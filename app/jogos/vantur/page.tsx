@@ -9,6 +9,23 @@ import VanturHowToPlay from '@/components/vantur/VanturHowToPlay';
 import VanturReplayButton from '@/components/vantur/VanturReplayButton';
 import type { VanturReplaySession } from '@/components/vantur/VanturReplay';
 import { gameUnavailableError } from '@/utils/game-access';
+import { createServiceClient } from '@/utils/supabase/service';
+import { normalizeText } from '@/utils/text-normalization';
+import { WORD_LIST } from '@/utils/vantur-word-list';
+
+// Palavras bíblicas que não estão na lista fixa de palpites (sobretudo nomes
+// próprios). Sem isto só eram aceites no dia em que eram a palavra secreta.
+// Os jogadores não leem vantur_dictionary (RLS), por isso vai pelo service role;
+// só seguem para o cliente as que faltam na lista — não o dicionário inteiro.
+async function getExtraValidWords(): Promise<Record<string, string>> {
+  const { data } = await createServiceClient().from('vantur_dictionary').select('word');
+  const extra: Record<string, string> = {};
+  for (const { word } of data ?? []) {
+    const clean = normalizeText(word);
+    if (/^[a-z]{5}$/.test(clean) && WORD_LIST[clean] === undefined) extra[clean] = word.toLowerCase();
+  }
+  return extra;
+}
 
 interface ModeCardProps {
   title: string;
@@ -151,6 +168,7 @@ export default async function VanturGamePage() {
   }
 
   const currentActiveSession = activeSessions.length > 0 ? activeSessions[0] : null;
+  const extraWords = currentActiveSession ? await getExtraValidWords() : {};
 
   return (
     <div className="min-h-screen bg-stone-50">
@@ -162,7 +180,7 @@ export default async function VanturGamePage() {
         </Link>
 
         {currentActiveSession ? (
-          <VanturGame initialSession={currentActiveSession} userId={user.id} />
+          <VanturGame initialSession={currentActiveSession} userId={user.id} extraWords={extraWords} />
         ) : (
           <div className="flex flex-col items-center justify-center space-y-8 animate-in fade-in duration-700">
             <div className="text-center space-y-3">
