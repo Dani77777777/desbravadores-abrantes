@@ -7,6 +7,7 @@ import type { VanaSketchSession, VanaSketchPlayer, VanaSketchGuess } from '@/typ
 import { useSketchSession, useSketchPlayers, useSketchGuesses } from './useSketchSession'
 import { CanvasViewer } from './CanvasViewer'
 import { SketchAvatar, CountdownBadge, MaskedWord } from './ui'
+import { useSketchAudio } from './useSketchAudio'
 import { VS, VS_SCREEN_STYLE, vsHand, vsSans } from './theme'
 import { Pencil, Trophy, Users } from 'lucide-react'
 
@@ -32,17 +33,21 @@ export function ProjectorView({ session: initialSession, initialPlayers }: Proje
     setJoinUrl(`${window.location.origin}/j/${session.code}`)
   }, [session.code])
 
-  // Recebe comandos do host (ampliar QR Code)
+  // Recebe comandos do host (ampliar QR Code, ligar/desligar a música)
   const [qrZoomed, setQrZoomed] = useState(false)
+  const [musicEnabled, setMusicEnabled] = useState(true)
   useEffect(() => {
     const supabase = createClient()
     const ch = supabase.channel(`vanasketch-present-${session.id}`, { config: { broadcast: { self: false } } })
     ch.on('broadcast', { event: 'cmd' }, ({ payload }) => {
       if (typeof payload?.qrZoomed === 'boolean') setQrZoomed(payload.qrZoomed)
+      if (typeof payload?.musicEnabled === 'boolean') setMusicEnabled(payload.musicEnabled)
     })
     ch.subscribe()
     return () => { supabase.removeChannel(ch) }
   }, [session.id])
+
+  const { audioUnlocked, unlock } = useSketchAudio(session, guesses, musicEnabled)
 
   const drawer = players.find((p) => p.id === session.drawer_player_id)
   const playerById = useMemo(() => new Map(players.map((p) => [p.id, p])), [players])
@@ -138,6 +143,21 @@ export function ProjectorView({ session: initialSession, initialPlayers }: Proje
             </p>
           </div>
         </div>
+      )}
+
+      {/* Os browsers só deixam tocar música depois de um clique na página */}
+      {!audioUnlocked && (
+        <button
+          type="button"
+          onClick={unlock}
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-6 backdrop-blur-md animate-in fade-in duration-300"
+        >
+          <span className="max-w-md rounded-3xl border-2 px-10 py-8 text-center shadow-2xl" style={{ background: VS.panel, borderColor: VS.pline }}>
+            <span className="mb-3 block text-5xl">🔊</span>
+            <span className={`${vsHand.className} block text-4xl font-bold`}>Clica para ativar o som</span>
+            <span className="mt-2 block text-sm" style={{ color: VS.mut }}>Os browsers exigem um clique antes de tocar música</span>
+          </span>
+        </button>
       )}
     </div>
   )

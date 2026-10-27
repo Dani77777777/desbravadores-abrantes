@@ -8,6 +8,7 @@ import { useSketchSession, useSketchPlayers, useSketchGuesses } from './useSketc
 import { DrawingCanvas } from './DrawingCanvas'
 import { CanvasViewer } from './CanvasViewer'
 import { SketchAvatar, CountdownBadge, MaskedWord, useCountdown } from './ui'
+import { sketchSound } from './useSketchAudio'
 import { VS, VS_SCREEN_STYLE, vsHand, vsSans } from './theme'
 import { Pencil, Send, Check, Trophy, Users, Sparkles } from 'lucide-react'
 
@@ -128,6 +129,13 @@ function WordChoiceView({ sessionId, roundNumber }: { sessionId: string; roundNu
   const [options, setOptions] = useState<string[] | null>(null)
   const [picking, setPicking] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  // Aviso sonoro no telemóvel de quem vai desenhar (se o browser deixar tocar)
+  useEffect(() => {
+    const a = new Audio(sketchSound('sfx-your-turn.mp3'))
+    a.volume = 0.7
+    a.play().catch(() => {})
+  }, [roundNumber])
 
   useEffect(() => {
     let cancelled = false

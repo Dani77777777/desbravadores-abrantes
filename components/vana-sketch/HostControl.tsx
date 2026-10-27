@@ -21,7 +21,7 @@ import { SketchAvatar, CountdownBadge, useCountdown } from './ui'
 import { VS, VS_SCREEN_STYLE, vsHand, vsSans } from './theme'
 import {
   Play, MonitorPlay, SkipForward, ArrowRight, Trophy, Trash2, Dices, Eye, Users, Flag,
-  Copy, Check, Maximize2, Bot, Plus,
+  Copy, Check, Maximize2, Bot, Plus, Volume2, VolumeX,
 } from 'lucide-react'
 
 interface HostControlProps {
@@ -76,8 +76,9 @@ export function HostControl({ session: initialSession, initialPlayers }: HostCon
     } catch {}
   }
 
-  // Canal de broadcast para comandar o projetor (ampliar QR Code)
+  // Canal de broadcast para comandar o projetor (ampliar QR Code, música)
   const [qrZoomed, setQrZoomed] = useState(false)
+  const [musicEnabled, setMusicEnabled] = useState(true)
   const presentChannelRef = useRef<ReturnType<ReturnType<typeof createClient>['channel']> | null>(null)
   useEffect(() => {
     const supabase = createClient()
@@ -87,10 +88,10 @@ export function HostControl({ session: initialSession, initialPlayers }: HostCon
     return () => { presentChannelRef.current = null; supabase.removeChannel(ch) }
   }, [session.id])
 
-  // Sincroniza o estado do zoom do QR com o projetor sempre que muda
+  // Sincroniza o zoom do QR e a música com o projetor sempre que mudam
   useEffect(() => {
-    presentChannelRef.current?.send({ type: 'broadcast', event: 'cmd', payload: { qrZoomed } })
-  }, [qrZoomed])
+    presentChannelRef.current?.send({ type: 'broadcast', event: 'cmd', payload: { qrZoomed, musicEnabled } })
+  }, [qrZoomed, musicEnabled])
 
   // Palavra secreta visível ao host
   const [secretWord, setSecretWord] = useState<string | null>(null)
@@ -160,14 +161,25 @@ export function HostControl({ session: initialSession, initialPlayers }: HostCon
               </p>
             </div>
           </div>
-          <Link
-            href={`/jogos/vana-sketch/${session.id}/present`}
-            target="_blank"
-            className="flex items-center gap-2 rounded-xl border px-3 py-2 text-sm font-bold hover:bg-white/10"
-            style={{ borderColor: VS.pline }}
-          >
-            <MonitorPlay className="h-4 w-4" style={{ color: VS.amber }} /> Projetor
-          </Link>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setMusicEnabled((v) => !v)}
+              title={musicEnabled ? 'Música do projetor ligada (clica para desligar)' : 'Música do projetor desligada (clica para ligar)'}
+              className="flex h-9 w-9 items-center justify-center rounded-xl border hover:bg-white/10"
+              style={{ borderColor: VS.pline, color: musicEnabled ? VS.amber : VS.mut }}
+            >
+              {musicEnabled ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
+            </button>
+            <Link
+              href={`/jogos/vana-sketch/${session.id}/present`}
+              target="_blank"
+              className="flex items-center gap-2 rounded-xl border px-3 py-2 text-sm font-bold hover:bg-white/10"
+              style={{ borderColor: VS.pline }}
+            >
+              <MonitorPlay className="h-4 w-4" style={{ color: VS.amber }} /> Projetor
+            </Link>
+          </div>
         </header>
 
         {error && (
