@@ -1,7 +1,7 @@
 // Utilitários do VanaSketch (Pictionary/Gartic)
 
 // ── Lista de palavras de emergência ──────────────────────────
-// Usada apenas se o dicionário Vantur (vantur_dictionary) estiver vazio.
+// Usada quando a sessão não tem packs de palavras (ou os packs já se gastaram).
 // Palavras bíblicas/clube fáceis de desenhar.
 export const FALLBACK_WORDS = [
   'Arca', 'Cruz', 'Pomba', 'Cordeiro', 'Estrela', 'Coroa', 'Templo', 'Altar',

@@ -13,7 +13,7 @@ import {
   deleteVanaSketchSession,
   addVanaSketchBot,
 } from '@/lib/actions/vana-sketch'
-import type { VanaSketchSession, VanaSketchPlayer, VanaSketchGuess } from '@/types/vana-sketch'
+import type { VanaSketchSession, VanaSketchPlayer, VanaSketchGuess, VanaSketchPack } from '@/types/vana-sketch'
 import { useSketchSession, useSketchPlayers, useSketchGuesses } from './useSketchSession'
 import { CanvasViewer } from './CanvasViewer'
 import { HostBotOverlay } from './HostBotOverlay'
@@ -27,9 +27,10 @@ import {
 interface HostControlProps {
   session: VanaSketchSession
   initialPlayers: VanaSketchPlayer[]
+  packs: VanaSketchPack[]
 }
 
-export function HostControl({ session: initialSession, initialPlayers }: HostControlProps) {
+export function HostControl({ session: initialSession, initialPlayers, packs }: HostControlProps) {
   const [session, setSession] = useState<VanaSketchSession>(initialSession)
   const [players, setPlayers] = useState<VanaSketchPlayer[]>(initialPlayers)
   const [guesses, setGuesses] = useState<VanaSketchGuess[]>([])
@@ -47,6 +48,13 @@ export function HostControl({ session: initialSession, initialPlayers }: HostCon
   // Definições do jogo (lobby)
   const [roundsPerPlayer, setRoundsPerPlayer] = useState(1)
   const [drawSeconds, setDrawSeconds] = useState(90)
+
+  // Packs de palavras — começam escolhidos os marcados "por defeito" no admin
+  const usablePacks = packs.filter((p) => p.word_count > 0)
+  const [packIds, setPackIds] = useState<string[]>(() => usablePacks.filter((p) => p.is_default).map((p) => p.id))
+  const selectedWords = usablePacks.filter((p) => packIds.includes(p.id)).reduce((n, p) => n + p.word_count, 0)
+  const togglePack = (id: string) =>
+    setPackIds((ids) => (ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]))
 
   // Bots (sessões de teste)
   const [botName, setBotName] = useState('')
@@ -324,6 +332,41 @@ export function HostControl({ session: initialSession, initialPlayers }: HostCon
                   ))}
                 </div>
               </div>
+              {usablePacks.length > 0 && (
+                <div>
+                  <p className="mb-2 text-xs font-bold uppercase tracking-wider" style={{ color: VS.mut }}>Palavras</p>
+                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                    {usablePacks.map((p) => {
+                      const on = packIds.includes(p.id)
+                      return (
+                        <button
+                          key={p.id}
+                          type="button"
+                          onClick={() => togglePack(p.id)}
+                          title={p.description ?? undefined}
+                          className="flex items-center gap-2 rounded-xl border px-3 py-2 text-left transition-colors"
+                          style={{
+                            borderColor: on ? VS.pink : VS.pline,
+                            background: on ? 'rgba(255,93,162,.15)' : 'transparent',
+                          }}
+                        >
+                          <span className="text-xl">{p.emoji}</span>
+                          <span className="min-w-0">
+                            <span className="block truncate text-sm font-bold">{p.name}</span>
+                            <span className="block text-[11px]" style={{ color: VS.mut }}>{p.word_count} palavras</span>
+                          </span>
+                          {on && <Check className="ml-auto h-4 w-4 shrink-0" style={{ color: VS.pink }} />}
+                        </button>
+                      )
+                    })}
+                  </div>
+                  <p className="mt-2 text-xs" style={{ color: packIds.length ? VS.mut : VS.amber }}>
+                    {packIds.length
+                      ? `${selectedWords} palavras escolhidas`
+                      : 'Nenhum pack escolhido — usa-se a lista de reserva do jogo.'}
+                  </p>
+                </div>
+              )}
               {players.length > 0 && (
                 <p className="text-xs" style={{ color: VS.mut }}>
                   {players.length} jogador{players.length !== 1 ? 'es' : ''} × {roundsPerPlayer} = {players.length * roundsPerPlayer} ronda{players.length * roundsPerPlayer !== 1 ? 's' : ''}
@@ -335,7 +378,7 @@ export function HostControl({ session: initialSession, initialPlayers }: HostCon
             <button
               type="button"
               disabled={busy || players.length < 2}
-              onClick={() => run(() => startVanaSketchGame(session.id, { roundsPerPlayer, drawSeconds }))}
+              onClick={() => run(() => startVanaSketchGame(session.id, { roundsPerPlayer, drawSeconds, packIds }))}
               className="flex items-center justify-center gap-2 rounded-2xl py-4 text-lg font-black text-white shadow-lg disabled:opacity-40"
               style={{ background: 'linear-gradient(160deg,#ff8fc0,#ff5da2)' }}
             >

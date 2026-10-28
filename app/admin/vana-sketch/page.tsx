@@ -3,8 +3,10 @@ import { createServiceClient } from '@/utils/supabase/service'
 import { redirect } from 'next/navigation'
 import { Navbar } from '@/components/layout/Navbar'
 import { createVanaSketchSession } from '@/lib/actions/vana-sketch'
+import { getVanaSketchPacksWithWords } from '@/lib/actions/vana-sketch-packs'
+import { WordPacksManager } from '@/components/vana-sketch/WordPacksManager'
 import { effectiveRole } from '@/utils/permissions'
-import { ChevronLeft, Plus, MonitorPlay, Gamepad2, BookOpen, FlaskConical } from 'lucide-react'
+import { ChevronLeft, Plus, MonitorPlay, Gamepad2, FlaskConical, Layers, AlertTriangle } from 'lucide-react'
 import Link from 'next/link'
 
 const STATUS_LABEL: Record<string, { label: string; cls: string }> = {
@@ -23,14 +25,14 @@ export default async function VanaSketchAdminPage() {
   if (role !== 'coordenador' && role !== 'dirigente') redirect('/')
 
   const service = createServiceClient()
-  const [{ data: sessions }, { count: dictCount }] = await Promise.all([
+  const [{ data: sessions }, packs] = await Promise.all([
     service
       .from('vanasketch_sessions')
       .select('*, vanasketch_players(count)')
       .eq('host_id', user.id)
       .order('created_at', { ascending: false })
       .limit(20),
-    service.from('vantur_dictionary').select('id', { count: 'exact', head: true }),
+    getVanaSketchPacksWithWords(),
   ])
 
   async function handleCreate() {
@@ -80,15 +82,6 @@ export default async function VanaSketchAdminPage() {
             </div>
           </div>
 
-          <div className="bg-white border rounded-xl px-4 py-3 text-sm text-slate-600 flex items-center gap-2">
-            <BookOpen className="w-4 h-4 text-slate-400 shrink-0" />
-            <span>
-              As palavras vêm do <strong>dicionário bíblico do Vantur</strong>
-              {typeof dictCount === 'number' && <> ({dictCount} palavra{dictCount !== 1 ? 's' : ''})</>}.
-              Gere-as em <Link href="/admin/vantur" className="text-pink-600 underline">Admin → Vantur</Link>.
-            </span>
-          </div>
-
           {(!sessions || sessions.length === 0) ? (
             <div className="bg-white border rounded-xl p-8 text-center text-slate-400">
               <Gamepad2 className="w-8 h-8 mx-auto mb-2 opacity-40" />
@@ -133,6 +126,29 @@ export default async function VanaSketchAdminPage() {
                 )
               })}
             </div>
+          )}
+        </section>
+
+        <section className="space-y-4">
+          <div>
+            <h2 className="flex items-center gap-2 font-semibold text-gray-700 text-lg">
+              <Layers className="w-5 h-5 text-pink-600" /> Packs de palavras
+            </h2>
+            <p className="text-sm text-slate-500">
+              Escolhes os packs no lobby antes de começar — por exemplo, só o de Natal num evento de Natal.
+              Os marcados com ★ vêm já escolhidos.
+            </p>
+          </div>
+          {packs === null ? (
+            <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+              <AlertTriangle className="mt-0.5 w-4 h-4 shrink-0" />
+              <span>
+                Os packs ainda não existem na base de dados. Corre <code className="font-mono font-bold">supabase-migration-vana-sketch-packs.sql</code> no
+                Supabase — até lá, o jogo usa a lista de reserva que vem no código.
+              </span>
+            </div>
+          ) : (
+            <WordPacksManager packs={packs} />
           )}
         </section>
       </main>

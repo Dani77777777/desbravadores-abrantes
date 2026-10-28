@@ -2,6 +2,7 @@ import { createClient } from '@/utils/supabase/server'
 import { createServiceClient } from '@/utils/supabase/service'
 import { redirect, notFound } from 'next/navigation'
 import { HostControl } from '@/components/vana-sketch/HostControl'
+import { getVanaSketchPacks } from '@/lib/actions/vana-sketch-packs'
 import type { VanaSketchSession, VanaSketchPlayer } from '@/types/vana-sketch'
 
 export default async function VanaSketchControlPage({
@@ -25,16 +26,20 @@ export default async function VanaSketchControlPage({
   if (session.host_id !== user.id) redirect(`/jogos/vana-sketch/${sessionId}`)
 
   const service = createServiceClient()
-  const { data: players } = await service
-    .from('vanasketch_players')
-    .select('*')
-    .eq('session_id', sessionId)
-    .order('joined_at')
+  const [{ data: players }, packs] = await Promise.all([
+    service
+      .from('vanasketch_players')
+      .select('*')
+      .eq('session_id', sessionId)
+      .order('joined_at'),
+    getVanaSketchPacks(),
+  ])
 
   return (
     <HostControl
       session={session as VanaSketchSession}
       initialPlayers={(players ?? []) as VanaSketchPlayer[]}
+      packs={packs ?? []}
     />
   )
 }

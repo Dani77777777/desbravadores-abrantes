@@ -132,28 +132,42 @@ export async function joinVanaSketchSession(
   return { sessionId: session.id }
 }
 
-// ── Escolher 3 opções de palavra do dicionário Vantur ─────────
+// ── Escolher 3 opções de palavra dos packs da sessão ─────────
 async function pickWordOptions(
   service: SupabaseClient,
   sessionId: string,
 ): Promise<string[]> {
   // Palavras já usadas nesta sessão (não repetir)
-  const { data: usedRows } = await service
-    .from('vanasketch_rounds')
-    .select('word, word_options')
-    .eq('session_id', sessionId)
+  const [{ data: usedRows }, { data: session }] = await Promise.all([
+    service.from('vanasketch_rounds').select('word, word_options').eq('session_id', sessionId),
+    service.from('vanasketch_sessions').select('pack_ids').eq('id', sessionId).maybeSingle(),
+  ])
   const used = new Set<string>()
   for (const r of usedRows ?? []) {
     if (r.word) used.add(normalizeText(r.word))
     for (const w of (r.word_options as string[]) ?? []) used.add(normalizeText(w))
   }
 
-  const { data: dict } = await service.from('vantur_dictionary').select('word')
-  let pool = (dict ?? []).map((r) => r.word as string).filter((w) => !used.has(normalizeText(w)))
-  if (pool.length < 3) {
-    pool = [...pool, ...FALLBACK_WORDS.filter((w) => !used.has(normalizeText(w)))]
+  // Sem packs escolhidos (ou sem a migração dos packs) → lista de reserva do código
+  const packIds = ((session as { pack_ids?: string[] } | null)?.pack_ids) ?? []
+  let packWords: string[] = []
+  if (packIds.length) {
+    const { data } = await service.from('vanasketch_pack_words').select('word').in('pack_id', packIds)
+    packWords = (data ?? []).map((r) => r.word as string)
   }
-  if (pool.length < 3) pool = [...FALLBACK_WORDS] // último recurso: aceitar repetições
+
+  // A mesma palavra pode estar em dois packs (ex.: "Cruz" na Bíblia e na Páscoa)
+  const seen = new Set<string>()
+  const fresh = (words: string[]) => words.filter((w) => {
+    const key = normalizeText(w)
+    if (used.has(key) || seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
+
+  let pool = fresh(packWords.length ? packWords : FALLBACK_WORDS)
+  if (pool.length < 3) pool = [...pool, ...fresh(FALLBACK_WORDS)]
+  if (pool.length < 3) pool = [...(packWords.length ? packWords : FALLBACK_WORDS)] // último recurso: aceitar repetições
 
   const shuffled = [...pool].sort(() => Math.random() - 0.5)
   return shuffled.slice(0, 3)
@@ -211,7 +225,7 @@ async function startRound(
 // ── Começar o jogo ────────────────────────────────────────────
 export async function startVanaSketchGame(
   sessionId: string,
-  opts: { roundsPerPlayer: number; drawSeconds: number },
+  opts: { roundsPerPlayer: number; drawSeconds: number; packIds?: string[] },
 ): Promise<{ error?: string }> {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -248,6 +262,20 @@ export async function startVanaSketchGame(
     started_at: new Date().toISOString(),
   }).eq('id', sessionId).eq('status', 'lobby').select('id')
   if (!claimed?.length) return { error: 'O jogo já começou.' }
+
+  // Packs de palavras — só os que existem e têm palavras. Numa base de dados
+  // sem a migração dos packs isto falha em silêncio e usa-se a lista de reserva.
+  const requested = [...new Set(opts.packIds ?? [])]
+  if (requested.length) {
+    const { data: withWords } = await service
+      .from('vanasketch_pack_words')
+      .select('pack_id')
+      .in('pack_id', requested)
+    const valid = requested.filter((id) => (withWords ?? []).some((w) => w.pack_id === id))
+    if (valid.length) {
+      await service.from('vanasketch_sessions').update({ pack_ids: valid }).eq('id', sessionId)
+    }
+  }
 
   // Baralhar a ordem de desenho
   const shuffled = [...players].sort(() => Math.random() - 0.5)

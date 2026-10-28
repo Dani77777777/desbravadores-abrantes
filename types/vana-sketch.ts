@@ -19,6 +19,7 @@ export interface VanaSketchSession {
   canvas_version: number
   is_test_session: boolean
   rewards_awarded: boolean
+  pack_ids?: string[] // packs de palavras escolhidos (migração dos packs)
   created_at: string
   started_at: string | null
   ended_at: string | null
@@ -46,6 +47,17 @@ export interface VanaSketchGuess {
   is_correct: boolean
   points: number
   created_at: string
+}
+
+// Pack de palavras (Admin → VanaSketch); word_count vem do count dos joins
+export interface VanaSketchPack {
+  id: string
+  name: string
+  emoji: string
+  description: string | null
+  is_default: boolean
+  sort_order: number
+  word_count: number
 }
 
 // Traço persistido na BD (pontos normalizados 0..1)
