@@ -200,8 +200,8 @@ async function startRound(
   // 23505 = a ronda já existe: outro pedido (duplo clique) já a arrancou
   if (roundError) return roundError.code === '23505' ? {} : { error: roundError.message }
 
-  // Limpar traços de rondas anteriores (o quadro começa em branco)
-  await service.from('vanasketch_strokes').delete().eq('session_id', sessionId)
+  // Os traços das rondas anteriores ficam guardados (para partilhar o melhor
+  // desenho no fim); o quadro começa em branco porque tudo filtra por round_number.
 
   const { data: session } = await service
     .from('vanasketch_sessions')
@@ -652,6 +652,87 @@ export async function awardVanaSketchPoints(sessionId: string): Promise<{ error?
   }
 
   return {}
+}
+
+// ── Desenhos do jogo (para partilhar o melhor no fim) ─────────
+export interface SketchDrawing {
+  roundNumber: number
+  word: string
+  drawerName: string
+  correctCount: number
+  guesserCount: number
+  strokes: { color: string; size: number; points: [number, number][] }[]
+}
+
+// Ordenados do melhor para o pior: a ronda em que mais gente acertou e, em
+// empate, a que foi adivinhada mais depressa (mais pontos dos palpiteiros).
+export async function getVanaSketchDrawings(
+  sessionId: string,
+): Promise<{ drawings?: SketchDrawing[]; error?: string }> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Não autenticado' }
+
+  const service = createServiceClient()
+  const { data: session } = await service
+    .from('vanasketch_sessions')
+    .select('host_id, status')
+    .eq('id', sessionId)
+    .maybeSingle()
+  if (!session || session.host_id !== user.id) return { error: 'Sem permissão' }
+  // As palavras só se mostram depois do jogo acabar
+  if (session.status !== 'finished') return { error: 'O jogo ainda não terminou.' }
+
+  // O PostgREST devolve no máximo 1000 linhas por pedido — um jogo comprido
+  // tem mais traços do que isso, por isso lê-se às páginas
+  const strokes: { round_number: number; color: string; size: number; points: [number, number][] }[] = []
+  for (let from = 0; ; from += 1000) {
+    const { data, error } = await service
+      .from('vanasketch_strokes')
+      .select('round_number, color, size, points')
+      .eq('session_id', sessionId)
+      .order('round_number')
+      .order('seq')
+      .range(from, from + 999)
+    if (error) return { error: error.message }
+    strokes.push(...((data ?? []) as typeof strokes))
+    if (!data || data.length < 1000) break
+  }
+
+  const [{ data: rounds }, { data: guesses }, { data: players }] = await Promise.all([
+    service.from('vanasketch_rounds').select('round_number, word, drawer_player_id').eq('session_id', sessionId).not('word', 'is', null),
+    service.from('vanasketch_guesses').select('round_number, points').eq('session_id', sessionId).eq('is_correct', true),
+    service.from('vanasketch_players').select('id, display_name').eq('session_id', sessionId),
+  ])
+
+  const nameById = new Map((players ?? []).map((p) => [p.id, p.display_name as string]))
+  const guesserCount = Math.max(0, (players?.length ?? 0) - 1)
+
+  const drawings = (rounds ?? [])
+    .map((r) => {
+      const roundGuesses = (guesses ?? []).filter((g) => g.round_number === r.round_number)
+      return {
+        drawing: {
+          roundNumber: r.round_number,
+          word: r.word as string,
+          drawerName: (nameById.get(r.drawer_player_id) ?? 'Alguém').split(' ')[0],
+          correctCount: roundGuesses.length,
+          guesserCount,
+          strokes: strokes
+            .filter((s) => s.round_number === r.round_number)
+            .map(({ color, size, points }) => ({ color, size, points })),
+        },
+        speed: roundGuesses.reduce((sum, g) => sum + g.points, 0),
+      }
+    })
+    .filter(({ drawing }) => drawing.strokes.length > 0)
+    .sort((a, b) =>
+      b.drawing.correctCount - a.drawing.correctCount ||
+      b.speed - a.speed ||
+      a.drawing.roundNumber - b.drawing.roundNumber)
+    .map(({ drawing }) => drawing)
+
+  return { drawings }
 }
 
 // ── Adicionar bot (sessões de teste) ─────────────────────────

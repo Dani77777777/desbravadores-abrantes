@@ -17,6 +17,7 @@ import type { VanaSketchSession, VanaSketchPlayer, VanaSketchGuess, VanaSketchPa
 import { useSketchSession, useSketchPlayers, useSketchGuesses } from './useSketchSession'
 import { CanvasViewer } from './CanvasViewer'
 import { HostBotOverlay } from './HostBotOverlay'
+import { BestDrawingShare } from './BestDrawingShare'
 import { SketchAvatar, CountdownBadge, useCountdown } from './ui'
 import { VS, VS_SCREEN_STYLE, vsHand, vsSans } from './theme'
 import {
@@ -520,6 +521,8 @@ export function HostControl({ session: initialSession, initialPlayers, packs }: 
                 ))}
               </div>
             </section>
+
+            <BestDrawingShare sessionId={session.id} players={players} gameDate={session.ended_at} />
 
             {!session.rewards_awarded ? (
               <button
