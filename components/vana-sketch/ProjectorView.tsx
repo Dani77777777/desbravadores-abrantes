@@ -8,8 +8,9 @@ import { useSketchSession, useSketchPlayers, useSketchGuesses } from './useSketc
 import { CanvasViewer } from './CanvasViewer'
 import { SketchAvatar, CountdownBadge, MaskedWord } from './ui'
 import { useSketchAudio } from './useSketchAudio'
+import { CinematicPodium } from '@/components/game-podium/CinematicPodium'
 import { VS, VS_SCREEN_STYLE, vsHand, vsSans } from './theme'
-import { Pencil, Trophy, Users } from 'lucide-react'
+import { Pencil, Users } from 'lucide-react'
 
 interface ProjectorViewProps {
   session: VanaSketchSession
@@ -127,8 +128,19 @@ export function ProjectorView({ session: initialSession, initialPlayers }: Proje
           </div>
         )}
 
-        {session.status === 'finished' && <ProjectorPodium sorted={sorted} />}
       </div>
+
+      {/* Pódio cinematográfico em ecrã inteiro */}
+      {session.status === 'finished' && (
+        <div className="fixed inset-0 z-40">
+          <CinematicPodium
+            entries={sorted.map((p) => ({ id: p.id, name: p.display_name.split(' ')[0], avatarUrl: p.avatar_url, points: p.score }))}
+            backgroundStyle={VS_SCREEN_STYLE}
+            ringOffsetClassName="ring-offset-[#0d0a22]"
+            displayFontClassName={vsHand.className}
+          />
+        </div>
+      )}
 
       {/* QR Code ampliado (controlado pelo host) */}
       {qrZoomed && session.status !== 'finished' && joinUrl && (
@@ -247,58 +259,6 @@ function Scoreboard({ sorted, drawerId }: { sorted: VanaSketchPlayer[]; drawerId
           </div>
         ))}
       </div>
-    </div>
-  )
-}
-
-function ProjectorPodium({ sorted }: { sorted: VanaSketchPlayer[] }) {
-  const top3 = sorted.slice(0, 3)
-  const rest = sorted.slice(3)
-  // Ordem visual do pódio: 2º, 1º, 3º
-  const podiumOrder = [top3[1], top3[0], top3[2]].filter(Boolean) as VanaSketchPlayer[]
-  const heights: Record<string, number> = {}
-  top3.forEach((p, i) => { if (p) heights[p.id] = [220, 160, 120][i] })
-  const medals: Record<string, string> = {}
-  top3.forEach((p, i) => { if (p) medals[p.id] = ['🥇', '🥈', '🥉'][i] })
-
-  return (
-    <div className="flex flex-1 flex-col items-center justify-center gap-10">
-      <div className="flex items-center gap-3">
-        <Trophy className="h-12 w-12" style={{ color: VS.amber }} />
-        <p className={`${vsHand.className} text-6xl font-bold`}>Fim de jogo!</p>
-      </div>
-      <div className="flex items-end gap-4">
-        {podiumOrder.map((p) => (
-          <div key={p.id} className="flex flex-col items-center gap-3">
-            <span className="text-5xl">{medals[p.id]}</span>
-            <SketchAvatar name={p.display_name} avatarUrl={p.avatar_url} size={72} highlight={medals[p.id] === '🥇'} />
-            <p className="max-w-[140px] truncate text-xl font-black">{p.display_name.split(' ')[0]}</p>
-            <div
-              className="flex w-36 items-start justify-center rounded-t-2xl border-x border-t pt-3 text-2xl font-black tabular-nums"
-              style={{
-                height: heights[p.id],
-                background: medals[p.id] === '🥇' ? 'rgba(255,179,71,.18)' : VS.panel,
-                borderColor: medals[p.id] === '🥇' ? 'rgba(255,179,71,.5)' : VS.pline,
-                color: VS.amber,
-              }}
-            >
-              {p.score}
-            </div>
-          </div>
-        ))}
-      </div>
-      {rest.length > 0 && (
-        <div className="flex max-w-3xl flex-wrap justify-center gap-2">
-          {rest.map((p, i) => (
-            <div key={p.id} className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 py-1 pl-1 pr-3 text-sm">
-              <span className="pl-1.5 font-bold" style={{ color: VS.mut }}>{i + 4}º</span>
-              <SketchAvatar name={p.display_name} avatarUrl={p.avatar_url} size={26} />
-              <span className="font-semibold">{p.display_name.split(' ')[0]}</span>
-              <span className="font-black tabular-nums" style={{ color: VS.amber }}>{p.score}</span>
-            </div>
-          ))}
-        </div>
-      )}
     </div>
   )
 }
