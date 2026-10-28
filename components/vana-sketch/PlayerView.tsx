@@ -9,6 +9,8 @@ import { DrawingCanvas } from './DrawingCanvas'
 import { CanvasViewer } from './CanvasViewer'
 import { SketchAvatar, CountdownBadge, MaskedWord, useCountdown } from './ui'
 import { sketchSound } from './useSketchAudio'
+import { vibrate } from '@/utils/vibrate'
+import { useWakeLock } from '@/components/vana-camp/useWakeLock'
 import { VS, VS_SCREEN_STYLE, vsHand, vsSans } from './theme'
 import { Pencil, Send, Check, Trophy, Users, Sparkles } from 'lucide-react'
 
@@ -36,6 +38,7 @@ export function PlayerView({ session: initialSession, myPlayer, initialPlayers, 
 
   return (
     <div className={`min-h-screen ${vsSans.className}`} style={VS_SCREEN_STYLE}>
+      {session.status !== 'finished' && <KeepScreenAwake />}
       <div className="mx-auto flex min-h-screen w-full max-w-lg flex-col gap-4 p-4">
         {asBotId && (
           <p className="rounded-xl border border-purple-500/50 bg-purple-500/15 px-3 py-2 text-center text-xs font-bold text-purple-200">
@@ -98,6 +101,13 @@ export function PlayerView({ session: initialSession, myPlayer, initialPlayers, 
   )
 }
 
+// Ecrã sempre aceso durante o jogo: com o ecrã bloqueado o Android congela a
+// ligação e ignora a vibração — a vez de desenhar passava despercebida.
+function KeepScreenAwake() {
+  useWakeLock()
+  return null
+}
+
 // ── Lobby ─────────────────────────────────────────────────────
 function LobbyView({ players, meId }: { players: VanaSketchPlayer[]; meId: string }) {
   return (
@@ -130,11 +140,20 @@ function WordChoiceView({ sessionId, roundNumber }: { sessionId: string; roundNu
   const [picking, setPicking] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // Aviso sonoro no telemóvel de quem vai desenhar (se o browser deixar tocar)
+  // Aviso de que é a vez de desenhar: som + vibração longa (o mesmo padrão da
+  // vez dos Infiltrados no VanaCamp). Sem iPhone a vibrar, fica o anel dourado.
   useEffect(() => {
     const a = new Audio(sketchSound('sfx-your-turn.mp3'))
     a.volume = 0.7
     a.play().catch(() => {})
+
+    // O Chrome só deixa vibrar depois de um toque na página (ex.: quem recarregou
+    // a página ainda não tocou em nada) — nesse caso vibra ao primeiro toque
+    const ua = (navigator as Navigator & { userActivation?: { hasBeenActive: boolean } }).userActivation
+    if (vibrate('night_call') && ua?.hasBeenActive !== false) return
+    const retry = () => vibrate('night_call')
+    document.addEventListener('pointerdown', retry, { once: true })
+    return () => document.removeEventListener('pointerdown', retry)
   }, [roundNumber])
 
   useEffect(() => {
@@ -164,6 +183,16 @@ function WordChoiceView({ sessionId, roundNumber }: { sessionId: string; roundNu
 
   return (
     <div className="flex flex-1 flex-col items-center justify-center gap-6 text-center">
+      {/* Anel dourado a piscar à volta do ecrã — como o VibrationFlash do VanaCamp */}
+      <style>{'@keyframes vs-turn-flash{0%,100%{opacity:0}25%,75%{opacity:1}}'}</style>
+      <div
+        aria-hidden
+        className="pointer-events-none fixed inset-0 z-[100]"
+        style={{
+          boxShadow: 'inset 0 0 0 8px rgba(252,211,77,.85), inset 0 0 60px 12px rgba(252,211,77,.3)',
+          animation: 'vs-turn-flash .8s ease-in-out 3 both',
+        }}
+      />
       <div>
         <p className={`${vsHand.className} text-4xl font-bold`} style={{ color: VS.pink }}>É a tua vez de desenhar!</p>
         <p className="mt-2 text-sm" style={{ color: VS.mut }}>Escolhe uma palavra — ninguém mais a vê.</p>
