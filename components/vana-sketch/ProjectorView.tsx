@@ -56,7 +56,10 @@ export function ProjectorView({ session: initialSession, initialPlayers }: Proje
 
   return (
     <div className={`min-h-screen ${vsSans.className}`} style={VS_SCREEN_STYLE}>
-      <div className="mx-auto flex min-h-screen max-w-[1500px] flex-col gap-4 p-6">
+      {/* Durante o jogo, num ecrã grande, tudo cabe na altura do ecrã (sem scroll) */}
+      <div className={`mx-auto flex min-h-screen max-w-[1500px] flex-col gap-4 p-6 ${
+        session.status === 'playing' ? 'lg:h-screen lg:overflow-hidden' : ''
+      }`}>
         {/* Cabeçalho */}
         <header className="flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -81,9 +84,9 @@ export function ProjectorView({ session: initialSession, initialPlayers }: Proje
         {session.status === 'lobby' && <ProjectorLobby session={session} players={players} joinUrl={joinUrl} />}
 
         {session.status === 'playing' && (
-          <div className="grid flex-1 grid-cols-1 gap-4 lg:grid-cols-[1fr_360px]">
+          <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 lg:grid-cols-[1fr_360px] lg:grid-rows-[minmax(0,1fr)]">
             {/* Quadro */}
-            <div className="relative flex flex-col gap-3">
+            <div className="relative flex min-h-0 flex-col gap-3">
               <div className="flex items-center justify-between rounded-2xl border px-5 py-3" style={{ background: VS.panel, borderColor: VS.pline }}>
                 <div className="flex items-center gap-3">
                   {drawer && (
@@ -111,17 +114,23 @@ export function ProjectorView({ session: initialSession, initialPlayers }: Proje
                   </p>
                 </div>
               ) : (
-                <CanvasViewer
-                  sessionId={session.id}
-                  roundNumber={session.round_number}
-                  canvasVersion={session.canvas_version}
-                  className="rounded-2xl border-4 border-white/20 shadow-2xl"
-                />
+                // O quadro é 4:3: no ecrã grande ocupa a largura OU a altura que
+                // sobra, a que for mais pequena (antes saía pelo fundo do ecrã)
+                <div className="flex min-h-0 flex-1 justify-center lg:[container-type:size]">
+                  <div className="w-full lg:w-[min(100cqw,calc(100cqh*4/3))]">
+                    <CanvasViewer
+                      sessionId={session.id}
+                      roundNumber={session.round_number}
+                      canvasVersion={session.canvas_version}
+                      className="rounded-2xl border-4 border-white/20 shadow-2xl"
+                    />
+                  </div>
+                </div>
               )}
             </div>
 
             {/* Barra lateral: feed + placar */}
-            <div className="flex flex-col gap-4">
+            <div className="flex min-h-0 flex-col gap-4">
               <GuessFeed guesses={guesses} playerById={playerById} />
               <Scoreboard sorted={sorted} drawerId={session.drawer_player_id} />
             </div>
