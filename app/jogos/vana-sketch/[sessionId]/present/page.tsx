@@ -1,6 +1,7 @@
 import { createClient } from '@/utils/supabase/server'
 import { notFound } from 'next/navigation'
 import { ProjectorView } from '@/components/vana-sketch/ProjectorView'
+import PresentationReceiver from '@/components/presentation-effects/PresentationReceiver'
 import type { VanaSketchSession, VanaSketchPlayer } from '@/types/vana-sketch'
 
 // A página do projetor é pública — não precisa de autenticação
@@ -27,9 +28,13 @@ export default async function VanaSketchPresentPage({
     .order('joined_at')
 
   return (
-    <ProjectorView
-      session={session as VanaSketchSession}
-      initialPlayers={(players ?? []) as VanaSketchPlayer[]}
-    />
+    <>
+      <ProjectorView
+        session={session as VanaSketchSession}
+        initialPlayers={(players ?? []) as VanaSketchPlayer[]}
+      />
+      {/* Efeitos de apresentação (confettis, rufar de tambor…) — como nos outros jogos */}
+      <PresentationReceiver />
+    </>
   )
 }

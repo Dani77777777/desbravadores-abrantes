@@ -3,6 +3,7 @@ import { createServiceClient } from '@/utils/supabase/service'
 import { redirect, notFound } from 'next/navigation'
 import { HostControl } from '@/components/vana-sketch/HostControl'
 import { getVanaSketchPacks } from '@/lib/actions/vana-sketch-packs'
+import PresentationController from '@/components/presentation-effects/PresentationController'
 import type { VanaSketchSession, VanaSketchPlayer } from '@/types/vana-sketch'
 
 export default async function VanaSketchControlPage({
@@ -36,10 +37,13 @@ export default async function VanaSketchControlPage({
   ])
 
   return (
-    <HostControl
-      session={session as VanaSketchSession}
-      initialPlayers={(players ?? []) as VanaSketchPlayer[]}
-      packs={packs ?? []}
-    />
+    <>
+      <HostControl
+        session={session as VanaSketchSession}
+        initialPlayers={(players ?? []) as VanaSketchPlayer[]}
+        packs={packs ?? []}
+      />
+      <PresentationController />
+    </>
   )
 }
