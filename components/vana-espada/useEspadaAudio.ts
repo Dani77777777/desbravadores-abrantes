@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { EspadaStatus } from '@/types/vana-espada'
+import { enterFullscreen } from '@/utils/fullscreen'
 
 /**
  * Banda sonora do projetor, com a soundboard do VanaQuest.
@@ -134,7 +135,10 @@ export function useEspadaAudio(status: EspadaStatus, musicEnabled: boolean) {
   // Os browsers só deixam tocar depois de um clique/tecla/toque.
   useEffect(() => {
     if (unlocked) return
-    const unlock = () => setUnlocked(true)
+    const unlock = () => {
+      setUnlocked(true)
+      enterFullscreen()
+    }
     window.addEventListener('click', unlock, { once: true })
     window.addEventListener('keydown', unlock, { once: true })
     window.addEventListener('touchstart', unlock, { once: true })
@@ -160,7 +164,7 @@ export function useEspadaAudio(status: EspadaStatus, musicEnabled: boolean) {
       <div style="background:rgba(255,255,255,0.08);border:2px solid rgba(255,255,255,0.2);border-radius:28px;
                   padding:36px 44px;text-align:center;box-shadow:0 25px 50px -12px rgba(0,0,0,.6);max-width:30rem;margin:0 16px">
         <div style="font-size:3.25rem;margin-bottom:10px">🔊</div>
-        <p style="color:#fff;font-size:1.6rem;font-weight:900;margin:0">Clica para ativar o áudio</p>
+        <p style="color:#fff;font-size:1.6rem;font-weight:900;margin:0">Clica para ativar o áudio e o ecrã inteiro</p>
         <p style="color:#fcd34d;font-size:.9rem;margin-top:10px">Os browsers exigem uma interação antes de tocar música</p>
       </div>
     `

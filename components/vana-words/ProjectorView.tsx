@@ -9,6 +9,7 @@ import { TeamChip, Avatar, OverflowAvatar, BlipDots, initials } from './ui'
 import { PlayerAvatar } from './PlayerAvatar'
 import { VW, VW_SCREEN_STYLE, VW_PANEL_STYLE, VW_SOFT_PULSE, TEAM_GRADIENT, teamPanelStyle, vwSans, vwSerif } from './theme'
 import { TEAM_LABELS } from '@/types/vana-words'
+import { enterFullscreen } from '@/utils/fullscreen'
 import type { VanaWordsSession, VanaWordsPlayer, VanaWordsWord, VanaWordsGuess, TeamId } from '@/types/vana-words'
 
 interface ProjectorViewProps {
@@ -127,6 +128,7 @@ export function ProjectorView({ session: initSession, initialPlayers }: Projecto
     if (audioUnlocked) return
     const unlock = () => {
       setAudioUnlocked(true)
+      enterFullscreen()
       const el = musicRef.current
       if (el && musicEnabled) {
         const next = trackForState(session.status, session.current_phase)
@@ -251,7 +253,7 @@ export function ProjectorView({ session: initSession, initialPlayers }: Projecto
       <style>@keyframes vwFade{from{opacity:0}to{opacity:1}}</style>
       <div style="background:rgba(255,255,255,0.1);border:2px solid rgba(255,255,255,0.2);border-radius:24px;padding:32px 40px;text-align:center;box-shadow:0 25px 50px -12px rgba(0,0,0,0.5);max-width:28rem;margin:0 16px">
         <div style="font-size:3rem;margin-bottom:12px">🔊</div>
-        <p style="color:white;font-size:1.5rem;font-weight:900;margin:0">Clica para activar o áudio</p>
+        <p style="color:white;font-size:1.5rem;font-weight:900;margin:0">Clica para activar o áudio e o ecrã inteiro</p>
         <p style="color:#7dd3fc;font-size:0.875rem;margin-top:8px">Os browsers exigem uma interacção antes de tocar música</p>
       </div>
     `

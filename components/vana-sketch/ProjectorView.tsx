@@ -175,7 +175,7 @@ export function ProjectorView({ session: initialSession, initialPlayers }: Proje
         >
           <span className="max-w-md rounded-3xl border-2 px-10 py-8 text-center shadow-2xl" style={{ background: VS.panel, borderColor: VS.pline }}>
             <span className="mb-3 block text-5xl">🔊</span>
-            <span className={`${vsHand.className} block text-4xl font-bold`}>Clica para ativar o som</span>
+            <span className={`${vsHand.className} block text-4xl font-bold`}>Clica para ativar o som e o ecrã inteiro</span>
             <span className="mt-2 block text-sm" style={{ color: VS.mut }}>Os browsers exigem um clique antes de tocar música</span>
           </span>
         </button>

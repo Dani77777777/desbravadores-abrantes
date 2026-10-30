@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { VanaSketchSession, VanaSketchGuess } from '@/types/vana-sketch'
 import { useCountdown } from './ui'
+import { enterFullscreen } from '@/utils/fullscreen'
 
 /**
  * Áudio do projetor do VanaSketch (soundboard em /public/sounds/VanaSketch) —
@@ -110,6 +111,7 @@ export function useSketchAudio(
   // gesto, que é o que os browsers mais exigentes (Safari) aceitam
   const unlock = useCallback(() => {
     setAudioUnlocked(true)
+    enterFullscreen()
     const t = trackRef.current
     if (t && musicEnabledRef.current && currentSrcRef.current !== t.src) startTrack(t)
   }, [startTrack])

@@ -10,6 +10,7 @@ import { getIntroSeconds, questionFontSize, optionFontSize } from '@/utils/vana-
 import { CinematicPodium } from '@/components/game-podium/CinematicPodium'
 import { ProjectorLobbyScreen } from '@/components/game-lobby/ProjectorLobby'
 import { GameReactionsOverlay } from '@/components/game-lobby/GameReactions'
+import { enterFullscreen } from '@/utils/fullscreen'
 
 const OPTION_COLORS = ['bg-red-500', 'bg-blue-500', 'bg-yellow-400', 'bg-green-500']
 const OPTION_LABELS = ['▲', '●', '◆', '■']
@@ -318,6 +319,7 @@ export function Presentation({ sessionId, initialSession, questions, siteUrl }: 
     if (audioUnlocked) return
     const unlock = () => {
       setAudioUnlocked(true)
+      enterFullscreen()
       // Tentar arrancar a música imediatamente
       const el = musicRef.current
       if (el && musicEnabled) {
@@ -394,7 +396,7 @@ export function Presentation({ sessionId, initialSession, questions, siteUrl }: 
       <style>@keyframes vqFade{from{opacity:0}to{opacity:1}}</style>
       <div style="background:rgba(255,255,255,0.1);border:2px solid rgba(255,255,255,0.2);border-radius:24px;padding:32px 40px;text-align:center;box-shadow:0 25px 50px -12px rgba(0,0,0,0.5);max-width:28rem;margin:0 16px">
         <div style="font-size:3rem;margin-bottom:12px">🔊</div>
-        <p style="color:white;font-size:1.5rem;font-weight:900;margin:0">Clica para activar o áudio</p>
+        <p style="color:white;font-size:1.5rem;font-weight:900;margin:0">Clica para activar o áudio e o ecrã inteiro</p>
         <p style="color:#7dd3fc;font-size:0.875rem;margin-top:8px">Os browsers exigem uma interacção antes de tocar música</p>
       </div>
     `

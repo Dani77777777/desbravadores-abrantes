@@ -149,7 +149,7 @@ function AudioUnlockOverlay() {
     <div className="fixed inset-0 z-[100] bg-black/70 backdrop-blur-md flex items-center justify-center cursor-pointer animate-in fade-in duration-300">
       <div className="bg-stone-900/80 border-2 border-amber-500/40 rounded-3xl px-10 py-8 text-center shadow-2xl max-w-md mx-4">
         <Volume2 className="w-14 h-14 text-amber-300 mx-auto mb-4 drop-shadow-[0_0_20px_rgba(252,211,77,0.5)]" />
-        <p className="text-amber-100 text-2xl font-black">Clica para ativar o áudio</p>
+        <p className="text-amber-100 text-2xl font-black">Clica para ativar o áudio e o ecrã inteiro</p>
         <p className="text-amber-300/70 text-sm mt-2">
           Os browsers exigem uma interação antes de tocar música
         </p>

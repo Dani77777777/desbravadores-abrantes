@@ -17,6 +17,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { createClient } from '@/utils/supabase/client'
 import type { VanaCampSide } from '@/types/vana-camp'
+import { enterFullscreen } from '@/utils/fullscreen'
 
 const BASE = '/sounds/VanaCamp'
 
@@ -121,6 +122,7 @@ function armAutoplayUnlock() {
     document.removeEventListener('touchstart', handler)
     unlockArmed = false
     setAutoplayBlocked(false)
+    enterFullscreen()
     const m = currentMusic
     if (m && m.audio.paused) {
       m.audio.play()
