@@ -3,6 +3,7 @@
 import { createClient } from '@/utils/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { deleteOwnAvatarFile } from '@/utils/avatar-storage'
+import { IMPLAUSIBLE_BIRTH_DATE_MESSAGE, hasImplausibleBirthDate } from '@/utils/birth-date'
 
 export async function updateProfile(data: {
   birthDate: string
@@ -21,6 +22,10 @@ export async function updateProfile(data: {
 
   if (data.gender !== 'm' && data.gender !== 'f') {
     return { error: 'Indica se és do sexo masculino ou feminino.' }
+  }
+
+  if (hasImplausibleBirthDate(data.birthDate)) {
+    return { error: IMPLAUSIBLE_BIRTH_DATE_MESSAGE }
   }
 
   // Check if profile exists

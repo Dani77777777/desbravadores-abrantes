@@ -20,6 +20,7 @@ import { SECTION_LABELS, helperLabel } from '@/utils/permissions'
 import { ROLE_LABELS, SECTION_DOT } from './member-constants'
 import type { SectionSuggestion } from './SectionSuggestions'
 import { detectGender } from '@/utils/name-gender'
+import { IMPLAUSIBLE_BIRTH_DATE_MESSAGE, hasImplausibleBirthDate } from '@/utils/birth-date'
 
 const PRESETS = [5, 10, 25, 50, 100]
 
@@ -63,6 +64,8 @@ export function ManageMemberDialog({
   const [sectionHistory, setSectionHistory] = useState<any[]>([])
   const [gender, setGender] = useState<string | null>(null)
   const [savingGender, setSavingGender] = useState(false)
+  const [birthDate, setBirthDate] = useState('')
+  const [savingBirthDate, setSavingBirthDate] = useState(false)
 
   // Repõe o formulário sempre que se abre para um membro.
   useEffect(() => {
@@ -80,6 +83,7 @@ export function ManageMemberDialog({
     setNotifyMember(true)
     setSectionHistory([])
     setGender(member.gender ?? null)
+    setBirthDate(member.birth_date ?? '')
   }, [open, member?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Histórico de classes (só a coordenação gere classes).
@@ -125,6 +129,29 @@ export function ManageMemberDialog({
       toast.error('Não foi possível guardar o sexo.')
       return
     }
+    router.refresh()
+  }
+
+  // Corrigir a data não muda a classe: se a idade pedir outra, aparece a sugestão de mudança de classe.
+  const today = new Date().toISOString().slice(0, 10)
+  const birthDateChanged = !!birthDate && birthDate !== (member.birth_date ?? '')
+  const handleBirthDate = async () => {
+    if (!birthDate || birthDate > today) {
+      toast.error('Indica uma data de nascimento válida, que não seja futura.')
+      return
+    }
+    if (hasImplausibleBirthDate(birthDate)) {
+      toast.error(IMPLAUSIBLE_BIRTH_DATE_MESSAGE)
+      return
+    }
+    setSavingBirthDate(true)
+    const { error } = await supabase.from('profiles').update({ birth_date: birthDate }).eq('id', member.id)
+    setSavingBirthDate(false)
+    if (error) {
+      toast.error('Não foi possível guardar a data de nascimento.')
+      return
+    }
+    toast.success('Data de nascimento atualizada.')
     router.refresh()
   }
 
@@ -257,6 +284,37 @@ export function ManageMemberDialog({
               })}
               {gender !== 'm' && gender !== 'f' && <span className="text-[11px] text-slate-400">não indicado</span>}
             </div>
+          )}
+          {isCoordenador && (
+            <div className="mt-2 flex items-center gap-2">
+              <label htmlFor="member-birth-date" className="text-[10px] uppercase font-bold tracking-wider text-slate-400">Nascimento</label>
+              <input
+                id="member-birth-date"
+                type="date"
+                max={today}
+                value={birthDate}
+                onChange={(e) => setBirthDate(e.target.value)}
+                disabled={savingBirthDate}
+                className="h-7 rounded-md border bg-white px-2 text-xs font-bold text-slate-700 disabled:opacity-50"
+              />
+              {birthDateChanged && (
+                <button
+                  type="button"
+                  onClick={handleBirthDate}
+                  disabled={savingBirthDate}
+                  className="h-7 rounded-md bg-blue-700 px-2.5 text-xs font-bold text-white disabled:opacity-50"
+                >
+                  {savingBirthDate ? 'A guardar...' : 'Guardar'}
+                </button>
+              )}
+              {!member.birth_date && !birthDateChanged && <span className="text-[11px] text-slate-400">não indicada</span>}
+            </div>
+          )}
+          {hasImplausibleBirthDate(member.birth_date) && (
+            <p className="mt-2 flex items-center gap-1.5 rounded-md bg-amber-50 px-2 py-1.5 text-xs font-semibold text-amber-800 ring-1 ring-inset ring-amber-200">
+              <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+              A data de nascimento parece errada (dá menos de 1 ano). {isCoordenador ? 'Corrige o ano acima.' : 'Pede à coordenação para corrigir.'}
+            </p>
           )}
           <div className="grid grid-cols-2 gap-2 mt-4">
             <div className="rounded-lg bg-white border px-3 py-2">

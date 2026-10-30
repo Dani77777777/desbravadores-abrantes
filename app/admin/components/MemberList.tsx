@@ -438,7 +438,7 @@ export function MemberList({ members, currentUserRole, adminProfile, clubMembers
                         {SECTION_LABELS[member.section] || member.section}
                       </span>
                       {age !== null && (
-                        <span className="inline-flex items-center gap-1 text-stone-400"><Cake className="h-3 w-3" /> {age} anos</span>
+                        <span className={`inline-flex items-center gap-1 ${age < 1 ? 'font-bold text-amber-600' : 'text-stone-400'}`} title={age < 1 ? 'Data de nascimento provavelmente errada' : undefined}><Cake className="h-3 w-3" /> {age} anos{age < 1 && ' · data errada?'}</span>
                       )}
                       <span className="rounded-full bg-indigo-50 px-1.5 text-[10px] font-extrabold text-indigo-600">Nv {levelOf(member.total_xp)}</span>
                       <span className="inline-flex items-center gap-1 font-bold tabular-nums text-indigo-700">
@@ -481,7 +481,7 @@ export function MemberList({ members, currentUserRole, adminProfile, clubMembers
                     <p className="flex items-center gap-1.5 text-xs text-stone-500">
                       <span className={`h-2 w-2 rounded-full ${SECTION_DOT[member.section] || 'bg-stone-300'}`} />
                       {SECTION_LABELS[member.section] || member.section}
-                      {age !== null && <span className="text-stone-400">· {age} anos</span>}
+                      {age !== null && <span className={age < 1 ? 'font-bold text-amber-600' : 'text-stone-400'}>· {age} anos{age < 1 && ' · data errada?'}</span>}
                     </p>
                   </div>
                 </button>

@@ -5,6 +5,7 @@ import { revalidatePath } from 'next/cache'
 import { createClient } from '@/utils/supabase/server'
 import { createServiceClient } from '@/utils/supabase/service'
 import { getFamilyAccountSummary } from '@/lib/family-accounts'
+import { IMPLAUSIBLE_BIRTH_DATE_MESSAGE, hasImplausibleBirthDate } from '@/utils/birth-date'
 
 type Result = { success?: true; error?: string; code?: string; parentName?: string }
 
@@ -77,6 +78,7 @@ export async function createFamilyAccount(data: {
   if (!data.fullName.trim() || !isValidBirthDate(data.birthDate) || !['m', 'f'].includes(data.gender)) {
     return { error: 'Preenche o nome, data de nascimento e sexo da nova conta.' }
   }
+  if (hasImplausibleBirthDate(data.birthDate)) return { error: IMPLAUSIBLE_BIRTH_DATE_MESSAGE }
   if (!await canOwnFamilyAccounts(ownerUserId)) {
     return { error: 'Esta conta já está associada a outra conta familiar.' }
   }
@@ -214,6 +216,7 @@ export async function updateFamilyAccountBirthDate(associatedUserId: string, bir
   const ownerUserId = await currentUserId()
   if (!ownerUserId) return { error: 'A tua sessão expirou. Entra novamente.' }
   if (!isValidBirthDate(birthDate)) return { error: 'Indica uma data de nascimento válida, que não seja futura.' }
+  if (hasImplausibleBirthDate(birthDate)) return { error: IMPLAUSIBLE_BIRTH_DATE_MESSAGE }
 
   const admin = createServiceClient()
   const { data: link } = await admin.from('family_account_links')

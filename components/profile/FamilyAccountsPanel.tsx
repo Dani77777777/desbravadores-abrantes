@@ -1,9 +1,10 @@
 'use client'
 
 import { useState } from 'react'
-import { Baby, CalendarDays, CheckCircle2, Copy, Loader2, Pencil, Trash2, UsersRound } from 'lucide-react'
+import { AlertTriangle, Baby, CalendarDays, CheckCircle2, Copy, Loader2, Pencil, Trash2, UsersRound } from 'lucide-react'
 import { toast } from 'sonner'
 import type { FamilyAccountSummary } from '@/lib/family-accounts'
+import { hasImplausibleBirthDate } from '@/utils/birth-date'
 import {
   acceptFamilyAssociationCode,
   createFamilyAccount,
@@ -143,7 +144,7 @@ export function FamilyAccountsPanel({ summary }: Props) {
   }
 
   return (
-    <section className="rounded-[1.75rem] bg-white p-6 shadow-md shadow-blue-950/5 ring-1 ring-stone-200 sm:p-7">
+    <section id="contas-familiares" className="scroll-mt-24 rounded-[1.75rem] bg-white p-6 shadow-md shadow-blue-950/5 ring-1 ring-stone-200 sm:p-7">
       <div className="flex gap-3">
         <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-fuchsia-500 text-white shadow-md"><UsersRound className="h-5 w-5" /></span>
         <div>
@@ -158,14 +159,21 @@ export function FamilyAccountsPanel({ summary }: Props) {
             <div key={account.id} className="rounded-2xl bg-fuchsia-50 p-4 ring-1 ring-inset ring-fuchsia-100">
               <div className="flex items-center gap-3">
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-fuchsia-600 font-extrabold text-white">{account.fullName.charAt(0).toUpperCase()}</div>
-                <div className="min-w-0 flex-1"><p className="truncate font-bold text-blue-950">{account.fullName}</p><p className="text-sm text-fuchsia-700">Conta associada à tua conta</p></div>
-                <button type="button" onClick={() => startEditingBirthDate(account.id, account.birthDate)} className="rounded-lg p-2 text-fuchsia-700 hover:bg-white" title="Corrigir data de nascimento"><Pencil className="h-4 w-4" /></button>
+                <div className="min-w-0 flex-1"><p className="truncate font-bold text-blue-950">{account.fullName}</p><p className="text-sm text-fuchsia-700">{account.birthDate ? `Nascido(a) a ${new Date(`${account.birthDate}T12:00:00Z`).toLocaleDateString('pt-PT', { timeZone: 'UTC' })}` : 'Conta associada à tua conta'}</p></div>
+                <button type="button" onClick={() => startEditingBirthDate(account.id, account.birthDate)} className="flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-xs font-bold text-fuchsia-700 hover:bg-white" title="Corrigir data de nascimento"><Pencil className="h-4 w-4" />Corrigir<span className="hidden sm:inline"> data</span></button>
                 <button type="button" disabled={deletingAccountId === account.id} onClick={() => removeFamilyAccount(account.id, account.fullName)} className="rounded-lg p-2 text-red-600 hover:bg-white disabled:opacity-50" title="Apagar conta criada"><Trash2 className="h-4 w-4" /></button>
               </div>
+              {hasImplausibleBirthDate(account.birthDate) && editingAccountId !== account.id && (
+                <div className="mt-3 flex flex-wrap items-center gap-2 rounded-xl bg-amber-50 p-3 text-sm text-amber-900 ring-1 ring-inset ring-amber-200">
+                  <AlertTriangle className="h-4 w-4 shrink-0 text-amber-600" />
+                  <span className="min-w-0 flex-1">A data de nascimento parece estar errada (dá menos de 1 ano). Corrige o ano.</span>
+                  <button type="button" onClick={() => startEditingBirthDate(account.id, account.birthDate)} className="rounded-lg bg-amber-500 px-3 py-1.5 text-xs font-extrabold text-white">Corrigir agora</button>
+                </div>
+              )}
               {editingAccountId === account.id && (
                 <div className="mt-4 border-t border-fuchsia-200 pt-4">
                   <label className="flex items-center gap-2 text-sm font-bold text-blue-950"><CalendarDays className="h-4 w-4 text-fuchsia-600" /> Data de nascimento correta</label>
-                  <div className="mt-2 flex flex-wrap gap-2"><input type="date" required value={birthDate} onChange={(event) => setBirthDate(event.target.value)} className={fieldClass} /><button type="button" disabled={busy || !birthDate} onClick={() => saveBirthDate(account.id)} className="rounded-xl bg-blue-950 px-4 py-2 text-sm font-extrabold text-white disabled:opacity-50">Guardar</button><button type="button" onClick={() => setEditingAccountId(null)} className="px-2 text-sm font-bold text-stone-500">Cancelar</button></div>
+                  <div className="mt-2 flex flex-wrap gap-2"><input type="date" required max={new Date().toISOString().slice(0, 10)} value={birthDate} onChange={(event) => setBirthDate(event.target.value)} className={fieldClass} /><button type="button" disabled={busy || !birthDate} onClick={() => saveBirthDate(account.id)} className="rounded-xl bg-blue-950 px-4 py-2 text-sm font-extrabold text-white disabled:opacity-50">Guardar</button><button type="button" onClick={() => setEditingAccountId(null)} className="px-2 text-sm font-bold text-stone-500">Cancelar</button></div>
                   <p className="mt-2 text-xs text-stone-500">A data é obrigatória e determina a classe do desbravador.</p>
                 </div>
               )}
