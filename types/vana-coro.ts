@@ -29,3 +29,44 @@ export interface VanaCoroQuestionWithStats extends VanaCoroQuestion {
   answers: number
   guest_respondents: number
 }
+
+export type VanaCoroGroupSource = 'auto' | 'ai' | 'manual'
+
+export interface VanaCoroGroup {
+  id: string
+  label: string
+  emoji: string | null
+  hidden: boolean
+  source: VanaCoroGroupSource
+}
+
+/**
+ * Uma resposta no ecrã de revisão. `person` é um pseudónimo da página ("p7"): serve
+ * para contar pessoas diferentes sem mandar ao browser quem respondeu.
+ */
+export interface VanaCoroReviewAnswer {
+  id: string
+  text: string
+  group_id: string | null
+  hidden: boolean
+  person: string
+  created_at: string
+}
+
+export interface VanaCoroBoardEntryRow {
+  rank: number
+  label: string
+  emoji: string | null
+  respondents: number
+  points: number
+}
+
+export interface VanaCoroReviewData {
+  question: VanaCoroQuestion
+  groups: VanaCoroGroup[]
+  answers: VanaCoroReviewAnswer[]
+  /** Quadro congelado (só quando a pergunta está pronta). */
+  board: VanaCoroBoardEntryRow[]
+  /** Há chave de IA configurada no servidor? */
+  aiEnabled: boolean
+}

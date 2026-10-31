@@ -1,15 +1,12 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { createClient } from '@/utils/supabase/server'
-import { createServiceClient } from '@/utils/supabase/service'
-import { effectiveRole } from '@/utils/permissions'
+import { FORBIDDEN, requireCoordinator, type ServiceClient } from '@/lib/vana-coro/auth'
 import { NORMAL_RHYTHM, TURBO_RHYTHM, closingFor, questionStatus, scheduleQueue } from '@/utils/vana-coro/schedule'
 import type { VanaCoroQuestion, VanaCoroQuestionWithStats, VanaCoroSettings } from '@/types/vana-coro'
 
 // Admin do VanaCoro (só coordenação): a fila de perguntas da "Pergunta da Semana",
-// o ritmo e o link de convite. As tabelas não têm políticas para o cliente, por isso
-// tudo passa pela service role depois de confirmar o cargo.
+// o ritmo e o link de convite. A revisão dos grupos está em vana-coro-review.ts.
 
 export type ActionResult = { error?: string }
 
@@ -17,20 +14,6 @@ const QUESTIONS = 'vanacoro_questions'
 const SETTINGS = 'vanacoro_settings'
 const PROMPT_MIN = 5
 const PROMPT_MAX = 140
-
-async function requireCoordinator() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return null
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('role, helper_role')
-    .eq('id', user.id)
-    .maybeSingle()
-  return effectiveRole(profile) === 'coordenador' ? { user, service: createServiceClient() } : null
-}
-
-const FORBIDDEN: ActionResult = { error: 'Só a coordenação pode gerir as perguntas.' }
 
 function done() {
   revalidatePath('/admin/vana-coro')
@@ -100,7 +83,7 @@ export async function getVanaCoroAdminData(): Promise<VanaCoroAdminData | null |
   }
 }
 
-async function answerCount(service: ReturnType<typeof createServiceClient>, questionId: string): Promise<number> {
+async function answerCount(service: ServiceClient, questionId: string): Promise<number> {
   const { count } = await service
     .from('vanacoro_answers')
     .select('id', { count: 'exact', head: true })
@@ -108,7 +91,7 @@ async function answerCount(service: ReturnType<typeof createServiceClient>, ques
   return count ?? 0
 }
 
-async function loadQuestion(service: ReturnType<typeof createServiceClient>, id: string) {
+async function loadQuestion(service: ServiceClient, id: string) {
   const { data } = await service
     .from(QUESTIONS)
     .select('id, opens_at, closes_at, review_status, used_at')

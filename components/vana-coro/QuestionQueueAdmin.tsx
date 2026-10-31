@@ -1,6 +1,7 @@
 'use client'
 
 import { useMemo, useRef, useState, useTransition } from 'react'
+import Link from 'next/link'
 import { QRCodeSVG } from 'qrcode.react'
 import { toast } from 'sonner'
 import {
@@ -8,6 +9,7 @@ import {
   Check,
   Copy,
   Loader2,
+  ListChecks,
   Lock,
   Pencil,
   Play,
@@ -114,7 +116,7 @@ export function QuestionQueueAdmin({ settings, questions, inviteUrl }: Props) {
         </div>
         <p className="mt-2 text-xs text-slate-500">
           {candidates > 0
-            ? `${candidates} pergunta${candidates === 1 ? '' : 's'} fechada${candidates === 1 ? '' : 's'} com ${MIN_RESPONDENTS}+ pessoas à espera da revisão dos grupos (chega na próxima fase).`
+            ? `${candidates} pergunta${candidates === 1 ? '' : 's'} fechada${candidates === 1 ? '' : 's'} com ${MIN_RESPONDENTS}+ pessoas à espera de revisão: carrega em "Rever" para agrupar as respostas.`
             : `Uma pergunta só pode ir a jogo com pelo menos ${MIN_RESPONDENTS} pessoas diferentes.`}
         </p>
       </section>
@@ -330,6 +332,16 @@ function QuestionRow({
 
       {!editing && (
         <div className="mt-3 flex flex-wrap gap-2">
+          {q.answers > 0 && (
+            <Link
+              href={`/admin/vana-coro/perguntas/${q.id}`}
+              className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-semibold transition-colors ${
+                q.status === 'review' ? 'bg-amber-500 text-white hover:bg-amber-600' : 'border text-slate-600 hover:bg-slate-50'
+              }`}
+            >
+              <ListChecks className="h-3.5 w-3.5" /> {q.status === 'ready' || q.status === 'played' ? 'Ver quadro' : 'Rever'}
+            </Link>
+          )}
           {q.status !== 'played' && (
             <RowButton icon={Pencil} label="Editar" onClick={() => setEditing(true)} disabled={busy} />
           )}
