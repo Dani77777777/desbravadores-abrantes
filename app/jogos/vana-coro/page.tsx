@@ -26,11 +26,10 @@ export default async function VanaCoroPage({ searchParams }: { searchParams: Pro
   const { data: mySessions } = canHost
     ? await createServiceClient()
         .from('vanacoro_sessions')
-        .select('id, code, status, is_test_session')
+        .select('id, code, status, is_test_session, created_at, ended_at, team_a_name, team_b_name, team_a_score, team_b_score, rewards_awarded_at')
         .eq('host_id', user!.id)
-        .neq('status', 'finished')
         .order('created_at', { ascending: false })
-        .limit(5)
+        .limit(30)
     : { data: [] }
 
   // Veio do QR (/j/ABCD → ?code=ABCD): já mostra a escolha da equipa.
@@ -39,7 +38,7 @@ export default async function VanaCoroPage({ searchParams }: { searchParams: Pro
     cleanCode.length === 4
       ? await createServiceClient()
           .from('vanacoro_sessions')
-          .select('id, code, team_a_name, team_b_name')
+          .select('id, code, team_a_name, team_b_name, status')
           .eq('code', cleanCode)
           .neq('status', 'finished')
           .order('created_at', { ascending: false })

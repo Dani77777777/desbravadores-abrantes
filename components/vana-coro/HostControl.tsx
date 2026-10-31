@@ -43,7 +43,7 @@ import {
 import { suggestGroup } from '@/utils/vana-coro/normalize'
 import { MAX_ROUNDS, MIN_ROUNDS, type RoundEvent } from '@/utils/vana-coro/scoring'
 import { StrikeMarks, TEAM_STYLE } from './BoardUI'
-import { teamName, useCoroPlayers, useCoroSession } from './useCoroLive'
+import { faceoffMessage, teamName, useCoroPlayers, useCoroSession } from './useCoroLive'
 import type {
   VanaCoroHostRound,
   VanaCoroHostSlot,
@@ -63,7 +63,7 @@ type Run = (key: string, action: () => Promise<{ error?: string }>, success?: st
 
 const PHASE_HELP: Record<string, string> = {
   intro: 'A pergunta está no projetor. Quando os capitães estiverem prontos, começa o duelo.',
-  faceoff: 'Duelo: o capitão que carregou primeiro diz a resposta. Revela-a ou marca ❌, e depois dá o controlo a uma equipa.',
+  faceoff: 'Duelo: revela a resposta de quem tem a vez ou marca ❌. O jogo passa a vez e dá o controlo sozinho.',
   playing: 'A equipa com o controlo vai dizendo respostas. Revela o grupo certo ou marca ❌ (3 falhas → roubo).',
   steal: 'Roubo: a outra equipa tem 1 tentativa. Se acertar, toca na resposta; se não, "Roubo errado".',
   reveal_rest: 'A ronda tem vencedor. Revela o resto (sem pontos) ou fecha a ronda.',
@@ -101,7 +101,6 @@ export function HostControl({ session: initial, initialPlayers, readyQuestions }
         <span className="rounded-lg bg-white/10 px-2 py-1 font-mono text-sm font-bold tracking-widest">{session.code}</span>
         {session.is_test_session && <span className="rounded-full bg-purple-600 px-2 py-0.5 text-[10px] font-bold uppercase">Teste</span>}
         <div className="ml-auto flex gap-2">
-          {session.status === 'playing' && <CopyJoinLink code={session.code} compact />}
           <Link
             href={`/jogos/vana-coro/${session.id}/present`}
             target="_blank"
@@ -263,8 +262,8 @@ function LobbyPanel({
   )
 }
 
-/** Copia o link de entrada com o código já incluído (abre logo a escolha da equipa). */
-function CopyJoinLink({ code, compact }: { code: string; compact?: boolean }) {
+/** Copia o link de entrada com o código já incluído (abre logo a escolha da equipa). Só na sala de espera: as equipas fecham quando o jogo começa. */
+function CopyJoinLink({ code }: { code: string }) {
   const [copied, setCopied] = useState(false)
 
   async function copy() {
@@ -275,20 +274,6 @@ function CopyJoinLink({ code, compact }: { code: string; compact?: boolean }) {
     } catch {
       toast.error('Não foi possível copiar.')
     }
-  }
-
-  if (compact) {
-    return (
-      <button
-        type="button"
-        onClick={copy}
-        className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-semibold ${
-          copied ? 'border-emerald-400/60 bg-emerald-500/20 text-emerald-200' : 'border-white/20 hover:bg-white/10'
-        }`}
-      >
-        {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />} {copied ? 'Copiado!' : 'Copiar link'}
-      </button>
-    )
   }
 
   return (
@@ -431,10 +416,43 @@ function GamePanel({
         <h2 className="mt-2 text-xl font-bold">{round?.prompt}</h2>
 
         {phase === 'faceoff' && (
-          <p className="mt-2 flex items-center gap-1.5 font-semibold text-amber-300">
-            <Zap className="h-4 w-4" />
-            {session.buzzed_team ? `${teamName(session, session.buzzed_team)} carregou primeiro` : 'À espera do “Já sei!”…'}
-          </p>
+          <div className="mt-2 space-y-2">
+            <p className="flex items-center gap-1.5 font-semibold text-amber-300">
+              <Zap className="h-4 w-4" />
+              {session.faceoff_turn ? faceoffMessage(session) : 'À espera do “Já sei!”…'}
+            </p>
+            {!session.faceoff_turn && (
+              // Sem telemóveis (ou o capitão não carregou): o anfitrião escolhe quem começa.
+              <div className="flex flex-wrap items-center gap-2 text-sm">
+                <span className="text-white/50">ou escolhe quem responde primeiro:</span>
+                {(['a', 'b'] as VanaCoroTeam[]).map((t) => (
+                  <button
+                    key={t}
+                    type="button"
+                    disabled={pending}
+                    onClick={() => ev(`first:${t}`, { kind: 'buzz', team: t })}
+                    className={`rounded-lg px-3 py-1 font-semibold disabled:opacity-40 ${TEAM_STYLE[t].bg}`}
+                  >
+                    {teamName(session, t)}
+                  </button>
+                ))}
+              </div>
+            )}
+            <div className="flex flex-wrap items-center gap-2 text-xs text-white/40">
+              <Flag className="h-3.5 w-3.5" /> Exceção no palco? Dar o controlo já a:
+              {(['a', 'b'] as VanaCoroTeam[]).map((t) => (
+                <button
+                  key={t}
+                  type="button"
+                  disabled={pending}
+                  onClick={() => ev(`control:${t}`, { kind: 'control', team: t })}
+                  className={`font-semibold underline hover:text-white disabled:opacity-40 ${TEAM_STYLE[t].text}`}
+                >
+                  {teamName(session, t)}
+                </button>
+              ))}
+            </div>
+          </div>
         )}
         {phase === 'playing' && (
           <div className="mt-2 flex items-center gap-2 text-sm">
@@ -465,7 +483,7 @@ function GamePanel({
               slot={s}
               phase={phase}
               suggested={s.id === suggested}
-              disabled={pending}
+              disabled={pending || (phase === 'faceoff' && !session.faceoff_turn)}
               busy={busy === `slot:${s.id}`}
               onReveal={() =>
                 phase === 'steal'
@@ -485,22 +503,25 @@ function GamePanel({
           </ActionButton>
         )}
         {(phase === 'faceoff' || phase === 'playing') && (
-          <ActionButton onClick={() => ev('strike', { kind: 'strike' })} busy={busy === 'strike'} disabled={pending} className="bg-red-600 hover:bg-red-500">
+          <ActionButton
+            onClick={() => ev('strike', { kind: 'strike' })}
+            busy={busy === 'strike'}
+            disabled={pending || (phase === 'faceoff' && !session.faceoff_turn)}
+            className="bg-red-600 hover:bg-red-500"
+          >
             <X className="h-5 w-5" strokeWidth={3} /> Falha
           </ActionButton>
         )}
-        {phase === 'faceoff' &&
-          (['a', 'b'] as VanaCoroTeam[]).map((t) => (
-            <ActionButton
-              key={t}
-              onClick={() => ev(`control:${t}`, { kind: 'control', team: t })}
-              busy={busy === `control:${t}`}
-              disabled={pending}
-              className={`${TEAM_STYLE[t].bg} hover:brightness-110 ${session.buzzed_team === t ? 'ring-4 ring-amber-300' : ''}`}
-            >
-              <Flag className="h-5 w-5" /> Controlo: {teamName(session, t)}
-            </ActionButton>
-          ))}
+        {phase === 'playing' && round?.canPass && session.control_team && (
+          <ActionButton
+            onClick={() => ev('pass', { kind: 'control', team: session.control_team === 'a' ? 'b' : 'a' })}
+            busy={busy === 'pass'}
+            disabled={pending}
+            className="bg-slate-600 hover:bg-slate-500"
+          >
+            <ArrowLeftRight className="h-5 w-5" /> {teamName(session, session.control_team)} passa a vez
+          </ActionButton>
+        )}
         {phase === 'steal' && (
           <ActionButton
             onClick={() => run('steal-no', () => coroHostEvent(session.id, { kind: 'steal_result', success: false }))}

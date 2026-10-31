@@ -105,6 +105,16 @@ export function useCoroBoard(session: VanaCoroSession): VanaCoroPublicRound | nu
   return playing ? round : null
 }
 
+/** O que está a acontecer no duelo, em linguagem de palco (projetor, controlo e telemóveis). */
+export function faceoffMessage(session: VanaCoroSession): string {
+  const turn = teamName(session, session.faceoff_turn)
+  if (!session.faceoff_turn) return 'Duelo! Capitães, preparados para o “Já sei!”…'
+  if (!session.faceoff_first_team) return `${turn} responde primeiro!`
+  const first = teamName(session, session.faceoff_first_team)
+  if (session.faceoff_first_rank === null) return `${first} falhou! Agora responde ${turn}.`
+  return `${first} acertou na nº ${session.faceoff_first_rank}! ${turn} consegue melhor?`
+}
+
 export function teamName(session: Pick<VanaCoroSession, 'team_a_name' | 'team_b_name'>, team: 'a' | 'b' | null): string {
   return team === 'a' ? session.team_a_name : team === 'b' ? session.team_b_name : ''
 }

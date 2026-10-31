@@ -76,6 +76,7 @@ async function requireSessionHost(sessionId: string) {
 }
 
 const NOT_HOST = { error: 'Só o anfitrião desta sessão pode fazer isto.' }
+const LATE = 'O jogo já começou e as equipas estão fechadas. Fica a ver no projetor!'
 
 function generateCode(): string {
   const alphabet = 'ABCDEFGHJKMNPQRSTUVWXYZ'
@@ -219,8 +220,11 @@ export async function joinCoroSession(input: {
       }
       return { playerId: existing.id, sessionId: session.id }
     }
+    if (session.status !== 'lobby') return { error: LATE }
     row = { profile_id: userId, display_name: shortDisplayName(profile.full_name), avatar_url: profile.avatar_url }
   } else {
+    // As equipas fecham quando o jogo começa: quem chega tarde já não entra.
+    if (session.status !== 'lobby') return { error: LATE }
     const name = normalizarAlcunha(input.guestName)
     if (!name) return { error: 'Escreve o teu nome (2 a 20 letras).' }
     row = { guest_name: name, display_name: name }
@@ -309,6 +313,9 @@ const RESET_ROUND = {
   round_pot: 0,
   round_winner: null,
   round_banked: 0,
+  faceoff_turn: null,
+  faceoff_first_team: null,
+  faceoff_first_rank: null,
 } as const
 
 export async function startCoroGame(sessionId: string): Promise<GameResult> {
@@ -433,6 +440,9 @@ async function recompute(service: Service, sessionId: string, roundNumber: numbe
         pot: state.pot,
         winner: state.winner,
         banked: state.banked,
+        faceoff_turn: state.turn,
+        faceoff_first_team: state.first?.team ?? null,
+        faceoff_first_rank: state.first?.rank ?? null,
         reveals: Object.entries(state.revealed).map(([entry_id, r]) => ({ entry_id, scored: r.scored })),
       },
     })
@@ -457,11 +467,13 @@ async function appendAndRecompute(service: Service, session: VanaCoroSession, ev
   return recompute(service, session.id, session.current_round)
 }
 
-/** Ação do anfitrião na ronda atual: começar o duelo, revelar, ❌, controlo, roubo, fechar. */
+/**
+ * Ação do anfitrião na ronda atual: começar o duelo, revelar, ❌, controlo, roubo,
+ * fechar. Um 'buzz' do anfitrião é o "responde primeiro" de quando não há telemóveis.
+ */
 export async function coroHostEvent(sessionId: string, event: RoundEvent): Promise<GameResult> {
   const ctx = await requireSessionHost(sessionId)
   if (!ctx) return NOT_HOST
-  if (event.kind === 'buzz') return { error: 'O "Já sei!" é dos capitães.' }
   return appendAndRecompute(ctx.service, ctx.session, event)
 }
 
@@ -699,6 +711,7 @@ export async function getHostRound(sessionId: string): Promise<VanaCoroHostRound
   }
 
   const last = loaded.events.at(-1)?.event
+  const state = stateOf(loaded)
   return {
     roundId: loaded.round.id,
     roundNumber: loaded.round.round_number,
@@ -717,6 +730,7 @@ export async function getHostRound(sessionId: string): Promise<VanaCoroHostRound
       texts: textsByLabel.get(e.label.toLowerCase()) ?? [],
     })),
     canUndo: !!last,
+    canPass: state.phase === 'playing' && state.strikes === 0 && state.playingReveals === 0,
     lastEvent: last
       ? last.kind === 'reveal'
         ? `Revelar «${loaded.board.find((e) => e.id === last.entryId)?.label ?? '?'}»`

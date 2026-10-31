@@ -4,15 +4,22 @@
 // registo de ações da ronda (vanacoro_round_events) por esta ordem. Assim o
 // "Desfazer" é só marcar a última ação como desfeita e voltar a calcular.
 //
-//   intro ──start──▶ faceoff ──control──▶ playing ──3 falhas──▶ steal
-//                       │                    │                    │
-//                       │              quadro limpo          certo/errado
-//                       ▼                    ▼                    ▼
-//                (revelar/❌/buzz)      reveal_rest ──finish/limpo──▶ round_end
+//   intro ──start──▶ faceoff ──(duelo decidido)──▶ playing ──3 falhas──▶ steal
+//                                                    │                    │
+//                                              quadro limpo          certo/errado
+//                                                    ▼                    ▼
+//                                               reveal_rest ──finish/limpo──▶ round_end
 //
-// • Duelo: o primeiro capitão a carregar em "Já sei!" ganha a vez. O anfitrião revela
-//   o que ele disse (vai para o pote) ou marca ❌ (sem contar para as 3 falhas) e
-//   depois dá o controlo a uma equipa.
+// • Duelo (automático, regras do programa): o primeiro capitão a carregar em
+//   "Já sei!" responde primeiro (sem telemóveis, o anfitrião escolhe quem começa).
+//     – acerta na resposta nº 1 → a equipa dele ganha o duelo logo;
+//     – acerta noutra → o outro capitão tenta uma resposta melhor (mais acima no
+//       quadro); ganha quem tiver a mais bem classificada;
+//     – falha → a vez passa ao outro capitão; se ele acertar em qualquer uma, ganha;
+//     – falham os dois → recomeça pela equipa que respondeu primeiro.
+//   As respostas do duelo vão para o pote; os ❌ do duelo não contam para as 3 falhas.
+//   Quem ganha o duelo joga; antes da 1.ª resposta pode passar a vez à outra equipa.
+//   O anfitrião pode sempre forçar o controlo (exceções no palco).
 // • A jogar: cada revelação soma ao pote; cada ❌ conta. 3 falhas → roubo. Quadro todo
 //   revelado → a equipa com o controlo ganha o pote.
 // • Roubo: a outra equipa tem 1 tentativa. Certo → fica com o pote (mais essa
@@ -45,6 +52,7 @@ export type RoundEvent =
   | { kind: 'buzz'; team: Team }
   | { kind: 'reveal'; entryId: string }
   | { kind: 'strike' }
+  /** No duelo força o controlo; a jogar, antes da 1.ª resposta, passa a vez. */
   | { kind: 'control'; team: Team }
   | { kind: 'steal_result'; success: boolean; entryId?: string }
   | { kind: 'finish' }
@@ -68,6 +76,12 @@ export interface RoundState {
   winner: Team | null
   /** Pontos que a equipa vencedora recebeu nesta ronda (pote × multiplicador). */
   banked: number
+  /** Duelo: de quem é a vez de responder. */
+  turn: Team | null
+  /** Duelo: a primeira resposta da troca (rank null = falhou). */
+  first: { team: Team; rank: number | null } | null
+  /** Respostas reveladas depois do duelo (com 0, a equipa ainda pode passar a vez). */
+  playingReveals: number
 }
 
 export function other(team: Team): Team {
@@ -90,6 +104,9 @@ export function initialRoundState(): RoundState {
     revealed: {},
     winner: null,
     banked: 0,
+    turn: null,
+    first: null,
+    playingReveals: 0,
   }
 }
 
@@ -117,6 +134,41 @@ export function applyStrike(state: RoundState): RoundState {
 export function bankPot(state: RoundState, winner: Team, multiplier: number, board: BoardEntryRef[]): RoundState {
   const decided = { ...state, winner, banked: state.pot * multiplier }
   return { ...decided, phase: isBoardCleared(decided, board) ? 'round_end' : 'reveal_rest' }
+}
+
+/** O duelo está decidido: a equipa joga (ou, se o quadro já ficou limpo, ganha logo). */
+export function winFaceoff(state: RoundState, team: Team, multiplier: number, board: BoardEntryRef[]): RoundState {
+  const next: RoundState = { ...state, controlTeam: team, phase: 'playing', turn: null, first: null }
+  return isBoardCleared(next, board) ? bankPot(next, team, multiplier, board) : next
+}
+
+/** Uma resposta no duelo (entry = null → falhou), da equipa que tem a vez. */
+export function applyFaceoffAnswer(
+  state: RoundState,
+  entry: BoardEntryRef | null,
+  multiplier: number,
+  board: BoardEntryRef[],
+): RoundState {
+  const team = state.turn!
+  const answered = entry ? applyReveal(state, entry, true) : { ...state, strikeSeq: state.strikeSeq + 1 }
+  const rank = entry?.rank ?? null
+  const top = Math.min(...board.map((e) => e.rank))
+
+  // Primeira resposta da troca
+  if (!state.first) {
+    if (rank === top) return winFaceoff(answered, team, multiplier, board)
+    return { ...answered, first: { team, rank }, turn: other(team) }
+  }
+
+  // Segunda resposta: compara com a primeira
+  const firstRank = state.first.rank
+  if (firstRank === null) {
+    if (rank !== null) return winFaceoff(answered, team, multiplier, board)
+    // Falharam os dois: recomeça pela equipa que respondeu primeiro
+    return { ...answered, first: null, turn: state.first.team }
+  }
+  const winner = rank !== null && rank < firstRank ? team : state.first.team
+  return winFaceoff(answered, winner, multiplier, board)
 }
 
 /** Resultado do roubo: certo → a outra equipa leva o pote; errado → fica com quem tinha o controlo. */
@@ -151,22 +203,25 @@ export function applyEvent(
     case 'buzz':
       if (state.phase !== 'faceoff') return 'Só no duelo.'
       if (state.buzzedTeam) return 'Já carregaram primeiro.'
-      return { ...state, buzzedTeam: event.team }
+      return { ...state, buzzedTeam: event.team, turn: event.team }
 
     case 'control':
-      if (state.phase !== 'faceoff') return 'O controlo dá-se no fim do duelo.'
-      {
-        const next: RoundState = { ...state, controlTeam: event.team, phase: 'playing' }
-        return isBoardCleared(next, board) ? bankPot(next, event.team, multiplier, board) : next
+      if (state.phase === 'faceoff') return winFaceoff(state, event.team, multiplier, board)
+      if (state.phase === 'playing' && state.strikes === 0 && state.playingReveals === 0) {
+        return { ...state, controlTeam: event.team }
       }
+      return 'Já não dá para mudar o controlo nesta ronda.'
 
     case 'reveal': {
       const entry = entryOf(event.entryId)
       if (!entry) return 'Resposta desconhecida.'
       if (state.revealed[entry.id]) return 'Essa resposta já está revelada.'
-      if (state.phase === 'faceoff') return applyReveal(state, entry, true)
+      if (state.phase === 'faceoff') {
+        if (!state.turn) return 'Primeiro escolhe quem responde (ou espera pelo "Já sei!").'
+        return applyFaceoffAnswer(state, entry, multiplier, board)
+      }
       if (state.phase === 'playing') {
-        const next = applyReveal(state, entry, true)
+        const next = { ...applyReveal(state, entry, true), playingReveals: state.playingReveals + 1 }
         return isBoardCleared(next, board) ? bankPot(next, state.controlTeam!, multiplier, board) : next
       }
       if (state.phase === 'reveal_rest') {
@@ -177,7 +232,11 @@ export function applyEvent(
     }
 
     case 'strike':
-      if (state.phase !== 'faceoff' && state.phase !== 'playing') return 'Agora não dá para marcar ❌.'
+      if (state.phase === 'faceoff') {
+        if (!state.turn) return 'Primeiro escolhe quem responde (ou espera pelo "Já sei!").'
+        return applyFaceoffAnswer(state, null, multiplier, board)
+      }
+      if (state.phase !== 'playing') return 'Agora não dá para marcar ❌.'
       return applyStrike(state)
 
     case 'steal_result': {

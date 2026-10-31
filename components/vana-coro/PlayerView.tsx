@@ -7,7 +7,7 @@ import { Bot, Crown, Gift, Loader2, Zap } from 'lucide-react'
 import { buzz, setCoroRewardsRecipient, skipCoroRewards } from '@/lib/actions/vana-coro-game'
 import { vibrate } from '@/utils/vibrate'
 import { CORO_BG, CoroBoard, StrikeMarks, TEAM_STYLE } from './BoardUI'
-import { teamName, useCoroBoard, useCoroPlayers, useCoroSession } from './useCoroLive'
+import { faceoffMessage, teamName, useCoroBoard, useCoroPlayers, useCoroSession } from './useCoroLive'
 import type { VanaCoroPlayer, VanaCoroSession } from '@/types/vana-coro'
 
 export const PLAYER_STORAGE_KEY = (sessionId: string) => `vanacoro_player_${sessionId}`
@@ -121,6 +121,9 @@ export function PlayerView({ session: initial, initialPlayers, myPlayerId, recip
           {me.is_captain && session.phase === 'faceoff' && (
             <BuzzButton session={session} playerId={me.id} myTeam={team} />
           )}
+          {session.phase === 'faceoff' && session.faceoff_turn && (
+            <p className="mt-3 text-center text-sm font-semibold text-amber-200">{faceoffMessage(session)}</p>
+          )}
 
           <p className="mt-4 text-xs font-bold uppercase tracking-widest text-white/50">
             Ronda {session.current_round}/{session.total_rounds}
@@ -167,20 +170,22 @@ function BuzzButton({ session, playerId, myTeam }: { session: VanaCoroSession; p
   const [pending, startTransition] = useTransition()
   const vibrated = useRef<string>('')
 
-  // Vibra quando começa o duelo de cada ronda
+  // Vibra quando começa o duelo de cada ronda e quando a vez passa para a minha equipa
   useEffect(() => {
-    const key = `${session.current_round}`
-    if (vibrated.current !== key && !session.buzzed_team) {
+    const myTurn = session.faceoff_turn === myTeam
+    const key = `${session.current_round}|${myTurn ? session.faceoff_first_team ?? 'start' : ''}`
+    if (vibrated.current === key) return
+    if (!session.faceoff_turn || (myTurn && session.faceoff_first_team)) {
       vibrated.current = key
       vibrate('alert')
     }
-  }, [session.current_round, session.buzzed_team])
+  }, [session.current_round, session.faceoff_turn, session.faceoff_first_team, myTeam])
 
-  if (session.buzzed_team) {
-    const won = session.buzzed_team === myTeam
+  if (session.faceoff_turn) {
+    const ours = session.faceoff_turn === myTeam
     return (
-      <div className={`mt-4 rounded-3xl p-6 text-center text-xl font-black ${won ? 'bg-emerald-500' : 'bg-white/10 text-white/70'}`}>
-        {won ? 'Foste o primeiro! Diz a resposta! 🎤' : 'A outra equipa foi mais rápida…'}
+      <div className={`mt-4 rounded-3xl p-6 text-center text-xl font-black ${ours ? 'bg-emerald-500' : 'bg-white/10 text-white/70'}`}>
+        {ours ? 'É a tua vez! Diz a resposta em voz alta! 🎤' : 'Vez da outra equipa… ouve com atenção!'}
       </div>
     )
   }

@@ -97,6 +97,11 @@ export interface VanaCoroSession {
   round_pot: number
   round_winner: VanaCoroTeam | null
   round_banked: number
+  /** Duelo: de quem é a vez de responder. */
+  faceoff_turn: VanaCoroTeam | null
+  /** Duelo: quem deu a primeira resposta da troca e em que lugar (null = falhou). */
+  faceoff_first_team: VanaCoroTeam | null
+  faceoff_first_rank: number | null
   board_version: number
   is_test_session: boolean
   rewards_awarded_at: string | null
@@ -161,6 +166,8 @@ export interface VanaCoroHostRound {
   prompt: string
   slots: VanaCoroHostSlot[]
   canUndo: boolean
+  /** A equipa que ganhou o duelo ainda pode passar a vez (antes da 1.ª resposta). */
+  canPass: boolean
   /** A última ação (para o botão "Desfazer" dizer o que desfaz). */
   lastEvent: string | null
 }

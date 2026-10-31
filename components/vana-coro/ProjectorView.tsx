@@ -3,10 +3,10 @@
 import { useSyncExternalStore } from 'react'
 import { QRCodeSVG } from 'qrcode.react'
 import { Crown, Volume2, Zap } from 'lucide-react'
-import { CinematicPodium } from '@/components/game-podium/CinematicPodium'
 import { CORO_BG, CoroBoard, StrikeMarks, StrikeOverlay, TEAM_STYLE } from './BoardUI'
-import { teamName, useCoroBoard, useCoroPlayers, useCoroSession } from './useCoroLive'
+import { faceoffMessage, teamName, useCoroBoard, useCoroPlayers, useCoroSession } from './useCoroLive'
 import { useCoroAudio } from './useCoroAudio'
+import { TeamPodium } from './TeamPodium'
 import type { VanaCoroPlayer, VanaCoroSession, VanaCoroTeam } from '@/types/vana-coro'
 
 interface Props {
@@ -79,14 +79,7 @@ export function ProjectorView({ session: initial, initialPlayers }: Props) {
       )}
 
       {session.status === 'finished' && (
-        <CinematicPodium
-          entries={(['a', 'b'] as VanaCoroTeam[])
-            .map((t) => ({ id: t, name: teamName(session, t), points: t === 'a' ? session.team_a_score : session.team_b_score }))
-            .sort((x, y) => y.points - x.points)}
-          backgroundClassName={CORO_BG}
-          ringOffsetClassName="ring-offset-purple-950"
-          title="O JA disse… e esta equipa ouviu melhor!"
-        />
+        <TeamPodium session={session} players={players} />
       )}
     </div>
   )
@@ -153,12 +146,12 @@ function Banner({ session }: { session: VanaCoroSession }) {
   const name = (t: VanaCoroTeam | null) => teamName(session, t)
   let text: React.ReactNode = null
   if (session.phase === 'faceoff') {
-    text = session.buzzed_team ? (
+    text = session.faceoff_turn ? (
       <>
-        <Zap className="inline h-8 w-8 text-amber-300" /> {name(session.buzzed_team)} carregou primeiro!
+        <Zap className="inline h-8 w-8 text-amber-300" /> {faceoffMessage(session)}
       </>
     ) : (
-      'Duelo! Capitães, preparados para o "Já sei!"…'
+      faceoffMessage(session)
     )
   } else if (session.phase === 'steal' && session.control_team) {
     text = `Roubo! ${name(session.control_team === 'a' ? 'b' : 'a')} tem uma tentativa`
