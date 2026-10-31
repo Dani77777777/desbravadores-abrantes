@@ -86,6 +86,10 @@ export async function updateSession(request: NextRequest) {
     !request.nextUrl.pathname.startsWith('/jogos/vana-quest') &&
     !request.nextUrl.pathname.startsWith('/jogos/vana-espada') &&
     !request.nextUrl.pathname.startsWith('/jogos/vana-sentinela') &&
+    !request.nextUrl.pathname.startsWith('/jogos/vana-coro') &&
+    // Pergunta da Semana: as páginas e a API verificam sozinhas a sessão ou o link de convite
+    !request.nextUrl.pathname.startsWith('/perguntas') &&
+    !request.nextUrl.pathname.startsWith('/api/perguntas') &&
     // A rota responde 401 sozinha (sem redirecionar para o login)
     !request.nextUrl.pathname.startsWith('/api/jogos/vana-sentinela') &&
     !request.nextUrl.pathname.startsWith('/jogos/vana-trilha/como-jogar') &&

@@ -87,9 +87,23 @@ describe('registo dos jogos', () => {
   })
 
   test('os jogos ao vivo não contam como de um jogador', () => {
-    const live = ['vana-quest', 'vana-words', 'vana-camp', 'vana-espada', 'vana-sketch']
+    const live = ['vana-quest', 'vana-words', 'vana-camp', 'vana-espada', 'vana-sketch', 'vana-coro']
     for (const id of live) {
       expect(GAMES.find((g) => g.id === id)?.singlePlayer).toBe(false)
     }
+  })
+})
+
+describe('jogos-surpresa sem linha na BD', () => {
+  test('o VanaCoro nasce escondido e só para a coordenação', () => {
+    const s = defaultGameSetting('vana-coro')
+    expect(s.allowed_roles).toEqual(['coordenador'])
+    expect(s.hidden).toBe(true)
+    expect(normalizeGameSetting('vana-coro', null).hidden).toBe(true)
+  })
+
+  test('os outros jogos continuam abertos a todos', () => {
+    expect(defaultGameSetting('vantur').allowed_roles).toEqual(['desbravador', 'dirigente', 'coordenador'])
+    expect(defaultGameSetting('vantur').hidden).toBe(false)
   })
 })

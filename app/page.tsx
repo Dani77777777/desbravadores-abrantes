@@ -13,6 +13,8 @@ import { getFamilyAccountSummary } from '@/lib/family-accounts'
 import { hasImplausibleBirthDate } from '@/utils/birth-date'
 import { displayFont } from '@/components/landing/fonts'
 import { SiteFooter } from '@/components/landing/SiteFooter'
+import { WeeklyQuestionCard } from '@/components/perguntas/WeeklyQuestionCard'
+import { latestOpenQuestionFor } from '@/lib/perguntas/data'
 
 import { LandingPage } from '@/components/landing/LandingPage'
 import type { PublicEvent } from '@/components/landing/NextEventCard'
@@ -149,6 +151,9 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
 
   // Tenda/boleias publicadas das saídas em que o membro aparece (a RPC só devolve essas).
   const { data: tripRows } = await supabase.rpc('get_my_trip_assignments')
+
+  // Pergunta da Semana aberta (null se não houver nenhuma)
+  const weeklyQuestion = await latestOpenQuestionFor(user.id)
 
   const completedTaskIds = new Set((myCompletions || []).map(c => c.task_id))
   const pendingAwardIds = new Set((myCompletions || []).filter(c => !c.points_awarded).map(c => c.task_id))
@@ -313,6 +318,8 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
         <main className="mx-auto max-w-7xl space-y-10 px-4 sm:px-6 lg:px-8">
           {/* Tenda e boleias da próxima saída (só aparece depois de a liderança publicar) */}
           <TripAssignments rows={(tripRows || []) as TripAssignmentRow[]} userId={user.id} displayClass={D} />
+
+          {weeklyQuestion && <WeeklyQuestionCard question={weeklyQuestion} displayClass={D} />}
 
           <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
             {/* Avisos */}
