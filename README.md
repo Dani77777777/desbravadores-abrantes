@@ -98,6 +98,10 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=sua-chave-anon
 SUPABASE_SERVICE_ROLE_KEY=sua-chave-service-role
 NEXT_PUBLIC_VAPID_PUBLIC_KEY=sua-chave-push-publica
 VAPID_PRIVATE_KEY=sua-chave-push-privada
+# Opcional: agrupar respostas com IA (API compatível com OpenAI; por omissão o Groq)
+VANACORO_AI_API_KEY=sua-chave-groq
+# VANACORO_AI_BASE_URL=https://api.groq.com/openai/v1
+# VANACORO_AI_MODEL=openai/gpt-oss-120b
 ```
 
 ### 4. Base de Dados

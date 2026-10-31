@@ -5,7 +5,8 @@
 // usa este ficheiro. Para adicionar um jogo novo basta acrescentar uma entrada a GAMES.
 //
 // A disponibilidade vive na tabela `game_settings` (supabase-migration-game-settings.sql).
-// Um jogo sem linha na tabela (ou se a tabela ainda não existir) conta como ativo para todos.
+// Um jogo sem linha na tabela (ou se a tabela ainda não existir) conta como ativo para todos,
+// salvo se a entrada em GAMES tiver `defaultAccess` (jogos-surpresa que nascem escondidos).
 //
 // Para cada visitante, um jogo está num de três estados:
 //   • available   → aparece e pode jogar
@@ -48,6 +49,11 @@ export interface GameDefinition {
   singlePlayer: boolean;
   /** Mostra a etiqueta "Novo" no Centro de Jogos e na página inicial. */
   isNew?: boolean;
+  /**
+   * Acesso enquanto o jogo não tem linha em `game_settings` (ex.: código já em
+   * produção antes de alguém correr o SQL). Por omissão, aberto a todos.
+   */
+  defaultAccess?: Pick<GameSetting, "allowed_roles" | "hidden">;
 }
 
 export const GAMES: GameDefinition[] = [
@@ -177,6 +183,23 @@ export const GAMES: GameDefinition[] = [
     adminCoordOnly: false,
     singlePlayer: true,
   },
+  {
+    id: "vana-coro",
+    title: "VanaCoro",
+    description:
+      "O que é que o JA disse? Adivinha as respostas mais populares e ganha pela tua equipa!",
+    image: "/images/VanaCoro.png",
+    href: "/jogos/vana-coro",
+    loginHref: "/jogos/vana-coro",
+    adminHref: "/admin/vana-coro",
+    color: "from-fuchsia-600 via-purple-800 to-amber-400",
+    requiresAuth: false,
+    adminCoordOnly: true,
+    singlePlayer: false,
+    isNew: true,
+    // Surpresa para o JA: escondido e só para a coordenação até ao dia do jogo.
+    defaultAccess: { allowed_roles: ["coordenador"], hidden: true },
+  },
 ];
 
 export function getGame(id: string): GameDefinition | undefined {
@@ -272,11 +295,12 @@ export function activeMultiplier(
 }
 
 export function defaultGameSetting(gameId: string): GameSetting {
+  const access = getGame(gameId)?.defaultAccess;
   return {
     game_id: gameId,
     enabled: true,
-    allowed_roles: [...GAME_ROLES],
-    hidden: false,
+    allowed_roles: access ? [...access.allowed_roles] : [...GAME_ROLES],
+    hidden: access?.hidden ?? false,
     points_multiplier: 1,
     multiplier_starts_at: null,
     multiplier_ends_at: null,
