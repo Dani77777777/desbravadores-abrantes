@@ -45,6 +45,7 @@ import {
 import { suggestGroup } from '@/utils/vana-coro/normalize'
 import { MAX_ROUNDS, MIN_ROUNDS, type RoundEvent } from '@/utils/vana-coro/scoring'
 import { StrikeMarks, TEAM_STYLE } from './BoardUI'
+import { WinnersShare } from './WinnersShare'
 import { faceoffMessage, teamName, useCoroPlayers, useCoroSession } from './useCoroLive'
 import type {
   VanaCoroHostRound,
@@ -791,6 +792,8 @@ function FinishedPanel({ session, players, run, pending }: { session: VanaCoroSe
         </p>
         <p className="mt-2 text-xs text-white/40">O projetor está a mostrar o pódio.</p>
       </section>
+
+      <WinnersShare session={session} players={players} />
 
       <section className="space-y-3 rounded-2xl bg-white/5 p-5">
         <h2 className="flex items-center gap-2 text-lg font-bold">

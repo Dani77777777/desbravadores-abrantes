@@ -746,3 +746,44 @@ export async function getBotForImpersonation(sessionId: string, playerId: string
   const { data } = await ctx.service.from(PLAYERS).select('*').eq('id', playerId).eq('session_id', sessionId).eq('is_bot', true).maybeSingle()
   return (data as VanaCoroPlayer) ?? null
 }
+
+// ── Imagem de partilha ────────────────────────────────────────
+
+export interface CoroShareRound {
+  roundNumber: number
+  prompt: string
+  winner: Team | null
+  banked: number
+  multiplier: number
+  entries: { rank: number; label: string; emoji: string | null; points: number }[]
+}
+
+/** As rondas jogadas, com o quadro de cada uma, para a imagem dos vencedores (só o anfitrião). */
+export async function getCoroShareRounds(sessionId: string): Promise<CoroShareRound[]> {
+  const ctx = await requireSessionHost(sessionId)
+  if (!ctx) return []
+  const { data: rounds } = await ctx.service
+    .from(ROUNDS)
+    .select('round_number, question_id, winner_team, banked_points, multiplier')
+    .eq('session_id', sessionId)
+    .not('winner_team', 'is', null)
+    .order('round_number')
+  if (!rounds?.length) return []
+
+  const ids = rounds.map((r) => r.question_id)
+  const [{ data: questions }, { data: entries }] = await Promise.all([
+    ctx.service.from(QUESTIONS).select('id, prompt').in('id', ids),
+    ctx.service.from(ENTRIES).select('question_id, rank, label, emoji, points').in('question_id', ids).order('rank'),
+  ])
+  const prompt = new Map((questions ?? []).map((q) => [q.id, q.prompt as string]))
+  return rounds.map((r) => ({
+    roundNumber: r.round_number,
+    prompt: prompt.get(r.question_id) ?? '',
+    winner: r.winner_team as Team | null,
+    banked: r.banked_points,
+    multiplier: r.multiplier,
+    entries: (entries ?? [])
+      .filter((e) => e.question_id === r.question_id)
+      .map(({ rank, label, emoji, points }) => ({ rank, label, emoji, points })),
+  }))
+}
