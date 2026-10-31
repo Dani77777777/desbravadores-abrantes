@@ -87,6 +87,8 @@ export async function updateSession(request: NextRequest) {
     !request.nextUrl.pathname.startsWith('/jogos/vana-espada') &&
     !request.nextUrl.pathname.startsWith('/jogos/vana-sentinela') &&
     !request.nextUrl.pathname.startsWith('/jogos/vana-coro') &&
+    // Código curto dos QR (/j/ABCD): os convidados do VanaCoro entram sem conta
+    !request.nextUrl.pathname.startsWith('/j/') &&
     // Pergunta da Semana: as páginas e a API verificam sozinhas a sessão ou o link de convite
     !request.nextUrl.pathname.startsWith('/perguntas') &&
     !request.nextUrl.pathname.startsWith('/api/perguntas') &&

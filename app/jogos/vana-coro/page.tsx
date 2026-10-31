@@ -1,43 +1,60 @@
-import Link from 'next/link'
-import { ChevronLeft, MessageCircleQuestion } from 'lucide-react'
+import type { Metadata } from 'next'
 import { createClient } from '@/utils/supabase/server'
-import { Navbar } from '@/components/layout/Navbar'
+import { createServiceClient } from '@/utils/supabase/service'
 import { effectiveRole } from '@/utils/permissions'
+import { VanaCoroHome } from '@/components/vana-coro/VanaCoroHome'
 
-// Só a coordenação chega aqui (o jogo está escondido em Gestão → Jogos).
-// O jogo ao vivo é a Fase 3 da spec (docs/VanaCoro.md); por agora há só a recolha.
-export default async function VanaCoroPage() {
+export const dynamic = 'force-dynamic'
+
+export const metadata: Metadata = {
+  title: 'VanaCoro — O que é que o JA disse?',
+  description: 'Adivinha as respostas mais populares e ganha pela tua equipa!',
+}
+
+// Entrada do jogo: os jogadores metem o código; o anfitrião cria a sessão.
+// O middleware já esconde esta página a quem não pode jogar (Gestão → Jogos).
+export default async function VanaCoroPage({ searchParams }: { searchParams: Promise<{ code?: string }> }) {
+  const { code } = await searchParams
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   const profile = user
-    ? (await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle()).data
+    ? (await supabase.from('profiles').select('role, helper_role').eq('id', user.id).maybeSingle()).data
     : null
-  const isCoord = effectiveRole(profile) === 'coordenador'
+  const role = effectiveRole(profile)
+  const canHost = role === 'dirigente' || role === 'coordenador'
+
+  const { data: mySessions } = canHost
+    ? await createServiceClient()
+        .from('vanacoro_sessions')
+        .select('id, code, status, is_test_session')
+        .eq('host_id', user!.id)
+        .neq('status', 'finished')
+        .order('created_at', { ascending: false })
+        .limit(5)
+    : { data: [] }
+
+  // Veio do QR (/j/ABCD → ?code=ABCD): já mostra a escolha da equipa.
+  const cleanCode = (code ?? '').toUpperCase().replace(/[^A-Z]/g, '').slice(0, 4)
+  const { data: found } =
+    cleanCode.length === 4
+      ? await createServiceClient()
+          .from('vanacoro_sessions')
+          .select('id, code, team_a_name, team_b_name')
+          .eq('code', cleanCode)
+          .neq('status', 'finished')
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle()
+      : { data: null }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-fuchsia-700 via-purple-900 to-indigo-950 text-white">
-      <Navbar user={user} profile={profile} />
-      <main className="mx-auto max-w-xl px-4 py-12 text-center">
-        <Link href="/jogos" className="inline-flex items-center gap-1 text-sm font-semibold text-white/60 hover:text-white">
-          <ChevronLeft className="h-4 w-4" /> Centro de Jogos
-        </Link>
-        <h1 className="mt-6 text-5xl font-black tracking-tight">VanaCoro</h1>
-        <p className="mt-2 text-lg font-semibold text-amber-300">O que é que o JA disse?</p>
-        <div className="mt-8 rounded-3xl bg-white/10 p-6 ring-1 ring-white/15">
-          <p className="font-bold">O jogo ao vivo ainda está em construção.</p>
-          <p className="mt-1 text-sm text-white/70">
-            Para já estamos a encher o banco de perguntas com a Pergunta da Semana.
-          </p>
-          {isCoord && (
-            <Link
-              href="/admin/vana-coro"
-              className="mt-5 inline-flex items-center gap-2 rounded-2xl bg-amber-400 px-5 py-3 font-bold text-purple-950 transition-colors hover:bg-amber-300"
-            >
-              <MessageCircleQuestion className="h-4 w-4" /> Gerir as perguntas
-            </Link>
-          )}
-        </div>
-      </main>
-    </div>
+    <VanaCoroHome
+      canHost={canHost}
+      isCoordinator={role === 'coordenador'}
+      isMember={!!profile}
+      initialCode={cleanCode}
+      initialFound={found}
+      mySessions={mySessions ?? []}
+    />
   )
 }
