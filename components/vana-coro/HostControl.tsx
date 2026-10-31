@@ -9,6 +9,7 @@ import {
   Bot,
   Check,
   ChevronRight,
+  Copy,
   Crown,
   Flag,
   Gift,
@@ -99,13 +100,16 @@ export function HostControl({ session: initial, initialPlayers, readyQuestions }
         </Link>
         <span className="rounded-lg bg-white/10 px-2 py-1 font-mono text-sm font-bold tracking-widest">{session.code}</span>
         {session.is_test_session && <span className="rounded-full bg-purple-600 px-2 py-0.5 text-[10px] font-bold uppercase">Teste</span>}
-        <Link
-          href={`/jogos/vana-coro/${session.id}/present`}
-          target="_blank"
-          className="ml-auto flex items-center gap-1.5 rounded-lg border border-white/20 px-3 py-1.5 text-sm font-semibold hover:bg-white/10"
-        >
-          <MonitorPlay className="h-4 w-4" /> Abrir projetor
-        </Link>
+        <div className="ml-auto flex gap-2">
+          {session.status === 'playing' && <CopyJoinLink code={session.code} compact />}
+          <Link
+            href={`/jogos/vana-coro/${session.id}/present`}
+            target="_blank"
+            className="flex items-center gap-1.5 rounded-lg border border-white/20 px-3 py-1.5 text-sm font-semibold hover:bg-white/10"
+          >
+            <MonitorPlay className="h-4 w-4" /> Abrir projetor
+          </Link>
+        </div>
       </header>
 
       <main className="mx-auto max-w-5xl space-y-5 px-4 py-5">
@@ -172,6 +176,7 @@ function LobbyPanel({
             </ul>
           ))}
         </div>
+        <CopyJoinLink code={session.code} />
         <p className="text-xs text-white/50">
           Os jogadores entram com o código <strong className="font-mono">{session.code}</strong> ou pelo QR do projetor. A coroa marca o capitão
           (é quem tem o “Já sei!”); por omissão é o primeiro a entrar.
@@ -255,6 +260,55 @@ function LobbyPanel({
         <DeleteButton sessionId={session.id} run={run} pending={pending} />
       </div>
     </div>
+  )
+}
+
+/** Copia o link de entrada com o código já incluído (abre logo a escolha da equipa). */
+function CopyJoinLink({ code, compact }: { code: string; compact?: boolean }) {
+  const [copied, setCopied] = useState(false)
+
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(`${window.location.origin}/jogos/vana-coro?code=${code}`)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch {
+      toast.error('Não foi possível copiar.')
+    }
+  }
+
+  if (compact) {
+    return (
+      <button
+        type="button"
+        onClick={copy}
+        className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-semibold ${
+          copied ? 'border-emerald-400/60 bg-emerald-500/20 text-emerald-200' : 'border-white/20 hover:bg-white/10'
+        }`}
+      >
+        {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />} {copied ? 'Copiado!' : 'Copiar link'}
+      </button>
+    )
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={copy}
+      className={`flex w-full items-center gap-3 rounded-2xl border p-4 text-left transition-all active:scale-[0.98] ${
+        copied ? 'border-emerald-400/60 bg-emerald-500/20' : 'border-white/10 bg-white/5 hover:bg-white/10'
+      }`}
+    >
+      <span className={`shrink-0 rounded-xl p-2.5 ${copied ? 'bg-emerald-400/20' : 'bg-fuchsia-500/20'}`}>
+        {copied ? <Check className="h-5 w-5 text-emerald-300" /> : <Copy className="h-5 w-5 text-fuchsia-300" />}
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block text-sm font-bold">{copied ? 'Link copiado!' : 'Copiar link de entrada'}</span>
+        <span className="block truncate text-xs text-white/60">
+          {copied ? 'Cola onde quiseres partilhar' : 'Código já incluído · toca para copiar'}
+        </span>
+      </span>
+    </button>
   )
 }
 
