@@ -38,9 +38,10 @@ const noSubscribe = () => () => {}
  * tem o "Já sei!" durante o duelo. Nunca recarrega a página (perdia-se a vibração).
  */
 export function PlayerView({ session: initial, initialPlayers, myPlayerId, recipients, asBot }: Props) {
-  const session = useCoroSession(initial)
-  const players = useCoroPlayers(session.id, initialPlayers)
-  const round = useCoroBoard(session)
+  const live = useCoroSession(initial)
+  const players = useCoroPlayers(live.id, initialPlayers)
+  // `session` só avança quando chega o quadro dessa versão: pontos e cartas ao mesmo tempo
+  const { round, shown: session } = useCoroBoard(live)
   // Convidados: o id só existe neste browser (no servidor ainda não se sabe).
   const stored = useSyncExternalStore(noSubscribe, () => readStoredPlayer(session.id), () => null)
   const checked = useSyncExternalStore(noSubscribe, () => true, () => !!myPlayerId)

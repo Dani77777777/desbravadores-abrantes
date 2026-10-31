@@ -17,9 +17,10 @@ interface Props {
 
 /** Ecrã do projetor: lobby com QR, quadro da ronda, ❌ gigantes e pódio das equipas. */
 export function ProjectorView({ session: initial, initialPlayers }: Props) {
-  const session = useCoroSession(initial)
-  const players = useCoroPlayers(session.id, initialPlayers)
-  const round = useCoroBoard(session)
+  const live = useCoroSession(initial)
+  const players = useCoroPlayers(live.id, initialPlayers)
+  // `session` só avança quando chega o quadro dessa versão: pontos e cartas ao mesmo tempo
+  const { round, shown: session } = useCoroBoard(live)
   const { unlocked, unlock } = useCoroAudio(session, round)
   const origin = useSyncExternalStore(
     () => () => {},
@@ -62,7 +63,7 @@ export function ProjectorView({ session: initial, initialPlayers }: Props) {
 
       {session.status === 'playing' && (
         <main className="mx-auto flex min-h-screen max-w-6xl flex-col gap-5 px-6 py-8 lg:py-10">
-          <header className="flex items-center justify-between gap-4">
+          <header className="mx-auto flex w-full max-w-4xl items-center justify-between gap-4">
             <span className="rounded-full bg-white/10 px-4 py-1.5 text-lg font-bold">
               Ronda {session.current_round} de {session.total_rounds}
             </span>
@@ -81,7 +82,8 @@ export function ProjectorView({ session: initial, initialPlayers }: Props) {
 
           <Banner session={session} />
 
-          <footer className="grid grid-cols-[1fr_auto_1fr] items-center gap-4">
+          {/* Duas colunas iguais com o pote ao meio, na largura do quadro */}
+          <footer className="mx-auto grid w-full max-w-4xl grid-cols-[minmax(0,1fr)_9rem_minmax(0,1fr)] items-center gap-4">
             <TeamScore session={session} team="a" />
             <div className="text-center">
               <p className="text-xs font-bold uppercase tracking-widest text-white/50">Pote</p>
@@ -162,11 +164,12 @@ function TeamScore({ session, team }: { session: VanaCoroSession; team: VanaCoro
     <div
       className={`rounded-3xl p-4 text-center ring-4 transition-all ${TEAM_STYLE[team].soft} ${
         hasControl ? `${TEAM_STYLE[team].ring} scale-105` : 'ring-transparent'
-      } ${team === 'b' ? 'justify-self-end' : ''}`}
+      }`}
     >
       <p className={`truncate text-2xl font-black ${TEAM_STYLE[team].text}`}>{teamName(session, team)}</p>
       <p className="text-6xl font-black tabular-nums">{score}</p>
-      {hasControl && <p className="text-xs font-bold uppercase tracking-widest text-white/70">tem o controlo</p>}
+      {/* Sempre no sítio (invisível sem controlo): as duas caixas ficam com a mesma altura */}
+      <p className={`text-xs font-bold uppercase tracking-widest text-white/70 ${hasControl ? '' : 'invisible'}`}>tem o controlo</p>
     </div>
   )
 }

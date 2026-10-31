@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState, useTransition } from 'react'
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore, useTransition } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
@@ -11,6 +11,8 @@ import {
   ChevronRight,
   Copy,
   Crown,
+  Eye,
+  EyeOff,
   Flag,
   Gift,
   Loader2,
@@ -357,6 +359,10 @@ function GamePanel({
 }) {
   const [round, setRound] = useState<VanaCoroHostRound | null>(null)
   const [hint, setHint] = useState('')
+  // Respostas tapadas (para mostrar o ecrã a alguém); "Espreitar" mostra-as enquanto se carrega
+  const hideAnswers = useSyncExternalStore(subscribeHide, readHide, () => false)
+  const [peek, setPeek] = useState(false)
+  const concealed = hideAnswers && !peek
   const router = useRouter()
   const versionRef = useRef(-1)
 
@@ -476,11 +482,38 @@ function GamePanel({
           </label>
         )}
 
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => writeHide(!hideAnswers)}
+            className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-semibold ${
+              hideAnswers ? 'border-amber-400/50 bg-amber-400/15 text-amber-200' : 'border-white/20 hover:bg-white/10'
+            }`}
+          >
+            {hideAnswers ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
+            {hideAnswers ? 'Mostrar respostas' : 'Esconder respostas'}
+          </button>
+          {hideAnswers && (
+            <button
+              type="button"
+              onPointerDown={() => setPeek(true)}
+              onPointerUp={() => setPeek(false)}
+              onPointerLeave={() => setPeek(false)}
+              onPointerCancel={() => setPeek(false)}
+              onContextMenu={(e) => e.preventDefault()}
+              className="flex select-none items-center gap-1.5 rounded-lg bg-white/10 px-3 py-1.5 text-sm font-semibold active:bg-white/20"
+            >
+              <Eye className="h-4 w-4" /> Manter carregado para espreitar
+            </button>
+          )}
+        </div>
+
         <ul className="mt-3 space-y-2">
           {round?.slots.map((s) => (
             <SlotRow
               key={s.id}
               slot={s}
+              concealed={concealed}
               phase={phase}
               suggested={s.id === suggested}
               disabled={pending || (phase === 'faceoff' && !session.faceoff_turn)}
@@ -621,8 +654,38 @@ function GamePanel({
   )
 }
 
+const HIDE_KEY = 'vanacoro-host-hide-answers'
+const HIDE_EVENT = 'vanacoro-host-hide-answers'
+
+function readHide(): boolean {
+  try {
+    return localStorage.getItem(HIDE_KEY) === '1'
+  } catch {
+    return false
+  }
+}
+
+function writeHide(on: boolean) {
+  try {
+    localStorage.setItem(HIDE_KEY, on ? '1' : '0')
+  } catch {
+    /* sem localStorage: vale só até recarregar */
+  }
+  window.dispatchEvent(new Event(HIDE_EVENT))
+}
+
+function subscribeHide(cb: () => void) {
+  window.addEventListener(HIDE_EVENT, cb)
+  window.addEventListener('storage', cb)
+  return () => {
+    window.removeEventListener(HIDE_EVENT, cb)
+    window.removeEventListener('storage', cb)
+  }
+}
+
 function SlotRow({
   slot,
+  concealed,
   phase,
   suggested,
   disabled,
@@ -630,6 +693,8 @@ function SlotRow({
   onReveal,
 }: {
   slot: VanaCoroHostSlot
+  /** Respostas tapadas: as por revelar não mostram nome, emoji, pontos nem respostas. */
+  concealed: boolean
   phase: VanaCoroSession['phase']
   suggested: boolean
   disabled: boolean
@@ -645,12 +710,24 @@ function SlotRow({
       }`}
     >
       <span className="w-6 text-center font-black text-white/40">{slot.rank}</span>
-      <span className="text-2xl">{slot.emoji}</span>
-      <div className="min-w-0 flex-1">
-        <p className={`font-bold ${slot.revealed ? 'text-amber-200' : ''}`}>{slot.label}</p>
-        {slot.texts.length > 0 && <p className="truncate text-xs text-white/40">{slot.texts.join(' · ')}</p>}
-      </div>
-      <span className="w-10 text-right font-black tabular-nums text-amber-300">{slot.points}</span>
+      {concealed && !slot.revealed ? (
+        <>
+          <span className="w-8 text-2xl text-white/20">?</span>
+          <div className="min-w-0 flex-1">
+            <p className="select-none font-bold tracking-widest text-white/25">● ● ● ● ● ●</p>
+          </div>
+          <span className="w-10 text-right font-black text-white/25">?</span>
+        </>
+      ) : (
+        <>
+          <span className="text-2xl">{slot.emoji}</span>
+          <div className="min-w-0 flex-1">
+            <p className={`font-bold ${slot.revealed ? 'text-amber-200' : ''}`}>{slot.label}</p>
+            {slot.texts.length > 0 && <p className="truncate text-xs text-white/40">{slot.texts.join(' · ')}</p>}
+          </div>
+          <span className="w-10 text-right font-black tabular-nums text-amber-300">{slot.points}</span>
+        </>
+      )}
       {canReveal ? (
         <button
           type="button"

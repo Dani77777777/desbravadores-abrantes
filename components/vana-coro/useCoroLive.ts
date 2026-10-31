@@ -80,21 +80,34 @@ export function useCoroPlayers(sessionId: string, initial: VanaCoroPlayer[], pol
   return players
 }
 
-/** O quadro público: volta a pedi-lo ao servidor sempre que board_version sobe. */
-export function useCoroBoard(session: VanaCoroSession): VanaCoroPublicRound | null {
-  const [round, setRound] = useState<VanaCoroPublicRound | null>(null)
+/**
+ * O quadro público: volta a pedi-lo ao servidor sempre que board_version sobe.
+ *
+ * Devolve também `shown`: a sessão tal como estava quando o quadro foi pedido.
+ * O pote, os pontos e os ❌ chegam logo pelo tempo real, mas a carta revelada só
+ * chega com o quadro; mostrando os dois juntos, os pontos sobem no mesmo instante
+ * em que a carta vira (e não antes, a denunciar a resposta).
+ */
+export function useCoroBoard(session: VanaCoroSession): { round: VanaCoroPublicRound | null; shown: VanaCoroSession } {
+  const [loaded, setLoaded] = useState<{ round: VanaCoroPublicRound | null; session: VanaCoroSession } | null>(null)
   const requested = useRef(-1)
+  const latest = useRef(session)
   const playing = session.status === 'playing'
+
+  useEffect(() => {
+    latest.current = session
+  })
 
   useEffect(() => {
     if (!playing) return
     const version = session.board_version
+    const snapshot = latest.current
     requested.current = version
     let cancelled = false
     getPublicRound(session.id)
       .then((r) => {
         // Ignora respostas de pedidos mais antigos que chegam fora de ordem
-        if (!cancelled && requested.current === version) setRound(r)
+        if (!cancelled && requested.current === version) setLoaded({ round: r, session: snapshot })
       })
       .catch(() => {})
     return () => {
@@ -102,7 +115,8 @@ export function useCoroBoard(session: VanaCoroSession): VanaCoroPublicRound | nu
     }
   }, [session.id, session.board_version, playing])
 
-  return playing ? round : null
+  if (!playing) return { round: null, shown: session }
+  return { round: loaded?.round ?? null, shown: loaded?.session ?? session }
 }
 
 /** O que está a acontecer no duelo, em linguagem de palco (projetor, controlo e telemóveis). */
