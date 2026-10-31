@@ -208,7 +208,7 @@ function Face({ player, color }: { player: VanaCoroPlayer; color: string }) {
         }}
       >
         {player.avatar_url ? (
-          // crossOrigin: sem isto a foto (Supabase / Google) não entra na captura
+          // crossOrigin: sem isto a foto de perfil (Supabase Storage) não entra na captura
           <img
             src={player.avatar_url}
             alt=""

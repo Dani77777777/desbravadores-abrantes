@@ -52,13 +52,9 @@ const BOT_NAMES = ['Bot Leão', 'Bot Águia', 'Bot Lobo', 'Bot Raposa', 'Bot Urs
 // ── Guardas ───────────────────────────────────────────────────
 
 async function currentUserId(): Promise<string | null> {
-  return (await currentUser())?.id ?? null
-}
-
-async function currentUser() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  return user
+  return user?.id ?? null
 }
 
 async function requireHostRole() {
@@ -205,8 +201,7 @@ export async function joinCoroSession(input: {
     .maybeSingle()
   if (!session) return { error: 'Código inválido ou o jogo já acabou.' }
 
-  const user = await currentUser()
-  const userId = user?.id ?? null
+  const userId = await currentUserId()
   let row: Record<string, unknown>
   if (userId) {
     const { data: profile } = await service.from('profiles').select('full_name, avatar_url').eq('id', userId).maybeSingle()
@@ -226,9 +221,7 @@ export async function joinCoroSession(input: {
       return { playerId: existing.id, sessionId: session.id }
     }
     if (session.status !== 'lobby') return { error: LATE }
-    // Sem foto no perfil, usa a da conta (Google), como no VanaQuest
-    const avatar = profile.avatar_url || user?.user_metadata?.avatar_url || user?.user_metadata?.picture || null
-    row = { profile_id: userId, display_name: shortDisplayName(profile.full_name), avatar_url: avatar }
+    row = { profile_id: userId, display_name: shortDisplayName(profile.full_name), avatar_url: profile.avatar_url }
   } else {
     // As equipas fecham quando o jogo começa: quem chega tarde já não entra.
     if (session.status !== 'lobby') return { error: LATE }

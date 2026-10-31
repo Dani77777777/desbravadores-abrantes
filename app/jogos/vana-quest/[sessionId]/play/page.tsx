@@ -11,7 +11,8 @@ export default async function PlayPage({ params }: { params: Promise<{ sessionId
   if (user) {
     const { data } = await supabase.from('profiles').select('*').eq('id', user.id).single()
     profile = data
-    // Fallback do avatar para o user_metadata (Google OAuth, etc.)
+    // Fallback do avatar para o user_metadata da conta. Nota: o site NÃO tem login com
+    // Google (só email e palavra-passe), por isso isto normalmente vem vazio.
     if (profile && !profile.avatar_url) {
       profile.avatar_url = user.user_metadata?.avatar_url || null
     }
@@ -46,7 +47,8 @@ export default async function PlayPage({ params }: { params: Promise<{ sessionId
     .eq('role', 'desbravador')
     .order('full_name')
 
-  // Fallback: para profiles sem avatar_url, buscar do auth.users metadata (Google OAuth etc)
+  // Fallback: para profiles sem avatar_url, buscar do auth.users metadata. O site não tem
+  // login com Google, por isso as fotos vêm sempre do perfil (avatar_url).
   const missingAvatarIds = (profilesData || []).filter((p) => !p.avatar_url).map((p) => p.id)
   const metaAvatars = new Map<string, string>()
   if (missingAvatarIds.length > 0) {
