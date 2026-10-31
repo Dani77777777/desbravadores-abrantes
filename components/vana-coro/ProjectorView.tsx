@@ -2,7 +2,8 @@
 
 import { useSyncExternalStore } from 'react'
 import { QRCodeSVG } from 'qrcode.react'
-import { Crown, Volume2, Zap } from 'lucide-react'
+import { Crown, Maximize, Volume2, Zap } from 'lucide-react'
+import { enterFullscreen, isWindowFullscreen } from '@/utils/fullscreen'
 import { CORO_BG, CoroBoard, StrikeMarks, StrikeOverlay, TEAM_STYLE } from './BoardUI'
 import { faceoffMessage, teamName, useCoroBoard, useCoroPlayers, useCoroSession } from './useCoroLive'
 import { useCoroAudio } from './useCoroAudio'
@@ -25,16 +26,35 @@ export function ProjectorView({ session: initial, initialPlayers }: Props) {
     () => window.location.origin,
     () => '',
   )
+  const fullscreen = useSyncExternalStore(subscribeFullscreen, isWindowFullscreen, () => true)
 
   return (
     <div className={`relative min-h-screen overflow-hidden text-white ${CORO_BG}`}>
+      {/* Como no VanaQuest: o ecrã todo pede o primeiro clique (áudio + ecrã inteiro) */}
       {!unlocked && (
         <button
           type="button"
           onClick={unlock}
-          className="fixed inset-x-0 top-0 z-40 flex items-center justify-center gap-2 bg-amber-400 py-2 text-sm font-bold text-purple-950"
+          className="fixed inset-0 z-[100] flex cursor-pointer items-center justify-center bg-black/70 backdrop-blur-md animate-in fade-in duration-300"
         >
-          <Volume2 className="h-4 w-4" /> Clica para ativar o áudio e o ecrã inteiro
+          <span className="mx-4 max-w-md rounded-3xl border-2 border-amber-400/40 bg-purple-950/80 px-10 py-8 text-center shadow-2xl">
+            <Volume2 className="mx-auto mb-4 h-14 w-14 text-amber-300 drop-shadow-[0_0_20px_rgba(252,211,77,0.5)]" />
+            <span className="block text-2xl font-black text-amber-100">Clica para ativar o áudio e o ecrã inteiro</span>
+            <span className="mt-2 block text-sm text-amber-300/70">Os browsers exigem uma interação antes de tocar música</span>
+          </span>
+        </button>
+      )}
+
+      {/* O ecrã inteiro caiu (Esc mantido, mudar de separador…): um clique em qualquer lado repõe-no */}
+      {unlocked && !fullscreen && (
+        <button
+          type="button"
+          onClick={() => enterFullscreen({ lockEscape: true })}
+          className="fixed inset-0 z-[90] flex cursor-pointer items-end justify-center pb-10"
+        >
+          <span className="flex items-center gap-2 rounded-full bg-black/70 px-6 py-3 text-lg font-bold text-amber-200 shadow-2xl backdrop-blur">
+            <Maximize className="h-5 w-5" /> Clica para voltar ao ecrã inteiro
+          </span>
         </button>
       )}
 
@@ -83,6 +103,15 @@ export function ProjectorView({ session: initial, initialPlayers }: Props) {
       )}
     </div>
   )
+}
+
+function subscribeFullscreen(cb: () => void) {
+  document.addEventListener('fullscreenchange', cb)
+  window.addEventListener('resize', cb)
+  return () => {
+    document.removeEventListener('fullscreenchange', cb)
+    window.removeEventListener('resize', cb)
+  }
 }
 
 function Lobby({ session, players, joinUrl }: { session: VanaCoroSession; players: VanaCoroPlayer[]; joinUrl: string }) {

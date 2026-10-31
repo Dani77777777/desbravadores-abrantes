@@ -149,7 +149,7 @@ export function useCoroAudio(session: VanaCoroSession, round: VanaCoroPublicRoun
 
   /** Tem de ser chamado num clique: desbloqueia o áudio e põe em ecrã inteiro. */
   const unlock = useCallback(() => {
-    enterFullscreen()
+    enterFullscreen({ lockEscape: true })
     try {
       ctxRef.current ??= new AudioContext()
       ctxRef.current.resume().catch(() => {})
