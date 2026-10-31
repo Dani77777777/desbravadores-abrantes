@@ -72,7 +72,8 @@ FROM (
         WHEN pl.description ILIKE 'Transferência%'                    THEN 'transferencia'
         WHEN pl.description ILIKE 'Vantur%'                             -- RPC award_vantur_rewards
           OR pl.description ILIKE 'Vana%'                               -- VanaQuest, VanaTrilha, ...
-          OR pl.description ILIKE '%VanaWords%'                       THEN 'jogo'
+          OR pl.description ILIKE '%VanaWords%'
+          OR pl.description ILIKE '%VanaSketch%'                      THEN 'jogo'
         WHEN COALESCE(a.helper_role, a.role)::text IN ('dirigente', 'coordenador') THEN 'manual'
         ELSE 'outro'
       END AS base_category
