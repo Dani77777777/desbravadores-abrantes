@@ -65,7 +65,13 @@ export function WinnersShare({ session, players }: Props) {
       let dataUrl: string | null = null
       for (let attempt = 0; attempt < 3 && !dataUrl; attempt++) {
         try {
-          dataUrl = await toPng(node, { pixelRatio: 2, cacheBust: true, backgroundColor: '#2e1065' })
+          dataUrl = await toPng(node, {
+            pixelRatio: 2,
+            cacheBust: true,
+            backgroundColor: '#2e1065',
+            // Uma foto que não carregue fica como o círculo da cor da equipa (não estraga a imagem toda)
+            imagePlaceholder: 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7',
+          })
         } catch (err) {
           if (attempt === 2) throw err
           await new Promise((r) => setTimeout(r, 400))
@@ -184,13 +190,60 @@ interface CardProps {
   date: string
 }
 
+const MAX_FACES = 8
+
+/** Foto (ou inicial) em círculo, com o anel da cor da equipa, e o nome por baixo. */
+function Face({ player, color }: { player: VanaCoroPlayer; color: string }) {
+  return (
+    <div className="flex flex-col items-center" style={{ width: 96 }}>
+      <span
+        className="flex items-center justify-center overflow-hidden"
+        style={{
+          width: 84,
+          height: 84,
+          borderRadius: 999,
+          border: `4px solid ${color}`,
+          boxShadow: `0 0 24px ${color}66`,
+          background: `linear-gradient(135deg, ${color}, #3b0764)`,
+        }}
+      >
+        {player.avatar_url ? (
+          // crossOrigin: sem isto a foto (Supabase / Google) não entra na captura
+          <img
+            src={player.avatar_url}
+            alt=""
+            crossOrigin="anonymous"
+            referrerPolicy="no-referrer"
+            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+          />
+        ) : (
+          <span style={{ fontSize: 34, fontWeight: 900 }}>{player.display_name[0]?.toUpperCase()}</span>
+        )}
+      </span>
+      <span
+        style={{
+          marginTop: 8,
+          maxWidth: 96,
+          fontSize: 18,
+          fontWeight: 800,
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          whiteSpace: 'nowrap',
+        }}
+      >
+        {player.display_name.split(' ')[0]}
+      </span>
+    </div>
+  )
+}
+
 const WinnersCard = forwardRef<HTMLDivElement, CardProps>(({ session, players, winner, round, date }, ref) => {
   const scores = { a: session.team_a_score, b: session.team_b_score }
   const lead: VanaCoroTeam = winner ?? 'a'
   const featured = winner ? [winner] : (['a', 'b'] as VanaCoroTeam[])
-  const names = (t: VanaCoroTeam) => players.filter((p) => p.team === t && !p.is_bot).map((p) => p.display_name)
-  const winnerNames = featured.flatMap(names)
-  const shownNames = winnerNames.slice(0, 12)
+  // Os vencedores (no empate, toda a gente), sem bots; cabem 8 numa fila, o resto fica em "+N"
+  const winners = featured.flatMap((t) => players.filter((p) => p.team === t && !p.is_bot))
+  const shown = winners.slice(0, MAX_FACES)
   const accent = winner ? COLORS[winner] : { main: GOLD, soft: 'rgba(252,211,77,.14)', glow: 'rgba(252,211,77,.5)' }
 
   return (
@@ -235,8 +288,8 @@ const WinnersCard = forwardRef<HTMLDivElement, CardProps>(({ session, players, w
       </div>
 
       {/* Vencedores */}
-      <div className="flex flex-col items-center text-center" style={{ marginTop: 34 }}>
-        <p style={{ fontSize: 64, lineHeight: 1 }}>{winner ? '👑' : '🤝'}</p>
+      <div className="flex flex-col items-center text-center" style={{ marginTop: 26 }}>
+        <p style={{ fontSize: 56, lineHeight: 1 }}>{winner ? '👑' : '🤝'}</p>
         <p
           className={displayFont.className}
           style={{
@@ -279,21 +332,21 @@ const WinnersCard = forwardRef<HTMLDivElement, CardProps>(({ session, players, w
           ))}
         </div>
 
-        {/* Nomes */}
-        {shownNames.length > 0 && (
-          <div className="flex flex-wrap justify-center" style={{ marginTop: 22, gap: 10, maxWidth: 940 }}>
-            {shownNames.map((n, i) => (
-              <span
-                key={`${n}-${i}`}
-                style={{ padding: '6px 16px', borderRadius: 999, background: 'rgba(255,255,255,.12)', fontSize: 22, fontWeight: 700 }}
-              >
-                {n}
-              </span>
+        {/* Fotos e nomes dos vencedores */}
+        {shown.length > 0 && (
+          <div className="flex justify-center" style={{ marginTop: 20, gap: 20, maxWidth: 960 }}>
+            {shown.map((p) => (
+              <Face key={p.id} player={p} color={p.team ? COLORS[p.team].main : GOLD} />
             ))}
-            {winnerNames.length > shownNames.length && (
-              <span style={{ padding: '6px 16px', fontSize: 22, fontWeight: 700, color: 'rgba(255,255,255,.6)' }}>
-                +{winnerNames.length - shownNames.length}
-              </span>
+            {winners.length > shown.length && (
+              <div className="flex flex-col items-center" style={{ width: 96 }}>
+                <span
+                  className="flex items-center justify-center"
+                  style={{ width: 84, height: 84, borderRadius: 999, background: 'rgba(255,255,255,.12)', fontSize: 28, fontWeight: 900 }}
+                >
+                  +{winners.length - shown.length}
+                </span>
+              </div>
             )}
           </div>
         )}
@@ -328,7 +381,7 @@ const WinnersCard = forwardRef<HTMLDivElement, CardProps>(({ session, players, w
                 key={e.rank}
                 className="flex items-center"
                 style={{
-                  height: 46,
+                  height: 42,
                   borderRadius: 14,
                   overflow: 'hidden',
                   background: 'linear-gradient(90deg, #fcd34d, #fde68a 60%, #fbbf24)',
