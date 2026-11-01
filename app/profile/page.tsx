@@ -2,8 +2,9 @@ import { createClient } from '@/utils/supabase/server'
 import { redirect } from 'next/navigation'
 import ProfileSettings from './ProfileSettings'
 import { getFamilyAccountSummary } from '@/lib/family-accounts'
+import { getMyClubFamily } from '@/lib/actions/club-families'
 
-export default async function ProfilePage() {
+export default async function ProfilePage({ searchParams }: { searchParams: Promise<{ familia?: string }> }) {
   const supabase = await createClient()
 
   const { data: { user } } = await supabase.auth.getUser()
@@ -55,7 +56,7 @@ export default async function ProfilePage() {
     .select('station')
     .eq('user_id', user.id)
 
-  const familyAccounts = await getFamilyAccountSummary(user.id)
+  const [familyAccounts, clubFamily, params] = await Promise.all([getFamilyAccountSummary(user.id), getMyClubFamily(), searchParams])
 
   return <ProfileSettings 
     profile={profile} 
@@ -64,5 +65,7 @@ export default async function ProfilePage() {
     purchases={purchases || []}
     vanaTrilhaStations={new Set((trilhaProgress || []).map((r) => r.station)).size}
     familyAccounts={familyAccounts}
+    clubFamily={clubFamily}
+    familyCode={params?.familia || ''}
   />
 }

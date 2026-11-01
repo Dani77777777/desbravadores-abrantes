@@ -17,6 +17,7 @@ import { ManageMemberDialog } from './ManageMemberDialog'
 import { DeleteMemberDialog } from './DeleteMemberDialog'
 import { SectionSuggestions, type SectionSuggestion } from './SectionSuggestions'
 import { GenderReview } from './GenderReview'
+import { ClubFamiliesPanel } from './ClubFamiliesPanel'
 import { InviteEventDialog } from './InviteEventDialog'
 import { SECTION_LABELS, helperLabel } from '@/utils/permissions'
 import { ROLE_LABELS, SECTION_DOT, SECTION_RING } from './member-constants'
@@ -280,6 +281,8 @@ export function MemberList({ members, currentUserRole, adminProfile, clubMembers
       {currentUserRole === 'coordenador' && <SectionSuggestions suggestions={sectionSuggestions} />}
 
       {currentUserRole === 'coordenador' && <GenderReview members={members} />}
+
+      {canAssignHelpers && <ClubFamiliesPanel members={members} />}
 
       {/* ── Filtros ────────────────────────────────────────────── */}
       <div className="space-y-3 rounded-[1.5rem] bg-white p-3 shadow-sm ring-1 ring-stone-200 sm:p-4">

@@ -1,4 +1,5 @@
 import { createServiceClient } from '@/utils/supabase/service'
+import { clubFamilyGroups } from '@/lib/club-families'
 
 type Service = ReturnType<typeof createServiceClient>
 
@@ -20,12 +21,16 @@ export async function familyGroupIds(service: Service, userId: string): Promise<
 }
 
 /**
- * Todas as famílias (conta principal + perfis associados) que juntam pelo menos duas
- * pessoas de `memberIds`. Usado no Formador de equipas para não separar famílias.
+ * Todas as famílias que juntam pelo menos duas pessoas de `memberIds`: as contas familiares
+ * (conta principal + perfis associados) e as famílias do clube (pais, irmãos… com contas
+ * próprias). Usado no Formador de equipas para não separar famílias.
  */
 export async function familyGroupsAmong(service: Service, memberIds: string[]): Promise<string[][]> {
   if (memberIds.length === 0) return []
-  const { data } = await service.from('family_account_links').select('owner_user_id, associated_user_id')
+  const [{ data }, clubGroups] = await Promise.all([
+    service.from('family_account_links').select('owner_user_id, associated_user_id'),
+    clubFamilyGroups(service),
+  ])
   const wanted = new Set(memberIds)
   const byOwner = new Map<string, string[]>()
   for (const l of data ?? []) {
@@ -33,5 +38,5 @@ export async function familyGroupsAmong(service: Service, memberIds: string[]): 
     list.push(l.associated_user_id)
     byOwner.set(l.owner_user_id, list)
   }
-  return [...byOwner.values()].map((ids) => ids.filter((id) => wanted.has(id))).filter((ids) => ids.length > 1)
+  return [...byOwner.values(), ...clubGroups].map((ids) => ids.filter((id) => wanted.has(id))).filter((ids) => ids.length > 1)
 }

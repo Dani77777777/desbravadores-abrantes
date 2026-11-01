@@ -102,6 +102,8 @@ export async function updateSession(request: NextRequest) {
     !request.nextUrl.pathname.startsWith('/api/convites/sair') &&
     // Presenças por QR: os convidados marcam sem conta (a página valida o passe do QR)
     !request.nextUrl.pathname.startsWith('/presenca') &&
+    // Convite para uma família: a rota manda para o login com o regresso ao perfil
+    !request.nextUrl.pathname.startsWith('/familia/') &&
     !request.nextUrl.pathname.includes('/present') &&
     request.nextUrl.pathname !== '/jogos'
   ) {

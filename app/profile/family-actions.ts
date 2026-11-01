@@ -5,6 +5,7 @@ import { revalidatePath } from 'next/cache'
 import { createClient } from '@/utils/supabase/server'
 import { createServiceClient } from '@/utils/supabase/service'
 import { getFamilyAccountSummary } from '@/lib/family-accounts'
+import { syncAssociatedIntoFamily } from '@/lib/club-families'
 import { IMPLAUSIBLE_BIRTH_DATE_MESSAGE, hasImplausibleBirthDate } from '@/utils/birth-date'
 
 type Result = { success?: true; error?: string; code?: string; parentName?: string }
@@ -123,6 +124,8 @@ export async function createFamilyAccount(data: {
     await admin.auth.admin.deleteUser(created.user.id)
     return { error: 'Não foi possível associar a nova conta. Tenta novamente.' }
   }
+  // Se o responsável já tem família no clube, o novo perfil entra nela.
+  await syncAssociatedIntoFamily(admin, ownerUserId)
 
   revalidatePath('/profile')
   return { success: true }
@@ -197,6 +200,7 @@ export async function acceptFamilyAssociationCode(rawCode: string): Promise<Resu
   await admin.from('family_account_requests').update({
     status: 'accepted', accepted_at: new Date().toISOString(), accepted_by_user_id: associatedUserId,
   }).eq('id', request.id)
+  await syncAssociatedIntoFamily(admin, request.owner_user_id)
   revalidatePath('/profile')
   return { success: true }
 }

@@ -21,6 +21,8 @@ import { GenderChoice } from '@/components/profile/GenderChoice'
 import type { Gender } from '@/utils/name-gender'
 import type { FamilyAccountSummary } from '@/lib/family-accounts'
 import { FamilyAccountsPanel } from '@/components/profile/FamilyAccountsPanel'
+import { ClubFamilyPanel } from '@/components/profile/ClubFamilyPanel'
+import type { MyClubFamily } from '@/lib/actions/club-families'
 
 const D = displayFont.className
 
@@ -41,6 +43,8 @@ interface ProfileSettingsProps {
   purchases: any[]
   vanaTrilhaStations?: number
   familyAccounts: FamilyAccountSummary
+  clubFamily: MyClubFamily
+  familyCode?: string
 }
 
 const SECTION_COLORS: Record<string, string> = {
@@ -79,7 +83,7 @@ function Panel({ icon: Icon, iconClass, title, description, children, className 
   )
 }
 
-export default function ProfileSettings({ profile, user, userEmail, purchases, vanaTrilhaStations = 0, familyAccounts }: ProfileSettingsProps) {
+export default function ProfileSettings({ profile, user, userEmail, purchases, vanaTrilhaStations = 0, familyAccounts, clubFamily, familyCode }: ProfileSettingsProps) {
   const [fullName, setFullName] = useState(profile.full_name)
   const [avatar, setAvatar] = useState<AvatarChoice>({ file: null, url: profile.avatar_url || '' })
   const savedGender: Gender | null = profile.gender === 'm' || profile.gender === 'f' ? profile.gender : null
@@ -390,6 +394,8 @@ export default function ProfileSettings({ profile, user, userEmail, purchases, v
           <PurchaseHistory purchases={purchases} />
 
           <FamilyAccountsPanel summary={familyAccounts} />
+
+          <ClubFamilyPanel data={clubFamily} userId={user.id} fullName={profile.full_name} initialCode={familyCode} />
 
           {/* Alterar email */}
           <Panel icon={Mail} iconClass="bg-violet-500" title="Alterar Email" description="Será enviado um email de confirmação para o novo endereço.">

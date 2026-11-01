@@ -1058,7 +1058,7 @@ export function TeamsClient({
                       <span
                         key={b.join()}
                         className="inline-flex items-center gap-1 rounded-full border border-fuchsia-200 bg-fuchsia-50 px-3 py-1 text-xs font-bold text-fuchsia-900"
-                        title="Contas familiares"
+                        title="Família (contas familiares ou famílias do clube)"
                       >
                         <Heart className="h-3 w-3" /> {b.map(nameOf).join(' + ')}
                       </span>
@@ -1066,8 +1066,8 @@ export function TeamsClient({
                   </div>
                 )}
                 <p className="text-xs text-gray-500">
-                  As contas familiares já ficam juntas. Junta aqui quem não está ligado (ex.: o pai com conta própria, ou uma visita que veio
-                  com eles). Fica guardado neste dispositivo.
+                  As famílias do clube (Membros → Famílias do clube, ou cada um no perfil) e as contas familiares já ficam juntas. Junta
+                  aqui só quem falta (ex.: uma visita que veio com eles). Fica guardado neste dispositivo.
                 </p>
                 <div className="flex flex-col gap-2 sm:flex-row">
                   {[
