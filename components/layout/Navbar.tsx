@@ -59,7 +59,7 @@ export function Navbar({ user, profile }: NavbarProps) {
   const pathname = usePathname()
   const supabase = createClient()
   const userId = user?.id as string | undefined
-  const [familyAccounts, setFamilyAccounts] = useState<Array<{ id: string; fullName: string; avatarUrl: string | null; relation: 'owner' | 'associated' }>>([])
+  const [familyAccounts, setFamilyAccounts] = useState<Array<{ id: string; fullName: string; avatarUrl: string | null; relation: 'child' | 'return' }>>([])
   const [switchingAccountId, setSwitchingAccountId] = useState<string | null>(null)
 
   const handleLogout = async () => {
@@ -232,7 +232,7 @@ export function Navbar({ user, profile }: NavbarProps) {
                         <DropdownMenuSeparator />
                         {familyAccounts.map((familyAccount) => <DropdownMenuItem key={familyAccount.id} disabled={!!switchingAccountId} onSelect={(event) => { event.preventDefault(); switchFamilyAccount(familyAccount.id) }} className="cursor-pointer rounded-lg text-fuchsia-700 focus:text-fuchsia-700">
                           {switchingAccountId === familyAccount.id ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ArrowLeftRight className="mr-2 h-4 w-4" />}
-                          <span className="truncate">Mudar para {familyAccount.fullName}</span>
+                          <span className="truncate">{familyAccount.relation === 'return' ? 'Voltar para' : 'Mudar para'} {familyAccount.fullName}</span>
                         </DropdownMenuItem>)}
                       </>
                     )}
@@ -334,7 +334,7 @@ export function Navbar({ user, profile }: NavbarProps) {
                 </div>
                 {familyAccounts.map((familyAccount) => (
                   <button key={familyAccount.id} type="button" disabled={!!switchingAccountId} onClick={() => switchFamilyAccount(familyAccount.id)} className="flex w-full items-center justify-center gap-2 rounded-2xl bg-fuchsia-500/20 px-4 py-3 text-sm font-extrabold text-fuchsia-100 ring-1 ring-inset ring-fuchsia-300/25 disabled:opacity-60">
-                    {switchingAccountId === familyAccount.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowLeftRight className="h-4 w-4" />} Mudar para {familyAccount.fullName}
+                    {switchingAccountId === familyAccount.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowLeftRight className="h-4 w-4" />} {familyAccount.relation === 'return' ? 'Voltar para' : 'Mudar para'} {familyAccount.fullName}
                   </button>
                 ))}
               </div>

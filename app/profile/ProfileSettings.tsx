@@ -19,8 +19,6 @@ import { PurchaseHistory } from './PurchaseHistory'
 import { DeleteAccountCard } from './DeleteAccountCard'
 import { GenderChoice } from '@/components/profile/GenderChoice'
 import type { Gender } from '@/utils/name-gender'
-import type { FamilyAccountSummary } from '@/lib/family-accounts'
-import { FamilyAccountsPanel } from '@/components/profile/FamilyAccountsPanel'
 import { ClubFamilyPanel } from '@/components/profile/ClubFamilyPanel'
 import type { MyClubFamily } from '@/lib/actions/club-families'
 
@@ -42,7 +40,6 @@ interface ProfileSettingsProps {
   userEmail: string
   purchases: any[]
   vanaTrilhaStations?: number
-  familyAccounts: FamilyAccountSummary
   clubFamily: MyClubFamily
   familyCode?: string
 }
@@ -83,7 +80,7 @@ function Panel({ icon: Icon, iconClass, title, description, children, className 
   )
 }
 
-export default function ProfileSettings({ profile, user, userEmail, purchases, vanaTrilhaStations = 0, familyAccounts, clubFamily, familyCode }: ProfileSettingsProps) {
+export default function ProfileSettings({ profile, user, userEmail, purchases, vanaTrilhaStations = 0, clubFamily, familyCode }: ProfileSettingsProps) {
   const [fullName, setFullName] = useState(profile.full_name)
   const [avatar, setAvatar] = useState<AvatarChoice>({ file: null, url: profile.avatar_url || '' })
   const savedGender: Gender | null = profile.gender === 'm' || profile.gender === 'f' ? profile.gender : null
@@ -392,8 +389,6 @@ export default function ProfileSettings({ profile, user, userEmail, purchases, v
 
           {/* Histórico de compras */}
           <PurchaseHistory purchases={purchases} />
-
-          <FamilyAccountsPanel summary={familyAccounts} />
 
           <ClubFamilyPanel data={clubFamily} userId={user.id} fullName={profile.full_name} initialCode={familyCode} />
 

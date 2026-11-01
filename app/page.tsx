@@ -9,7 +9,7 @@ import { EventDashboard } from '@/components/events/EventDashboard'
 import { TripAssignments, type TripAssignmentRow } from '@/components/dashboard/TripAssignments'
 import { pendingRsvpCount } from '@/utils/event-rsvp'
 import { User, Trophy, Coins, Megaphone, History, ListChecks, CheckCircle2, Clock, ShieldCheck, Hourglass, CalendarCheck, AlertTriangle } from 'lucide-react'
-import { getFamilyAccountSummary } from '@/lib/family-accounts'
+import { switchableAccounts } from '@/lib/family-accounts'
 import { hasImplausibleBirthDate } from '@/utils/birth-date'
 import { displayFont } from '@/components/landing/fonts'
 import { SiteFooter } from '@/components/landing/SiteFooter'
@@ -167,10 +167,11 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
   // Contas criadas antes de o onboarding perguntar o sexo (serve às tendas nas saídas)
   const missingGender = profile.gender !== 'm' && profile.gender !== 'f'
 
-  // Perfis familiares com um ano mal escrito (dá 0 anos ou menos): o pai corrige no perfil.
-  const familyAccounts = await getFamilyAccountSummary(user.id)
-  const wrongBirthDateAccounts = familyAccounts.linkedAccounts.filter(
-    (account) => account.relation === 'owner' && hasImplausibleBirthDate(account.birthDate)
+  // Crianças da família com um ano mal escrito (dá 0 anos ou menos): um adulto corrige no perfil.
+  // Sem o cookie de voltar, só um adulto recebe a lista (as crianças da sua família).
+  const familyAccounts = await switchableAccounts(user.id, null)
+  const wrongBirthDateAccounts = familyAccounts.filter(
+    (account) => account.relation === 'child' && hasImplausibleBirthDate(account.birthDate)
   )
 
   const level = Math.floor(profile.total_xp / 1000) + 1
@@ -262,7 +263,7 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
                     </Link>
                   )}
                   {wrongBirthDateAccounts.map((account) => (
-                    <Link key={account.id} href="/profile#contas-familiares" className="inline-flex items-center gap-1.5 rounded-full bg-amber-500 px-3.5 py-1.5 text-sm font-extrabold text-white transition-transform hover:-translate-y-0.5">
+                    <Link key={account.id} href="/profile#familia" className="inline-flex items-center gap-1.5 rounded-full bg-amber-500 px-3.5 py-1.5 text-sm font-extrabold text-white transition-transform hover:-translate-y-0.5">
                       <AlertTriangle className="h-4 w-4" /> Corrige a data de nascimento de {account.fullName.split(' ')[0]}
                     </Link>
                   ))}

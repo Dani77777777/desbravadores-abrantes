@@ -55,13 +55,20 @@ export async function sendEventInvites(input: {
   }
 
   // ── Membros, famílias e quem não quer receber ──
-  const [{ data: members }, { data: links }, { data: optOuts }, { data: invites }] = await Promise.all([
+  const [{ data: members }, { data: managed }, { data: optOuts }, { data: invites }] = await Promise.all([
     admin.from('profiles').select('id, full_name, section, gender').in('id', memberIds),
-    admin.from('family_account_links').select('owner_user_id, associated_user_id').in('associated_user_id', memberIds),
+    // Perfis criados pela família (sem email próprio): o convite vai para um adulto da família.
+    admin.from('club_family_members').select('user_id, family_id').eq('managed', true).in('user_id', memberIds),
     admin.from('email_opt_outs').select('user_id').in('user_id', memberIds),
     admin.from('event_invites').select('user_id').eq('event_id', event.id).in('user_id', memberIds),
   ])
-  const ownerOf = new Map((links || []).map((l) => [l.associated_user_id, l.owner_user_id]))
+  const managedFamilies = [...new Set((managed || []).map((m) => m.family_id as string))]
+  const { data: adults } = managedFamilies.length
+    ? await admin.from('club_family_members').select('user_id, family_id').eq('kind', 'adult').in('family_id', managedFamilies).order('created_at')
+    : { data: [] }
+  const adultsOf = new Map<string, string[]>()
+  for (const a of adults || []) adultsOf.set(a.family_id as string, [...(adultsOf.get(a.family_id as string) ?? []), a.user_id as string])
+  const familyAdults = new Map((managed || []).map((m) => [m.user_id as string, adultsOf.get(m.family_id as string) ?? []]))
   const optedOut = new Set((optOuts || []).map((o) => o.user_id))
   const invited = new Set((invites || []).map((i) => i.user_id))
 
@@ -80,16 +87,19 @@ export async function sendEventInvites(input: {
       if (optedOut.has(id)) { skip(id, 'opted_out'); continue }
       if (invited.has(id) && !input.resend) { skip(id, 'already_invited'); continue }
 
-      // Perfis familiares têm um email interno: o convite vai para a conta principal.
-      const ownerId = ownerOf.get(id)
-      const { data: authUser } = await admin.auth.admin.getUserById(ownerId || id)
-      const email = authUser.user?.email
-      if (!isDeliverableEmail(email)) { skip(id, 'no_email'); continue }
+      // Perfis da família têm um email interno: o convite vai para o primeiro adulto da família com email.
+      const viaFamily = familyAdults.has(id)
+      let email: string | undefined
+      for (const candidate of viaFamily ? familyAdults.get(id)! : [id]) {
+        const { data: authUser } = await admin.auth.admin.getUserById(candidate)
+        if (isDeliverableEmail(authUser.user?.email)) { email = authUser.user!.email!; break }
+      }
+      if (!email) { skip(id, 'no_email'); continue }
 
       const content = buildInviteEmail({
         firstName: (member.full_name || '').trim().split(/\s+/)[0] || 'Desbravador',
         gender: member.gender,
-        toFamily: !!ownerId,
+        toFamily: viaFamily,
         event,
         message,
         inviterName: actor?.full_name,
@@ -120,7 +130,7 @@ export async function sendEventInvites(input: {
       }
 
       await admin.rpc('record_event_invite', {
-        p_event_id: event.id, p_user_id: id, p_invited_by: user.id, p_family: !!ownerId,
+        p_event_id: event.id, p_user_id: id, p_invited_by: user.id, p_family: viaFamily,
       })
       result.sent.push(id)
     }

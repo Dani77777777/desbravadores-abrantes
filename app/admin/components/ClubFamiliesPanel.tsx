@@ -7,7 +7,7 @@ import {
   adminAddToClubFamily, adminCreateClubFamily, adminDeleteClubFamily, adminRemoveFromClubFamily, listClubFamiliesForAdmin,
   renameClubFamily, setClubFamilyKind,
 } from '@/lib/actions/club-families'
-import { familyKindLabel, suggestedFamilyName, type ClubFamily, type FamilyKind } from '@/utils/club-families'
+import { familyKindLabel, isGrownChild, suggestedFamilyName, type ClubFamily, type FamilyKind } from '@/utils/club-families'
 import { SECTION_DOT } from './member-constants'
 
 type Member = { id: string; full_name: string | null; section: string | null }
@@ -86,9 +86,9 @@ export function ClubFamiliesPanel({ members }: { members: Member[] }) {
       >
         <Heart className="h-4 w-4 shrink-0" />
         <span className="flex-1">
-          <b>Famílias do clube</b>
-          {count !== undefined && <> · {count} {count === 1 ? 'família' : 'famílias'}</>} — quem é família de quem (adultos e crianças, cada
-          um com a sua conta). No Formador de equipas ficam sempre juntos.
+          <b>Famílias</b>
+          {count !== undefined && <> · {count} {count === 1 ? 'família' : 'famílias'}</>} — quem é família de quem, adultos e crianças. Os
+          adultos entram nas contas das crianças; no Formador de equipas ficam sempre juntos.
         </span>
         <ChevronDown className={`h-4 w-4 transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
@@ -100,8 +100,9 @@ export function ClubFamiliesPanel({ members }: { members: Member[] }) {
           ) : (
             <>
               <p className="text-xs text-rose-900/80">
-                Os membros também criam a família no perfil (<b>A minha família</b>) e convidam os outros com um código. Os perfis
-                associados a uma conta entram com o responsável.{canEdit ? ' Aqui podes criar e corrigir qualquer família.' : ''}
+                Os <b>adultos</b> entram nas contas das <b>crianças</b> da mesma família; as crianças não entram em nenhuma conta. Os
+                membros também criam a família no perfil (<b>A minha família</b>) e convidam os outros com um código.
+                {canEdit ? ' Aqui podes criar e corrigir qualquer família. Adulto/Criança só muda aqui: carrega na etiqueta.' : ''}
               </p>
 
               {canEdit && (
@@ -133,7 +134,10 @@ export function ClubFamiliesPanel({ members }: { members: Member[] }) {
                         ))}
                       </div>
                     )}
-                    <p className="text-[11px] text-stone-500">Adulto ou criança fica pela idade do perfil; depois podes trocar.</p>
+                    <p className="text-[11px] text-stone-500">
+                      Adulto ou criança fica pela idade do perfil (18 anos ou mais é adulto); depois podes trocar. Os adultos passam a entrar nas
+                      contas das crianças.
+                    </p>
                     <div className="flex gap-2">
                       <button
                         type="button"
@@ -210,8 +214,15 @@ export function ClubFamiliesPanel({ members }: { members: Member[] }) {
                             <span className={`h-2 w-2 shrink-0 rounded-full ${SECTION_DOT[m.section || ''] || 'bg-stone-300'}`} />
                             <span className="min-w-0 flex-1 truncate">
                               <span className="font-semibold text-blue-950">{m.name}</span>
-                              {m.accountOwner && <span className="ml-1.5 rounded-full bg-fuchsia-100 px-1.5 py-0.5 text-[10px] font-bold text-fuchsia-800">Responsável da conta</span>}
-                              {m.managedBy && <span className="ml-1.5 text-[11px] text-stone-400">perfil de {m.managedBy}</span>}
+                              {m.managed && <span className="ml-1.5 text-[11px] text-stone-400">sem email</span>}
+                              {isGrownChild(m) && (
+                                <span
+                                  className="ml-1.5 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-800"
+                                  title={m.managed ? 'Já tem 18 anos. Para passar a adulto, precisa primeiro de um email próprio.' : 'Já tem 18 anos. Podes passá-lo a adulto.'}
+                                >
+                                  18+
+                                </span>
+                              )}
                             </span>
                             {canEdit ? (
                               <button
@@ -228,7 +239,7 @@ export function ClubFamiliesPanel({ members }: { members: Member[] }) {
                                 {familyKindLabel(m.kind, m.gender)}
                               </span>
                             )}
-                            {canEdit && (
+                            {canEdit && !m.managed && (
                               <button
                                 type="button"
                                 disabled={busy !== null}

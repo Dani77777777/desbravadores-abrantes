@@ -1,6 +1,7 @@
 import { expect, test } from 'bun:test'
 import {
-  ageOn, cleanFamilyName, defaultFamilyKind, familyKindLabel, normalizeFamilyCode, sortFamilyMembers, suggestedFamilyName,
+  ageOn, canEnterAccount, cleanFamilyName, defaultFamilyKind, familyKindLabel, isGrownChild, isManagedEmail,
+  normalizeFamilyCode, sortFamilyMembers, suggestedFamilyName,
 } from './club-families'
 
 const today = new Date(2026, 10, 1) // 1 de novembro de 2026
@@ -12,13 +13,34 @@ test('idade conta o aniversário deste ano', () => {
   expect(ageOn('lixo', today)).toBeNull()
 })
 
-test('adulto ou criança pela idade; sem data depende de ser perfil associado', () => {
-  expect(defaultFamilyKind('1980-05-10', false, today)).toBe('adult')
-  expect(defaultFamilyKind('2015-05-10', false, today)).toBe('child')
-  // Irmã mais velha responsável pelas contas dos irmãos: adulta pela idade.
-  expect(defaultFamilyKind('2004-01-01', false, today)).toBe('adult')
-  expect(defaultFamilyKind(null, true, today)).toBe('child')
-  expect(defaultFamilyKind(null, false, today)).toBe('adult')
+test('adulto ou criança pela idade; sem data é adulto', () => {
+  expect(defaultFamilyKind('1980-05-10', today)).toBe('adult')
+  expect(defaultFamilyKind('2015-05-10', today)).toBe('child')
+  expect(defaultFamilyKind(null, today)).toBe('adult')
+})
+
+test('só um adulto entra na conta de uma criança da mesma família', () => {
+  const pri = { familyId: 'f1', kind: 'adult' as const }
+  const juvico = { familyId: 'f1', kind: 'adult' as const }
+  const lorena = { familyId: 'f1', kind: 'child' as const }
+  const outra = { familyId: 'f2', kind: 'child' as const }
+  expect(canEnterAccount(pri, lorena)).toBe(true)
+  expect(canEnterAccount(lorena, pri)).toBe(false)
+  expect(canEnterAccount(pri, juvico)).toBe(false)
+  expect(canEnterAccount(pri, outra)).toBe(false)
+  expect(canEnterAccount(null, lorena)).toBe(false)
+})
+
+test('criança que já fez 18 anos fica assinalada', () => {
+  expect(isGrownChild({ kind: 'child', birthDate: '2008-01-01' }, today)).toBe(true)
+  expect(isGrownChild({ kind: 'child', birthDate: '2012-01-01' }, today)).toBe(false)
+  expect(isGrownChild({ kind: 'adult', birthDate: '2000-01-01' }, today)).toBe(false)
+})
+
+test('emails internos dos perfis da família', () => {
+  expect(isManagedEmail('family-123@family.desbravadores-abrantes.invalid')).toBe(true)
+  expect(isManagedEmail('pri@gmail.com')).toBe(false)
+  expect(isManagedEmail(null)).toBe(false)
 })
 
 test('etiquetas e nome sugerido', () => {

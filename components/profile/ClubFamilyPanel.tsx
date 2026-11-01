@@ -2,14 +2,16 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { CheckCircle2, Copy, Heart, Link2, Loader2, LogOut, Pencil, UserPlus } from 'lucide-react'
+import { AlertTriangle, Baby, CalendarDays, CheckCircle2, Copy, Heart, Link2, Loader2, LogOut, Pencil, Trash2, UserPlus } from 'lucide-react'
 import { toast } from 'sonner'
 import {
   acceptClubFamilyInvite, createClubFamilyInvite, createMyClubFamily, inspectClubFamilyInvite, leaveMyClubFamily,
-  renameClubFamily, revokeClubFamilyInvite, setClubFamilyKind, type MyClubFamily,
+  renameClubFamily, revokeClubFamilyInvite, type MyClubFamily,
 } from '@/lib/actions/club-families'
+import { createFamilyAccount, deleteFamilyAccount, updateFamilyAccountBirthDate } from '@/app/profile/family-actions'
+import { hasImplausibleBirthDate } from '@/utils/birth-date'
 import {
-  FAMILY_CODE_LENGTH, FAMILY_JOIN_PATH, familyKindLabel, normalizeFamilyCode, suggestedFamilyName, type FamilyKind,
+  FAMILY_CODE_LENGTH, FAMILY_INVITE_HOURS, FAMILY_JOIN_PATH, familyKindLabel, normalizeFamilyCode, suggestedFamilyName, type FamilyKind,
 } from '@/utils/club-families'
 
 type Props = {
@@ -22,20 +24,26 @@ type Props = {
 
 const fieldClass = 'h-11 w-full rounded-xl border border-stone-200 bg-stone-50 px-3 text-sm text-blue-950 outline-none transition focus:border-yellow-400 focus:ring-2 focus:ring-yellow-400/30'
 
+type Preview = { familyName: string; members: string[]; kind: FamilyKind }
+
 /**
- * A família da pessoa no clube (pais, irmãos…), à parte das contas familiares: cria-se aqui,
- * convida-se por código e serve para os jogos de famílias. Não dá acesso a outras contas.
+ * A família da pessoa no clube: adultos e crianças, cada um com a sua conta. Os adultos
+ * entram nas contas das crianças da família (menu do avatar); as crianças não entram em
+ * nenhuma. Os adultos criam perfis de criança e convidam os outros por código ou link.
  */
 export function ClubFamilyPanel({ data, userId, fullName, initialCode = '' }: Props) {
   const router = useRouter()
-  const { family, managedBy } = data
-  const canEdit = !managedBy
+  const { family, myKind, joinKind } = data
+  const isAdult = myKind === 'adult'
   const [busy, setBusy] = useState<string | null>(null)
   const [name, setName] = useState(() => suggestedFamilyName(fullName))
   const [renaming, setRenaming] = useState(false)
   const [newName, setNewName] = useState(family?.name ?? '')
   const [code, setCode] = useState(normalizeFamilyCode(initialCode))
-  const [preview, setPreview] = useState<{ familyName: string; members: string[] } | null>(null)
+  const [preview, setPreview] = useState<Preview | null>(null)
+  const [creatingChild, setCreatingChild] = useState(false)
+  const [editingBirth, setEditingBirth] = useState<{ id: string; value: string } | null>(null)
+
   const run = async (key: string, fn: () => Promise<{ error?: string }>, ok?: string) => {
     setBusy(key)
     const r = await fn()
@@ -58,17 +66,17 @@ export function ClubFamilyPanel({ data, userId, fullName, initialCode = '' }: Pr
       toast.error(r.error)
       return
     }
-    setPreview({ familyName: r.familyName!, members: r.members ?? [] })
+    setPreview({ familyName: r.familyName!, members: r.members ?? [], kind: r.kind ?? 'adult' })
   }
 
   // Veio pelo link do convite: mostra logo de que família é.
   useEffect(() => {
-    if (family || !canEdit || normalizeFamilyCode(initialCode).length !== FAMILY_CODE_LENGTH) return
+    if (family || normalizeFamilyCode(initialCode).length !== FAMILY_CODE_LENGTH) return
     let cancelled = false
     inspectClubFamilyInvite(initialCode).then((r) => {
       if (cancelled) return
       if (r.error) toast.error(r.error)
-      else setPreview({ familyName: r.familyName!, members: r.members ?? [] })
+      else setPreview({ familyName: r.familyName!, members: r.members ?? [], kind: r.kind ?? 'adult' })
     })
     return () => { cancelled = true }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
@@ -82,17 +90,42 @@ export function ClubFamilyPanel({ data, userId, fullName, initialCode = '' }: Pr
     }
   }
 
-  const toggleKind = (memberId: string, kind: FamilyKind) =>
-    run(`kind:${memberId}`, () => setClubFamilyKind(memberId, kind === 'adult' ? 'child' : 'adult'))
+  const createChild = async (form: FormData) => {
+    const ok = await run('child', () => createFamilyAccount({
+      fullName: String(form.get('fullName') || ''),
+      birthDate: String(form.get('birthDate') || ''),
+      gender: String(form.get('gender') || '') as 'm' | 'f',
+    }), 'Perfil da criança criado.')
+    if (ok) setCreatingChild(false)
+  }
 
   const leave = () => {
-    const ownsProfiles = family?.members.some((m) => m.id === userId && m.accountOwner)
-    const msg = ownsProfiles
-      ? 'Sair da família? Os perfis associados à tua conta também saem.'
-      : 'Sair da família?'
-    if (!window.confirm(msg)) return
+    if (!window.confirm('Sair da família? Deixas de poder entrar nas contas das crianças.')) return
     void run('leave', leaveMyClubFamily, 'Saíste da família.')
   }
+
+  const removeChild = (id: string, childName: string) => {
+    if (!window.confirm(`Apagar definitivamente o perfil de ${childName}? Esta ação remove também os dados deste perfil.`)) return
+    void run(`del:${id}`, () => deleteFamilyAccount(id), 'Perfil apagado.')
+  }
+
+  const today = new Date().toISOString().slice(0, 10)
+
+  const childForm = (
+    <form action={createChild} className="space-y-4 rounded-2xl bg-stone-50 p-4 ring-1 ring-inset ring-stone-200">
+      <div className="flex items-center gap-2 text-sm font-bold text-blue-950"><Baby className="h-4 w-4 text-rose-600" /> Novo perfil de criança</div>
+      <input name="fullName" required placeholder="Nome completo" className={fieldClass} />
+      <div className="grid gap-3 sm:grid-cols-2">
+        <label className="text-sm font-semibold text-blue-950">Data de nascimento<input name="birthDate" type="date" required max={today} className={`${fieldClass} mt-1.5`} /></label>
+        <label className="text-sm font-semibold text-blue-950">Sexo<select name="gender" required defaultValue="" className={`${fieldClass} mt-1.5`}><option value="" disabled>Selecionar</option><option value="m">Masculino</option><option value="f">Feminino</option></select></label>
+      </div>
+      <p className="text-xs text-stone-500">Sem email nem palavra-passe: os adultos da família entram neste perfil pelo menu do avatar.</p>
+      <div className="flex gap-3">
+        <button disabled={busy !== null} className="rounded-xl bg-blue-950 px-4 py-2.5 text-sm font-extrabold text-white disabled:opacity-60">{busy === 'child' ? 'A criar…' : 'Criar perfil'}</button>
+        <button type="button" onClick={() => setCreatingChild(false)} className="px-3 text-sm font-bold text-stone-500">Cancelar</button>
+      </div>
+    </form>
+  )
 
   return (
     <section id="familia" className="scroll-mt-24 rounded-[1.75rem] bg-white p-6 shadow-md shadow-blue-950/5 ring-1 ring-stone-200 sm:p-7">
@@ -101,7 +134,8 @@ export function ClubFamilyPanel({ data, userId, fullName, initialCode = '' }: Pr
         <div>
           <h2 className="text-xl font-extrabold text-blue-950">A minha família</h2>
           <p className="mt-0.5 text-sm text-stone-500">
-            Pais, mães, irmãos… cada um com a sua conta. Nos jogos de famílias ficam juntos. Não dá acesso às contas uns dos outros.
+            Adultos e crianças, cada um com a sua conta. Os adultos entram nas contas das crianças da família; as crianças não entram nas
+            dos adultos.
           </p>
         </div>
       </div>
@@ -125,7 +159,7 @@ export function ClubFamilyPanel({ data, userId, fullName, initialCode = '' }: Pr
             ) : (
               <>
                 <p className="text-lg font-extrabold text-blue-950">{family.name}</p>
-                {canEdit && (
+                {isAdult && (
                   <button type="button" onClick={() => { setNewName(family.name); setRenaming(true) }} className="rounded-lg p-1.5 text-stone-400 hover:bg-stone-100 hover:text-blue-950" title="Mudar o nome">
                     <Pencil className="h-4 w-4" />
                   </button>
@@ -135,43 +169,91 @@ export function ClubFamilyPanel({ data, userId, fullName, initialCode = '' }: Pr
           </div>
 
           <ul className="space-y-2">
-            {family.members.map((m) => (
-              <li key={m.id} className="flex items-center gap-3 rounded-2xl bg-rose-50/60 p-3 ring-1 ring-inset ring-rose-100">
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-rose-500 text-sm font-extrabold text-white">{m.name.charAt(0).toUpperCase()}</span>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate font-bold text-blue-950">{m.name}{m.id === userId && <span className="font-semibold text-stone-400"> (tu)</span>}</p>
-                  <div className="mt-0.5 flex flex-wrap gap-1.5 text-[11px] font-bold">
-                    {m.accountOwner && <span className="rounded-full bg-fuchsia-100 px-2 py-0.5 text-fuchsia-800">Responsável da conta</span>}
-                    {m.managedBy && <span className="rounded-full bg-stone-100 px-2 py-0.5 text-stone-600">Perfil de {m.managedBy}</span>}
+            {family.members.map((m) => {
+              const canFix = isAdult && m.kind === 'child' && m.id !== userId
+              return (
+                <li key={m.id} className="rounded-2xl bg-rose-50/60 p-3 ring-1 ring-inset ring-rose-100">
+                  <div className="flex items-center gap-3">
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-rose-500 text-sm font-extrabold text-white">{m.name.charAt(0).toUpperCase()}</span>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate font-bold text-blue-950">{m.name}{m.id === userId && <span className="font-semibold text-stone-400"> (tu)</span>}</p>
+                      {m.managed && <p className="text-[11px] font-semibold text-stone-500">Perfil sem email próprio</p>}
+                    </div>
+                    <span className={`shrink-0 rounded-full px-3 py-1 text-xs font-extrabold ${m.kind === 'adult' ? 'bg-blue-50 text-blue-800' : 'bg-amber-50 text-amber-800'}`}>
+                      {familyKindLabel(m.kind, m.gender)}
+                    </span>
+                    {canFix && (
+                      <button type="button" onClick={() => setEditingBirth({ id: m.id, value: m.birthDate ?? '' })} className="rounded-lg p-1.5 text-stone-400 hover:bg-white hover:text-blue-950" title="Corrigir a data de nascimento">
+                        <CalendarDays className="h-4 w-4" />
+                      </button>
+                    )}
+                    {canFix && m.managed && (
+                      <button type="button" disabled={busy !== null} onClick={() => removeChild(m.id, m.name)} className="rounded-lg p-1.5 text-red-500 hover:bg-white disabled:opacity-50" title="Apagar este perfil">
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    )}
                   </div>
-                </div>
-                {canEdit ? (
-                  <button
-                    type="button"
-                    disabled={busy !== null}
-                    onClick={() => toggleKind(m.id, m.kind)}
-                    title="Carrega para trocar entre adulto e criança"
-                    className={`shrink-0 rounded-full px-3 py-1 text-xs font-extrabold ring-1 ring-inset disabled:opacity-50 ${m.kind === 'adult' ? 'bg-blue-50 text-blue-800 ring-blue-200' : 'bg-amber-50 text-amber-800 ring-amber-200'}`}
-                  >
-                    {busy === `kind:${m.id}` ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : familyKindLabel(m.kind, m.gender)}
-                  </button>
-                ) : (
-                  <span className={`shrink-0 rounded-full px-3 py-1 text-xs font-extrabold ${m.kind === 'adult' ? 'bg-blue-50 text-blue-800' : 'bg-amber-50 text-amber-800'}`}>
-                    {familyKindLabel(m.kind, m.gender)}
-                  </span>
-                )}
-              </li>
-            ))}
+                  {canFix && hasImplausibleBirthDate(m.birthDate) && editingBirth?.id !== m.id && (
+                    <div className="mt-3 flex flex-wrap items-center gap-2 rounded-xl bg-amber-50 p-3 text-sm text-amber-900 ring-1 ring-inset ring-amber-200">
+                      <AlertTriangle className="h-4 w-4 shrink-0 text-amber-600" />
+                      <span className="min-w-0 flex-1">A data de nascimento parece estar errada (dá menos de 1 ano). Corrige o ano.</span>
+                      <button type="button" onClick={() => setEditingBirth({ id: m.id, value: m.birthDate ?? '' })} className="rounded-lg bg-amber-500 px-3 py-1.5 text-xs font-extrabold text-white">Corrigir agora</button>
+                    </div>
+                  )}
+                  {editingBirth?.id === m.id && (
+                    <div className="mt-3 flex flex-wrap gap-2 border-t border-rose-200 pt-3">
+                      <input type="date" max={today} value={editingBirth.value} onChange={(e) => setEditingBirth({ id: m.id, value: e.target.value })} className={`${fieldClass} max-w-[12rem]`} />
+                      <button
+                        type="button"
+                        disabled={busy !== null || !editingBirth.value}
+                        onClick={async () => { if (await run('birth', () => updateFamilyAccountBirthDate(m.id, editingBirth.value), 'Data atualizada.')) setEditingBirth(null) }}
+                        className="rounded-xl bg-blue-950 px-4 py-2 text-sm font-extrabold text-white disabled:opacity-50"
+                      >
+                        Guardar
+                      </button>
+                      <button type="button" onClick={() => setEditingBirth(null)} className="px-2 text-sm font-bold text-stone-500">Cancelar</button>
+                    </div>
+                  )}
+                </li>
+              )
+            })}
           </ul>
 
-          {canEdit ? (
+          {isAdult ? (
             <>
-              {family.invite ? (
+              <p className="text-xs text-stone-500">
+                Para entrares na conta de uma criança, usa o menu do teu avatar, no topo da página. Só a coordenação muda quem é adulto ou
+                criança.
+              </p>
+
+              {creatingChild ? childForm : (
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <button type="button" onClick={() => setCreatingChild(true)} className="rounded-2xl bg-blue-950 p-4 text-left text-white transition hover:bg-blue-900">
+                    <Baby className="h-5 w-5 text-yellow-300" />
+                    <p className="mt-3 font-extrabold">Criar perfil de criança</p>
+                    <p className="mt-1 text-sm text-blue-200">Sem email nem palavra-passe próprios.</p>
+                  </button>
+                  {!family.invite && (
+                    <button
+                      type="button"
+                      disabled={busy !== null}
+                      onClick={() => run('invite', createClubFamilyInvite)}
+                      className="rounded-2xl bg-rose-50 p-4 text-left text-blue-950 ring-1 ring-inset ring-rose-200 transition hover:bg-rose-100 disabled:opacity-60"
+                    >
+                      {busy === 'invite' ? <Loader2 className="h-5 w-5 animate-spin text-rose-600" /> : <UserPlus className="h-5 w-5 text-rose-600" />}
+                      <p className="mt-3 font-extrabold">Convidar familiar</p>
+                      <p className="mt-1 text-sm text-stone-500">Quem já tem conta própria, adulto ou criança.</p>
+                    </button>
+                  )}
+                </div>
+              )}
+
+              {family.invite && (
                 <div className="rounded-2xl bg-rose-50 p-5 ring-1 ring-inset ring-rose-200">
-                  <p className="font-bold text-blue-950">Envia o link ou o código a quem é da família</p>
+                  <p className="font-bold text-blue-950">Envia o link ou o código só a quem é da família</p>
                   <p className="mt-1 text-sm text-stone-600">
-                    Quem tem conta própria, adulto ou criança, aceita no perfil. Os perfis associados à conta dessa pessoa entram com ela.
-                    Vale 7 dias.
+                    Um adulto que aceite passa a poder entrar nas contas das crianças. Uma criança que aceite fica com a conta acessível aos
+                    adultos. Vale {FAMILY_INVITE_HOURS} h e só pode ser usado uma vez.
                   </p>
                   <div className="mt-4 flex flex-wrap items-center gap-2">
                     <code className="rounded-xl bg-white px-4 py-3 font-mono text-xl font-extrabold tracking-[0.2em] text-rose-700 ring-1 ring-rose-200">{family.invite.code}</code>
@@ -190,51 +272,47 @@ export function ClubFamilyPanel({ data, userId, fullName, initialCode = '' }: Pr
                     Cancelar convite
                   </button>
                 </div>
-              ) : (
-                <button
-                  type="button"
-                  disabled={busy !== null}
-                  onClick={() => run('invite', createClubFamilyInvite)}
-                  className="flex w-full items-center gap-3 rounded-2xl bg-rose-50 p-4 text-left text-blue-950 ring-1 ring-inset ring-rose-200 transition hover:bg-rose-100 disabled:opacity-60"
-                >
-                  {busy === 'invite' ? <Loader2 className="h-5 w-5 animate-spin text-rose-600" /> : <UserPlus className="h-5 w-5 text-rose-600" />}
-                  <span>
-                    <span className="block font-extrabold">Convidar alguém da família</span>
-                    <span className="block text-sm text-stone-500">A pessoa aceita com um código ou um link.</span>
-                  </span>
-                </button>
               )}
+
               <button type="button" disabled={busy !== null} onClick={leave} className="flex items-center gap-1.5 text-sm font-bold text-stone-500 hover:text-red-600">
                 <LogOut className="h-4 w-4" /> Sair da família
               </button>
             </>
           ) : (
-            <p className="text-sm text-stone-500">Esta família é gerida pela conta de <b>{managedBy}</b>.</p>
+            <p className="rounded-2xl bg-stone-50 p-4 text-sm text-stone-600 ring-1 ring-inset ring-stone-200">
+              Os adultos da família podem entrar na tua conta. Para saíres da família, fala com um adulto da família ou com a coordenação.
+            </p>
           )}
         </div>
-      ) : managedBy ? (
-        <p className="mt-6 rounded-2xl bg-stone-50 p-4 text-sm text-stone-600 ring-1 ring-inset ring-stone-200">
-          Este perfil está associado à conta de <b>{managedBy}</b>. Quando essa conta criar uma família ou entrar numa, este perfil entra também.
-        </p>
       ) : (
         <div className="mt-6 space-y-6">
-          <div className="space-y-2">
-            <p className="text-sm font-bold text-blue-950">Criar a minha família</p>
-            <div className="flex flex-col gap-2 sm:flex-row">
-              <input value={name} onChange={(e) => setName(e.target.value)} maxLength={40} placeholder="Nome da família" className={fieldClass} />
-              <button
-                type="button"
-                disabled={busy !== null || name.trim().length < 2}
-                onClick={() => run('create', () => createMyClubFamily(name), 'Família criada. Agora convida os outros.')}
-                className="flex shrink-0 items-center justify-center gap-1.5 rounded-xl bg-blue-950 px-4 py-2.5 text-sm font-extrabold text-white disabled:opacity-50"
-              >
-                {busy === 'create' && <Loader2 className="h-4 w-4 animate-spin" />} Criar
-              </button>
+          {joinKind === 'adult' ? (
+            <div className="space-y-2">
+              <p className="text-sm font-bold text-blue-950">Criar a minha família</p>
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <input value={name} onChange={(e) => setName(e.target.value)} maxLength={40} placeholder="Nome da família" className={fieldClass} />
+                <button
+                  type="button"
+                  disabled={busy !== null || name.trim().length < 2}
+                  onClick={() => run('create', () => createMyClubFamily(name), 'Família criada. Agora cria os perfis das crianças ou convida os outros.')}
+                  className="flex shrink-0 items-center justify-center gap-1.5 rounded-xl bg-blue-950 px-4 py-2.5 text-sm font-extrabold text-white disabled:opacity-50"
+                >
+                  {busy === 'create' && <Loader2 className="h-4 w-4 animate-spin" />} Criar
+                </button>
+              </div>
+              {creatingChild ? childForm : (
+                <button type="button" onClick={() => setCreatingChild(true)} className="flex items-center gap-1.5 text-sm font-bold text-blue-900 hover:underline">
+                  <Baby className="h-4 w-4" /> Ou cria logo o perfil de uma criança (a família é criada contigo)
+                </button>
+              )}
             </div>
-            <p className="text-xs text-stone-500">Os perfis associados à tua conta entram contigo.</p>
-          </div>
+          ) : (
+            <p className="rounded-2xl bg-stone-50 p-4 text-sm text-stone-600 ring-1 ring-inset ring-stone-200">
+              A família é criada por um adulto. Pede-lhe um convite e escreve aqui o código.
+            </p>
+          )}
 
-          <div className="border-t border-stone-100 pt-6">
+          <div className={joinKind === 'adult' ? 'border-t border-stone-100 pt-6' : ''}>
             <p className="text-sm font-bold text-blue-950">Recebeste um convite para uma família?</p>
             <div className="mt-2 flex gap-2">
               <input
@@ -246,7 +324,7 @@ export function ClubFamilyPanel({ data, userId, fullName, initialCode = '' }: Pr
               />
               <button
                 type="button"
-                onClick={() => inspect()}
+                onClick={inspect}
                 disabled={code.length < FAMILY_CODE_LENGTH || busy !== null}
                 className="rounded-xl bg-stone-100 px-4 text-sm font-extrabold text-blue-950 disabled:opacity-50"
               >
@@ -259,7 +337,10 @@ export function ClubFamilyPanel({ data, userId, fullName, initialCode = '' }: Pr
                   <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600" />
                   <span>
                     Vais entrar na <b>{preview.familyName}</b>
-                    {preview.members.length > 0 && <> com {preview.members.join(', ')}</>}.
+                    {preview.members.length > 0 && <> com {preview.members.join(', ')}</>} como <b>{preview.kind === 'adult' ? 'adulto' : 'criança'}</b>.{' '}
+                    {preview.kind === 'adult'
+                      ? 'Vais poder entrar nas contas das crianças desta família.'
+                      : 'Os adultos desta família vão poder entrar na tua conta.'}
                   </span>
                 </p>
                 <button

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
 import { createServiceClient } from '@/utils/supabase/service'
-import { canSwitchFamilyAccount, getFamilyAccountSummary } from '@/lib/family-accounts'
+import { FAMILY_RETURN_COOKIE, FAMILY_RETURN_MAX_AGE, familySwitch, switchableAccounts } from '@/lib/family-accounts'
 
 function sessionClient(request: NextRequest, response: NextResponse) {
   return createServerClient(
@@ -28,12 +28,13 @@ export async function GET(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
 
-  const summary = await getFamilyAccountSummary(user.id)
-  return jsonWithSessionCookies({ linkedAccounts: summary.linkedAccounts }, response)
+  const accounts = await switchableAccounts(user.id, request.cookies.get(FAMILY_RETURN_COOKIE)?.value)
+  return jsonWithSessionCookies({ linkedAccounts: accounts }, response)
 }
 
-/** Alterna a sessão para a conta familiar ligada. Não é impersonação por cookie:
- * a sessão passa a ser mesmo da outra conta e toda a RLS existente mantém-se. */
+/** Alterna a sessão para a conta de uma criança da família (ou volta ao adulto que entrou).
+ * Não é impersonação por cookie: a sessão passa a ser mesmo da outra conta e toda a RLS
+ * existente mantém-se. Só um adulto entra nas crianças; ver lib/family-accounts.ts. */
 export async function POST(request: NextRequest) {
   const response = NextResponse.json({ ok: false })
   const supabase = sessionClient(request, response)
@@ -47,7 +48,8 @@ export async function POST(request: NextRequest) {
   } catch {
     return NextResponse.json({ error: 'Pedido inválido' }, { status: 400 })
   }
-  if (!targetId || !await canSwitchFamilyAccount(user.id, targetId)) {
+  const decision = targetId ? await familySwitch(user.id, targetId, request.cookies.get(FAMILY_RETURN_COOKIE)?.value) : null
+  if (!decision?.allowed) {
     return NextResponse.json({ error: 'Não tens acesso a esta conta.' }, { status: 403 })
   }
 
@@ -55,8 +57,8 @@ export async function POST(request: NextRequest) {
   const { data: targetData, error: targetError } = await admin.auth.admin.getUserById(targetId)
   if (targetError || !targetData.user?.email) return NextResponse.json({ error: 'A conta associada não está disponível.' }, { status: 404 })
 
-  // Gera um token de sessão sem enviar email. A ligação familiar já foi aprovada
-  // ou criada pelo titular, e a rota confirmou a relação exclusiva acima.
+  // Gera um token de sessão sem enviar email. A família já foi confirmada acima
+  // (adulto → criança da mesma família, ou voltar ao adulto que entrou).
   const { data: linkData, error: linkError } = await admin.auth.admin.generateLink({
     type: 'magiclink',
     email: targetData.user.email,
@@ -71,5 +73,16 @@ export async function POST(request: NextRequest) {
   })
   if (switchError) return NextResponse.json({ error: 'Não foi possível iniciar a outra conta.' }, { status: 500 })
 
+  if (decision.cookie) {
+    response.cookies.set(FAMILY_RETURN_COOKIE, decision.cookie, {
+      httpOnly: true,
+      sameSite: 'lax',
+      secure: process.env.NODE_ENV === 'production',
+      path: '/',
+      maxAge: FAMILY_RETURN_MAX_AGE,
+    })
+  } else {
+    response.cookies.set(FAMILY_RETURN_COOKIE, '', { path: '/', maxAge: 0 })
+  }
   return jsonWithSessionCookies({ ok: true }, response)
 }

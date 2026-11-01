@@ -1,5 +1,6 @@
-// Famílias do clube (quem é família de quem), à parte das contas familiares.
-// Funções puras, partilhadas pelo servidor, pelo perfil e pela administração dos membros.
+// Famílias do clube: pais, mães, irmãos…, cada um Adulto ou Criança.
+// Os adultos entram nas contas das crianças da mesma família; as crianças não entram em
+// conta nenhuma. Funções puras, partilhadas pelo servidor, pelo perfil e pela administração.
 
 export type FamilyKind = 'adult' | 'child'
 
@@ -9,11 +10,10 @@ export type ClubFamilyMember = {
   avatarUrl: string | null
   gender: string | null
   section: string | null
+  birthDate: string | null
   kind: FamilyKind
-  /** É o responsável de pelo menos uma conta familiar. */
-  accountOwner: boolean
-  /** Perfil associado a outra conta: segue sempre o responsável. */
-  managedBy: string | null
+  /** Perfil criado pela família, sem email próprio. */
+  managed: boolean
 }
 
 export type ClubFamily = {
@@ -24,9 +24,11 @@ export type ClubFamily = {
 }
 
 export const ADULT_AGE = 18
-export const FAMILY_INVITE_DAYS = 7
+export const FAMILY_INVITE_HOURS = 48
 export const FAMILY_CODE_LENGTH = 8
 export const FAMILY_JOIN_PATH = '/familia'
+/** Domínio dos emails internos dos perfis criados pela família (não recebem nada). */
+export const MANAGED_EMAIL_DOMAIN = 'family.desbravadores-abrantes.invalid'
 
 export function ageOn(birthDate: string | null | undefined, today: Date = new Date()): number | null {
   if (!birthDate || !/^\d{4}-\d{2}-\d{2}/.test(birthDate)) return null
@@ -36,14 +38,28 @@ export function ageOn(birthDate: string | null | undefined, today: Date = new Da
   return age
 }
 
-/**
- * Adulto ou criança ao entrar na família: pela idade do perfil. Sem data, um perfil associado
- * conta como criança e uma conta própria como adulto (a família pode corrigir depois).
- */
-export function defaultFamilyKind(birthDate: string | null | undefined, isAssociated: boolean, today: Date = new Date()): FamilyKind {
+/** Adulto ou criança ao entrar numa família com conta própria: pela idade (sem data, adulto). */
+export function defaultFamilyKind(birthDate: string | null | undefined, today: Date = new Date()): FamilyKind {
   const age = ageOn(birthDate, today)
-  if (age === null) return isAssociated ? 'child' : 'adult'
-  return age >= ADULT_AGE ? 'adult' : 'child'
+  return age === null || age >= ADULT_AGE ? 'adult' : 'child'
+}
+
+/** Um adulto entra na conta de uma criança da mesma família. Nunca o contrário, nunca entre adultos. */
+export function canEnterAccount(
+  from: { familyId: string; kind: FamilyKind } | null,
+  to: { familyId: string; kind: FamilyKind } | null,
+): boolean {
+  return !!from && !!to && from.familyId === to.familyId && from.kind === 'adult' && to.kind === 'child'
+}
+
+/** Criança que já fez 18 anos (a coordenação decide quando passa a adulto). */
+export function isGrownChild(member: { kind: FamilyKind; birthDate: string | null }, today: Date = new Date()): boolean {
+  const age = ageOn(member.birthDate, today)
+  return member.kind === 'child' && age !== null && age >= ADULT_AGE
+}
+
+export function isManagedEmail(email: string | null | undefined): boolean {
+  return !!email && email.toLowerCase().endsWith(`@${MANAGED_EMAIL_DOMAIN}`)
 }
 
 /** "Adulto", "Adulta" ou "Criança" (o sexo vem do perfil). */
