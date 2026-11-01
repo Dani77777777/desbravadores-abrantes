@@ -104,6 +104,8 @@ export interface VanaCoroSession {
   faceoff_first_rank: number | null
   board_version: number
   is_test_session: boolean
+  /** As equipas vêm das famílias sorteadas no Formador de equipas (cada um entra na sua). */
+  uses_families?: boolean
   rewards_awarded_at: string | null
   created_at: string
   started_at: string | null
@@ -122,6 +124,8 @@ export interface VanaCoroPlayer {
   is_bot: boolean
   rewards_recipient_id: string | null
   rewards_skipped: boolean
+  /** Com famílias sorteadas: quem é na lista (id do perfil ou "guest:…"). */
+  roster_key?: string | null
   joined_at: string
 }
 

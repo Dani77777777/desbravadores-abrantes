@@ -5,7 +5,7 @@ import { createClient } from '@/utils/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { toast } from 'sonner'
-import { Trophy, Coins, CheckCircle2, XCircle, Clock, Save, Loader2, CalendarCheck, Wand2 } from 'lucide-react'
+import { Trophy, Coins, CheckCircle2, XCircle, Clock, Save, Loader2, CalendarCheck, Wand2, Smartphone } from 'lucide-react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { rsvpRank } from '@/utils/event-rsvp'
 
@@ -25,6 +25,8 @@ export function EventAttendanceManager({ event, members, profile, onComplete }: 
   const [hasChanges, setHasChanges] = useState(false)
   // O que cada um disse no Painel ("Vou"/"Não vou") — só uma intenção; a presença é marcada aqui.
   const [rsvps, setRsvps] = useState<Record<string, boolean>>({})
+  // Quem marcou presença sozinho pelo QR do Ecrã do Clube (fica no rascunho até confirmares).
+  const [viaQr, setViaQr] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     async function fetchAttendance() {
@@ -45,11 +47,27 @@ export function EventAttendanceManager({ event, members, profile, onComplete }: 
           initialMap[record.user_id] = record.status
         })
         setAttendance(initialMap)
+        setViaQr(new Set((data || []).filter((r) => r.checkin_at).map((r) => r.user_id)))
       }
       setLoading(false)
     }
     fetchAttendance()
   }, [event.id, event.rsvp_enabled, supabase])
+
+  // Enquanto o evento está aberto, quem marca pelo QR vai aparecendo (sem mexer no que já marcaste).
+  useEffect(() => {
+    if (event.is_finished) return
+    const t = setInterval(async () => {
+      const { data } = await supabase.from('event_attendance').select('user_id, status, checkin_at').eq('event_id', event.id).not('checkin_at', 'is', null)
+      if (!data?.length) return
+      setAttendance((prev) => {
+        const fresh = data.filter((r) => !prev[r.user_id])
+        return fresh.length ? { ...prev, ...Object.fromEntries(fresh.map((r) => [r.user_id, r.status])) } : prev
+      })
+      setViaQr((prev) => (data.every((r) => prev.has(r.user_id)) ? prev : new Set([...prev, ...data.map((r) => r.user_id)])))
+    }, 10000)
+    return () => clearInterval(t)
+  }, [event.id, event.is_finished, supabase])
 
   // Quem disse que ia primeiro, depois quem não respondeu, por fim quem disse que não ia
   const sortedMembers = event.rsvp_enabled
@@ -111,11 +129,18 @@ export function EventAttendanceManager({ event, members, profile, onComplete }: 
 
     setSaving(true)
     try {
+      // 0. Quem marcou pelo QR depois de abrires esta página também conta (o que marcaste aqui ganha).
+      const { data: current } = await supabase.from('event_attendance').select('user_id, status').eq('event_id', event.id)
+      const finalStatus: Record<string, 'presente' | 'atrasado' | 'faltou'> = {
+        ...Object.fromEntries((current || []).map((r) => [r.user_id, r.status])),
+        ...attendance,
+      }
+
       // 1. Prepare and Save final attendance
       const attendanceToUpsert = members.map(m => ({
         event_id: event.id,
         user_id: m.id,
-        status: attendance[m.id] || 'faltou', // Default to faltou if not marked
+        status: finalStatus[m.id] || 'faltou', // Default to faltou if not marked
         points_awarded: true,
         awarded_at: new Date().toISOString()
       }))
@@ -131,7 +156,7 @@ export function EventAttendanceManager({ event, members, profile, onComplete }: 
       for (const member of members) {
         // Só o coordenador real pode receber pontos de si próprio; os outros a BD rejeitaria (o lote inteiro).
         if (member.id === profile.id && !(profile.role === 'coordenador' && !profile.helper_role)) continue
-        const status = attendance[member.id] || 'faltou'
+        const status = finalStatus[member.id] || 'faltou'
         let xp = 0
         let gold = 0
         let description = `Participação em: ${event.title}`
@@ -266,6 +291,11 @@ export function EventAttendanceManager({ event, members, profile, onComplete }: 
                     </p>
                     <p className="flex flex-wrap items-center gap-1.5 text-[10px] text-gray-400 font-bold uppercase tracking-tight">
                       {member.section}
+                      {viaQr.has(member.id) && (
+                        <span className="inline-flex items-center gap-0.5 rounded-full bg-blue-100 px-1.5 py-0.5 normal-case tracking-normal text-blue-700">
+                          <Smartphone className="h-2.5 w-2.5" /> Marcou pelo QR
+                        </span>
+                      )}
                       {event.rsvp_enabled && (
                         <span
                           className={`rounded-full px-1.5 py-0.5 normal-case tracking-normal ${

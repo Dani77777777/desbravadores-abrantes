@@ -4,6 +4,8 @@ import { Navbar } from '@/components/layout/Navbar'
 import { TeamsClient, type TeamsEvent } from '@/components/teams/TeamsClient'
 import { effectiveLeadershipSection, effectiveRole } from '@/utils/permissions'
 import type { TeamMember } from '@/utils/teams'
+import { createServiceClient } from '@/utils/supabase/service'
+import { familyGroupsAmong } from '@/lib/checkin/family'
 
 const MEMBER_COLUMNS =
   'id, full_name, avatar_url, role, section, leadership_section, helper_role, helper_section, birth_date, gender'
@@ -44,11 +46,18 @@ export default async function TeamsPage() {
   if (section) eventsQuery = eventsQuery.or(`target_section.is.null,target_section.eq.${section}`)
 
   const [{ data: members }, { data: events }] = await Promise.all([membersQuery, eventsQuery])
+  // Modo Famílias: quem é da mesma família (contas familiares) fica junto.
+  const familyGroups = await familyGroupsAmong(createServiceClient(), (members || []).map((m) => m.id))
 
   return (
     <div className="min-h-screen bg-stone-50">
       <Navbar user={user} profile={profile} />
-      <TeamsClient userId={user.id} members={(members || []) as TeamMember[]} events={(events || []) as TeamsEvent[]} />
+      <TeamsClient
+        userId={user.id}
+        members={(members || []) as TeamMember[]}
+        events={(events || []) as TeamsEvent[]}
+        familyGroups={familyGroups}
+      />
     </div>
   )
 }

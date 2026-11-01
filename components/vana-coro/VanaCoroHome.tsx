@@ -1,12 +1,13 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useEffect, useState, useTransition } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { ChevronRight, FlaskConical, History, Loader2, MessageCircleQuestion, Play, Plus, Trash2, Trophy } from 'lucide-react'
 import { createClient } from '@/utils/supabase/client'
-import { createCoroSession, deleteCoroSession, joinCoroSession } from '@/lib/actions/vana-coro-game'
+import { createCoroSession, deleteCoroSession, joinCoroSession, listCoroRosterGuests } from '@/lib/actions/vana-coro-game'
+import { readStoredGuest, type StoredCheckinGuest } from '@/utils/checkin'
 import { CORO_BG, TEAM_STYLE } from './BoardUI'
 import { PLAYER_STORAGE_KEY } from './PlayerView'
 import type { VanaCoroTeam } from '@/types/vana-coro'
@@ -42,6 +43,8 @@ export interface FoundSession {
   team_a_name: string
   team_b_name: string
   status: string
+  /** As equipas são as famílias sorteadas: cada um entra logo na sua. */
+  uses_families?: boolean
 }
 
 export function VanaCoroHome({ canHost, isCoordinator, isMember, initialCode, initialFound, mySessions }: Props) {
@@ -56,7 +59,7 @@ export function VanaCoroHome({ canHost, isCoordinator, isMember, initialCode, in
     if (clean.length !== 4) return
     const { data } = await createClient()
       .from('vanacoro_sessions')
-      .select('id, code, team_a_name, team_b_name, status')
+      .select('*')
       .eq('code', clean)
       .neq('status', 'finished')
       .order('created_at', { ascending: false })
@@ -66,10 +69,16 @@ export function VanaCoroHome({ canHost, isCoordinator, isMember, initialCode, in
     else toast.error('Não há nenhum jogo com esse código.')
   }
 
-  function join(team: VanaCoroTeam) {
+  function join(team?: VanaCoroTeam, family?: { guestPass?: StoredCheckinGuest; rosterKey?: string }) {
     if (!found) return
     startTransition(async () => {
-      const r = await joinCoroSession({ code: found.code, team, guestName: isMember ? undefined : name })
+      const r = await joinCoroSession({
+        code: found.code,
+        team,
+        guestName: isMember ? undefined : name,
+        guestPass: family?.guestPass ? { guestId: family.guestPass.guestId, secret: family.guestPass.secret } : undefined,
+        rosterKey: family?.rosterKey,
+      })
       if (r.error || !r.playerId || !r.sessionId) {
         toast.error(r.error ?? 'Não foi possível entrar.')
         return
@@ -150,6 +159,8 @@ export function VanaCoroHome({ canHost, isCoordinator, isMember, initialCode, in
                     </button>
                   )}
                 </>
+              ) : found.uses_families ? (
+                <FamilyJoin found={found} isMember={isMember} pending={pending} join={join} />
               ) : (
                 <>
                   {!isMember && (
@@ -233,6 +244,101 @@ export function VanaCoroHome({ canHost, isCoordinator, isMember, initialCode, in
           </section>
         )}
       </main>
+    </div>
+  )
+}
+
+/**
+ * Com famílias sorteadas ninguém escolhe a equipa: o membro entra pela conta e o convidado
+ * pelo telemóvel onde marcou presença (ou escolhendo o nome na lista das duas famílias).
+ */
+function FamilyJoin({
+  found,
+  isMember,
+  pending,
+  join,
+}: {
+  found: FoundSession
+  isMember: boolean
+  pending: boolean
+  join: (team?: VanaCoroTeam, family?: { guestPass?: StoredCheckinGuest; rosterKey?: string }) => void
+}) {
+  const [stored, setStored] = useState<StoredCheckinGuest | null>(null)
+  const [names, setNames] = useState<{ key: string; name: string }[] | null>(null)
+  const [pickName, setPickName] = useState(false)
+
+  useEffect(() => {
+    if (isMember) return
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setStored(readStoredGuest())
+    listCoroRosterGuests(found.code)
+      .then(setNames)
+      .catch(() => setNames([]))
+  }, [isMember, found.code])
+
+  return (
+    <div className="space-y-3">
+      <p className="text-center font-bold">
+        {found.team_a_name} <span className="text-white/50">vs</span> {found.team_b_name}
+      </p>
+      <p className="text-center text-sm text-white/70">As famílias já foram sorteadas: entras logo na tua.</p>
+      {isMember ? (
+        <button
+          type="button"
+          disabled={pending}
+          onClick={() => join()}
+          className="w-full rounded-2xl bg-amber-400 py-4 text-lg font-black text-purple-950 shadow-lg disabled:opacity-40"
+        >
+          Entrar no jogo
+        </button>
+      ) : (
+        <>
+          {stored && !pickName && (
+            <>
+              <button
+                type="button"
+                disabled={pending}
+                onClick={() => join(undefined, { guestPass: stored })}
+                className="w-full rounded-2xl bg-amber-400 py-4 text-lg font-black text-purple-950 shadow-lg disabled:opacity-40"
+              >
+                Entrar como {stored.name}
+              </button>
+              <button type="button" onClick={() => setPickName(true)} className="w-full text-sm text-white/60 underline">
+                Não sou {stored.name}
+              </button>
+            </>
+          )}
+          {(!stored || pickName) && (
+            <>
+              <p className="text-center text-sm font-bold">Quem és?</p>
+              {names === null ? (
+                <Loader2 className="mx-auto h-5 w-5 animate-spin" />
+              ) : names.length === 0 ? (
+                <p className="rounded-2xl bg-black/20 p-4 text-center text-sm font-semibold">
+                  Não há visitas por entrar nas famílias que vão jogar. A tua família deve estar a assistir: acompanha no projetor! 👀
+                </p>
+              ) : (
+                <div className="grid grid-cols-2 gap-2">
+                  {names.map((n) => (
+                    <button
+                      key={n.key}
+                      type="button"
+                      disabled={pending}
+                      onClick={() => join(undefined, { rosterKey: n.key })}
+                      className="truncate rounded-xl bg-white/15 px-3 py-3 font-bold hover:bg-white/25 disabled:opacity-40"
+                    >
+                      {n.name}
+                    </button>
+                  ))}
+                </div>
+              )}
+              {names && names.length > 0 && (
+                <p className="text-center text-xs text-white/60">Não estás na lista? A tua família está a assistir: acompanha no projetor. 👀</p>
+              )}
+            </>
+          )}
+        </>
+      )}
     </div>
   )
 }

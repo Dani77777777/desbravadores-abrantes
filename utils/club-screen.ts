@@ -3,9 +3,9 @@
 
 import { isDayKey, isSection, type RankingSection, type RankingView } from '@/utils/ranking'
 
-export type ClubStage = 'logo' | 'ranking' | 'timer' | 'raffle' | 'teams'
+export type ClubStage = 'logo' | 'ranking' | 'checkin' | 'timer' | 'raffle' | 'teams'
 
-export const CLUB_STAGES: ClubStage[] = ['logo', 'ranking', 'timer', 'raffle', 'teams']
+export const CLUB_STAGES: ClubStage[] = ['logo', 'ranking', 'checkin', 'timer', 'raffle', 'teams']
 
 export function isClubStage(value: unknown): value is ClubStage {
   return typeof value === 'string' && (CLUB_STAGES as string[]).includes(value)
@@ -43,10 +43,14 @@ export type RankingSettings = {
   speed: ScrollSpeed
 }
 
+/** Presenças por QR: o evento cujo QR está no ecrã. */
+export type CheckinSettings = { eventId: string | null }
+
 /** Estado sincronizado com o projetor (tabela `club_screens.state`). */
 export type ClubScreenState = {
   stage: ClubStage
   ranking: RankingSettings
+  checkin: CheckinSettings
   /** Hora de envio no relógio de quem enviou (só se compara com mensagens do mesmo `by`). */
   sentAt: number
   /** Quem enviou (um id aleatório por janela aberta). */
@@ -66,6 +70,7 @@ export const DEFAULT_RANKING: RankingSettings = {
 export const DEFAULT_CLUB_STATE: ClubScreenState = {
   stage: 'logo',
   ranking: DEFAULT_RANKING,
+  checkin: { eventId: null },
   sentAt: 0,
   by: 'default',
 }
@@ -76,6 +81,7 @@ export function normalizeClubState(raw: unknown): ClubScreenState {
   const r = s.ranking && typeof s.ranking === 'object' ? (s.ranking as Record<string, unknown>) : {}
   const view: RankingView = r.view === 'xp' || r.view === 'gold' ? r.view : 'combined'
   const speed: ScrollSpeed = r.speed === 'slow' || r.speed === 'fast' ? r.speed : 'normal'
+  const c = s.checkin && typeof s.checkin === 'object' ? (s.checkin as Record<string, unknown>) : {}
   return {
     stage: isClubStage(s.stage) ? s.stage : 'logo',
     ranking: {
@@ -87,6 +93,7 @@ export function normalizeClubState(raw: unknown): ClubScreenState {
       scrolling: r.scrolling !== false,
       speed,
     },
+    checkin: { eventId: typeof c.eventId === 'string' ? c.eventId : null },
     sentAt: typeof s.sentAt === 'number' ? s.sentAt : 0,
     by: typeof s.by === 'string' ? s.by : 'default',
   }

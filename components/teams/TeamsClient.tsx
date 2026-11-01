@@ -11,6 +11,8 @@ import {
   ChevronLeft,
   Copy,
   ExternalLink,
+  Gamepad2,
+  Heart,
   Maximize,
   Minimize,
   Minus,
@@ -32,6 +34,7 @@ import {
   X,
 } from 'lucide-react'
 import { createClient } from '@/utils/supabase/client'
+import { listCheckinGuests } from '@/lib/actions/checkin'
 import { getClubApp } from '@/utils/club-screen'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Switch } from '@/components/ui/switch'
@@ -43,13 +46,20 @@ import {
   isLeaderFor,
   memberEntry,
   newId,
+  pickWinners,
   recommendEvent,
   type RaffleEntry,
   type RaffleEvent,
 } from '@/utils/raffle'
 import {
+  FAMILY_PRESETS,
+  MAX_FAMILY_SIZE,
   MAX_TEAM_COUNT,
+  MIN_FAMILY_SIZE,
   MIN_TEAMS,
+  familiesCount,
+  formFamilies,
+  togetherBlocks,
   TEAMS_PROJECTOR_PATH,
   TEAMS_PROJECTOR_WINDOW_NAME,
   TEAM_PRESETS,
@@ -68,16 +78,20 @@ import {
   type TeamMember,
   type TeamPerson,
   type TeamsLocalMessage,
+  type TeamsMatch,
   type TeamsScreenState,
 } from '@/utils/teams'
 import { unlockRaffleSound } from '@/utils/raffle-sound'
 import { EntryAvatar } from '@/components/raffle/RaffleStage'
 import { SECTION_DOT } from '@/app/admin/components/member-constants'
 import { TeamsBoard } from './TeamsBoard'
+import { MatchBoard } from './MatchBoard'
 
 export type TeamsEvent = RaffleEvent & { rsvp_enabled?: boolean | null }
 type Source = 'rsvp' | 'attendance'
 type SizeMode = 'count' | 'size'
+/** Equipas (animais) ou Famílias (como no Family Feud: famílias a sério juntas, depois sorteia-se quem joga). */
+type FormMode = 'teams' | 'families'
 
 type Saved = {
   v: 1
@@ -95,6 +109,11 @@ type Saved = {
   teams: Team[]
   revealId: string | null
   formedAt?: number | null
+  mode?: FormMode
+  formedMode?: FormMode
+  familySize?: number
+  match?: TeamsMatch | null
+  played?: string[]
 }
 
 /** Seleção e equipas são temporárias (como no Sorteador): ao fim de 12h recomeça do zero. */
@@ -106,6 +125,9 @@ function storageKey(userId: string) {
 }
 function pairsKey(userId: string) {
   return `teams:pairs:${userId}`
+}
+function togetherKey(userId: string) {
+  return `teams:together:${userId}`
 }
 
 function loadJson<T>(key: string): T | null {
@@ -135,7 +157,18 @@ function defaultSource(e: TeamsEvent, now: number): Source {
   return e.rsvp_enabled && now < new Date(e.start_at).getTime() ? 'rsvp' : 'attendance'
 }
 
-export function TeamsClient({ userId, members, events }: { userId: string; members: TeamMember[]; events: TeamsEvent[] }) {
+export function TeamsClient({
+  userId,
+  members,
+  events,
+  familyGroups,
+}: {
+  userId: string
+  members: TeamMember[]
+  events: TeamsEvent[]
+  /** Famílias pelas contas familiares (conta principal + perfis associados). */
+  familyGroups: string[][]
+}) {
   const router = useRouter()
   const [supabase] = useState(() => createClient())
 
@@ -154,6 +187,18 @@ export function TeamsClient({ userId, members, events }: { userId: string; membe
   const [revealId, setRevealId] = useState<string | null>(null)
   const [formedAt, setFormedAt] = useState<number | null>(null)
   const [pairs, setPairs] = useState<[string, string][]>([])
+  const [mode, setMode] = useState<FormMode>('teams')
+  const [familySize, setFamilySize] = useState(5)
+  /** Pares "juntar sempre" (Modo Famílias), além das contas familiares. */
+  const [togetherPairs, setTogetherPairs] = useState<[string, string][]>([])
+  const [match, setMatch] = useState<TeamsMatch | null>(null)
+  /** Famílias que já jogaram (o sorteio escolhe primeiro entre as outras). */
+  const [played, setPlayed] = useState<string[]>([])
+  const [playCount, setPlayCount] = useState(2)
+  const [togA, setTogA] = useState('')
+  const [togB, setTogB] = useState('')
+  /** Modo com que as equipas atuais foram formadas. */
+  const [formedMode, setFormedMode] = useState<FormMode>('teams')
 
   const [search, setSearch] = useState('')
   const [sectionFilter, setSectionFilter] = useState('all')
@@ -175,17 +220,20 @@ export function TeamsClient({ userId, members, events }: { userId: string; membe
       setEventId(ev.id)
       setSource(src)
       setLoadingEvent(true)
-      const res =
+      const [res, visits] = await Promise.all([
         src === 'rsvp'
-          ? await supabase.from('event_rsvps').select('user_id').eq('event_id', ev.id).eq('going', true)
-          : await supabase.from('event_attendance').select('user_id').eq('event_id', ev.id).in('status', ['presente', 'atrasado'])
+          ? supabase.from('event_rsvps').select('user_id').eq('event_id', ev.id).eq('going', true)
+          : supabase.from('event_attendance').select('user_id').eq('event_id', ev.id).in('status', ['presente', 'atrasado']),
+        // As visitas que se registaram pelo QR só contam nas presenças
+        src === 'attendance' ? listCheckinGuests(ev.id).catch(() => [] as RaffleEntry[]) : Promise.resolve([] as RaffleEntry[]),
+      ])
       setLoadingEvent(false)
       if (res.error) {
         if (!opt.auto) toast.error('Não foi possível carregar as pessoas do evento.')
         return
       }
       const ids = (res.data || []).map((r) => r.user_id as string).filter((id) => memberById.has(id))
-      if (ids.length === 0) {
+      if (ids.length === 0 && visits.length === 0) {
         if (!opt.auto)
           toast.info(
             src === 'rsvp'
@@ -194,8 +242,11 @@ export function TeamsClient({ userId, members, events }: { userId: string; membe
           )
         return
       }
-      setSelected((prev) => new Set([...ids, ...[...prev].filter(isGuestId)]))
-      toast.success(`${ids.length} ${src === 'rsvp' ? 'disseram que iam' : 'presentes'} em "${ev.title}"`)
+      if (visits.length > 0) setGuests((prev) => [...prev.filter((g) => !visits.some((v) => v.id === g.id)), ...visits])
+      setSelected((prev) => new Set([...ids, ...visits.map((v) => v.id), ...[...prev].filter(isGuestId)]))
+      toast.success(
+        `${ids.length} ${src === 'rsvp' ? 'disseram que iam' : 'presentes'}${visits.length ? ` + ${visits.length} ${visits.length === 1 ? 'visita' : 'visitas'}` : ''} em "${ev.title}"`,
+      )
     },
     [supabase, memberById],
   )
@@ -205,8 +256,10 @@ export function TeamsClient({ userId, members, events }: { userId: string; membe
     const saved = loadJson<Saved>(storageKey(userId))
     const fresh = saved?.v === 1 && Date.now() - saved.savedAt < TEMP_MS
     const savedPairs = loadJson<[string, string][]>(pairsKey(userId))
+    const savedTogether = loadJson<[string, string][]>(togetherKey(userId))
     // Lido só depois de montar (no servidor não há localStorage)
     if (Array.isArray(savedPairs)) setPairs(savedPairs)
+    if (Array.isArray(savedTogether)) setTogetherPairs(savedTogether)
     if (saved?.v === 1) {
       setSizeMode(saved.sizeMode || 'count')
       setCount(saved.count || 4)
@@ -214,6 +267,8 @@ export function TeamsClient({ userId, members, events }: { userId: string; membe
       setOpts({ ...DEFAULT_OPTS, ...saved.opts })
       setProjector(!!saved.projector)
       setSound(saved.sound !== false)
+      setMode(saved.mode === 'families' ? 'families' : 'teams')
+      setFamilySize(saved.familySize || 5)
     }
     if (fresh && saved && (saved.selected.length > 0 || saved.teams.length > 0)) {
       setSelected(new Set(saved.selected.filter((id) => isGuestId(id) || memberById.has(id))))
@@ -223,6 +278,9 @@ export function TeamsClient({ userId, members, events }: { userId: string; membe
       setTeams(saved.teams || [])
       setRevealId(saved.revealId ?? null)
       setFormedAt(saved.formedAt ?? null)
+      setMatch(saved.match ?? null)
+      setFormedMode(saved.formedMode === 'families' ? 'families' : 'teams')
+      setPlayed(saved.played ?? [])
     } else if (recommended) {
       applyEvent(recommended, defaultSource(recommended, Date.now()), { auto: true })
     }
@@ -248,12 +306,21 @@ export function TeamsClient({ userId, members, events }: { userId: string; membe
       teams,
       revealId,
       formedAt,
+      mode,
+      formedMode,
+      familySize,
+      match,
+      played,
     } satisfies Saved)
-  }, [hydrated, userId, selected, guests, eventId, source, sizeMode, count, perTeam, opts, projector, sound, teams, revealId, formedAt])
+  }, [hydrated, userId, selected, guests, eventId, source, sizeMode, count, perTeam, opts, projector, sound, teams, revealId, formedAt, mode, formedMode, familySize, match, played])
 
   useEffect(() => {
     if (hydrated) saveJson(pairsKey(userId), pairs)
   }, [hydrated, userId, pairs])
+
+  useEffect(() => {
+    if (hydrated) saveJson(togetherKey(userId), togetherPairs)
+  }, [hydrated, userId, togetherPairs])
 
   // ── Pessoas ────────────────────────────────────────────────
   const personById = useMemo(() => {
@@ -346,7 +413,14 @@ export function TeamsClient({ userId, members, events }: { userId: string; membe
   const nameOf = (id: string) => personById.get(id)?.name ?? memberById.get(id)?.full_name ?? 'Membro'
 
   // ── Formar ─────────────────────────────────────────────────
-  const teamCount = sizeMode === 'count' ? Math.min(count, Math.max(MIN_TEAMS, people.length)) : teamsForSize(people.length, perTeam)
+  const families = mode === 'families'
+  /** As equipas que estão formadas são famílias (o "Quem joga" só faz sentido aí). */
+  const familiesFormed = teams.length > 0 && formedMode === 'families'
+  const teamCount = families
+    ? familiesCount(people.length, familySize)
+    : sizeMode === 'count'
+      ? Math.min(count, Math.max(MIN_TEAMS, people.length))
+      : teamsForSize(people.length, perTeam)
   const sizes = people.length > 0 ? [Math.floor(people.length / teamCount), Math.ceil(people.length / teamCount)] : [0, 0]
 
   const form = () => {
@@ -355,12 +429,17 @@ export function TeamsClient({ userId, members, events }: { userId: string; membe
       toast.error('Escolhe pelo menos 2 pessoas.')
       return
     }
-    const groups = formTeams(people, teamCount, opts, pairs)
+    const result = families ? formFamilies(people, familySize, [...familyGroups, ...togetherPairs], opts, pairs) : null
+    const groups = result ? result.groups : formTeams(people, teamCount, opts, pairs)
+    const presets = families ? FAMILY_PRESETS : TEAM_PRESETS
+    // Ao trocar entre Equipas e Famílias os nomes recomeçam (senão ficavam animais nas famílias)
+    const switched = teams.length > 0 && formedMode !== mode
+    setFormedMode(mode)
     setTeams((prev) =>
       groups.map((ids, i) => {
         // Mantém os nomes que tinhas mudado à mão (mesma posição)
-        const keep = prev[i]
-        const preset = TEAM_PRESETS[i % TEAM_PRESETS.length]
+        const keep = switched ? undefined : prev[i]
+        const preset = presets[i % presets.length]
         return {
           id: keep?.id ?? newId(),
           name: keep?.name ?? preset.name,
@@ -373,6 +452,12 @@ export function TeamsClient({ userId, members, events }: { userId: string; membe
     setRevealId(null)
     setFormedAt(Date.now())
     setMoving(null)
+    setMatch(null)
+    setPlayed([])
+    if (result?.split.length)
+      toast.warning(
+        `${result.split.map((b) => b.map(nameOf).join(', ')).join(' / ')}: são mais do que ${familySize}, por isso ficaram em famílias diferentes.`,
+      )
     const c = conflictCount(groups, avoidSet)
     if (c > 0) toast.warning(`Não deu para separar ${c} ${c === 1 ? 'par' : 'pares'} — vê as equipas marcadas a vermelho.`)
   }
@@ -408,6 +493,46 @@ export function TeamsClient({ userId, members, events }: { userId: string; membe
     setTeams([])
     setRevealId(null)
     setMoving(null)
+    setMatch(null)
+    setPlayed([])
+  }
+
+  // ── Modo Famílias: quem fica junto e quem joga ─────────────
+  const togetherSet = useMemo(() => new Set(togetherPairs.map(([a, b]) => pairKey(a, b))), [togetherPairs])
+  const addTogether = () => {
+    if (!togA || !togB || togA === togB) return
+    if (togetherSet.has(pairKey(togA, togB))) {
+      toast.info('Esse par já está na lista.')
+      return
+    }
+    setTogetherPairs((p) => [...p, [togA, togB]])
+    setTogA('')
+    setTogB('')
+  }
+  /** Famílias a sério (contas familiares) entre quem está escolhido. */
+  const accountFamilies = useMemo(() => togetherBlocks([...selected], familyGroups).filter((b) => b.length > 1), [selected, familyGroups])
+
+  /** Sorteia as famílias que jogam, primeiro entre as que ainda não jogaram. */
+  const drawPlayers = () => {
+    unlockRaffleSound()
+    const n = Math.min(playCount, teams.length)
+    const fresh = teams.filter((t) => !played.includes(t.id))
+    let picked = pickWinners(fresh, n)
+    let nextPlayed = [...played, ...picked.map((t) => t.id)]
+    if (picked.length < n) {
+      // Já jogaram (quase) todas: as que faltavam jogam e as outras saem das que já jogaram
+      const again = pickWinners(
+        teams.filter((t) => played.includes(t.id)),
+        n - picked.length,
+      )
+      picked = [...picked, ...again]
+      nextPlayed = picked.map((t) => t.id)
+      toast.info('Todas as famílias já jogaram: começa uma nova volta.')
+    }
+    setMatch({ id: newId(), teamIds: picked.map((t) => t.id) })
+    setPlayed(nextPlayed)
+    if (!revealId) setRevealId(newId())
+    setOverlay('reveal')
   }
 
   // ── Estado para o projetor / cronómetro ────────────────────
@@ -424,8 +549,10 @@ export function TeamsClient({ userId, members, events }: { userId: string; membe
       })),
       revealId,
       formedAt: teams.length > 0 ? formedAt : null,
+      mode: teams.length > 0 ? formedMode : mode,
+      match: match && match.teamIds.every((id) => teams.some((t) => t.id === id)) ? match : null,
     }),
-    [event, people.length, teams, personById, revealId, formedAt],
+    [event, people.length, teams, personById, revealId, formedAt, mode, formedMode, match],
   )
 
   // Últimas equipas neste browser (para o Cronómetro)
@@ -847,6 +974,45 @@ export function TeamsClient({ userId, members, events }: { userId: string; membe
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-5">
+            <div className="grid grid-cols-2 gap-1 rounded-xl bg-fuchsia-50 p-1 ring-1 ring-inset ring-fuchsia-100">
+              {(
+                [
+                  ['teams', 'Equipas', UsersRound],
+                  ['families', 'Famílias', Heart],
+                ] as const
+              ).map(([id, label, Icon]) => (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => setMode(id)}
+                  className={`flex items-center justify-center gap-1.5 rounded-lg px-2 py-2.5 text-sm font-black ${
+                    mode === id ? 'bg-fuchsia-700 text-white shadow-sm' : 'text-fuchsia-800/70 hover:text-fuchsia-900'
+                  }`}
+                >
+                  <Icon className="h-4 w-4" /> {label}
+                </button>
+              ))}
+            </div>
+            {families && (
+              <p className="text-xs text-gray-500">
+                Como no Family Feud: quem é da mesma família fica junto e o resto preenche os lugares. Depois sorteias que famílias jogam.
+              </p>
+            )}
+            {families ? (
+              <div className="flex flex-wrap items-center gap-4">
+                <Stepper value={familySize} min={MIN_FAMILY_SIZE} max={MAX_FAMILY_SIZE} onChange={setFamilySize} suffix="no máximo por família" />
+                <p className="text-sm text-gray-500">
+                  {people.length > 1 ? (
+                    <>
+                      → <b>{teamCount}</b> famílias de <b>{sizes[0] === sizes[1] ? sizes[0] : `${sizes[0]}–${sizes[1]}`}</b> pessoas
+                    </>
+                  ) : (
+                    'Escolhe as pessoas primeiro.'
+                  )}
+                </p>
+              </div>
+            ) : (
+            <>
             <div className="grid grid-cols-2 gap-1 rounded-xl bg-gray-100 p-1">
               {(
                 [
@@ -880,6 +1046,82 @@ export function TeamsClient({ userId, members, events }: { userId: string; membe
                 )}
               </p>
             </div>
+            </>
+            )}
+
+            {families && (
+              <div className="space-y-2 border-t border-gray-100 pt-4">
+                <p className="text-xs font-bold uppercase tracking-wider text-gray-500">Ficam sempre juntos</p>
+                {accountFamilies.length > 0 && (
+                  <div className="flex flex-wrap gap-2">
+                    {accountFamilies.map((b) => (
+                      <span
+                        key={b.join()}
+                        className="inline-flex items-center gap-1 rounded-full border border-fuchsia-200 bg-fuchsia-50 px-3 py-1 text-xs font-bold text-fuchsia-900"
+                        title="Contas familiares"
+                      >
+                        <Heart className="h-3 w-3" /> {b.map(nameOf).join(' + ')}
+                      </span>
+                    ))}
+                  </div>
+                )}
+                <p className="text-xs text-gray-500">
+                  As contas familiares já ficam juntas. Junta aqui quem não está ligado (ex.: o pai com conta própria, ou uma visita que veio
+                  com eles). Fica guardado neste dispositivo.
+                </p>
+                <div className="flex flex-col gap-2 sm:flex-row">
+                  {[
+                    [togA, setTogA],
+                    [togB, setTogB],
+                  ].map(([value, set], i) => (
+                    <select
+                      key={i}
+                      value={value as string}
+                      onChange={(e) => (set as (v: string) => void)(e.target.value)}
+                      className="h-10 min-w-0 flex-1 rounded-xl border border-gray-200 bg-white px-3 text-sm"
+                    >
+                      <option value="">{i === 0 ? 'Pessoa…' : 'fica com…'}</option>
+                      {[...people]
+                        .sort((a, b) => a.name.localeCompare(b.name, 'pt'))
+                        .map((p) => (
+                          <option key={p.id} value={p.id}>
+                            {p.name}
+                            {isGuestId(p.id) ? ' (visita)' : ''}
+                          </option>
+                        ))}
+                    </select>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={addTogether}
+                    disabled={!togA || !togB || togA === togB}
+                    className="flex h-10 flex-shrink-0 items-center justify-center gap-1.5 rounded-xl bg-blue-900 px-3 text-sm font-bold text-white disabled:opacity-40"
+                  >
+                    <Plus className="h-4 w-4" /> Juntar
+                  </button>
+                </div>
+                {togetherPairs.length > 0 && (
+                  <div className="flex flex-wrap gap-2">
+                    {togetherPairs.map(([a, b]) => (
+                      <span
+                        key={pairKey(a, b)}
+                        className="inline-flex items-center gap-1 rounded-full border border-green-200 bg-green-50 py-1 pl-3 pr-1.5 text-xs font-bold text-green-800"
+                      >
+                        {nameOf(a)} + {nameOf(b)}
+                        <button
+                          type="button"
+                          onClick={() => setTogetherPairs((p) => p.filter(([x, y]) => pairKey(x, y) !== pairKey(a, b)))}
+                          className="ml-1 rounded-full p-0.5 text-green-500 hover:bg-green-100 hover:text-green-800"
+                          title="Tirar da lista"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
 
             <div className="space-y-2.5 border-t border-gray-100 pt-4">
               <p className="text-xs font-bold uppercase tracking-wider text-gray-500">Equilibrar</p>
@@ -960,7 +1202,7 @@ export function TeamsClient({ userId, members, events }: { userId: string; membe
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-base">
-                <UsersRound className="h-5 w-5 text-fuchsia-700" /> Equipas
+                <UsersRound className="h-5 w-5 text-fuchsia-700" /> {familiesFormed ? 'Famílias' : 'Equipas'}
                 {revealId && (
                   <span className="rounded-full bg-green-100 px-2 py-0.5 text-[11px] font-bold text-green-700">Revelado no projetor</span>
                 )}
@@ -988,10 +1230,13 @@ export function TeamsClient({ userId, members, events }: { userId: string; membe
                   const sum = teamSummary(t.memberIds, personById)
                   const teamConflicts = conflictCount([t.memberIds], avoidSet)
                   const canDrop = moving && !t.memberIds.includes(moving)
+                  const playing = familiesFormed && !!screenState.match?.teamIds.includes(t.id)
                   return (
                     <div
                       key={t.id}
-                      className={`overflow-hidden rounded-2xl border bg-white shadow-sm ${teamConflicts ? 'border-red-300' : 'border-gray-200'}`}
+                      className={`overflow-hidden rounded-2xl border bg-white shadow-sm ${teamConflicts ? 'border-red-300' : 'border-gray-200'} ${
+                        playing ? 'ring-2 ring-fuchsia-500' : ''
+                      }`}
                     >
                       <div className="flex items-center gap-2 px-3 py-2 text-white" style={{ backgroundColor: t.color }}>
                         <span className="text-xl">{t.emoji}</span>
@@ -1003,6 +1248,15 @@ export function TeamsClient({ userId, members, events }: { userId: string; membe
                         />
                         <span className="rounded-full bg-black/25 px-2 text-xs font-black">{t.memberIds.length}</span>
                       </div>
+                      {familiesFormed && screenState.match && (
+                        <p
+                          className={`px-3 py-1 text-[11px] font-black uppercase tracking-wider ${
+                            playing ? 'bg-fuchsia-100 text-fuchsia-800' : 'bg-gray-50 text-gray-400'
+                          }`}
+                        >
+                          {playing ? '🎮 Vai jogar' : played.includes(t.id) ? '✓ Já jogou' : '👀 A assistir'}
+                        </p>
+                      )}
                       <p className="border-b border-gray-100 px-3 py-1.5 text-[11px] font-bold text-gray-500">
                         ♂ {sum.m} · ♀ {sum.f}
                         {sum.leaders > 0 && ` · ${sum.leaders} liderança`}
@@ -1042,6 +1296,49 @@ export function TeamsClient({ userId, members, events }: { userId: string; membe
                   )
                 })}
               </div>
+              {familiesFormed && (
+                <div className="space-y-3 rounded-2xl bg-fuchsia-50 p-4 ring-1 ring-inset ring-fuchsia-100">
+                  <p className="flex items-center gap-2 font-black text-fuchsia-950">
+                    <Gamepad2 className="h-5 w-5" /> Quem joga
+                  </p>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <Stepper value={playCount} min={2} max={Math.max(2, teams.length)} onChange={setPlayCount} suffix="famílias jogam" />
+                    <button
+                      type="button"
+                      onClick={drawPlayers}
+                      disabled={teams.length < 2}
+                      className="flex h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-fuchsia-700 to-indigo-700 px-4 font-black text-white shadow-md disabled:opacity-40"
+                    >
+                      <Shuffle className="h-5 w-5" /> {screenState.match ? 'Sortear outra vez' : 'Sortear quem joga'}
+                    </button>
+                  </div>
+                  <p className="text-xs text-fuchsia-900/70">
+                    O sorteio escolhe primeiro as famílias que ainda não jogaram. No VanaCoro, carrega em &quot;Usar as famílias
+                    sorteadas&quot; na sala de espera.
+                  </p>
+                  {(screenState.match || played.length > 0) && (
+                    <div className="flex flex-wrap gap-3 text-xs font-bold">
+                      {screenState.match && (
+                        <button type="button" onClick={() => setMatch(null)} className="text-fuchsia-800 hover:underline">
+                          Mostrar todas as famílias no projetor
+                        </button>
+                      )}
+                      {played.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setPlayed(screenState.match?.teamIds ?? [])
+                            toast.success('Todas as outras famílias podem voltar a ser sorteadas.')
+                          }}
+                          className="text-gray-500 hover:underline"
+                        >
+                          Recomeçar a volta ({played.length} já {played.length === 1 ? 'jogou' : 'jogaram'})
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
               <div className="flex flex-wrap gap-2 border-t border-gray-100 pt-4">
                 <button
                   type="button"
@@ -1094,10 +1391,10 @@ export function TeamsClient({ userId, members, events }: { userId: string; membe
               }`}
             >
               <span className="flex items-center gap-2 text-lg">
-                <Shuffle className="h-5 w-5" /> {teams.length > 0 ? 'Formar de novo' : 'Formar equipas'}
+                <Shuffle className="h-5 w-5" /> {teams.length > 0 ? 'Formar de novo' : families ? 'Formar famílias' : 'Formar equipas'}
               </span>
               <span className={`text-[11px] font-bold ${teams.length > 0 ? 'text-gray-500' : 'text-white/75'}`}>
-                {people.length} pessoas · {teamCount} equipas
+                {people.length} pessoas · {teamCount} {families ? 'famílias' : 'equipas'}
               </span>
             </button>
             {teams.length > 0 && (
@@ -1170,7 +1467,10 @@ function RevealOverlay({
   return (
     <div ref={ref} className="fixed inset-0 z-50 flex flex-col bg-gradient-to-br from-blue-950 via-indigo-950 to-slate-950 text-white">
       <div className="flex items-center gap-2 px-4 py-3">
-        <p className="min-w-0 flex-1 truncate text-sm font-bold text-blue-200">{state.title ? `Equipas · ${state.title}` : 'Equipas'}</p>
+        <p className="min-w-0 flex-1 truncate text-sm font-bold text-blue-200">
+          {state.mode === 'families' ? 'Famílias' : 'Equipas'}
+          {state.title ? ` · ${state.title}` : ''}
+        </p>
         {!soundOnProjector && (
           <button type="button" onClick={onToggleSound} className="rounded-lg p-2 text-blue-200 hover:bg-white/10" title="Som">
             {sound ? <Volume2 className="h-5 w-5" /> : <VolumeX className="h-5 w-5" />}
@@ -1191,7 +1491,11 @@ function RevealOverlay({
         </button>
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-4">
-        <TeamsBoard key={id} teams={state.teams} revealId={id} instant={!animate} sound={sound} />
+        {state.match ? (
+          <MatchBoard key={state.match.id} teams={state.teams} match={state.match} instant={!animate} sound={sound} />
+        ) : (
+          <TeamsBoard key={id} teams={state.teams} revealId={id} instant={!animate} sound={sound} />
+        )}
       </div>
     </div>
   )

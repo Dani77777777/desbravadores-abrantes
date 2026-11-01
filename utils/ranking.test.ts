@@ -108,18 +108,21 @@ describe('normalizeClubState', () => {
   test('valores inválidos voltam ao padrão', () => {
     const s = normalizeClubState({ stage: 'nope', ranking: { view: 'x', section: 'marte', beforeDay: 'ontem', speed: 9 } })
     expect(s.stage).toBe('logo')
+    expect(s.checkin).toEqual({ eventId: null })
     expect(s.ranking).toMatchObject({ view: 'combined', section: 'todos', beforeDay: null, speed: 'normal', scrolling: true })
   })
   test('mantém valores válidos', () => {
     const s = normalizeClubState({
       stage: 'ranking',
       ranking: { view: 'gold', section: 'ticoes', beforeDay: '2026-09-20', revealed: true, revealId: 'r1', scrolling: false, speed: 'fast' },
+      checkin: { eventId: 'e1' },
       sentAt: 5,
       by: 'pc',
     })
     expect(s).toEqual({
       stage: 'ranking',
       ranking: { view: 'gold', section: 'ticoes', beforeDay: '2026-09-20', revealed: true, revealId: 'r1', scrolling: false, speed: 'fast' },
+      checkin: { eventId: 'e1' },
       sentAt: 5,
       by: 'pc',
     })

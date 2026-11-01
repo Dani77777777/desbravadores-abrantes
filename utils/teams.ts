@@ -211,6 +211,160 @@ export function formTeams(
   return best
 }
 
+// ── Modo Famílias ──────────────────────────────────────────
+// Como no Family Feud: as pessoas são divididas em "famílias" com um máximo de pessoas.
+// Quem é da mesma família a sério (contas familiares) ou foi marcado "juntar" fica sempre
+// junto; o resto preenche os lugares. Depois sorteia-se que famílias jogam.
+
+/** Nomes das famílias (bíblicas) com emoji e cor para o projetor. */
+export const FAMILY_PRESETS: { name: string; emoji: string; color: string }[] = [
+  { name: 'Família de Noé', emoji: '🕊️', color: '#0891b2' },
+  { name: 'Família de Abraão', emoji: '⭐', color: '#f59e0b' },
+  { name: 'Família de Jacó', emoji: '🪜', color: '#7c3aed' },
+  { name: 'Família de José', emoji: '🌈', color: '#db2777' },
+  { name: 'Família de Moisés', emoji: '🔥', color: '#dc2626' },
+  { name: 'Família de Davi', emoji: '👑', color: '#ca8a04' },
+  { name: 'Família de Daniel', emoji: '🦁', color: '#ea580c' },
+  { name: 'Família de Rute', emoji: '🌾', color: '#65a30d' },
+  { name: 'Família de Ester', emoji: '💎', color: '#2563eb' },
+  { name: 'Família de Josué', emoji: '🎺', color: '#15803d' },
+  { name: 'Família de Samuel', emoji: '🪔', color: '#a16207' },
+  { name: 'Família de Elias', emoji: '☁️', color: '#475569' },
+]
+
+export const MIN_FAMILY_SIZE = 2
+export const MAX_FAMILY_SIZE = 12
+
+/** Quantas famílias para um máximo de `maxSize` pessoas cada (nunca menos de 2). */
+export function familiesCount(people: number, maxSize: number): number {
+  return Math.max(MIN_TEAMS, Math.min(FAMILY_PRESETS.length, Math.ceil(people / Math.max(1, maxSize))))
+}
+
+/**
+ * Junta em blocos quem tem de ficar junto (só quem está em `people`). Os grupos podem
+ * sobrepor-se (ex.: família da conta + um par "juntar" à mão): ficam todos num só bloco.
+ * Quem não está em nenhum grupo fica num bloco sozinho.
+ */
+export function togetherBlocks(people: string[], groups: string[][]): string[][] {
+  const present = new Set(people)
+  const parent = new Map(people.map((id) => [id, id]))
+  const find = (x: string): string => {
+    let r = x
+    while (parent.get(r) !== r) r = parent.get(r)!
+    parent.set(x, r)
+    return r
+  }
+  for (const g of groups) {
+    const ids = g.filter((id) => present.has(id))
+    for (let i = 1; i < ids.length; i++) parent.set(find(ids[i]), find(ids[0]))
+  }
+  const blocks = new Map<string, string[]>()
+  for (const id of people) {
+    const r = find(id)
+    blocks.set(r, [...(blocks.get(r) ?? []), id])
+  }
+  return [...blocks.values()]
+}
+
+export type FamiliesResult = {
+  groups: string[][]
+  /** Famílias a sério maiores do que o máximo, que tiveram de ser separadas. */
+  split: string[][]
+}
+
+/**
+ * Forma as famílias: os blocos (quem fica junto) entram primeiro, dos maiores para os mais
+ * pequenos, onde ainda cabem; depois cada pessoa sozinha vai para a família mais pequena
+ * (com o mesmo equilíbrio do formTeams). Várias tentativas ao acaso, fica a melhor.
+ */
+export function formFamilies(
+  people: TeamPerson[],
+  maxSize: number,
+  together: string[][],
+  opts: BalanceOptions,
+  avoidPairs: [string, string][] = [],
+  { attempts = 120, rnd = Math.random }: { attempts?: number; rnd?: () => number } = {},
+): FamiliesResult {
+  const size = Math.max(1, maxSize)
+  const k = Math.min(familiesCount(people.length, size), Math.max(1, people.length))
+  const cap = Math.ceil(people.length / k)
+  const avoid = new Set(avoidPairs.map(([a, b]) => pairKey(a, b)))
+  const byId = new Map(people.map((p) => [p.id, p]))
+
+  const split: string[][] = []
+  const blocks: string[][] = []
+  for (const b of togetherBlocks(
+    people.map((p) => p.id),
+    together,
+  )) {
+    if (b.length <= size) blocks.push(b)
+    else {
+      split.push(b)
+      for (let i = 0; i < b.length; i += size) blocks.push(b.slice(i, i + size))
+    }
+  }
+  const multi = blocks.filter((b) => b.length > 1)
+  const singles = blocks.filter((b) => b.length === 1).map((b) => byId.get(b[0])!)
+
+  let best: string[][] = []
+  let bestScore = Infinity
+  for (let attempt = 0; attempt < attempts; attempt++) {
+    const fams: string[][] = Array.from({ length: k }, () => [])
+    const stats: Stats[] = Array.from({ length: k }, emptyStats)
+    const put = (i: number, p: TeamPerson) => {
+      fams[i].push(p.id)
+      add(stats[i], p)
+    }
+
+    // 1) Famílias a sério / "juntar": as maiores primeiro, onde ainda caibam inteiras
+    // (de preferência sem passar o tamanho igual para todos; senão, sem passar o máximo)
+    const order = shuffle(multi, rnd).sort((a, b) => b.length - a.length)
+    const all = stats.map((_, i) => i)
+    for (const b of order) {
+      const even = all.filter((i) => stats[i].size + b.length <= cap)
+      const fits = even.length ? even : all.filter((i) => stats[i].size + b.length <= size)
+      const pool = fits.length ? fits : all
+      const min = Math.min(...pool.map((i) => stats[i].size))
+      const pick = shuffle(
+        pool.filter((i) => stats[i].size === min),
+        rnd,
+      )[0]
+      b.forEach((id) => put(pick, byId.get(id)!))
+    }
+
+    // 2) Quem está sozinho preenche as mais pequenas (como no formTeams)
+    let rest = shuffle(singles, rnd)
+    if (opts.age) {
+      const key = new Map(rest.map((p) => [p.id, (p.age ?? 12) + (rnd() - 0.5) * 3]))
+      rest = rest.sort((a, b) => key.get(b.id)! - key.get(a.id)!)
+    }
+    if (opts.leaders) rest = [...rest.filter((p) => p.leader), ...rest.filter((p) => !p.leader)]
+    for (const p of rest) {
+      const min = Math.min(...stats.map((s) => s.size))
+      let pick = -1
+      let pickCost = Infinity
+      for (const i of shuffle(
+        stats.map((_, i) => i).filter((i) => stats[i].size === min),
+        rnd,
+      )) {
+        const c = placementCost(p, stats[i], fams[i], opts, avoid)
+        if (c < pickCost) {
+          pick = i
+          pickCost = c
+        }
+      }
+      put(pick, p)
+    }
+
+    const score = scoreTeams(fams, byId, opts, avoid) + spread(fams.map((f) => f.length)) * 200
+    if (score < bestScore) {
+      best = fams
+      bestScore = score
+    }
+  }
+  return { groups: best, split }
+}
+
 /** Resumo de uma equipa para mostrar ao lado do nome. */
 export function teamSummary(ids: string[], byId: Map<string, TeamPerson>) {
   let m = 0
@@ -248,6 +402,9 @@ export function personFromMember(m: TeamMember, entry: RaffleEntry): TeamPerson 
 
 export type TeamsScreenTeam = { id: string; name: string; emoji: string; color: string; members: RaffleEntry[] }
 
+/** Famílias sorteadas para jogar. O `id` muda a cada sorteio (o projetor volta a animar). */
+export type TeamsMatch = { id: string; teamIds: string[] }
+
 /** Estado sincronizado com o projetor (tabela `team_screens.state`). */
 export type TeamsScreenState = {
   title: string | null
@@ -258,6 +415,10 @@ export type TeamsScreenState = {
   revealId: string | null
   /** Última formação (para o Cronómetro ir buscar os nomes). */
   formedAt: number | null
+  /** 'families' = Modo Famílias (o projetor diz "Famílias"). */
+  mode?: 'teams' | 'families'
+  /** Famílias que vão jogar (Modo Famílias). */
+  match?: TeamsMatch | null
 }
 
 export type TeamsLocalMessage =

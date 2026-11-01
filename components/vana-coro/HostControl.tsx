@@ -15,6 +15,7 @@ import {
   EyeOff,
   Flag,
   Gift,
+  Heart,
   Loader2,
   MonitorPlay,
   Play,
@@ -28,6 +29,7 @@ import {
 } from 'lucide-react'
 import {
   addBots,
+  applyDrawnFamilies,
   awardCoroRewards,
   buzz,
   coroHostEvent,
@@ -39,6 +41,7 @@ import {
   setCaptain,
   setPlayerTeam,
   startCoroGame,
+  stopUsingFamilies,
   undoLast,
   updateLobby,
 } from '@/lib/actions/vana-coro-game'
@@ -150,10 +153,61 @@ function LobbyPanel({
   const save = () => updateLobby(session.id, { teamAName: teamA, teamBName: teamB, questionIds: selected })
   const toggle = (id: string) => setSelected((s) => (s.includes(id) ? s.filter((x) => x !== id) : s.length >= MAX_ROUNDS ? s : [...s, id]))
 
+  const takeFamilies = () =>
+    run('families', async () => {
+      const r = await applyDrawnFamilies(session.id)
+      if (r.error) return r
+      if (r.teamA) setTeamA(r.teamA)
+      if (r.teamB) setTeamB(r.teamB)
+      toast.success(
+        r.missing
+          ? `Famílias prontas. ${r.missing} ${r.missing === 1 ? 'pessoa na sala não é' : 'pessoas na sala não são'} de nenhuma das duas: tira-as ou muda-as à mão.`
+          : 'Famílias prontas: cada um entra logo na sua.',
+      )
+      return {}
+    })
+
   return (
     <div className="grid gap-5 lg:grid-cols-2">
       <section className="space-y-4 rounded-2xl bg-white/5 p-5">
         <h2 className="text-lg font-bold">Equipas</h2>
+        <div className="space-y-2 rounded-xl bg-fuchsia-500/10 p-3 ring-1 ring-fuchsia-400/30">
+          <p className="flex items-center gap-1.5 text-sm font-bold text-fuchsia-200">
+            <Heart className="h-4 w-4" /> Famílias sorteadas
+          </p>
+          {session.uses_families ? (
+            <p className="text-xs text-white/70">
+              As equipas são as famílias sorteadas no Formador de equipas. Os membros entram logo na sua; as visitas pelo telemóvel onde
+              marcaram presença ou escolhendo o nome. Quem não é destas famílias fica a assistir.
+            </p>
+          ) : (
+            <p className="text-xs text-white/70">
+              Formaste famílias e sorteaste quem joga no Formador de equipas (Modo Famílias)? Usa-as aqui e ninguém precisa de escolher a
+              equipa.
+            </p>
+          )}
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              disabled={pending}
+              onClick={takeFamilies}
+              className="flex items-center gap-1.5 rounded-lg bg-fuchsia-600 px-3 py-1.5 text-sm font-semibold hover:bg-fuchsia-500 disabled:opacity-50"
+            >
+              {busy === 'families' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Heart className="h-4 w-4" />}
+              {session.uses_families ? 'Atualizar as famílias' : 'Usar as famílias sorteadas'}
+            </button>
+            {session.uses_families && (
+              <button
+                type="button"
+                disabled={pending}
+                onClick={() => run('nofamilies', () => stopUsingFamilies(session.id), 'Cada um volta a escolher a equipa')}
+                className="rounded-lg border border-white/20 px-3 py-1.5 text-sm font-semibold hover:bg-white/10 disabled:opacity-50"
+              >
+                Cada um escolhe a equipa
+              </button>
+            )}
+          </div>
+        </div>
         <div className="grid grid-cols-2 gap-3">
           {(['a', 'b'] as VanaCoroTeam[]).map((t) => (
             <label key={t} className="block">

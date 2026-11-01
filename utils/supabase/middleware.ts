@@ -100,6 +100,8 @@ export async function updateSession(request: NextRequest) {
     // Deixar de receber convites por email (link assinado, sem sessão)
     !request.nextUrl.pathname.startsWith('/convites/sair') &&
     !request.nextUrl.pathname.startsWith('/api/convites/sair') &&
+    // Presenças por QR: os convidados marcam sem conta (a página valida o passe do QR)
+    !request.nextUrl.pathname.startsWith('/presenca') &&
     !request.nextUrl.pathname.includes('/present') &&
     request.nextUrl.pathname !== '/jogos'
   ) {

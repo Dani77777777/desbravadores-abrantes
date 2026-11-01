@@ -20,6 +20,8 @@ import {
   type Team,
 } from '@/utils/vana-coro/scoring'
 import { MIN_BOARD_GROUPS } from '@/utils/vana-coro/board'
+import { checkinGuestEntryId } from '@/utils/checkin'
+import type { TeamsScreenState } from '@/utils/teams'
 import type {
   VanaCoroHostRound,
   VanaCoroPlayer,
@@ -43,6 +45,7 @@ const ROUNDS = 'vanacoro_rounds'
 const EVENTS = 'vanacoro_round_events'
 const ENTRIES = 'vanacoro_board_entries'
 const QUESTIONS = 'vanacoro_questions'
+const ROSTER = 'vanacoro_roster'
 
 type Service = ReturnType<typeof createServiceClient>
 export type GameResult = { error?: string }
@@ -77,6 +80,7 @@ async function requireSessionHost(sessionId: string) {
 
 const NOT_HOST = { error: 'Só o anfitrião desta sessão pode fazer isto.' }
 const LATE = 'O jogo já começou e as equipas estão fechadas. Fica a ver no projetor!'
+const WATCHING = 'A tua família está a assistir neste jogo. Acompanha no projetor! 👀'
 
 function generateCode(): string {
   const alphabet = 'ABCDEFGHJKMNPQRSTUVWXYZ'
@@ -181,19 +185,24 @@ async function ensureCaptains(service: Service, sessionId: string) {
   }
 }
 
+type JoinResult = { playerId?: string; sessionId?: string; error?: string }
+
 export async function joinCoroSession(input: {
   code: string
-  team: Team
+  team?: Team
   guestName?: string
-}): Promise<{ playerId?: string; sessionId?: string; error?: string }> {
+  /** Famílias sorteadas: o convidado que marcou presença pelo QR neste telemóvel. */
+  guestPass?: { guestId: string; secret: string }
+  /** Famílias sorteadas: o nome que o convidado escolheu na lista. */
+  rosterKey?: string
+}): Promise<JoinResult> {
   const unavailable = await gameUnavailableError(GAME_ID)
   if (unavailable) return { error: unavailable }
-  if (input.team !== 'a' && input.team !== 'b') return { error: 'Escolhe uma equipa.' }
 
   const service = createServiceClient()
   const { data: session } = await service
     .from(SESSIONS)
-    .select('id, status')
+    .select('*')
     .eq('code', input.code.trim().toUpperCase())
     .neq('status', 'finished')
     .order('created_at', { ascending: false })
@@ -202,6 +211,8 @@ export async function joinCoroSession(input: {
   if (!session) return { error: 'Código inválido ou o jogo já acabou.' }
 
   const userId = await currentUserId()
+  if (session.uses_families) return joinFamily(service, session, userId, input)
+  if (input.team !== 'a' && input.team !== 'b') return { error: 'Escolhe uma equipa.' }
   let row: Record<string, unknown>
   if (userId) {
     const { data: profile } = await service.from('profiles').select('full_name, avatar_url').eq('id', userId).maybeSingle()
@@ -241,6 +252,162 @@ export async function joinCoroSession(input: {
   }
   await ensureCaptains(service, session.id)
   return { playerId: player.id, sessionId: session.id }
+}
+
+// ── Famílias sorteadas (Formador de equipas → Modo Famílias) ──
+
+type RosterRow = { key: string; team: Team; name: string; is_guest: boolean }
+
+/** Com famílias sorteadas cada um entra na sua; quem não está na lista fica a assistir. */
+async function joinFamily(
+  service: Service,
+  session: { id: string; status: string },
+  userId: string | null,
+  input: { guestPass?: { guestId: string; secret: string }; rosterKey?: string },
+): Promise<JoinResult> {
+  let key: string
+  if (userId) key = userId
+  else if (input.guestPass) {
+    // O telemóvel onde o convidado marcou presença: o segredo prova que é ele.
+    const { data: guest } = await service.from('event_guests').select('id, secret').eq('id', input.guestPass.guestId).maybeSingle()
+    if (!guest || guest.secret !== input.guestPass.secret) return { error: 'Não te encontrámos. Escolhe o teu nome na lista.' }
+    key = checkinGuestEntryId(guest.id)
+  } else if (input.rosterKey) key = input.rosterKey
+  else return { error: 'Escolhe o teu nome na lista.' }
+
+  // Quem já estava no jogo (ex.: fechou o separador) volta para a sua família.
+  const { data: existing } = await service
+    .from(PLAYERS)
+    .select('id')
+    .eq('session_id', session.id)
+    .or(userId ? `profile_id.eq.${userId},roster_key.eq.${key}` : `roster_key.eq.${key}`)
+    .limit(1)
+    .maybeSingle()
+  if (existing && (userId || input.guestPass)) return { playerId: existing.id, sessionId: session.id }
+  if (existing) return { error: 'Esse nome já entrou no jogo. Se não és tu, fala com o anfitrião.' }
+  if (session.status !== 'lobby') return { error: LATE }
+
+  const { data: entry } = await service.from(ROSTER).select('key, team, name, is_guest').eq('session_id', session.id).eq('key', key).maybeSingle()
+  const row = entry as RosterRow | null
+  if (!row || (!userId && !row.is_guest)) return { error: WATCHING }
+
+  const profile = userId
+    ? (await service.from('profiles').select('full_name, avatar_url').eq('id', userId).maybeSingle()).data
+    : null
+  const { data: player, error } = await service
+    .from(PLAYERS)
+    .insert({
+      session_id: session.id,
+      team: row.team,
+      roster_key: key,
+      ...(userId
+        ? { profile_id: userId, display_name: shortDisplayName(profile?.full_name ?? row.name), avatar_url: profile?.avatar_url ?? null }
+        : { guest_name: row.name.slice(0, 40), display_name: row.name.slice(0, 40) }),
+    })
+    .select('id')
+    .single()
+  if (error || !player) {
+    if (error?.code === '23505') return { error: 'Esse nome já entrou no jogo. Se não és tu, fala com o anfitrião.' }
+    console.error('VanaCoro: erro a entrar (famílias)', error)
+    return { error: 'Não foi possível entrar. Tenta outra vez.' }
+  }
+  await ensureCaptains(service, session.id)
+  return { playerId: player.id, sessionId: session.id }
+}
+
+/** Convidados das famílias que vão jogar e que ainda não entraram (para escolherem o nome). */
+export async function listCoroRosterGuests(code: string): Promise<{ key: string; name: string }[]> {
+  const service = createServiceClient()
+  const { data: session } = await service
+    .from(SESSIONS)
+    .select('*')
+    .eq('code', code.trim().toUpperCase())
+    .neq('status', 'finished')
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+  if (!session?.uses_families || session.status !== 'lobby') return []
+  const [{ data: roster }, { data: players }] = await Promise.all([
+    service.from(ROSTER).select('key, name').eq('session_id', session.id).eq('is_guest', true),
+    service.from(PLAYERS).select('roster_key').eq('session_id', session.id).not('roster_key', 'is', null),
+  ])
+  const taken = new Set((players ?? []).map((p) => p.roster_key))
+  return (roster ?? [])
+    .filter((r) => !taken.has(r.key))
+    .map((r) => ({ key: r.key, name: r.name }))
+    .sort((a, b) => a.name.localeCompare(b.name, 'pt'))
+}
+
+/**
+ * Copia para a sessão as famílias sorteadas no Formador de equipas (do mesmo anfitrião):
+ * os nomes das duas equipas e quem é de cada uma. Quem já entrou e é de uma delas muda logo
+ * para a família certa.
+ */
+export async function applyDrawnFamilies(sessionId: string): Promise<{ teamA?: string; teamB?: string; missing?: number; error?: string }> {
+  const ctx = await requireSessionHost(sessionId)
+  if (!ctx) return NOT_HOST
+  if (ctx.session.status !== 'lobby') return { error: 'O jogo já começou.' }
+
+  const { data: screen } = await ctx.service.from('team_screens').select('state').eq('host_id', ctx.userId).maybeSingle()
+  const state = screen?.state as TeamsScreenState | undefined
+  const teams = state?.teams ?? []
+  const ids = state?.match?.teamIds ?? (teams.length === 2 ? teams.map((t) => t.id) : [])
+  const picked = ids.map((id) => teams.find((t) => t.id === id)).filter(Boolean) as TeamsScreenState['teams']
+  if (state?.mode !== 'families' || picked.length < 2) {
+    return { error: 'Primeiro forma as famílias e sorteia quem joga no Formador de equipas (Modo Famílias).' }
+  }
+  if (picked.length > 2) return { error: 'O VanaCoro é só para 2 famílias. Sorteia 2 famílias no Formador de equipas.' }
+
+  const label = (t: { emoji: string; name: string }) => `${t.emoji} ${t.name}`.trim()
+  const teamA = cleanTeamName(label(picked[0]), 'Equipa A')
+  const teamB = cleanTeamName(label(picked[1]), 'Equipa B')
+  const rows: (RosterRow & { session_id: string })[] = []
+  picked.forEach((t, i) => {
+    for (const m of t.members) {
+      rows.push({ session_id: sessionId, key: m.id, team: i === 0 ? 'a' : 'b', name: m.name, is_guest: m.id.startsWith('guest:') })
+    }
+  })
+
+  await ctx.service.from(ROSTER).delete().eq('session_id', sessionId)
+  if (rows.length) {
+    const { error } = await ctx.service.from(ROSTER).insert(rows)
+    if (error) {
+      console.error('VanaCoro: erro a guardar as famílias', error)
+      return { error: 'Não foi possível usar as famílias. Correste a migração supabase-migration-vana-coro-familias.sql?' }
+    }
+  }
+  const { error } = await ctx.service
+    .from(SESSIONS)
+    .update({ uses_families: true, team_a_name: teamA, team_b_name: teamB })
+    .eq('id', sessionId)
+  if (error) return { error: 'Não foi possível usar as famílias.' }
+
+  // Quem já está na sala: os membros das famílias vão para a sua; os outros ficam onde estão.
+  const teamOf = new Map(rows.map((r) => [r.key, r.team]))
+  const { data: players } = await ctx.service.from(PLAYERS).select('id, profile_id, roster_key, team').eq('session_id', sessionId)
+  let missing = 0
+  for (const p of players ?? []) {
+    const key = p.profile_id ?? p.roster_key
+    const team = key ? teamOf.get(key) : undefined
+    if (team) {
+      if (team !== p.team || p.roster_key !== key) {
+        await ctx.service.from(PLAYERS).update({ team, roster_key: key, is_captain: false }).eq('id', p.id)
+      }
+    } else missing++
+  }
+  await ensureCaptains(ctx.service, sessionId)
+  return { teamA, teamB, missing }
+}
+
+/** Volta ao normal: cada um escolhe a equipa. */
+export async function stopUsingFamilies(sessionId: string): Promise<GameResult> {
+  const ctx = await requireSessionHost(sessionId)
+  if (!ctx) return NOT_HOST
+  if (ctx.session.status !== 'lobby') return { error: 'O jogo já começou.' }
+  await ctx.service.from(ROSTER).delete().eq('session_id', sessionId)
+  await ctx.service.from(PLAYERS).update({ roster_key: null }).eq('session_id', sessionId)
+  const { error } = await ctx.service.from(SESSIONS).update({ uses_families: false }).eq('id', sessionId)
+  return error ? { error: 'Não foi possível guardar.' } : {}
 }
 
 export async function setPlayerTeam(sessionId: string, playerId: string, team: Team): Promise<GameResult> {

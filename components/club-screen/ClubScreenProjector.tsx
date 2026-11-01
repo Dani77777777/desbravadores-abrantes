@@ -15,10 +15,11 @@ import { TeamsProjector } from '@/components/teams/TeamsProjector'
 import { useClubScreen } from './useClubScreen'
 import { LogoStage } from './LogoStage'
 import { RankingBoard } from './RankingBoard'
+import { CheckinStage } from './CheckinStage'
 
 /**
- * Ecrã do Clube no projetor: mostra o logo, o ranking ou o ecrã de uma ferramenta
- * (cronómetro, sorteio, equipas), conforme o que se escolhe no controlo.
+ * Ecrã do Clube no projetor: mostra o logo, o ranking, o QR das presenças ou o ecrã de uma
+ * ferramenta (cronómetro, sorteio, equipas), conforme o que se escolhe no controlo.
  * Dentro da app do clube o som e o ecrã inteiro já vêm ligados.
  */
 export function ClubScreenProjector({ userId, initialState }: { userId: string; initialState: ClubScreenState }) {
@@ -71,6 +72,7 @@ export function ClubScreenProjector({ userId, initialState }: { userId: string; 
       <div key={stage} className="cs-stage-in absolute inset-0">
         {stage === 'logo' && <LogoStage />}
         {stage === 'ranking' && <RankingBoard settings={state.ranking} />}
+        {stage === 'checkin' && <CheckinStage eventId={state.checkin.eventId} />}
         {(stage === 'timer' || stage === 'raffle' || stage === 'teams') && <ToolStage kind={stage} userId={userId} sound={soundOn} />}
       </div>
 
@@ -94,7 +96,7 @@ const TOOL_TABLE = { timer: 'timer_screens', raffle: 'raffle_screens', teams: 't
  * Ecrã de uma ferramenta. Vai buscar o estado atual antes de a mostrar, para um sorteio
  * ou equipas que já tinham sido revelados aparecerem logo (sem repetir a animação).
  */
-function ToolStage({ kind, userId, sound }: { kind: Exclude<ClubStage, 'logo' | 'ranking'>; userId: string; sound: boolean }) {
+function ToolStage({ kind, userId, sound }: { kind: Exclude<ClubStage, 'logo' | 'ranking' | 'checkin'>; userId: string; sound: boolean }) {
   const [supabase] = useState(() => createClient())
   const [initial, setInitial] = useState<{ state: unknown } | null>(null)
 

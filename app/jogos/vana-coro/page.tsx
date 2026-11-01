@@ -38,7 +38,7 @@ export default async function VanaCoroPage({ searchParams }: { searchParams: Pro
     cleanCode.length === 4
       ? await createServiceClient()
           .from('vanacoro_sessions')
-          .select('id, code, team_a_name, team_b_name, status')
+          .select('*')
           .eq('code', cleanCode)
           .neq('status', 'finished')
           .order('created_at', { ascending: false })
@@ -52,7 +52,18 @@ export default async function VanaCoroPage({ searchParams }: { searchParams: Pro
       isCoordinator={role === 'coordenador'}
       isMember={!!profile}
       initialCode={cleanCode}
-      initialFound={found}
+      initialFound={
+        found
+          ? {
+              id: found.id,
+              code: found.code,
+              team_a_name: found.team_a_name,
+              team_b_name: found.team_b_name,
+              status: found.status,
+              uses_families: !!found.uses_families,
+            }
+          : null
+      }
       mySessions={mySessions ?? []}
     />
   )

@@ -17,6 +17,7 @@ import {
   MonitorX,
   Pause,
   Play,
+  QrCode,
   RotateCcw,
   Shuffle,
   Smartphone,
@@ -45,12 +46,15 @@ import {
 } from '@/utils/club-screen'
 import { SECTIONS, SECTION_LABELS, VIEW_LABELS, dayLabel, localDayKey, yesterdayKey, type RankingSection, type RankingView } from '@/utils/ranking'
 import { useClubScreen } from './useClubScreen'
+import { CheckinCard } from './CheckinCard'
+import type { RaffleEvent } from '@/utils/raffle'
 
 type IconType = ComponentType<{ className?: string }>
 
 const STAGE_BUTTONS: { stage: ClubStage; label: string; icon: IconType; tool?: string }[] = [
   { stage: 'logo', label: 'Logo', icon: Flag },
   { stage: 'ranking', label: 'Ranking', icon: Trophy },
+  { stage: 'checkin', label: 'Presenças', icon: QrCode },
   { stage: 'timer', label: 'Cronómetro', icon: Timer, tool: 'o Cronómetro' },
   { stage: 'raffle', label: 'Sorteio', icon: Shuffle, tool: 'o Sorteador' },
   { stage: 'teams', label: 'Equipas', icon: UsersRound, tool: 'o Formador de equipas' },
@@ -68,10 +72,13 @@ export function ClubScreenClient({
   userId,
   userName,
   initialState,
+  events,
 }: {
   userId: string
   userName: string
   initialState: ClubScreenState
+  /** Eventos recentes e próximos (para as presenças por QR). */
+  events: RaffleEvent[]
 }) {
   const { state, update, saveError } = useClubScreen(userId, initialState, 'controller')
   const [app, setApp] = useState<ClubAppBridge | null>(null)
@@ -81,6 +88,7 @@ export function ClubScreenClient({
   const ranking = state.ranking
   const setStage = (stage: ClubStage) => update((s) => ({ ...s, stage }))
   const setRanking = (change: Partial<RankingSettings>) => update((s) => ({ ...s, ranking: { ...s.ranking, ...change } }))
+  const setCheckinEvent = (eventId: string | null) => update((s) => ({ ...s, checkin: { eventId } }))
 
   const reveal = () =>
     update((s) => ({ ...s, stage: 'ranking', ranking: { ...s.ranking, revealed: true, revealId: newRevealId() } }))
@@ -123,7 +131,7 @@ export function ClubScreenClient({
           <CardDescription>Muda na hora o que aparece no projetor.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
-          <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
+          <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
             {STAGE_BUTTONS.map(({ stage, label, icon: Icon }) => {
               const active = state.stage === stage
               return (
@@ -156,6 +164,14 @@ export function ClubScreenClient({
           ))}
         </CardContent>
       </Card>
+
+      <CheckinCard
+        events={events}
+        eventId={state.checkin.eventId}
+        onScreen={state.stage === 'checkin'}
+        onEvent={setCheckinEvent}
+        onShow={() => setStage('checkin')}
+      />
 
       {/* Ranking */}
       <Card className={state.stage === 'ranking' ? 'ring-2 ring-yellow-400' : ''}>

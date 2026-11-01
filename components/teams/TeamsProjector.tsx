@@ -6,6 +6,7 @@ import { createClient } from '@/utils/supabase/client'
 import { teamsLocalChannelName, type TeamsLocalMessage, type TeamsScreenState } from '@/utils/teams'
 import { unlockRaffleSound } from '@/utils/raffle-sound'
 import { TeamsBoard } from './TeamsBoard'
+import { MatchBoard } from './MatchBoard'
 
 /**
  * `embedded`: dentro do Ecrã do Clube, que já trata do som e do ecrã inteiro (sem botão próprio).
@@ -25,6 +26,7 @@ export function TeamsProjector({
   const [screen, setScreen] = useState<TeamsScreenState | null>(initialState?.teams ? initialState : null)
   // Uma revelação que já existia quando o ecrã abriu aparece logo completa (sem animação).
   const [instantId, setInstantId] = useState<string | null>(initialState?.revealId ?? null)
+  const [instantMatchId, setInstantMatchId] = useState<string | null>(initialState?.match?.id ?? null)
   const [soundOnLocal, setSoundOn] = useState(false)
   const soundOn = embedded ? sound : soundOnLocal
   const [isFull, setIsFull] = useState(false)
@@ -48,6 +50,7 @@ export function TeamsProjector({
           // Primeiro contacto: uma revelação que já tinha sido feita aparece logo completa
           localActiveRef.current = true
           setInstantId(m.state.revealId)
+          setInstantMatchId(m.state.match?.id ?? null)
         }
         setScreen(m.state)
       } else if (m.type === 'bye' && m.from === 'controller') {
@@ -103,13 +106,21 @@ export function TeamsProjector({
     >
       <header className="flex items-center justify-between px-[4vh] pt-[3vh]">
         <p className="flex items-center gap-3 text-[3.2vh] font-black uppercase tracking-widest text-blue-200">
-          <UsersRound className="h-[4vh] w-[4vh]" /> Equipas
+          <UsersRound className="h-[4vh] w-[4vh]" /> {screen?.mode === 'families' ? 'Famílias' : 'Equipas'}
         </p>
         {screen?.title && <p className="max-w-[55%] truncate text-[3.2vh] font-bold text-blue-200/80">{screen.title}</p>}
       </header>
 
       <main className="flex min-h-0 flex-1 items-center justify-center px-[4vh] py-[3vh]">
-        {revealed ? (
+        {revealed && screen!.match ? (
+          <MatchBoard
+            key={screen!.match.id}
+            teams={screen!.teams}
+            match={screen!.match}
+            instant={screen!.match.id === instantMatchId}
+            sound={soundOn}
+          />
+        ) : revealed ? (
           <TeamsBoard
             key={screen!.revealId!}
             teams={screen!.teams}

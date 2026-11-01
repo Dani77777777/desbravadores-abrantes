@@ -28,6 +28,7 @@ import {
   X,
 } from 'lucide-react'
 import { createClient } from '@/utils/supabase/client'
+import { listCheckinGuests } from '@/lib/actions/checkin'
 import { getClubApp } from '@/utils/club-screen'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Switch } from '@/components/ui/switch'
@@ -157,23 +158,26 @@ export function RaffleClient({
     async (ev: RaffleEvent, opts: { auto?: boolean } = {}) => {
       setEventId(ev.id)
       setLoadingEvent(true)
-      const { data, error } = await supabase
-        .from('event_attendance')
-        .select('user_id')
-        .eq('event_id', ev.id)
-        .in('status', ['presente', 'atrasado'])
+      // Presenças (também as marcadas pelo QR) e as visitas que se registaram pelo QR
+      const [{ data, error }, visits] = await Promise.all([
+        supabase.from('event_attendance').select('user_id').eq('event_id', ev.id).in('status', ['presente', 'atrasado']),
+        listCheckinGuests(ev.id).catch(() => [] as RaffleEntry[]),
+      ])
       setLoadingEvent(false)
       if (error) {
         if (!opts.auto) toast.error('Não foi possível carregar as presenças.')
         return
       }
       const ids = (data || []).map((r) => r.user_id as string).filter((id) => memberById.has(id))
-      if (ids.length === 0) {
+      if (ids.length === 0 && visits.length === 0) {
         if (!opts.auto) toast.info('Este evento ainda não tem presenças marcadas — escolhe as pessoas à mão.')
         return
       }
-      setSelected((prev) => new Set([...ids, ...[...prev].filter(isGuestId)]))
-      toast.success(`${ids.length} ${ids.length === 1 ? 'pessoa presente' : 'pessoas presentes'} em "${ev.title}"`)
+      if (visits.length > 0) setGuests((prev) => [...prev.filter((g) => !visits.some((v) => v.id === g.id)), ...visits])
+      setSelected((prev) => new Set([...ids, ...visits.map((v) => v.id), ...[...prev].filter(isGuestId)]))
+      toast.success(
+        `${ids.length} ${ids.length === 1 ? 'pessoa presente' : 'pessoas presentes'}${visits.length ? ` + ${visits.length} ${visits.length === 1 ? 'visita' : 'visitas'}` : ''} em "${ev.title}"`,
+      )
     },
     [supabase, memberById],
   )
