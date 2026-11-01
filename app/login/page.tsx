@@ -10,7 +10,6 @@ import { displayFont } from '@/components/landing/fonts'
 import { useState, useEffect, useRef, useCallback, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
-import { getSignedCallbackUrl } from './actions'
 import { safeNextPath } from '@/utils/safe-next-path'
 
 function LoginContent() {
@@ -104,13 +103,11 @@ function LoginContent() {
 
     try {
       if (isSignUp) {
-        // Get a signed callback URL that includes the email for auto-login
-        const redirectUrl = await getSignedCallbackUrl(email)
         const { error } = await supabase.auth.signUp({
           email,
           password,
           options: {
-            emailRedirectTo: redirectUrl,
+            emailRedirectTo: `${window.location.origin}/auth/callback`,
           },
         })
         if (error) throw error
