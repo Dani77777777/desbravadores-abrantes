@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import {
   AlertOctagon, AlertTriangle, ArrowDownRight, ArrowUpRight, Bot, CalendarCheck, ChevronLeft, ChevronRight,
-  ClipboardList, Coins, Download, Gamepad2, Hand, History, ListChecks, MessageSquare, QrCode, Repeat,
+  ClipboardList, Coins, Download, Gamepad2, Hand, History, ListChecks, MessageCircleQuestion, MessageSquare, QrCode, Repeat,
   RotateCcw, Search, ShieldCheck, ShoppingBag, Trophy, Users, Wrench, X,
 } from 'lucide-react'
 import { toast } from 'sonner'
@@ -38,6 +38,7 @@ const CATEGORIES: Record<string, { label: string; icon: any }> = {
   qr:            { label: 'QR / Questões',     icon: QrCode },
   sugestao:      { label: 'Sugestões',         icon: MessageSquare },
   inquerito:     { label: 'Inquéritos',        icon: ClipboardList },
+  pergunta:      { label: 'Pergunta da Semana', icon: MessageCircleQuestion },
   loja:          { label: 'Loja',              icon: ShoppingBag },
   transferencia: { label: 'Transferências',    icon: Repeat },
   jogo:          { label: 'Jogos',             icon: Gamepad2 },
