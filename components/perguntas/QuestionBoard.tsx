@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
-import { CheckCircle2, Clock, Loader2, Send, X } from 'lucide-react'
+import { CheckCircle2, Clock, Loader2, Send, Trash2 } from 'lucide-react'
 import type { PublicQuestion } from '@/lib/perguntas/types'
 import { obterConvidadoId } from './storage'
 
@@ -148,7 +148,7 @@ export function QuestionBoard({ initialQuestions, mode }: Props) {
                       className="flex h-6 w-6 items-center justify-center rounded-full text-blue-400 transition-colors hover:bg-blue-100 hover:text-blue-700 disabled:opacity-50"
                       aria-label={`Apagar "${a.text}"`}
                     >
-                      {busy === a.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <X className="h-3.5 w-3.5" />}
+                      {busy === a.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
                     </button>
                   </li>
                 ))}
