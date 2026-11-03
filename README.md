@@ -1,169 +1,388 @@
-# 🏕️ Clube de Desbravadores - Abrantes
+# 🏕️ Clube de Desbravadores de Abrantes
 
-Plataforma de gamificação e gestão para o Clube de Desbravadores de Abrantes, desenvolvida com foco na motivação e organização seguindo as diretrizes da UPASD Portugal.
+Plataforma *mobile-first* de gamificação e gestão do **Clube de Desbravadores de Abrantes** (UPASD Portugal). Os membros ganham **XP** e **Gold** por participarem nas atividades; a liderança gere membros, famílias, eventos, presenças, loja e comunicados, tem ferramentas para o projetor do clube e uma coleção de **10 jogos** feitos de raiz.
 
----
-
-## 🌟 Visão Geral
-
-O projeto **Desbravadores Abrantes** é uma plataforma "Mobile-First" que transforma a progressão dos desbravadores numa experiência interativa. Através de um sistema de XP (Experiência) e Gold (Moedas), os membros são recompensados pela sua participação, pontualidade e dedicação às atividades do clube.
-
-### ✨ Funcionalidades Principais
-
-#### 🎒 Para Desbravadores
-- **Dashboard Personalizado:** Visualização de progresso, saldo de Gold e medalha de investidura.
-- **Ranking (Leaderboard):** Tabela classificativa pública em tempo real entre todos os membros.
-- **Agenda de Eventos:** Consulta de próximas atividades, localizações e recompensas previstas.
-- **Sistema de Tarefas e Loja:** Conclusão de objetivos e troca de Gold por recompensas físicas na loja.
-- **Transferência de Gold:** Envio de moedas entre amigos para incentivar a cooperação.
-- **Caixa de Sugestões:** Canal direto para enviar críticas ou ideias à liderança.
-- **Histórico de Pontos:** Transparência total sobre como e quando os pontos foram ganhos.
-- **Anúncios Globais:** Avisos importantes em destaque para todos os membros.
-- **Resgate de Códigos QR:** Leitura de códigos QR para receber pontos em atividades e eventos.
-
-#### 🛡️ Para Liderança (Dirigentes e Coordenadores)
-- **Painel de Gestão Admin:** Visão consolidada de secções com dashboard horizontal otimizado.
-- **Visão Geral (Coordenadores):** Dashboard de métricas com estatísticas de engajamento, aniversários e distribuição de membros.
-- **Controlo de Presenças por Evento:** Gestão de presenças com filtragem automática por faixa etária — os eventos direcionados a uma secção só mostram os membros dessa secção na lista de presenças.
-- **QR Codes:** Criação, edição e impressão de QR Codes (A4/A5) para check-in por scan, com limites globais de resgate.
-- **Gestão de Loja e Entregas:** Widget prático para gerir as entregas pendentes dos produtos da loja.
-- **Emissão de Comunicados:** Sistema de anúncios globais ou direcionados (por pessoa, secção ou papel).
-- **Gestão de Investiduras:** Toggle manual para marcar a conclusão de classes.
-- **Moderação de Sugestões:** Leitura, gestão e resolução do feedback recebido, com atribuição de pontos.
-- **Gestão de Tarefas:** Criação de tarefas com recompensas de XP/Gold, aprovação de conclusões.
-- **Gestão de Eventos:** Criação, edição, reagendamento e cancelamento de eventos com notificação automática.
+**Aventura • Amizade • Fé**
 
 ---
 
-## 🔒 Filtragem por Faixa Etária e Hierarquia
+## Índice
 
-O sistema aplica filtragem rigorosa baseada no papel do utilizador:
+1. [Visão geral](#-visão-geral)
+2. [Funcionalidades para os membros](#-funcionalidades-para-os-membros)
+3. [Funcionalidades para a liderança](#️-funcionalidades-para-a-liderança)
+4. [Jogos](#-jogos)
+5. [Pontos: XP e Gold](#-pontos-xp-e-gold)
+6. [Papéis, secções e permissões](#-papéis-secções-e-permissões)
+7. [Stack](#️-stack)
+8. [Instalação](#-instalação)
+9. [Base de dados](#️-base-de-dados)
+10. [Estrutura do código e rotas](#-estrutura-do-código-e-rotas)
+11. [Convenções](#-convenções)
 
-| Papel | Visibilidade |
+---
+
+## 🌟 Visão geral
+
+| | |
 | :--- | :--- |
-| **Desbravador** | Apenas os seus próprios dados e o ranking público. |
-| **Dirigente** | Apenas os membros da sua `leadership_section` (secção de liderança atribuída). |
-| **Coordenador** | Acesso total a todos os dados e ferramentas do clube. |
-
-### Presenças com Faixa Etária
-- Quando um evento é criado com uma secção alvo (ex: "Exploradores"), a lista de presenças **mostra apenas** os membros dessa secção.
-- Os dirigentes vêem apenas os desbravadores da sua faixa etária atribuída, independentemente do público alvo do evento.
-- Os coordenadores vêem os membros filtrados pela secção do evento, ou todos se o evento for para "Todos".
+| **Quem usa** | Desbravadores, as suas famílias, dirigentes e coordenação do clube; visitantes e convidados em partes públicas (loja, alguns jogos, inquéritos embutidos, presenças por QR). |
+| **O que faz** | Progressão com XP/Gold e ranking, eventos com confirmação de presença, presenças por QR, comunicados com push, tarefas, inquéritos, loja com desconto em Gold, ferramentas de projetor (sorteio, equipas, cronómetro, tendas e boleias, ecrã do clube) e jogos ao vivo e diários. |
+| **Como está feito** | Next.js 16 (App Router, React 19) + Supabase (Auth, Postgres com RLS, Realtime, Storage, Edge Functions), alojado no plano gratuito da Vercel e do Supabase. |
+| **Segurança** | Todas as permissões vivem na base de dados (RLS + RPCs `SECURITY DEFINER`); todos os pontos passam por um registo único auditável (`points_log`); os segredos dos jogos nunca vão para o realtime. |
 
 ---
 
-## 👤 Secções e Cores
+## 🎒 Funcionalidades para os membros
 
-O sistema adapta-se visualmente à secção do utilizador, calculada automaticamente pela data de nascimento:
+### Conta, perfil e família
+- **Registo e entrada** com email e palavra-passe (não há login com Google). O registo passa sempre pela verificação de email; `/login/reset-password` recupera a palavra-passe.
+- **Onboarding** (`/onboarding`): nome, foto, data de nascimento (define a classe inicial) e sexo (obrigatório e fixo; só a coordenação o corrige).
+- **Perfil** (`/profile`): dados pessoais, avatar, histórico de compras da loja, progresso no VanaTrilha, transferências de Gold e **apagar a conta** com um código enviado por email.
+- **Transferir Gold** a outro membro, para incentivar a cooperação (RPC `transfer_gold`, fica no histórico).
+- **Histórico de pontos** (`/points-history`): todos os movimentos de XP e Gold do membro.
+- **A minha família**: uma pessoa é **Adulto** ou **Criança**.
+  - Os adultos criam a família, criam perfis de criança (sem email) e convidam outras contas por código/link (`/familia/CÓDIGO`, 48 h, uma utilização).
+  - **Todos os adultos da família entram nas contas de todas as crianças** (troca de sessão real na Navbar, com "Voltar para…" por cookie assinado durante 12 h). As crianças não entram nas contas dos adultos.
+  - Adulto/Criança segue a idade (18+), mas só a coordenação o muda à mão. A coordenação vê e corrige todas as famílias em Membros → Famílias do clube.
 
-| Secção | Cor Principal | Faixa Etária (Aprox.) |
+### Painel do membro (`/`)
+- Nível, XP, Gold e medalha de investidura.
+- **Calendário de eventos** do clube + **Agenda JA** (eventos nacionais da Juventude Adventista, lidos do site público e filtrados pela secção pessoal; a inscrição é sempre feita pelo próprio no site da JA).
+- Aviso "**N eventos à espera da tua resposta**".
+- Comunicados (com estado lido), tarefas, inquéritos abertos e a **Pergunta da Semana**.
+- **A minha tenda / o meu carro** quando a liderança publica um plano de Tendas e boleias, com o mapa do ponto de encontro.
+- Introdução de **códigos** de pontos.
+- Para visitantes sem conta, a mesma rota mostra a landing page com os próximos eventos e os jogos públicos.
+
+### Eventos
+- Detalhe de cada evento com local num **mapa** (Leaflet + OpenStreetMap, botões Google Maps / Waze / "Como chegar") ou **evento online** (o link só aparece a membros; o `anon` nem tem permissão de leitura da coluna `online_url`).
+- **Confirmação de presença (RSVP)**: "Vou / Não vou" nos eventos que a pedem, com prazo opcional. A resposta não é presença: a liderança valida depois.
+- **Convites por email** para membros por investir, com link direto para o evento (`/?evento=<id>`) e "deixar de receber" de um clique (HMAC).
+- **Presenças por QR** (`/presenca/[evento]`): o projetor mostra um QR que muda a cada 30 s; quem o lê fica marcado no rascunho das presenças (até 10 min depois do início = presente, depois = atrasado). Um adulto marca-se a si e às crianças da família ("Quem está aqui?"). Visitas escrevem só o nome e são apagadas quando as presenças são finalizadas (fica só o número, por RGPD).
+
+### Comunicados, tarefas, sugestões e inquéritos
+- **Comunicados** para todos, uma secção, um papel ou membros específicos; os destinatários ficam gravados no envio e cada um tem estado lido.
+- **Notificações push** (Web Push + Service Worker, também em iOS com a app instalada como PWA) sempre que há um comunicado.
+- **Tarefas** com recompensa em XP/Gold: o membro conclui, a liderança aprova.
+- **Caixa de sugestões** (`/suggestions`): ideias e críticas à liderança, que pode premiar uma boa sugestão.
+- **Inquéritos** de escolha múltipla com recompensa por opção, resultados ao vivo opcionais, voto definitivo ou alterável até ao prazo, e resultados visíveis até 3 dias depois. Têm um **embed público** (`/embed/inquerito/[id]`, com `?qr=1`) para o Canva ou o projetor.
+- **Pergunta da Semana** (`/perguntas`): uma pergunta aberta por semana, até 3 respostas por pessoa, para membros (com 5 XP) e convidados por link de convite do clube (`/perguntas/[token]`). As respostas alimentam um jogo ao vivo.
+
+### QR codes de pontos
+- Códigos criados pela liderança e impressos em A4/A5. Três tipos: **resgate automático**, **manual** e **pergunta** (só dá pontos com a resposta certa).
+- Cada membro usa cada código uma vez; limite global opcional. Entrada pela câmara (`/codes/[code]`) ou escrevendo o código no Painel. Os pontos são dados só pelo servidor.
+
+### Leaderboard e loja
+- **Ranking** público (`/leaderboard`) por XP; os ajudantes continuam no ranking.
+- **Loja** (`/shop`, pública):
+  - preços fixos em euros e o **Gold dá desconto** a uma taxa dinâmica (quanto mais Gold em circulação, mais caro fica o desconto), até um máximo por artigo;
+  - membros compram com desconto; **convidados sem conta** compram sem desconto;
+  - artigos físicos e **chaves digitais** (reveladas só depois de pagas), artigos **por encomenda** com prazo, 1 a 10 unidades com desconto de quantidade;
+  - pagamento em dinheiro confirmado pela coordenação, e cancelamento pelo próprio enquanto não houver pagamento.
+
+---
+
+## 🛡️ Funcionalidades para a liderança
+
+### Painel de gestão (`/admin`)
+
+| Aba | Quem | O que faz |
 | :--- | :--- | :--- |
-| **Rebentos** | 🟢 Esmeralda | 3 - 5 anos |
-| **Tições** | 🔴 Bordeaux | 6 - 10 anos |
-| **Exploradores** | 🟡 Amarelo | 11 - 15 anos |
-| **Companheiros** | 🔵 Azul | 16 - 23 anos |
-| **Embaixadores** | ⚪ Cinza/Dourado | Liderança / +23 anos |
+| Visão Geral | coordenação | métricas de participação, aniversários, distribuição de membros |
+| Membros | todos | lista, cargos, ajudantes, classes e sugestões de classe por idade, investiduras, famílias do clube, convites por email, apagar membro |
+| Tarefas | todos | criar tarefas e aprovar conclusões |
+| Eventos | todos | criar, editar, duplicar, reagendar, cancelar (com aviso), imagem de partilha, presenças, RSVP, reverter pontos de um evento |
+| Comunicados | todos | enviar e ver quem leu |
+| Sugestões | todos | ler, resolver e premiar |
+| Questões / QR | coordenação | criar, editar e imprimir QR codes |
+| Inquéritos | coordenação | criar, abrir, fechar e finalizar votações |
+| Jogos | todos (dirigentes só leem) | disponibilidade de cada jogo, analítica dos jogos a solo, multiplicador de pontos |
+| Ferramentas | todos | ferramentas do projetor (ver abaixo) |
+| Loja | coordenação | produtos, encomendas, entregas, taxa do Gold |
+| Auditoria | coordenador real | auditoria de pontos e reset de fim de época |
+
+Cada jogo tem também uma página de gestão (`/admin/<jogo>`) para bancos de perguntas, versículos, palavras, packs e relatórios por sessão.
+
+### Ajudantes
+Um desbravador pode receber **acesso de gestão** de dirigente de uma secção ou de coordenação **sem deixar de ser membro** (continua no ranking e a ganhar pontos). Faz tudo menos gerir cargos. As RLS usam sempre o cargo efetivo.
+
+### Classes e investiduras
+A classe é calculada pela idade só na criação do perfil. Depois só a coordenação a muda (à mão ou aceitando as **sugestões por idade**), escolhendo se reinicia a investidura e se avisa o membro; cada mudança fica no histórico. Os dirigentes marcam a investidura dos membros da sua classe.
+
+### Auditoria e reset de pontos
+- Vista com todos os movimentos, a origem deduzida e sinais de alerta (auto-atribuições, totais que não batem com o histórico), com correção de totais.
+- **Reset de fim de época** sem apagar o histórico: insere movimentos de compensação, arquiva a classificação final da época e exige escrever "RESETAR".
+
+### Ferramentas do projetor
+Todas abrem uma **janela de projetor** controlada pelo PC (sem base de dados, por `BroadcastChannel`) ou são controladas **pelo telemóvel** (estado em realtime).
+
+| Ferramenta | O que faz |
+| :--- | :--- |
+| **Ecrã do Clube** | projetor fixo que mostra o logo, o **ranking animado** ("ontem" → "hoje", quem subiu e desceu), o cronómetro, o sorteio, as equipas ou as **presenças por QR** |
+| **Sorteador** | sorteio de pessoas com animação de *slot*, a partir das presenças de um evento (com visitas), atalhos "Tirar dirigentes" / "Tirar ajudantes", não repetir |
+| **Formador de equipas** | equipas equilibradas (idades, secções, rapazes/raparigas, dirigentes, pares a não juntar), nomes de animais e revelação no projetor; **modo Famílias** com as famílias reais juntas, nomes bíblicos e sorteio de quem joga |
+| **Cronómetro** | contagem decrescente, cronómetro, chegadas de equipas com ranking e sequência de rondas |
+| **Tendas e boleias** | distribui as pessoas de um evento por tendas e carros, com pontos de encontro no mapa e horas por paragem, e publica para cada membro ver no Painel |
 
 ---
 
-## 🛠️ Stack Tecnológica
+## 🎮 Jogos
 
-- **Frontend:** [Next.js 15+](https://nextjs.org/) (App Router, React 19)
-- **Estilo:** [Tailwind CSS v4](https://tailwindcss.com/) & [Shadcn/UI](https://ui.shadcn.com/)
-- **Backend:** [Supabase](https://supabase.com/) (Auth, PostgreSQL, Real-time, Storage)
-- **Notificações:** Web Push API (Service Workers)
-- **Ícones:** [Lucide React](https://lucide.dev/)
-- **Formulários:** React Hook Form + Zod
+`/jogos` é o hub. Cada jogo pode ser **ativado/desativado**, limitado por cargo ou **escondido** (para surpresas) na aba Jogos. Os jogos a solo têm **analítica** (quem joga, vitórias, assiduidade) e campanhas de **pontos multiplicados** (até ×10).
+
+### Ao vivo (projetor + telemóveis)
+Todos têm controlo do anfitrião, ecrã de projetor e ecrã de jogador; entra-se por PIN ou código/QR. Os pontos são atribuídos no fim pelo anfitrião; os convidados escolhem um desbravador para receber os seus pontos.
+
+| Jogo | Em que consiste |
+| :--- | :--- |
+| **VanaQuest** | quiz em tempo real estilo Kahoot: rapidez, sequências de acertos, multiplicador por pergunta, sala de espera com reações, pódio cinematográfico |
+| **VanaEspada** | "Onde está?": aparece um excerto da Bíblia (ACF) e cada um adivinha livro → capítulo → versículo; pontuação por proximidade, prémios sem teto |
+| **VanaWords** | estilo Codenames: grelha 5×5, equipas Leão e Águia, um Arauto por equipa, sessões de teste com bots |
+| **VanaSketch** | estilo Pictionary: desenho no telemóvel em tempo real no projetor, packs de palavras, música e efeitos, imagem do melhor desenho |
+| **VanaCamp: Infiltrados** | estilo Lobisomem (tom IASD: ninguém morre, "vai para casa"), 5 a 25 jogadores, fases com temporizador, Diretor, só para membros |
+| **VanaCoro** | estilo Family Feud com as respostas da Pergunta da Semana (agrupadas por IA e revistas pelo anfitrião): duelo, 3 falhas, roubo, ronda ×2; as equipas podem ser as famílias sorteadas no Formador |
+
+### A solo (desafio diário)
+Pagam uma vez por modo por dia, com o multiplicador ativo.
+
+| Jogo | Em que consiste |
+| :--- | :--- |
+| **VANTUR** | palavras bíblicas de 5 letras estilo Wordle, modos Solo / Mix (2 grelhas) / Plex (4 grelhas) |
+| **VanaCódigo** | decifrar a mensagem do dia: Morse, semáforo, César, Atbash ou A1Z26 conforme o dia da semana; modos Recruta / Explorador / Mestre |
+| **VanaTrilha: A Rota da Promessa** | tabuleiro bíblico pelo Êxodo: 7 estações, 8 casas, 3 vidas, casas especiais, insígnia "Peregrino da Promessa" |
+| **VanaSentinela** | "Verdade ou Distorção?": *swipe* de citações por pack, combo e rapidez, ranking com membros e convidados (público) |
 
 ---
 
-## 🚀 Guia de Início Rápido
+## 💰 Pontos: XP e Gold
+
+- **XP** mede a progressão: nível = `floor(XP / 1000) + 1`.
+- **Gold** é a moeda: dá desconto na loja e pode ser transferido.
+- **Regra de ouro:** todos os pontos entram como uma linha em `points_log`. Os totais do perfil são recalculados por trigger e o trigger `protect_point_totals` rejeita qualquer outro valor.
+- Origens: presenças em eventos, QR codes, tarefas, sugestões, inquéritos, Pergunta da Semana, jogos e atribuição manual (dirigentes só à sua classe).
+- As descrições dos movimentos identificam a origem na Auditoria e na analítica: não se mudam sem atualizar essas contagens.
+
+---
+
+## 🔒 Papéis, secções e permissões
+
+| Papel | Visibilidade e ações |
+| :--- | :--- |
+| **Desbravador** | os seus dados, o ranking público e os jogos |
+| **Dirigente** | gere a sua `leadership_section`: membros, presenças, tarefas, sugestões, investiduras |
+| **Coordenador** | acesso total ao clube |
+| **Ajudante** | desbravador com acesso de dirigente ou coordenador, sem sair do ranking |
+
+| Secção | Cor | Idade aprox. |
+| :--- | :--- | :--- |
+| Rebentos | 🟢 Esmeralda | 3–5 |
+| Tições | 🔴 Bordeaux | 6–10 |
+| Exploradores | 🟡 Amarelo | 11–15 |
+| Companheiros | 🔵 Azul | 16–23 |
+| Embaixadores | ⚪ Cinza/Dourado | liderança / +23 |
+
+**Como é garantido**
+- As RLS usam funções `SECURITY DEFINER` que devolvem o valor efetivo: `get_my_role()`, `get_my_section()`, `get_my_leadership_section()` e `get_my_real_role()` (cargo real, para a gestão de cargos).
+- Salvaguardas por trigger: `protect_role_columns` (só o coordenador real muda cargos), `protect_point_totals` e `protect_gender_column`.
+- O cliente `createServiceClient()` (ignora a RLS) só é usado em server actions e route handlers, depois das verificações de permissão.
+- Segredos dos jogos (respostas, papéis, palavras) não têm política de SELECT nem estão no realtime: leem-se por RPCs que filtram pelo estado da sessão.
+
+---
+
+## 🛠️ Stack
+
+| Camada | Tecnologia |
+| :--- | :--- |
+| Frontend | Next.js 16.1 (App Router), React 19.2, TypeScript |
+| Estilo | Tailwind CSS v4, shadcn/ui (Radix), Lucide |
+| Formulários | React Hook Form + Zod 4 |
+| Backend | Supabase: Auth, PostgreSQL com RLS, Realtime, Storage, Edge Functions |
+| Mapas | Leaflet + OpenStreetMap / Nominatim (sem chave) |
+| Push | Web Push API (`web-push`) + Edge Function `send-push` |
+| Email | Gmail do clube por SMTP (`nodemailer`) |
+| IA (VanaCoro) | qualquer API compatível com OpenAI (por omissão o Groq) |
+| Outros | `@dnd-kit`, `canvas-confetti`, `html-to-image`, `qrcode.react`, `sonner` |
+| Testes | `bun test` (regras puras em `utils/` e `lib/`) |
+| Alojamento | Vercel |
+
+---
+
+## 🚀 Instalação
 
 ### 1. Requisitos
-- Node.js 18.x ou superior.
-- Conta no Supabase.
+- Node.js 20+ (ou Bun)
+- Um projeto Supabase
+- Opcional: conta Gmail do clube com palavra-passe de aplicação (convites por email) e chave de uma API de IA (VanaCoro)
 
-### 2. Instalação
+### 2. Código
 ```bash
-git clone <url-do-repositorio>
+git clone https://github.com/Dani77777777/desbravadores-abrantes.git
 cd desbravadores-abrantes
 npm install
 ```
 
-### 3. Configuração de Ambiente
-Crie um `.env.local` com:
-```env
-NEXT_PUBLIC_SUPABASE_URL=https://seu-projeto.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=sua-chave-anon
-SUPABASE_SERVICE_ROLE_KEY=sua-chave-service-role
-NEXT_PUBLIC_VAPID_PUBLIC_KEY=sua-chave-push-publica
-VAPID_PRIVATE_KEY=sua-chave-push-privada
-# Opcional: agrupar respostas com IA (API compatível com OpenAI; por omissão o Groq)
-VANACORO_AI_API_KEY=sua-chave-groq
-# VANACORO_AI_BASE_URL=https://api.groq.com/openai/v1
-# VANACORO_AI_MODEL=openai/gpt-oss-120b
+### 3. Variáveis de ambiente (`.env.local` e Vercel)
+
+| Variável | Obrigatória | Para quê |
+| :--- | :---: | :--- |
+| `NEXT_PUBLIC_SUPABASE_URL` | ✅ | URL do projeto Supabase |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | ✅ | chave pública |
+| `SUPABASE_SERVICE_ROLE_KEY` | ✅ | server actions que ignoram a RLS (só no servidor) |
+| `NEXT_PUBLIC_SITE_URL` | ✅ | URL público do site (QR codes, links dos emails) |
+| `NEXT_PUBLIC_VAPID_PUBLIC_KEY` | push | chave pública VAPID das notificações |
+| `VAPID_PRIVATE_KEY` | push | chave privada VAPID |
+| `NEXT_PUBLIC_SUPABASE_STORAGE_BUCKET` | — | bucket das imagens (por omissão `imagens`) |
+| `GMAIL_USER`, `GMAIL_APP_PASSWORD` | convites | envio dos convites por email (~500 destinatários/dia) |
+| `VANACORO_AI_API_KEY` | VanaCoro | agrupar respostas com IA |
+| `VANACORO_AI_BASE_URL`, `VANACORO_AI_MODEL` | — | por omissão `https://api.groq.com/openai/v1` e `openai/gpt-oss-120b` |
+| `PERGUNTAS_IP_SALT` | — | sal do hash de IP da Pergunta da Semana (por omissão usa a service role) |
+
+Gerar as chaves VAPID:
+```bash
+npx web-push generate-vapid-keys
 ```
 
-### 4. Base de Dados
-O coração do sistema reside no arquivo `supabase-setup.sql`. Execute este script no editor SQL do Supabase para configurar:
-- Tabelas e Enums.
-- **RLS (Row Level Security):** Proteção rigorosa de dados.
-- **Triggers:** Automação de criação de perfis, cálculo de secção por idade e sincronização de totais de XP/Gold.
-- **Functions:** Lógica de transferência de ouro e cálculo de classes.
+### 4. Base de dados
+Ver [Base de dados](#️-base-de-dados): num projeto novo basta correr **um ficheiro**.
 
-Ficheiros SQL adicionais:
-- `supabase-setup-store.sql` — Configuração da loja (produtos, compras, entregas).
-- `supabase-push-setup.sql` — Configuração de notificações push.
-- `supabase-setup-vantur.sql` — VANTUR (sessões, dicionários e RPCs de sorteio). Correr antes de `supabase-setup-game-analytics.sql` e de `supabase-migration-game-points-multiplier.sql`.
+### 5. Correr
+```bash
+npm run dev
+```
+
+```bash
+bun test
+```
+
+```bash
+npm run lint
+```
 
 ---
 
-## 📂 Estrutura de Pastas
+## 🗄️ Base de dados
+
+### Projeto novo: um só ficheiro
+[`supabase-schema-completo.sql`](supabase-schema-completo.sql) cria **toda** a base de dados de uma vez, numa só transação:
+
+- 5 enums, 91 tabelas, 4 vistas, 106 funções/RPCs, 23 triggers, 53 índices e 164 políticas RLS;
+- as permissões exatas (incluindo as permissões por coluna do `anon` e as RPCs só para o `service_role`);
+- o trigger que cria o perfil quando alguém se regista (`on_auth_user_created`);
+- o bucket `imagens` e as suas políticas (avatares e produtos da loja);
+- as 25 tabelas publicadas no Realtime (com `REPLICA IDENTITY FULL` onde é preciso);
+- os dados iniciais: definições dos jogos e da loja, perguntas do VanaTrilha, versículos do VanaEspada, packs do VanaSketch e o banco inicial da Pergunta da Semana.
+
+Corre-se no **SQL Editor** do Supabase (colar tudo → Run) ou com `psql`:
+```bash
+psql "<connection string do projeto>" -f supabase-schema-completo.sql
+```
+
+> [!IMPORTANT]
+> É para um projeto **vazio**. Na base de produção continuam a usar-se as migrações individuais (abaixo).
+
+> [!TIP]
+> Para montar o site para **outro clube** (ex.: Angra do Heroísmo), seguir o [NOVO-CLUBE.md](NOVO-CLUBE.md): o que mudar no código, o fuso horário dos Açores e a configuração do Supabase e da Vercel.
+
+Depois de correr o SQL:
+1. **Auth → URL Configuration:** Site URL = `NEXT_PUBLIC_SITE_URL` e Redirect URL `<site>/auth/callback`. Manter a confirmação de email ligada.
+2. **Auth → Email Templates:** copiar os modelos de `supabase/templates/` (`magic-link.html` envia o código de confirmação para apagar a conta; `email-change.html`).
+3. **Notificações push:** fazer deploy da Edge Function e definir os segredos dela:
+   ```bash
+   supabase functions deploy send-push
+   ```
+   ```bash
+   supabase secrets set VAPID_PUBLIC_KEY=... VAPID_PRIVATE_KEY=... VAPID_EMAIL=...
+   ```
+   e criar o webhook em **Database → Webhooks**: tabela `public.announcements`, evento `INSERT`, Edge Function `send-push` (há um modelo em SQL no fim do ficheiro).
+4. **Primeiro coordenador:** criar a conta no site, fazer o onboarding e correr o comando da secção 5.2 do ficheiro (põe `role = 'coordenador'`). A partir daí os cargos geram-se no painel.
+
+### Migrações individuais (base existente)
+Não há ferramenta de migrações: cada `supabase-*.sql` na raiz é corrido à mão no SQL Editor e é idempotente. O `supabase-schema-completo.sql` é o resultado de as aplicar todas por esta ordem (os `supabase-teste-*.sql` são só dados de teste do VanaCoro e não entram):
+
+<details>
+<summary>Ordem das migrações</summary>
+
+1. `supabase-setup.sql`
+2. `supabase-push-setup.sql`
+3. `supabase-setup-store.sql`
+4. `supabase/migrations/20260225_qr_system.sql`
+5. `supabase/migrations/20240301_qr_limit_trigger.sql`
+6. `supabase-setup-vantur.sql`
+7. `supabase-setup-vana-quest.sql` → `-vana-quest-v2` → `-v3` → `-v4` → `-v5`
+8. `supabase-setup-vana-camp.sql` → `-vana-camp-v2-test-mode`
+9. `supabase-setup-surveys.sql`
+10. `supabase-setup-vana-words.sql` → `-vana-words-word-bank` → `-vana-words-realtime-delete`
+11. `supabase-setup-surveys-embed.sql`
+12. `-vana-quest-explanation` → `-vana-quest-rewards-decision`
+13. `-event-revert` → `-helpers` → `-event-optional-end` → `-store-product-images`
+14. `-vana-words-reveal-on-finish` → `-vana-words-swap-request` → `-vana-words-arauto-choice` → `-vana-words-public-present`
+15. `-store-v2-euros` → `-levels-revert`
+16. `supabase-setup-vana-codigo.sql`
+17. `supabase-setup-vana-sketch.sql` → `-vana-sketch-bots`
+18. `supabase-setup-vana-trilha.sql` → `supabase-seed-vana-trilha-questions.sql`
+19. `-classes-and-announcements` → `-points-security-audit` → `-role-safeguards` → `-points-reset`
+20. `-game-settings` → `-game-settings-vana-camp` → `-vana-sketch` → `-vana-codigo` → `-vana-espada`
+21. `supabase-setup-vana-espada.sql` → `supabase-seed-vana-espada.sql` → `-vana-espada-acf-fix`
+22. `-game-points-multiplier`
+23. `supabase-setup-tools-raffle.sql` → `-audit-helper-label` → `-event-rsvp`
+24. `supabase-setup-tools-timer-trips.sql` → `supabase-setup-tools-teams.sql` → `supabase-setup-tools-club-screen.sql` → `-leaderboard-dirigentes`
+25. `-store-preorders` → `-store-quantity` → `-store-self-cancel` → `-store-volume-discount`
+26. `supabase-setup-game-analytics.sql` → `-event-location-map`
+27. `supabase-setup-vana-sentinela.sql` → `-vana-sentinela-convidados-premios` → `-game-analytics-vana-sentinela`
+28. `-event-online` → `-event-rsvp-leader-response`
+29. `supabase/migrations/20261017_family_accounts.sql` → `20261017_family_accounts_multiple_profiles.sql`
+30. `-event-invites` → `-vana-sketch-fixes` → `-vana-sketch-packs`
+31. `supabase-setup-vana-coro.sql` → `supabase-seed-vana-coro-perguntas.sql` → `-vana-coro-grupos` → `-audit-vanasketch` → `-vana-coro-jogo` → `-vana-coro-duelo` → `-vana-coro-familias`
+32. `supabase-setup-event-checkin.sql` → `-club-families` → `-audit-pergunta-semana`
+
+(`-x` = `supabase-migration-x.sql`.)
+</details>
+
+Regras ao escrever uma migração nova:
+- idempotente (`IF NOT EXISTS`, `DROP POLICY IF EXISTS`, `CREATE OR REPLACE`); `DROP FUNCTION` antes de mudar o tipo de retorno;
+- quando um setup já foi corrido, a migração tem só a diferença;
+- só se publicam no Realtime tabelas **sem segredos**; os listeners de DELETE filtrados precisam de `REPLICA IDENTITY FULL`;
+- depois, voltar a gerar o `supabase-schema-completo.sql` para ele continuar a ter tudo.
+
+---
+
+## 📂 Estrutura do código e rotas
 
 ```text
-app/
-├── admin/          # Painel de controlo (Tabs: Overview, Members, Tasks, Events, Announcements, Suggestions, QR, Store)
-│   └── components/ # Componentes do admin (EventPanel, EventAttendanceManager, MemberList, etc.)
-├── auth/           # Callbacks de autenticação
-├── codes/          # Resgate de códigos QR
-├── contacts/       # Informação útil e redes sociais
-├── leaderboard/    # Ranking público de membresia
-├── login/          # Login e registo com magic links
-├── onboarding/     # Setup inicial do perfil
-├── points-history/ # Registo detalhado de ganhos/gastos
-├── profile/        # Edição de perfil e transferências
-├── shop/           # Loja de recompensas
-└── suggestions/    # Sistema de feedback
-components/
-├── dashboard/      # Componentes do dashboard (CodeEntryDialog, ManualClaimForm)
-├── events/         # Calendar e Card de eventos
-├── layout/         # Navbar dinâmica
-├── notifications/  # Gestor de notificações push
-├── profile/        # Dialogs e Avatars
-├── shop/           # Componentes da loja
-└── ui/             # Componentes base (Shadcn)
-lib/
-└── actions/        # Server Actions (QR codes)
-utils/
-└── supabase/       # Configuração client/server/middleware
+app/            rotas (páginas, server actions e route handlers)
+  admin/        painel de gestão, ferramentas e gestão de cada jogo
+  jogos/        um diretório por jogo (control / present / play / as)
+  api/          family-accounts, push/subscribe, perguntas, convites/sair, pontuação do VanaSentinela
+components/     UI por domínio (events/, shop/, vana-quest/, game-lobby/, game-podium/, ui/ …)
+lib/actions/    server actions (I/O com o Supabase)
+utils/          regras puras e testáveis (pontuação, equipas, sorteio, check-in …)
+types/          tipos de cada jogo
+supabase/       Edge Function send-push, modelos de email e migrações antigas
+docs/           especificações (VanaCoro, VanaEspada, VanaTrilha)
+NOVO-CLUBE.md   guia para criar o site de outro clube
+supabase-*.sql  setup e migrações; supabase-schema-completo.sql = tudo junto
 ```
 
----
+Padrão dos módulos mais recentes: `types/` → `utils/` (regras puras com testes) → `lib/actions/` (I/O) → `components/`.
 
-## 🔐 Segurança e Regras
-
-1. **Privacidade:** Membros só vêem os seus próprios dados e o ranking básico.
-2. **Hierarquia:** 
-   - **Dirigentes:** Gerem apenas a sua secção atribuída (`leadership_section`). Presenças, tarefas, sugestões e membros são filtrados pela sua secção.
-   - **Coordenadores:** Acesso total a todos os dados e ferramentas do clube.
-3. **Filtragem de Presenças por Secção:** Eventos com faixa etária específica mostram apenas os membros dessa faixa na lista de presenças.
-4. **Persistência:** Todo o XP e Gold é auditado através da tabela `points_log`, impedindo alterações manuais sem rasto.
-5. **RLS (Row Level Security):** Todas as tabelas têm políticas de segurança ao nível da base de dados, garantindo que mesmo chamadas diretas à API são controladas.
-6. **Limites de Resgate:** Os QR Codes têm limites globais de resgate controlados por trigger na base de dados.
-
-## 🤝 Contacto e Suporte
-
-Este projeto é desenvolvido para o **Clube de Desbravadores de Abrantes**. Para suporte técnico ou sugestões, contacte a equipa de tecnologia do clube ou utilize a aba de Sugestões na plataforma.
+**Rotas principais**
+- Membros: `/`, `/onboarding`, `/login`, `/profile`, `/points-history`, `/leaderboard`, `/shop`, `/suggestions`, `/contacts`, `/codes/[code]`, `/perguntas`, `/presenca/[eventId]`, `/familia/[code]`
+- Gestão: `/admin?tab=…`, `/admin/ferramentas/{ecra,sorteio,equipas,cronometro,tendas}` (+ `/projetor`), `/admin/<jogo>`
+- Jogos: `/jogos`, `/jogos/<jogo>/…`, `/j/[code]` (link curto dos QR para VanaWords, VanaSketch e VanaCoro)
+- Públicas: `/shop`, `/embed/inquerito/[id]`, `/perguntas/[token]`, `/convites/sair`, VanaEspada, VanaSentinela e os ecrãs de projetor
 
 ---
-**Aventura • Amizade • Fé** 🏕️
+
+## 📏 Convenções
+
+- **A semana começa ao domingo** e acaba ao sábado. Em SQL nunca se usa `date_trunc('week')`.
+- O "dia" do clube é o de **Lisboa** (`Europe/Lisbon`); o servidor corre em UTC.
+- Interface em **português de Portugal**, com tom adventista (IASD). Nos jogos nunca se diz "apostar".
+- Só o plano gratuito da Vercel e do Supabase: sem workers pagos, e os telemóveis enviam por `httpSend` em vez de subscreverem canais com muito tráfego.
+- Nunca automatizar inscrições no site da Juventude Adventista.
+- Nos filtros por secção usa-se sempre a secção pessoal, também para coordenadores.
+
+---
+
+Desenvolvido para o **Clube de Desbravadores de Abrantes**. Para suporte ou ideias, falar com a equipa de tecnologia do clube ou usar a Caixa de Sugestões da plataforma.
