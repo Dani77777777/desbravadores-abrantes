@@ -6,7 +6,7 @@ import type { VanaCoroPublicRound, VanaCoroSession } from '@/types/vana-coro'
 
 /**
  * Áudio do projetor do VanaCoro. As músicas vivem em /public/sounds/VanaCoro
- * (prompts em docs/VanaCoro-musicas-suno.md). Enquanto uma música não existir, essa
+ * (prompts do Suno no vault do Obsidian: 30 Jogos/Prompts). Enquanto uma música não existir, essa
  * fase fica em silêncio; os efeitos sonoros caem para um som sintetizado.
  */
 
