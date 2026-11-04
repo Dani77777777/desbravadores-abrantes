@@ -85,8 +85,8 @@ export function PurchaseMoneyDialog({ action, onClose, coordinators, currentUser
 
   return (
     <Dialog open onOpenChange={open => { if (!open) onClose() }}>
-      <DialogContent className="max-h-[92vh] overflow-y-auto sm:max-w-md">
-        <form onSubmit={submit} className="space-y-4">
+      <DialogContent className="max-h-[92vh] grid-cols-1 overflow-y-auto overflow-x-hidden sm:max-w-md">
+        <form onSubmit={submit} className="min-w-0 space-y-4">
           <DialogHeader>
             <DialogTitle>{TITLES[mode]}</DialogTitle>
             <DialogDescription>

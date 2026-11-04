@@ -39,7 +39,7 @@ export function ReverseDialog({ movement, onClose }: { movement: CashMovement | 
   return (
     <Dialog open={movement !== null} onOpenChange={open => { if (!open) close() }}>
       <DialogContent className="sm:max-w-md">
-        <form onSubmit={submit} className="space-y-4">
+        <form onSubmit={submit} className="min-w-0 space-y-4">
           <DialogHeader>
             <DialogTitle>Estornar movimento</DialogTitle>
             <DialogDescription>
