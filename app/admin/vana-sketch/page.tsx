@@ -28,7 +28,9 @@ export default async function VanaSketchAdminPage() {
   const [{ data: sessions }, packs] = await Promise.all([
     service
       .from('vanasketch_sessions')
-      .select('*, vanasketch_players(count)')
+      // Há duas FKs entre sessões e jogadores (players.session_id e sessions.drawer_player_id):
+      // sem indicar qual, o PostgREST recusa o embed e a lista vinha vazia.
+      .select('*, vanasketch_players!vanasketch_players_session_id_fkey(count)')
       .eq('host_id', user.id)
       .order('created_at', { ascending: false })
       .limit(20),

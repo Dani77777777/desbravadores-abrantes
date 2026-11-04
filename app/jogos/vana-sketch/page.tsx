@@ -19,7 +19,8 @@ export default async function VanaSketchEntryPage() {
     // Failsafe: sessões a decorrer onde o utilizador já entrou (para reconectar)
     const { data: participations } = await supabase
       .from('vanasketch_players')
-      .select('session_id, vanasketch_sessions(id, code, status)')
+      // FK explícita: sessions.drawer_player_id também liga as duas tabelas.
+      .select('session_id, vanasketch_sessions!vanasketch_players_session_id_fkey(id, code, status)')
       .eq('user_id', user.id)
 
     activeSessions = (participations || [])
