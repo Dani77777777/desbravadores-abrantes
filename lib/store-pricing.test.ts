@@ -3,7 +3,9 @@ import {
   amountDueFor,
   computePurchasePricing,
   nextVolumeTier,
+  pricingFor,
   volumeTiersLabel,
+  withPriceQuotes,
 } from './store-pricing'
 
 // Anilha: 5,00 €, custo 2,50 €, Gold até 50%. Taxa 10 🪙 por €.
@@ -134,4 +136,35 @@ test('etiqueta do cartão', () => {
   expect(volumeTiersLabel({ ...anilha, stock: 7 })).toBe('5+ un.: −5%')
   expect(volumeTiersLabel({ ...anilha, stock: 3 })).toBeNull()
   expect(volumeTiersLabel({ ...anilha, stock: 0, is_preorder: true })).toBe('5+ un.: −5% · 10 un.: −10%')
+})
+
+// O browser não recebe o custo: a página calcula as cotações no servidor.
+test('cotações do servidor = cálculo com o custo, sem o custo', () => {
+  const products = [
+    anilha,
+    { ...anilha, cost_price: null },
+    { ...anilha, cost_price: 4.8 },
+    { type: 'physical', price_eur: 3, cost_price: 1, max_discount_percent: 100, stock: 0, is_preorder: true },
+    { type: 'digital', price_eur: 10, cost_price: 8, max_discount_percent: 50 },
+  ]
+  for (const product of products) {
+    const quoted = withPriceQuotes(product)
+    expect('cost_price' in quoted).toBe(false)
+    expect(JSON.stringify(quoted)).not.toContain('costTotal')
+    for (let qty = 1; qty <= quoted.price_quotes.length; qty++) {
+      for (const gold of [null, 0, 15, 75, RICH]) {
+        const expected: Record<string, unknown> = { ...computePurchasePricing(product, qty, gold, RATE) }
+        delete expected.costTotal
+        expect(pricingFor(quoted, qty, gold, RATE) as Record<string, unknown>).toEqual(expected)
+      }
+    }
+    // Dicas e etiquetas continuam iguais sem o custo.
+    expect(volumeTiersLabel(quoted)).toBe(volumeTiersLabel(product))
+    for (let qty = 1; qty <= 10; qty++) expect(nextVolumeTier(quoted, qty)).toEqual(nextVolumeTier(product, qty))
+  }
+})
+
+test('digitais: só a cotação de 1 unidade', () => {
+  expect(withPriceQuotes({ type: 'digital', price_eur: 10, cost_price: 8, max_discount_percent: 50 }).price_quotes).toHaveLength(1)
+  expect(withPriceQuotes(anilha).price_quotes).toHaveLength(10)
 })

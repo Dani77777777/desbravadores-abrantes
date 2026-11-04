@@ -18,7 +18,7 @@ import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
 import { ShoppingBag, Coins, CheckCircle2, Copy, Key, AlertCircle, User, Banknote, CalendarClock, Minus, Plus, Undo2, BadgePercent } from 'lucide-react'
 import { formatEur, goldCostFor, formatDeadline } from '@/lib/store-economy'
-import { computePurchasePricing, amountDueFor, nextVolumeTier, maxQuantityFor, toCents } from '@/lib/store-pricing'
+import { pricingFor, amountDueFor, nextVolumeTier, maxQuantityFor, toCents } from '@/lib/store-pricing'
 import { addGuestOrder, removeGuestOrder } from '@/lib/guest-orders'
 
 interface PurchaseDialogProps {
@@ -48,7 +48,7 @@ export function PurchaseDialog({ product, userProfile, goldRate, disabled, reaso
   // Pré-visualização (o servidor recalcula tudo): desconto por quantidade e teto do Gold,
   // que nunca deixa o total abaixo do custo.
   const userGold = isGuest ? null : userProfile.current_gold || 0
-  const pricing = computePurchasePricing(product, quantity, userGold, goldRate)
+  const pricing = pricingFor(product, quantity, userGold, goldRate)
   const priceEur = pricing.baseEur
   // Limite do slider: o teto do artigo, cortado pelo Gold que o membro tem.
   const maxDisc = pricing.userGoldMaxEur
@@ -59,7 +59,7 @@ export function PurchaseDialog({ product, userProfile, goldRate, disabled, reaso
     setQuantity(qty)
     // Quem está a usar todo o Gold continua a usar todo; senão, não deixar o slider
     // acima do novo limite (o máximo muda com as unidades e o desconto por quantidade).
-    const nextMax = computePurchasePricing(product, qty, userGold, goldRate).userGoldMaxEur
+    const nextMax = pricingFor(product, qty, userGold, goldRate).userGoldMaxEur
     setDiscount(d => (d >= maxDisc ? nextMax : Math.min(d, nextMax)))
   }
   const goldCost = goldCostFor(discount, goldRate)
@@ -167,8 +167,8 @@ export function PurchaseDialog({ product, userProfile, goldRate, disabled, reaso
               <DialogTitle className="text-xl font-bold">{isPreorder ? 'Confirmar Reserva' : 'Confirmar Compra'}</DialogTitle>
               <DialogDescription className="text-gray-500">
                 {isGuest
-                  ? 'O pagamento é feito em dinheiro, junto da direção do clube.'
-                  : 'Podes usar o teu Gold para baixar o preço. O resto pagas em dinheiro.'}
+                  ? 'Pagas em dinheiro a um coordenador do clube.'
+                  : 'Podes usar o teu Gold para baixar o preço. O resto pagas em dinheiro a um coordenador do clube.'}
               </DialogDescription>
             </DialogHeader>
 
@@ -410,12 +410,12 @@ export function PurchaseDialog({ product, userProfile, goldRate, disabled, reaso
                 <div className="text-blue-800 text-sm">
                   {isPreorder ? (
                     Number(result.amount_due_eur) > 0
-                      ? <>Paga a um elemento da <strong>direção</strong>. Quando o artigo chegar, levantas o teu com o <strong>coordenador</strong>.</>
-                      : <>A tua reserva ficou registada. Quando o artigo chegar, levantas o teu com o <strong>coordenador</strong>.</>
+                      ? <>Paga a um <strong>coordenador do clube</strong>. Quando o artigo chegar, levantas o teu com um coordenador.</>
+                      : <>A tua reserva ficou registada. Quando o artigo chegar, levantas o teu com um <strong>coordenador do clube</strong>.</>
                   ) : Number(result.amount_due_eur) > 0 ? (
-                    <>Procura um elemento da <strong>direção</strong> para pagares{product.type === 'digital' ? ' e receberes a tua chave' : ' e levantares o artigo'}.</>
+                    <>Paga a um <strong>coordenador do clube</strong>{product.type === 'digital' ? ' para receberes a tua chave' : ' para levantares o artigo'}.</>
                   ) : (
-                    <>A tua encomenda ficou registada. Dirige-te ao teu <strong>coordenador</strong> para levantar o artigo.</>
+                    <>A tua encomenda ficou registada. Levanta o artigo com um <strong>coordenador do clube</strong>.</>
                   )}
                 </div>
               </div>
@@ -429,7 +429,7 @@ export function PurchaseDialog({ product, userProfile, goldRate, disabled, reaso
               >
                 Fechar
               </Button>
-              {/* Digital já pago = chave revelada: aí só a direção pode reembolsar. */}
+              {/* Digital já pago = chave revelada: aí só a coordenação pode reembolsar. */}
               {!(product.type === 'digital' && result.paid) && (
                 <Button
                   variant="ghost"

@@ -2,6 +2,13 @@
 // balances, finished-event rewards, XP levels) into fair price/level guidance.
 // Used by the admin Overview panel and the product creation dialog.
 
+// Colunas de store_products que o browser pode ler: todas menos cost_price
+// (escondida por permissões de coluna; ver supabase-migration-store-security-fix.sql).
+// select('*') falha com "permission denied". Coluna nova na tabela = acrescentar aqui
+// e voltar a correr o bloco de permissões da migração.
+export const STORE_PRODUCT_COLUMNS =
+  'id, name, description, price, type, stock, image_url, restrictions, is_active, min_level, created_at, updated_at, price_eur, max_discount_percent, is_preorder, preorder_deadline'
+
 export interface PriceTier {
   key: string
   label: string

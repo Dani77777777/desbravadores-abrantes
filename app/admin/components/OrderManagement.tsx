@@ -68,7 +68,8 @@ export function OrderManagement({ initialPurchases, profile, products }: OrderMa
     )
   }
 
-  // Limpar enganos: só registos já cancelados/reembolsados (o Gold já foi devolvido).
+  // Limpar enganos: só registos cancelados que nunca foram pagos (o Gold já foi devolvido).
+  // Uma compra que chegou a ser paga fica sempre no histórico.
   const handleDelete = (purchaseId: string) => {
     if (!confirm('Apagar este registo do histórico? Usa isto só para enganos — não dá para desfazer.')) return
     runAction(
@@ -99,6 +100,11 @@ export function OrderManagement({ initialPurchases, profile, products }: OrderMa
     .sort((a, b) => Number(b.open) - Number(a.open))
 
   const buyerName = (order: any) => order.profiles?.full_name || order.buyer_name || 'Desconhecido'
+
+  // Há quantos dias a encomenda espera pagamento (as físicas por pagar caducam ao fim de
+  // store_settings.unpaid_expiry_days; as reservas não).
+  const daysWaiting = (order: { created_at: string }) => Math.max(0, Math.floor((Date.now() - new Date(order.created_at).getTime()) / 86_400_000))
+  const waitingLabel = (days: number) => (days === 0 ? 'hoje' : days === 1 ? 'há 1 dia' : `há ${days} dias`)
 
   const OrderCard = ({ order, tone }: { order: any; tone: 'orange' | 'blue' }) => {
     const isGuest = !order.user_id
@@ -138,7 +144,7 @@ export function OrderManagement({ initialPurchases, profile, products }: OrderMa
 
             <div className={`flex-1 px-4 py-2 rounded-lg border bg-white/60 ${tone === 'orange' ? 'border-orange-100/50' : 'border-blue-100/50'}`}>
               <p className={`text-[10px] font-black uppercase mb-0.5 ${tone === 'orange' ? 'text-orange-600' : 'text-blue-600'}`}>
-                {isPaid ? 'Pago — por entregar' : 'Aguarda pagamento'}
+                {isPaid ? 'Pago — por entregar' : `Aguarda pagamento ${waitingLabel(daysWaiting(order))}`}
                 {isPreorder && <span className="ml-1.5 text-teal-600">· Reserva</span>}
               </p>
               <div className="flex items-center justify-between gap-2 flex-wrap">
@@ -321,7 +327,7 @@ export function OrderManagement({ initialPurchases, profile, products }: OrderMa
                     >
                       Reembolsar
                     </Button>
-                  ) : (
+                  ) : !order.paid_at && (
                     <Button
                       variant="ghost"
                       size="icon"

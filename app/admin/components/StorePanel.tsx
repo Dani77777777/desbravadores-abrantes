@@ -31,6 +31,9 @@ export function StorePanel({ profile, products, initialPurchases, members, event
   const [saving, setSaving] = useState(false)
   const [baseRate, setBaseRate] = useState<number>(Number(settings?.base_gold_per_euro) || 100)
   const [refGold, setRefGold] = useState<number>(Number(settings?.reference_total_gold) || 10000)
+  // Encomendas por pagar (supabase-migration-store-security-fix.sql)
+  const [expiryDays, setExpiryDays] = useState<number>(Number(settings?.unpaid_expiry_days) || 14)
+  const [guestLimit, setGuestLimit] = useState<number>(settings?.max_guest_unpaid_orders ?? 10)
 
   const goldRate = rateInfo?.gold_per_euro || 100
   const totalGold = Number(rateInfo?.total_gold) || 0
@@ -41,7 +44,14 @@ export function StorePanel({ profile, products, initialPurchases, members, event
     try {
       const { error } = await supabase
         .from('store_settings')
-        .upsert({ id: true, base_gold_per_euro: baseRate, reference_total_gold: refGold, updated_at: new Date().toISOString() })
+        .upsert({
+          id: true,
+          base_gold_per_euro: baseRate,
+          reference_total_gold: refGold,
+          unpaid_expiry_days: expiryDays,
+          max_guest_unpaid_orders: guestLimit,
+          updated_at: new Date().toISOString(),
+        })
       if (error) throw error
       toast.success('Economia atualizada!')
       setEcoOpen(false)
@@ -107,6 +117,20 @@ export function StorePanel({ profile, products, initialPurchases, members, event
               </div>
               <p className="text-[10px] text-gray-400">
                 Quando o Gold em circulação = referência, 1 € custa exatamente a base.
+              </p>
+              <div className="border-t pt-4 grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Caducam ao fim de (dias)</Label>
+                  <Input type="number" min={1} max={365} value={expiryDays} onChange={e => setExpiryDays(Number(e.target.value))} required />
+                </div>
+                <div className="space-y-2">
+                  <Label>Máx. de convidados por pagar</Label>
+                  <Input type="number" min={0} max={1000} value={guestLimit} onChange={e => setGuestLimit(Number(e.target.value))} required />
+                </div>
+              </div>
+              <p className="text-[10px] text-gray-400">
+                Encomendas físicas por pagar (não as reservas) caducam: o stock e o Gold voltam e o registo é apagado.
+                Cada membro pode ter até 3 encomendas por pagar; os convidados, todos juntos, até ao máximo acima.
               </p>
               <DialogFooter>
                 <Button type="submit" className="w-full bg-blue-800 hover:bg-blue-900" disabled={saving}>

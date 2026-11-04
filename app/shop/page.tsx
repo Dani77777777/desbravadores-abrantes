@@ -5,7 +5,8 @@ import Link from 'next/link'
 import { ShoppingBag, Coins, Trophy, Sparkles, ArrowRight, MousePointerClick, Banknote, Star } from 'lucide-react'
 import { ProductGrid } from '@/components/shop/ProductGrid'
 import { MyOrders } from '@/components/shop/MyOrders'
-import type { GoldRateInfo } from '@/lib/store-economy'
+import { STORE_PRODUCT_COLUMNS, type GoldRateInfo } from '@/lib/store-economy'
+import { attachPriceQuotes, expireUnpaidStoreOrders } from '@/lib/store-maintenance'
 import { displayFont } from '@/components/landing/fonts'
 import { SiteFooter } from '@/components/landing/SiteFooter'
 
@@ -16,9 +17,12 @@ const delay = (ms: number) => ({ '--d': `${ms}ms` }) as CSSProperties
 export default async function ShopPage() {
   const supabase = await createClient()
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  // Encomendas por pagar há demasiado tempo caducam antes de se mostrar o stock.
+  const [
+    {
+      data: { user },
+    },
+  ] = await Promise.all([supabase.auth.getUser(), expireUnpaidStoreOrders()])
 
   // A loja é pública: visitantes podem comprar (pagam em dinheiro, sem desconto Gold).
   let profile = null
@@ -39,9 +43,10 @@ export default async function ShopPage() {
   }
 
   const [{ data: products }, { data: keyStock }, { data: rateData }] = await Promise.all([
+    // Sem cost_price: os preços por quantidade vêm já calculados (attachPriceQuotes).
     supabase
       .from('store_products')
-      .select('*')
+      .select(STORE_PRODUCT_COLUMNS)
       .eq('is_active', true)
       .order('price_eur', { ascending: true }),
     supabase.from('digital_key_stock').select('*'),
@@ -54,7 +59,7 @@ export default async function ShopPage() {
   const stockByProduct: Record<string, number> = {}
   for (const row of keyStock || []) stockByProduct[row.product_id] = row.available
 
-  const productsWithKeys = (products || []).map(p => ({
+  const productsWithKeys = (await attachPriceQuotes(products || [])).map(p => ({
     ...p,
     available_keys: stockByProduct[p.id] ?? 0,
   }))

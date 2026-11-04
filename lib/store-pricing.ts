@@ -9,6 +9,10 @@
 // 3. Gold até min(teto% × base, preço com volume − custo total)
 // 4. o total nunca fica abaixo do custo total
 // Sem custo definido: sem desconto por quantidade e o Gold funciona como antes.
+//
+// O custo (cost_price) não chega ao browser: a página da Loja (servidor) calcula
+// com computePurchasePricing e manda só as cotações por quantidade
+// (withPriceQuotes); os componentes usam pricingFor.
 // ---------------------------------------------------------------------------
 
 // Escalões do desconto por quantidade (por encomenda, unidades do mesmo artigo).
@@ -31,6 +35,9 @@ type PricedProduct = {
   max_discount_percent?: number | null
   is_preorder?: boolean | null
   stock?: number | null
+  // Vêm do servidor em vez do custo (ver withPriceQuotes).
+  volume_eligible?: boolean
+  price_quotes?: PriceQuote[]
 }
 
 // Arredonda a cêntimos (o EPSILON evita 2.675 → 2.67 por erros de vírgula flutuante).
@@ -40,7 +47,8 @@ export const hasCostPrice = (product: PricedProduct) =>
   product.cost_price !== null && product.cost_price !== undefined && product.cost_price !== '' &&
   Number.isFinite(Number(product.cost_price))
 
-const isVolumeEligible = (product: PricedProduct) => product.type !== 'digital' && hasCostPrice(product)
+const isVolumeEligible = (product: PricedProduct) =>
+  product.type !== 'digital' && (product.volume_eligible ?? hasCostPrice(product))
 
 // Máximo de unidades numa encomenda: até 10, cortado pelo stock; por encomenda sem stock; digitais sempre 1.
 export const maxQuantityFor = (product: PricedProduct) => {
@@ -107,8 +115,52 @@ export function computePurchasePricing(
   }
 }
 
+// Cotação de uma quantidade sem nada que revele o custo nem dependa do utilizador.
+export type PriceQuote = Omit<PurchasePricing, 'costTotal' | 'userGoldMaxEur'>
+
+const toQuote = (p: PurchasePricing): PriceQuote => ({
+  baseEur: p.baseEur,
+  volumePercent: p.volumePercent,
+  volumeEur: p.volumeEur,
+  priceAfterVolume: p.priceAfterVolume,
+  goldCapEur: p.goldCapEur,
+  goldLimitedByCost: p.goldLimitedByCost,
+})
+
+// Servidor: troca cost_price pelas cotações de 1 até ao máximo de unidades
+// (price_quotes[qty - 1]) e pela indicação de desconto por quantidade.
+export function withPriceQuotes<T extends PricedProduct>(product: T): Omit<T, 'cost_price'> & { volume_eligible: boolean; price_quotes: PriceQuote[] } {
+  const rest: Omit<T, 'cost_price'> & { cost_price?: unknown } = { ...product }
+  delete rest.cost_price
+  const maxQty = product.type === 'digital' ? 1 : MAX_QTY_PER_ORDER
+  return {
+    ...rest,
+    volume_eligible: isVolumeEligible(product),
+    price_quotes: Array.from({ length: maxQty }, (_, i) => toQuote(computePurchasePricing(product, i + 1, null, 1))),
+  }
+}
+
+// Browser: preço de uma quantidade a partir das cotações do servidor (ou do custo,
+// se o produto o tiver, como nos testes e na gestão).
+export function pricingFor(
+  product: PricedProduct,
+  quantity: number,
+  userGold: number | null,
+  goldPerEuro: number,
+): Omit<PurchasePricing, 'costTotal'> {
+  const quotes = product.price_quotes
+  if (!quotes?.length) {
+    const pricing = computePurchasePricing(product, quantity, userGold, goldPerEuro)
+    return { ...toQuote(pricing), userGoldMaxEur: pricing.userGoldMaxEur }
+  }
+  const qty = Math.min(quotes.length, Math.max(1, Math.floor(quantity || 1)))
+  const quote = quotes[qty - 1]
+  const affordable = userGold === null ? 0 : Math.floor(((userGold || 0) / (goldPerEuro || 1)) * 100) / 100
+  return { ...quote, userGoldMaxEur: Math.max(0, Math.min(quote.goldCapEur, affordable)) }
+}
+
 // Total a pagar em dinheiro para um desconto Gold escolhido (cortado ao teto).
-export const amountDueFor = (pricing: PurchasePricing, goldDiscountEur: number) =>
+export const amountDueFor = (pricing: Pick<PurchasePricing, 'priceAfterVolume' | 'goldCapEur'>, goldDiscountEur: number) =>
   Math.max(0, toCents(pricing.priceAfterVolume - Math.min(Math.max(0, goldDiscountEur || 0), pricing.goldCapEur)))
 
 // Próximo escalão, se estiver perto (≤ VOLUME_HINT_UNITS) e couber no máximo de unidades.

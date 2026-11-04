@@ -20,6 +20,8 @@ import { Users, ListChecks, Megaphone, MessageSquare, LayoutDashboard, CalendarD
 import { effectiveRole, effectiveLeadershipSection, isHelper, helperLabel } from '@/utils/permissions'
 import { fetchGameSettings } from '@/utils/games'
 import { displayFont } from '@/components/landing/fonts'
+import { STORE_PRODUCT_COLUMNS } from '@/lib/store-economy'
+import { expireUnpaidStoreOrders } from '@/lib/store-maintenance'
 
 export default async function AdminPage({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
   const supabase = await createClient()
@@ -135,14 +137,22 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
   const { data: events } = await eventsQuery
 
   // Fetch Store Data
-  let products = []
+  let products: Record<string, unknown>[] = []
   let purchases = []
   let storeRateInfo = null
   let storeSettings = null
 
-  if (effRole === 'coordenador') {
-    const { data: storeProducts } = await supabase.from('store_products').select('*').order('created_at', { ascending: false })
-    products = storeProducts || []
+  // Loja (dinheiro, preços e chaves): só coordenadores REAIS, nunca ajudantes.
+  if (profile.role === 'coordenador') {
+    await expireUnpaidStoreOrders()
+
+    // cost_price não se lê da tabela: vem de get_store_product_costs (só coordenação real).
+    const [{ data: storeProducts }, { data: costs }] = await Promise.all([
+      supabase.from('store_products').select(STORE_PRODUCT_COLUMNS).order('created_at', { ascending: false }),
+      supabase.rpc('get_store_product_costs'),
+    ])
+    const costById = new Map<string, number | null>((costs || []).map((c: { product_id: string; cost_price: number | null }) => [c.product_id, c.cost_price]))
+    products = (storeProducts || []).map((p) => ({ ...p, cost_price: costById.get(p.id) ?? null }))
 
     const { data: storePurchases } = await supabase
       .from('store_purchases')
@@ -189,9 +199,10 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
   if (isDirigente && coordOnlyTabs.includes(activeTab)) {
     redirect('/admin?tab=members')
   }
-  // Auditoria: só coordenadores REAIS (ajudantes de coordenação não se auditam a si próprios)
+  // Auditoria e Loja: só coordenadores REAIS (ajudantes de coordenação não se auditam
+  // a si próprios nem mexem em pagamentos, preços e chaves).
   const isRealCoordenador = profile.role === 'coordenador'
-  if (activeTab === 'audit' && !isRealCoordenador) {
+  if ((activeTab === 'audit' || activeTab === 'store') && !isRealCoordenador) {
     redirect(`/admin?tab=${defaultTab}`)
   }
 
@@ -300,7 +311,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
             { id: 'surveys', label: 'Inquéritos', icon: ClipboardList, coordOnly: true, count: 0, countColor: 'blue' },
             { id: 'games', label: 'Jogos', icon: Gamepad2, coordOnly: false, count: 0, countColor: 'blue' },
             { id: 'tools', label: 'Ferramentas', icon: Wrench, coordOnly: false, count: 0, countColor: 'blue' },
-            { id: 'store', label: 'Loja', icon: ShoppingBag, coordOnly: true, count: purchases?.filter(p => p.status === 'pending').length || 0, countColor: 'orange' },
+            { id: 'store', label: 'Loja', icon: ShoppingBag, coordOnly: true, realCoordOnly: true, count: purchases?.filter(p => p.status === 'pending').length || 0, countColor: 'orange' },
             { id: 'audit', label: 'Auditoria', icon: ScrollText, coordOnly: true, realCoordOnly: true, count: 0, countColor: 'blue' }
           ] as { id: string, label: string, icon: any, coordOnly: boolean, realCoordOnly?: boolean, count: number, countColor: string, href?: string }[])
             .filter(tab => (!tab.coordOnly || isCoordenador) && (!tab.realCoordOnly || isRealCoordenador))
@@ -335,6 +346,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
             events={events || []}
             purchases={purchases || []}
             rateInfo={storeRateInfo}
+            canManageStore={isRealCoordenador}
             attendance={attendance}
             suggestions={suggestions || []}
             tasks={tasks || []}
@@ -429,7 +441,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
         )}
 
         {/* Store tab */}
-        {activeTab === 'store' && isCoordenador && (
+        {activeTab === 'store' && isRealCoordenador && (
           <StorePanel
             profile={effProfile}
             products={products}

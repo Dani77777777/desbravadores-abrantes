@@ -78,8 +78,12 @@ Plataforma *mobile-first* de gamificação e gestão do **Clube de Desbravadores
 - **Loja** (`/shop`, pública):
   - preços fixos em euros e o **Gold dá desconto** a uma taxa dinâmica (quanto mais Gold em circulação, mais caro fica o desconto), até um máximo por artigo;
   - membros compram com desconto; **convidados sem conta** compram sem desconto;
-  - artigos físicos e **chaves digitais** (reveladas só depois de pagas), artigos **por encomenda** com prazo, 1 a 10 unidades com desconto de quantidade;
-  - pagamento em dinheiro confirmado pela coordenação, e cancelamento pelo próprio enquanto não houver pagamento.
+  - artigos físicos e **chaves digitais** (a chave só é atribuída quando a compra fica paga), artigos **por encomenda** com prazo, 1 a 10 unidades com desconto de quantidade;
+  - pagamento em dinheiro **a um coordenador do clube**, confirmado pela coordenação (só coordenadores reais; os ajudantes não mexem na loja), e cancelamento pelo próprio enquanto não houver pagamento;
+  - no máximo **3 encomendas por pagar por membro** e um teto global para convidados (`store_settings.max_guest_unpaid_orders`, 10 por omissão);
+  - encomendas físicas por pagar (não as reservas) **caducam** ao fim de `store_settings.unpaid_expiry_days` dias (14 por omissão): o stock e o Gold voltam e o registo é apagado. Corre pelo `pg_cron`, se existir, e sempre que a loja ou o `/admin` abrem;
+  - compras que chegaram a ser pagas ficam sempre no histórico (não se apagam);
+  - o **preço de custo** não chega ao browser: a página da loja calcula os preços por quantidade no servidor (`lib/store-maintenance.ts`) e a gestão lê o custo por `get_store_product_costs()`.
 
 ---
 
@@ -99,7 +103,7 @@ Plataforma *mobile-first* de gamificação e gestão do **Clube de Desbravadores
 | Inquéritos | coordenação | criar, abrir, fechar e finalizar votações |
 | Jogos | todos (dirigentes só leem) | disponibilidade de cada jogo, analítica dos jogos a solo, multiplicador de pontos |
 | Ferramentas | todos | ferramentas do projetor (ver abaixo) |
-| Loja | coordenação | produtos, encomendas, entregas, taxa do Gold |
+| Loja | coordenador real | produtos, encomendas, entregas, taxa do Gold, caducidade das encomendas |
 | Auditoria | coordenador real | auditoria de pontos e reset de fim de época |
 
 Cada jogo tem também uma página de gestão (`/admin/<jogo>`) para bancos de perguntas, versículos, palavras, packs e relatórios por sessão.
@@ -184,6 +188,8 @@ Pagam uma vez por modo por dia, com o multiplicador ativo.
 
 **Como é garantido**
 - As RLS usam funções `SECURITY DEFINER` que devolvem o valor efetivo: `get_my_role()`, `get_my_section()`, `get_my_leadership_section()` e `get_my_real_role()` (cargo real, para a gestão de cargos).
+- **Verificações à prova de NULL:** sem sessão, `get_my_role()` e `get_my_real_role()` devolvem `NULL`, e `NULL <> 'coordenador'` não dispara o `RAISE`. Nunca usar `<>`, `NOT IN` nem `IF NOT (...)` numa verificação de permissão: usar `IS DISTINCT FROM`, `COALESCE(..., '') NOT IN (...)` ou `NOT COALESCE(..., false)`. As funções de gestão também não têm `EXECUTE` para o `anon`.
+- Dinheiro (loja: pagamentos, reembolsos, preços, chaves digitais) usa sempre `get_my_real_role()`: os ajudantes nunca lhe tocam.
 - Salvaguardas por trigger: `protect_role_columns` (só o coordenador real muda cargos), `protect_point_totals` e `protect_gender_column`.
 - O cliente `createServiceClient()` (ignora a RLS) só é usado em server actions e route handlers, depois das verificações de permissão.
 - Segredos dos jogos (respostas, papéis, palavras) não têm política de SELECT nem estão no realtime: leem-se por RPCs que filtram pelo estado da sessão.
@@ -335,6 +341,7 @@ Não há ferramenta de migrações: cada `supabase-*.sql` na raiz é corrido à 
 30. `-event-invites` → `-vana-sketch-fixes` → `-vana-sketch-packs`
 31. `supabase-setup-vana-coro.sql` → `supabase-seed-vana-coro-perguntas.sql` → `-vana-coro-grupos` → `-audit-vanasketch` → `-vana-coro-jogo` → `-vana-coro-duelo` → `-vana-coro-familias`
 32. `supabase-setup-event-checkin.sql` → `-club-families` → `-audit-pergunta-semana`
+33. `-store-security-fix`
 
 (`-x` = `supabase-migration-x.sql`.)
 </details>
@@ -342,6 +349,7 @@ Não há ferramenta de migrações: cada `supabase-*.sql` na raiz é corrido à 
 Regras ao escrever uma migração nova:
 - idempotente (`IF NOT EXISTS`, `DROP POLICY IF EXISTS`, `CREATE OR REPLACE`); `DROP FUNCTION` antes de mudar o tipo de retorno;
 - quando um setup já foi corrido, a migração tem só a diferença;
+- verificações de permissão à prova de `NULL` (ver "Como é garantido");
 - só se publicam no Realtime tabelas **sem segredos**; os listeners de DELETE filtrados precisam de `REPLICA IDENTITY FULL`;
 - depois, voltar a gerar o `supabase-schema-completo.sql` para ele continuar a ter tudo.
 

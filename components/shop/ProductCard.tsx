@@ -3,7 +3,7 @@
 import { Package, Coins, BadgePercent } from 'lucide-react'
 import { PurchaseDialog } from './PurchaseDialog'
 import { formatEur, isPreorderOpen, formatDeadline } from '@/lib/store-economy'
-import { computePurchasePricing, volumeTiersLabel } from '@/lib/store-pricing'
+import { pricingFor, volumeTiersLabel } from '@/lib/store-pricing'
 import { displayFont } from '@/components/landing/fonts'
 
 interface ProductCardProps {
@@ -35,7 +35,7 @@ export function ProductCard({ product, userProfile, goldRate }: ProductCardProps
     : undefined
 
   // Teto do Gold para 1 unidade — com custo definido, nunca abaixo do custo.
-  const unitPricing = computePurchasePricing(product, 1, null, goldRate)
+  const unitPricing = pricingFor(product, 1, null, goldRate)
   const maxDisc = unitPricing.goldCapEur
   // Só artigos físicos com custo definido (e escalões que o stock permite).
   const volumeLabel = volumeTiersLabel(product)

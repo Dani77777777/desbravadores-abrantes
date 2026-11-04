@@ -9,11 +9,11 @@
 -- Realtime e os dados iniciais dos jogos.
 --
 -- É o estado final de todas as migrações supabase-*.sql e supabase/migrations/*
--- do repositório (até 2026-11-03), aplicadas por ordem cronológica. Não inclui
+-- do repositório (até 2026-11-04), aplicadas por ordem cronológica. Não inclui
 -- os ficheiros supabase-teste-*.sql (dados de teste do VanaCoro).
 --
--- Conteúdo: 5 enums · 91 tabelas · 4 vistas · 106 funções · 23 triggers
---           53 índices · 164 políticas RLS (+ 7 no storage) · trigger de perfil em auth.users
+-- Conteúdo: 5 enums · 91 tabelas · 4 vistas · 108 funções · 23 triggers
+--           53 índices · 163 políticas RLS (+ 7 no storage) · trigger de perfil em auth.users
 --           457 linhas de dados iniciais (definições, packs, versículos, perguntas)
 --
 -- COMO CORRER
@@ -246,7 +246,7 @@ DECLARE
   v_new_role public.app_role;
   v_new_section public.app_section;
 BEGIN
-  IF v_real_role NOT IN ('coordenador', 'dirigente') THEN
+  IF COALESCE(v_real_role, '') NOT IN ('coordenador', 'dirigente') THEN
     RAISE EXCEPTION 'Sem permissão para nomear ajudantes.';
   END IF;
 
@@ -873,9 +873,12 @@ $$;
 -- Name: cancel_my_purchase(uuid, uuid); Type: FUNCTION; Schema: public; Owner: -
 --
 
-CREATE FUNCTION public.cancel_my_purchase(p_purchase_id uuid, p_cancel_token uuid DEFAULT NULL::uuid) RETURNS jsonb
-    LANGUAGE plpgsql SECURITY DEFINER
-    AS $$
+CREATE FUNCTION public.cancel_my_purchase(p_purchase_id uuid, p_cancel_token uuid DEFAULT NULL)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public'
+AS $$
 DECLARE
   v_purchase record;
   v_product record;
@@ -892,11 +895,11 @@ BEGIN
   END IF;
 
   IF v_purchase.status <> 'pending' THEN
-    RAISE EXCEPTION 'Esta encomenda já foi entregue ou cancelada. Fala com a direção.';
+    RAISE EXCEPTION 'Esta encomenda já foi entregue ou cancelada. Fala com a coordenação.';
   END IF;
-  -- Com dinheiro já entregue, o cancelamento passa pela direção (tem de devolver em mãos).
+  -- Com dinheiro já entregue, o cancelamento passa pela coordenação (tem de devolver em mãos).
   IF v_purchase.paid_at IS NOT NULL AND COALESCE(v_purchase.amount_due_eur, 0) > 0 THEN
-    RAISE EXCEPTION 'Esta encomenda já foi paga. Fala com a direção para a cancelar.';
+    RAISE EXCEPTION 'Esta encomenda já foi paga. Fala com a coordenação para a cancelar.';
   END IF;
 
   SELECT name, type, is_preorder INTO v_product
@@ -914,9 +917,14 @@ BEGIN
     UPDATE public.store_products SET stock = stock + COALESCE(v_purchase.quantity, 1)
     WHERE id = v_purchase.product_id;
   END IF;
-  -- Nota: tal como no reembolso, a chave digital reservada não volta ao stock.
 
-  -- 3. Um engano não fica no histórico
+  -- 3. Digital por pagar com chave (encomendas de antes desta correção): a chave volta.
+  IF v_purchase.paid_at IS NULL AND v_purchase.digital_key_delivered IS NOT NULL THEN
+    UPDATE public.digital_keys SET is_used = false
+    WHERE product_id = v_purchase.product_id AND key_value = v_purchase.digital_key_delivered;
+  END IF;
+
+  -- 4. Um engano não fica no histórico
   DELETE FROM public.store_purchases WHERE id = p_purchase_id;
 
   RETURN jsonb_build_object('success', true, 'gold_returned', COALESCE(v_purchase.gold_spent, 0));
@@ -1057,22 +1065,30 @@ $$;
 -- Name: delete_purchase_record(uuid); Type: FUNCTION; Schema: public; Owner: -
 --
 
-CREATE FUNCTION public.delete_purchase_record(p_purchase_id uuid) RETURNS void
-    LANGUAGE plpgsql SECURITY DEFINER
-    AS $$
+CREATE FUNCTION public.delete_purchase_record(p_purchase_id uuid)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public'
+AS $$
 DECLARE
   v_status public.purchase_status;
+  v_paid_at timestamptz;
 BEGIN
-  IF public.get_my_role() <> 'coordenador' THEN
+  IF public.get_my_real_role() IS DISTINCT FROM 'coordenador' THEN
     RAISE EXCEPTION 'Apenas coordenadores podem apagar registos.';
   END IF;
 
-  SELECT status INTO v_status FROM public.store_purchases WHERE id = p_purchase_id;
+  SELECT status, paid_at INTO v_status, v_paid_at
+  FROM public.store_purchases WHERE id = p_purchase_id;
   IF NOT FOUND THEN
     RAISE EXCEPTION 'Compra não encontrada.';
   END IF;
   IF v_status <> 'refunded' THEN
     RAISE EXCEPTION 'Só se podem apagar compras canceladas ou reembolsadas.';
+  END IF;
+  IF v_paid_at IS NOT NULL THEN
+    RAISE EXCEPTION 'Esta compra teve dinheiro envolvido e fica no histórico.';
   END IF;
 
   DELETE FROM public.store_purchases WHERE id = p_purchase_id;
@@ -1162,6 +1178,52 @@ $$;
 
 
 --
+-- Name: expire_unpaid_store_orders(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.expire_unpaid_store_orders()
+RETURNS integer
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public'
+AS $$
+DECLARE
+  v_days integer;
+  v_count integer := 0;
+  r record;
+BEGIN
+  SELECT COALESCE((SELECT unpaid_expiry_days FROM public.store_settings WHERE id = true), 14)
+    INTO v_days;
+
+  FOR r IN
+    SELECT sp.id, sp.user_id, sp.product_id, sp.quantity, sp.gold_spent, p.name
+    FROM public.store_purchases sp
+    JOIN public.store_products p ON p.id = sp.product_id
+    WHERE sp.status = 'pending'
+      AND sp.paid_at IS NULL
+      AND p.type = 'physical'
+      AND NOT COALESCE(p.is_preorder, false)
+      AND sp.created_at < now() - make_interval(days => v_days)
+    FOR UPDATE OF sp SKIP LOCKED
+  LOOP
+    IF r.gold_spent > 0 AND r.user_id IS NOT NULL THEN
+      INSERT INTO public.points_log (target_user_id, awarded_by_user_id, amount_xp, amount_gold, description)
+      VALUES (r.user_id, r.user_id, 0, r.gold_spent, 'Encomenda caducada (não foi paga): ' || COALESCE(r.name, 'artigo'));
+    END IF;
+
+    UPDATE public.store_products SET stock = stock + COALESCE(r.quantity, 1)
+    WHERE id = r.product_id;
+
+    DELETE FROM public.store_purchases WHERE id = r.id;
+    v_count := v_count + 1;
+  END LOOP;
+
+  RETURN v_count;
+END;
+$$;
+
+
+--
 -- Name: finalize_survey(uuid); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -1175,7 +1237,7 @@ DECLARE
   s_definitive boolean;
   s_finalized timestamptz;
 BEGIN
-  IF public.get_my_role() <> 'coordenador' THEN
+  IF public.get_my_role() IS DISTINCT FROM 'coordenador' THEN
     RAISE EXCEPTION 'Apenas coordenadores podem finalizar inquéritos';
   END IF;
 
@@ -1464,6 +1526,27 @@ CREATE FUNCTION public.get_survey_embed(p_survey_id uuid) RETURNS json
   )
   FROM public.surveys s
   WHERE s.id = p_survey_id;
+$$;
+
+
+--
+-- Name: get_store_product_costs(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.get_store_product_costs()
+RETURNS TABLE(product_id uuid, cost_price numeric)
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path TO 'public'
+AS $$
+BEGIN
+  IF public.get_my_real_role() IS DISTINCT FROM 'coordenador' THEN
+    RAISE EXCEPTION 'Sem permissão.';
+  END IF;
+
+  RETURN QUERY SELECT p.id, p.cost_price FROM public.store_products p;
+END;
 $$;
 
 
@@ -1916,7 +1999,7 @@ CREATE FUNCTION public.list_club_members_for_assignment() RETURNS TABLE(id uuid,
     LANGUAGE plpgsql STABLE SECURITY DEFINER
     AS $$
 BEGIN
-  IF public.get_my_real_role() NOT IN ('coordenador', 'dirigente') THEN
+  IF COALESCE(public.get_my_real_role(), '') NOT IN ('coordenador', 'dirigente') THEN
     RAISE EXCEPTION 'Sem permissão.';
   END IF;
 
@@ -2126,17 +2209,20 @@ $$;
 -- Name: mark_purchase_delivered(uuid); Type: FUNCTION; Schema: public; Owner: -
 --
 
-CREATE FUNCTION public.mark_purchase_delivered(p_purchase_id uuid) RETURNS void
-    LANGUAGE plpgsql SECURITY DEFINER
-    AS $$
+CREATE FUNCTION public.mark_purchase_delivered(p_purchase_id uuid)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public'
+AS $$
 DECLARE
   v_purchase record;
 BEGIN
-  IF public.get_my_role() <> 'coordenador' THEN
+  IF public.get_my_real_role() IS DISTINCT FROM 'coordenador' THEN
     RAISE EXCEPTION 'Sem permissão para confirmar entregas.';
   END IF;
 
-  SELECT * INTO v_purchase FROM public.store_purchases WHERE id = p_purchase_id;
+  SELECT * INTO v_purchase FROM public.store_purchases WHERE id = p_purchase_id FOR UPDATE;
   IF NOT FOUND THEN
     RAISE EXCEPTION 'Compra não encontrada.';
   END IF;
@@ -2160,18 +2246,23 @@ $$;
 -- Name: mark_purchase_paid(uuid, boolean); Type: FUNCTION; Schema: public; Owner: -
 --
 
-CREATE FUNCTION public.mark_purchase_paid(p_purchase_id uuid, p_deliver boolean DEFAULT false) RETURNS void
-    LANGUAGE plpgsql SECURITY DEFINER
-    AS $$
+CREATE FUNCTION public.mark_purchase_paid(p_purchase_id uuid, p_deliver boolean DEFAULT false)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public'
+AS $$
 DECLARE
   v_purchase record;
   v_type public.product_type;
+  v_key_id uuid;
+  v_key_value text;
 BEGIN
-  IF public.get_my_role() <> 'coordenador' THEN
+  IF public.get_my_real_role() IS DISTINCT FROM 'coordenador' THEN
     RAISE EXCEPTION 'Sem permissão para confirmar pagamentos.';
   END IF;
 
-  SELECT * INTO v_purchase FROM public.store_purchases WHERE id = p_purchase_id;
+  SELECT * INTO v_purchase FROM public.store_purchases WHERE id = p_purchase_id FOR UPDATE;
   IF NOT FOUND THEN
     RAISE EXCEPTION 'Compra não encontrada.';
   END IF;
@@ -2181,8 +2272,24 @@ BEGIN
 
   SELECT type INTO v_type FROM public.store_products WHERE id = v_purchase.product_id;
 
+  -- Digital: a chave só sai do stock quando o pagamento é confirmado.
+  IF v_type = 'digital' AND v_purchase.digital_key_delivered IS NULL THEN
+    SELECT id, key_value INTO v_key_id, v_key_value
+    FROM public.digital_keys
+    WHERE product_id = v_purchase.product_id AND is_used = false
+    LIMIT 1
+    FOR UPDATE SKIP LOCKED;
+
+    IF v_key_id IS NULL THEN
+      RAISE EXCEPTION 'Já não há chaves digitais para este artigo. Junta chaves ao produto antes de confirmar o pagamento.';
+    END IF;
+
+    UPDATE public.digital_keys SET is_used = true WHERE id = v_key_id;
+  END IF;
+
   UPDATE public.store_purchases
   SET paid_at = COALESCE(paid_at, now()),
+      digital_key_delivered = COALESCE(digital_key_delivered, v_key_value),
       -- digital pago = entregue (a chave fica disponível); físico só se p_deliver
       status = CASE WHEN p_deliver OR v_type = 'digital' THEN 'delivered'::public.purchase_status ELSE status END,
       delivered_at = CASE WHEN p_deliver OR v_type = 'digital' THEN COALESCE(delivered_at, now()) ELSE delivered_at END,
@@ -2289,9 +2396,17 @@ $$;
 -- Name: process_purchase(uuid, numeric, text, integer); Type: FUNCTION; Schema: public; Owner: -
 --
 
-CREATE FUNCTION public.process_purchase(p_product_id uuid, p_discount_eur numeric DEFAULT 0, p_buyer_name text DEFAULT NULL::text, p_quantity integer DEFAULT 1) RETURNS jsonb
-    LANGUAGE plpgsql SECURITY DEFINER
-    AS $$
+CREATE FUNCTION public.process_purchase(
+  p_product_id uuid,
+  p_discount_eur numeric DEFAULT 0,
+  p_buyer_name text DEFAULT NULL,
+  p_quantity integer DEFAULT 1
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public'
+AS $$
 DECLARE
   v_user_id uuid := auth.uid();
   v_product record;
@@ -2315,6 +2430,9 @@ DECLARE
   v_volume_pct numeric := 0;
   v_volume_eur numeric := 0;
   v_after_volume numeric;
+  v_unpaid integer;
+  v_guest_limit integer;
+  v_due_text text;
 BEGIN
   -- 1. Produto
   SELECT id, name, price_eur, max_discount_percent, type, stock, min_level,
@@ -2396,7 +2514,34 @@ BEGIN
     END IF;
   END IF;
 
-  -- 4. Disponibilidade
+  v_amount_due := round(v_after_volume - v_discount, 2);
+  v_paid := v_amount_due <= 0;
+
+  -- 4. Limite de encomendas por pagar (contra encomendas falsas que esgotam a loja).
+  --    O lock evita que dois pedidos ao mesmo tempo passem os dois a contagem.
+  IF NOT v_paid THEN
+    IF v_user_id IS NULL THEN
+      PERFORM pg_advisory_xact_lock(hashtext('store_unpaid:guests'));
+      SELECT COALESCE((SELECT max_guest_unpaid_orders FROM public.store_settings WHERE id = true), 10)
+        INTO v_guest_limit;
+      SELECT count(*) INTO v_unpaid
+      FROM public.store_purchases
+      WHERE user_id IS NULL AND status = 'pending' AND paid_at IS NULL;
+      IF v_unpaid >= v_guest_limit THEN
+        RAISE EXCEPTION 'Há muitas encomendas por pagar. Fala com a coordenação.';
+      END IF;
+    ELSE
+      PERFORM pg_advisory_xact_lock(hashtext('store_unpaid:' || v_user_id::text));
+      SELECT count(*) INTO v_unpaid
+      FROM public.store_purchases
+      WHERE user_id = v_user_id AND status = 'pending' AND paid_at IS NULL;
+      IF v_unpaid >= 3 THEN
+        RAISE EXCEPTION 'Já tens 3 encomendas por pagar. Paga ou cancela uma antes de fazeres outra.';
+      END IF;
+    END IF;
+  END IF;
+
+  -- 5. Disponibilidade
   IF v_product.is_preorder THEN
     -- Por encomenda: sem stock, só conta o prazo.
     IF v_product.preorder_deadline IS NOT NULL AND now() > v_product.preorder_deadline THEN
@@ -2414,28 +2559,38 @@ BEGIN
     END IF;
 
   ELSIF v_product.type = 'digital' THEN
-    SELECT id, key_value INTO v_key_id, v_key_value
-    FROM public.digital_keys
-    WHERE product_id = p_product_id AND is_used = false
-    LIMIT 1
-    FOR UPDATE SKIP LOCKED;
+    IF v_paid THEN
+      -- Paga já (toda com Gold): a chave é entregue agora.
+      SELECT id, key_value INTO v_key_id, v_key_value
+      FROM public.digital_keys
+      WHERE product_id = p_product_id AND is_used = false
+      LIMIT 1
+      FOR UPDATE SKIP LOCKED;
 
-    IF v_key_id IS NULL THEN
-      RAISE EXCEPTION 'Não existem chaves digitais disponíveis para este produto.';
+      IF v_key_id IS NULL THEN
+        RAISE EXCEPTION 'Não existem chaves digitais disponíveis para este produto.';
+      END IF;
+
+      UPDATE public.digital_keys SET is_used = true WHERE id = v_key_id;
+    ELSE
+      -- Por pagar: não se reserva chave nenhuma (seria legível antes de pagar).
+      -- A chave é atribuída em mark_purchase_paid, quando o pagamento é confirmado.
+      IF NOT EXISTS (
+        SELECT 1 FROM public.digital_keys
+        WHERE product_id = p_product_id AND is_used = false
+      ) THEN
+        RAISE EXCEPTION 'Não existem chaves digitais disponíveis para este produto.';
+      END IF;
     END IF;
-
-    UPDATE public.digital_keys SET is_used = true WHERE id = v_key_id;
   END IF;
 
-  -- 5. Débito do Gold do desconto
+  -- 6. Débito do Gold do desconto
   IF v_gold_cost > 0 THEN
     INSERT INTO public.points_log (target_user_id, awarded_by_user_id, amount_xp, amount_gold, description)
     VALUES (v_user_id, v_user_id, 0, -v_gold_cost, 'Desconto na Loja: ' || v_product.name);
   END IF;
 
-  -- 6. Registo da compra
-  v_amount_due := round(v_after_volume - v_discount, 2);
-  v_paid := v_amount_due <= 0;
+  -- 7. Registo da compra
   -- Digital já pago fica entregue de imediato; tudo o resto aguarda pagamento/entrega.
   v_status := CASE WHEN v_paid AND v_product.type = 'digital'
                    THEN 'delivered'::public.purchase_status
@@ -2455,6 +2610,8 @@ BEGIN
   )
   RETURNING id, cancel_token INTO v_purchase_id, v_cancel_token;
 
+  v_due_text := to_char(v_amount_due, 'FM999990.00') || ' €';
+
   RETURN jsonb_build_object(
     'success', true,
     'purchase_id', v_purchase_id,
@@ -2471,16 +2628,16 @@ BEGIN
     'digital_key', CASE WHEN v_paid THEN v_key_value END,
     'message', CASE
       WHEN v_product.is_preorder AND NOT v_paid
-        THEN 'Reserva registada! Paga ' || to_char(v_amount_due, 'FM999990.00') || ' € em dinheiro ao teu dirigente. Levantas o artigo quando chegar.'
+        THEN 'Reserva registada! Paga ' || v_due_text || ' em dinheiro a um coordenador do clube. Levantas o artigo quando chegar.'
       WHEN v_product.is_preorder
         THEN 'Reserva paga com Gold! Levantas o artigo quando chegar.'
       WHEN NOT v_paid AND v_product.type = 'digital'
-        THEN 'Pedido registado! Paga ' || to_char(v_amount_due, 'FM999990.00') || ' € ao teu dirigente para receberes a chave.'
+        THEN 'Pedido registado! Paga ' || v_due_text || ' em dinheiro a um coordenador do clube para receberes a chave.'
       WHEN NOT v_paid
-        THEN 'Pedido registado! Paga ' || to_char(v_amount_due, 'FM999990.00') || ' € em dinheiro ao teu dirigente para levantar o artigo.'
+        THEN 'Pedido registado! Paga ' || v_due_text || ' em dinheiro a um coordenador do clube para levantares o artigo.'
       WHEN v_product.type = 'digital'
         THEN 'Compra concluída!'
-      ELSE 'Pago com Gold! Levanta o artigo com o teu coordenador.'
+      ELSE 'Pago com Gold! Levanta o artigo com um coordenador do clube.'
     END
   );
 
@@ -2569,7 +2726,8 @@ BEGIN
      OR NEW.helper_section     IS DISTINCT FROM OLD.helper_section
   )
   AND COALESCE(current_setting('app.allow_role_change', true), '') <> 'on'
-  AND public.get_my_real_role() <> 'coordenador'
+  AND auth.uid() IS NOT NULL
+  AND public.get_my_real_role() IS DISTINCT FROM 'coordenador'
   THEN
     RAISE EXCEPTION 'Sem permissão para alterar cargos.';
   END IF;
@@ -2600,20 +2758,23 @@ $$;
 -- Name: refund_purchase(uuid); Type: FUNCTION; Schema: public; Owner: -
 --
 
-CREATE FUNCTION public.refund_purchase(p_purchase_id uuid) RETURNS void
-    LANGUAGE plpgsql SECURITY DEFINER
-    AS $$
+CREATE FUNCTION public.refund_purchase(p_purchase_id uuid)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public'
+AS $$
 DECLARE
   v_purchase record;
   v_product_name text;
   v_type public.product_type;
   v_is_preorder boolean;
 BEGIN
-  IF public.get_my_role() <> 'coordenador' THEN
+  IF public.get_my_real_role() IS DISTINCT FROM 'coordenador' THEN
     RAISE EXCEPTION 'Apenas coordenadores podem realizar reembolsos.';
   END IF;
 
-  SELECT * INTO v_purchase FROM public.store_purchases WHERE id = p_purchase_id;
+  SELECT * INTO v_purchase FROM public.store_purchases WHERE id = p_purchase_id FOR UPDATE;
   IF NOT FOUND THEN
     RAISE EXCEPTION 'Compra não encontrada.';
   END IF;
@@ -2641,6 +2802,7 @@ BEGIN
   END IF;
 
   -- Nota: não "des-usamos" chaves digitais porque podem já ter sido vistas.
+  -- (Uma encomenda digital por pagar já não tem chave.)
 END;
 $$;
 
@@ -2765,9 +2927,10 @@ BEGIN
   END IF;
 
   -- Apenas coordenador, ou dirigente da secção-alvo do evento (mesma regra da gestão de eventos)
-  IF NOT (
+  IF NOT COALESCE(
     v_role = 'coordenador'
-    OR (v_role = 'dirigente' AND v_event.target_section = public.get_my_leadership_section())
+    OR (v_role = 'dirigente' AND v_event.target_section = public.get_my_leadership_section()),
+    false
   ) THEN
     RAISE EXCEPTION 'Sem permissão para reverter este evento.';
   END IF;
@@ -2975,7 +3138,7 @@ BEGIN
     RAISE EXCEPTION 'Sessão expirada. Entra outra vez.';
   END IF;
 
-  IF v_role NOT IN ('coordenador', 'dirigente') THEN
+  IF COALESCE(v_role, '') NOT IN ('coordenador', 'dirigente') THEN
     RAISE EXCEPTION 'Sem permissão para responder por um membro.';
   END IF;
 
@@ -3039,9 +3202,10 @@ BEGIN
     RAISE EXCEPTION 'Membro não encontrado.';
   END IF;
 
-  IF NOT (
+  IF NOT COALESCE(
     public.get_my_role() = 'coordenador'
-    OR (public.get_my_role() = 'dirigente' AND v_section = public.get_my_leadership_section())
+    OR (public.get_my_role() = 'dirigente' AND v_section = public.get_my_leadership_section()),
+    false
   ) THEN
     RAISE EXCEPTION 'Sem permissão para alterar a investidura deste membro.';
   END IF;
@@ -4501,11 +4665,15 @@ CREATE TABLE public.store_settings (
     min_rate_multiplier numeric DEFAULT 0.5 NOT NULL,
     max_rate_multiplier numeric DEFAULT 3 NOT NULL,
     updated_at timestamp with time zone DEFAULT now(),
+    unpaid_expiry_days integer DEFAULT 14 NOT NULL,
+    max_guest_unpaid_orders integer DEFAULT 10 NOT NULL,
     CONSTRAINT store_settings_base_gold_per_euro_check CHECK ((base_gold_per_euro > (0)::numeric)),
     CONSTRAINT store_settings_id_check CHECK (id),
+    CONSTRAINT store_settings_max_guest_unpaid_orders_check CHECK (((max_guest_unpaid_orders >= 0) AND (max_guest_unpaid_orders <= 1000))),
     CONSTRAINT store_settings_max_rate_multiplier_check CHECK ((max_rate_multiplier >= (1)::numeric)),
     CONSTRAINT store_settings_min_rate_multiplier_check CHECK ((min_rate_multiplier > (0)::numeric)),
-    CONSTRAINT store_settings_reference_total_gold_check CHECK ((reference_total_gold > (0)::numeric))
+    CONSTRAINT store_settings_reference_total_gold_check CHECK ((reference_total_gold > (0)::numeric)),
+    CONSTRAINT store_settings_unpaid_expiry_days_check CHECK (((unpaid_expiry_days >= 1) AND (unpaid_expiry_days <= 365)))
 );
 
 
@@ -9375,13 +9543,6 @@ CREATE POLICY "Coordinators can update profiles" ON public.profiles FOR UPDATE U
 
 
 --
--- Name: store_purchases Coordinators can update purchases; Type: POLICY; Schema: public; Owner: -
---
-
-CREATE POLICY "Coordinators can update purchases" ON public.store_purchases FOR UPDATE USING ((public.get_my_role() = 'coordenador'::text));
-
-
---
 -- Name: profiles Coordinators can view all; Type: POLICY; Schema: public; Owner: -
 --
 
@@ -9392,7 +9553,7 @@ CREATE POLICY "Coordinators can view all" ON public.profiles FOR SELECT USING ((
 -- Name: store_purchases Coordinators can view all purchases; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Coordinators can view all purchases" ON public.store_purchases FOR SELECT USING ((public.get_my_role() = 'coordenador'::text));
+CREATE POLICY "Coordinators can view all purchases" ON public.store_purchases FOR SELECT USING ((public.get_my_real_role() = 'coordenador'::text));
 
 
 --
@@ -9455,14 +9616,14 @@ CREATE POLICY "Coordinators manage options" ON public.survey_options USING ((pub
 -- Name: store_products Coordinators manage products; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Coordinators manage products" ON public.store_products USING ((public.get_my_role() = 'coordenador'::text));
+CREATE POLICY "Coordinators manage products" ON public.store_products USING ((public.get_my_real_role() = 'coordenador'::text));
 
 
 --
 -- Name: store_settings Coordinators manage store settings; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Coordinators manage store settings" ON public.store_settings USING ((public.get_my_role() = 'coordenador'::text));
+CREATE POLICY "Coordinators manage store settings" ON public.store_settings USING ((public.get_my_real_role() = 'coordenador'::text));
 
 
 --
@@ -9572,14 +9733,14 @@ CREATE POLICY "Leaders can view their charges" ON public.profiles FOR SELECT USI
 -- Name: digital_keys Only coordinators can manage keys; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Only coordinators can manage keys" ON public.digital_keys USING ((public.get_my_role() = 'coordenador'::text));
+CREATE POLICY "Only coordinators can manage keys" ON public.digital_keys USING ((public.get_my_real_role() = 'coordenador'::text));
 
 
 --
 -- Name: store_products Public can view active products; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Public can view active products" ON public.store_products FOR SELECT USING (((is_active = true) OR (public.get_my_role() = 'coordenador'::text)));
+CREATE POLICY "Public can view active products" ON public.store_products FOR SELECT USING (((is_active = true) OR (public.get_my_real_role() = 'coordenador'::text)));
 
 
 --
@@ -11117,7 +11278,7 @@ GRANT ALL ON FUNCTION public.apply_points_multiplier(p_amount integer, p_multipl
 -- Name: FUNCTION assign_helper(p_target_id uuid, p_helper_role text, p_helper_section text); Type: ACL; Schema: public; Owner: -
 --
 
-GRANT ALL ON FUNCTION public.assign_helper(p_target_id uuid, p_helper_role text, p_helper_section text) TO anon;
+REVOKE ALL ON FUNCTION public.assign_helper(p_target_id uuid, p_helper_role text, p_helper_section text) FROM PUBLIC;
 GRANT ALL ON FUNCTION public.assign_helper(p_target_id uuid, p_helper_role text, p_helper_section text) TO authenticated;
 GRANT ALL ON FUNCTION public.assign_helper(p_target_id uuid, p_helper_role text, p_helper_section text) TO service_role;
 
@@ -11126,7 +11287,7 @@ GRANT ALL ON FUNCTION public.assign_helper(p_target_id uuid, p_helper_role text,
 -- Name: FUNCTION audit_fix_totals(); Type: ACL; Schema: public; Owner: -
 --
 
-GRANT ALL ON FUNCTION public.audit_fix_totals() TO anon;
+REVOKE ALL ON FUNCTION public.audit_fix_totals() FROM PUBLIC;
 GRANT ALL ON FUNCTION public.audit_fix_totals() TO authenticated;
 GRANT ALL ON FUNCTION public.audit_fix_totals() TO service_role;
 
@@ -11135,7 +11296,7 @@ GRANT ALL ON FUNCTION public.audit_fix_totals() TO service_role;
 -- Name: FUNCTION audit_points_mismatches(); Type: ACL; Schema: public; Owner: -
 --
 
-GRANT ALL ON FUNCTION public.audit_points_mismatches() TO anon;
+REVOKE ALL ON FUNCTION public.audit_points_mismatches() FROM PUBLIC;
 GRANT ALL ON FUNCTION public.audit_points_mismatches() TO authenticated;
 GRANT ALL ON FUNCTION public.audit_points_mismatches() TO service_role;
 
@@ -11277,7 +11438,7 @@ GRANT ALL ON FUNCTION public.delete_empty_club_family() TO service_role;
 -- Name: FUNCTION delete_purchase_record(p_purchase_id uuid); Type: ACL; Schema: public; Owner: -
 --
 
-GRANT ALL ON FUNCTION public.delete_purchase_record(p_purchase_id uuid) TO anon;
+REVOKE ALL ON FUNCTION public.delete_purchase_record(p_purchase_id uuid) FROM PUBLIC;
 GRANT ALL ON FUNCTION public.delete_purchase_record(p_purchase_id uuid) TO authenticated;
 GRANT ALL ON FUNCTION public.delete_purchase_record(p_purchase_id uuid) TO service_role;
 
@@ -11319,10 +11480,18 @@ GRANT ALL ON FUNCTION public.fill_announcement_recipients() TO service_role;
 
 
 --
+-- Name: FUNCTION expire_unpaid_store_orders(); Type: ACL; Schema: public; Owner: -
+--
+
+REVOKE ALL ON FUNCTION public.expire_unpaid_store_orders() FROM PUBLIC;
+GRANT ALL ON FUNCTION public.expire_unpaid_store_orders() TO service_role;
+
+
+--
 -- Name: FUNCTION finalize_survey(p_survey_id uuid); Type: ACL; Schema: public; Owner: -
 --
 
-GRANT ALL ON FUNCTION public.finalize_survey(p_survey_id uuid) TO anon;
+REVOKE ALL ON FUNCTION public.finalize_survey(p_survey_id uuid) FROM PUBLIC;
 GRANT ALL ON FUNCTION public.finalize_survey(p_survey_id uuid) TO authenticated;
 GRANT ALL ON FUNCTION public.finalize_survey(p_survey_id uuid) TO service_role;
 
@@ -11445,6 +11614,15 @@ GRANT ALL ON FUNCTION public.get_survey_embed(p_survey_id uuid) TO service_role;
 
 
 --
+-- Name: FUNCTION get_store_product_costs(); Type: ACL; Schema: public; Owner: -
+--
+
+REVOKE ALL ON FUNCTION public.get_store_product_costs() FROM PUBLIC;
+GRANT ALL ON FUNCTION public.get_store_product_costs() TO authenticated;
+GRANT ALL ON FUNCTION public.get_store_product_costs() TO service_role;
+
+
+--
 -- Name: FUNCTION get_vana_sentinela_ranking(p_pack text, p_period text, p_limit integer, p_guest_id uuid); Type: ACL; Schema: public; Owner: -
 --
 
@@ -11557,7 +11735,7 @@ GRANT ALL ON FUNCTION public.is_announcement_recipient(p_announcement_id uuid) T
 -- Name: FUNCTION list_club_members_for_assignment(); Type: ACL; Schema: public; Owner: -
 --
 
-GRANT ALL ON FUNCTION public.list_club_members_for_assignment() TO anon;
+REVOKE ALL ON FUNCTION public.list_club_members_for_assignment() FROM PUBLIC;
 GRANT ALL ON FUNCTION public.list_club_members_for_assignment() TO authenticated;
 GRANT ALL ON FUNCTION public.list_club_members_for_assignment() TO service_role;
 
@@ -11611,7 +11789,7 @@ GRANT ALL ON FUNCTION public.mark_announcements_read(p_ids uuid[]) TO service_ro
 -- Name: FUNCTION mark_purchase_delivered(p_purchase_id uuid); Type: ACL; Schema: public; Owner: -
 --
 
-GRANT ALL ON FUNCTION public.mark_purchase_delivered(p_purchase_id uuid) TO anon;
+REVOKE ALL ON FUNCTION public.mark_purchase_delivered(p_purchase_id uuid) FROM PUBLIC;
 GRANT ALL ON FUNCTION public.mark_purchase_delivered(p_purchase_id uuid) TO authenticated;
 GRANT ALL ON FUNCTION public.mark_purchase_delivered(p_purchase_id uuid) TO service_role;
 
@@ -11620,7 +11798,7 @@ GRANT ALL ON FUNCTION public.mark_purchase_delivered(p_purchase_id uuid) TO serv
 -- Name: FUNCTION mark_purchase_paid(p_purchase_id uuid, p_deliver boolean); Type: ACL; Schema: public; Owner: -
 --
 
-GRANT ALL ON FUNCTION public.mark_purchase_paid(p_purchase_id uuid, p_deliver boolean) TO anon;
+REVOKE ALL ON FUNCTION public.mark_purchase_paid(p_purchase_id uuid, p_deliver boolean) FROM PUBLIC;
 GRANT ALL ON FUNCTION public.mark_purchase_paid(p_purchase_id uuid, p_deliver boolean) TO authenticated;
 GRANT ALL ON FUNCTION public.mark_purchase_paid(p_purchase_id uuid, p_deliver boolean) TO service_role;
 
@@ -11708,7 +11886,7 @@ GRANT ALL ON FUNCTION public.record_event_invite(p_event_id uuid, p_user_id uuid
 -- Name: FUNCTION refund_purchase(p_purchase_id uuid); Type: ACL; Schema: public; Owner: -
 --
 
-GRANT ALL ON FUNCTION public.refund_purchase(p_purchase_id uuid) TO anon;
+REVOKE ALL ON FUNCTION public.refund_purchase(p_purchase_id uuid) FROM PUBLIC;
 GRANT ALL ON FUNCTION public.refund_purchase(p_purchase_id uuid) TO authenticated;
 GRANT ALL ON FUNCTION public.refund_purchase(p_purchase_id uuid) TO service_role;
 
@@ -11735,7 +11913,7 @@ GRANT ALL ON FUNCTION public.resolve_announcement_recipients(p_target_user_id uu
 -- Name: FUNCTION revert_event_points(p_event_id uuid); Type: ACL; Schema: public; Owner: -
 --
 
-GRANT ALL ON FUNCTION public.revert_event_points(p_event_id uuid) TO anon;
+REVOKE ALL ON FUNCTION public.revert_event_points(p_event_id uuid) FROM PUBLIC;
 GRANT ALL ON FUNCTION public.revert_event_points(p_event_id uuid) TO authenticated;
 GRANT ALL ON FUNCTION public.revert_event_points(p_event_id uuid) TO service_role;
 
@@ -11789,7 +11967,7 @@ GRANT ALL ON FUNCTION public.set_event_rsvp_for_member(p_event_id uuid, p_user_i
 -- Name: FUNCTION set_member_invested(p_member_id uuid, p_invested boolean); Type: ACL; Schema: public; Owner: -
 --
 
-GRANT ALL ON FUNCTION public.set_member_invested(p_member_id uuid, p_invested boolean) TO anon;
+REVOKE ALL ON FUNCTION public.set_member_invested(p_member_id uuid, p_invested boolean) FROM PUBLIC;
 GRANT ALL ON FUNCTION public.set_member_invested(p_member_id uuid, p_invested boolean) TO authenticated;
 GRANT ALL ON FUNCTION public.set_member_invested(p_member_id uuid, p_invested boolean) TO service_role;
 
@@ -12473,6 +12651,136 @@ GRANT ALL ON TABLE public.section_changes TO service_role;
 GRANT ALL ON TABLE public.store_products TO anon;
 GRANT ALL ON TABLE public.store_products TO authenticated;
 GRANT ALL ON TABLE public.store_products TO service_role;
+-- cost_price escondido do browser: SELECT só coluna a coluna (em baixo).
+REVOKE SELECT ON TABLE public.store_products FROM anon, authenticated;
+
+
+--
+-- Name: COLUMN store_products.id; Type: ACL; Schema: public; Owner: -
+--
+
+GRANT SELECT(id) ON TABLE public.store_products TO anon;
+GRANT SELECT(id) ON TABLE public.store_products TO authenticated;
+
+
+--
+-- Name: COLUMN store_products.name; Type: ACL; Schema: public; Owner: -
+--
+
+GRANT SELECT(name) ON TABLE public.store_products TO anon;
+GRANT SELECT(name) ON TABLE public.store_products TO authenticated;
+
+
+--
+-- Name: COLUMN store_products.description; Type: ACL; Schema: public; Owner: -
+--
+
+GRANT SELECT(description) ON TABLE public.store_products TO anon;
+GRANT SELECT(description) ON TABLE public.store_products TO authenticated;
+
+
+--
+-- Name: COLUMN store_products.price; Type: ACL; Schema: public; Owner: -
+--
+
+GRANT SELECT(price) ON TABLE public.store_products TO anon;
+GRANT SELECT(price) ON TABLE public.store_products TO authenticated;
+
+
+--
+-- Name: COLUMN store_products.type; Type: ACL; Schema: public; Owner: -
+--
+
+GRANT SELECT(type) ON TABLE public.store_products TO anon;
+GRANT SELECT(type) ON TABLE public.store_products TO authenticated;
+
+
+--
+-- Name: COLUMN store_products.stock; Type: ACL; Schema: public; Owner: -
+--
+
+GRANT SELECT(stock) ON TABLE public.store_products TO anon;
+GRANT SELECT(stock) ON TABLE public.store_products TO authenticated;
+
+
+--
+-- Name: COLUMN store_products.image_url; Type: ACL; Schema: public; Owner: -
+--
+
+GRANT SELECT(image_url) ON TABLE public.store_products TO anon;
+GRANT SELECT(image_url) ON TABLE public.store_products TO authenticated;
+
+
+--
+-- Name: COLUMN store_products.restrictions; Type: ACL; Schema: public; Owner: -
+--
+
+GRANT SELECT(restrictions) ON TABLE public.store_products TO anon;
+GRANT SELECT(restrictions) ON TABLE public.store_products TO authenticated;
+
+
+--
+-- Name: COLUMN store_products.is_active; Type: ACL; Schema: public; Owner: -
+--
+
+GRANT SELECT(is_active) ON TABLE public.store_products TO anon;
+GRANT SELECT(is_active) ON TABLE public.store_products TO authenticated;
+
+
+--
+-- Name: COLUMN store_products.min_level; Type: ACL; Schema: public; Owner: -
+--
+
+GRANT SELECT(min_level) ON TABLE public.store_products TO anon;
+GRANT SELECT(min_level) ON TABLE public.store_products TO authenticated;
+
+
+--
+-- Name: COLUMN store_products.created_at; Type: ACL; Schema: public; Owner: -
+--
+
+GRANT SELECT(created_at) ON TABLE public.store_products TO anon;
+GRANT SELECT(created_at) ON TABLE public.store_products TO authenticated;
+
+
+--
+-- Name: COLUMN store_products.updated_at; Type: ACL; Schema: public; Owner: -
+--
+
+GRANT SELECT(updated_at) ON TABLE public.store_products TO anon;
+GRANT SELECT(updated_at) ON TABLE public.store_products TO authenticated;
+
+
+--
+-- Name: COLUMN store_products.price_eur; Type: ACL; Schema: public; Owner: -
+--
+
+GRANT SELECT(price_eur) ON TABLE public.store_products TO anon;
+GRANT SELECT(price_eur) ON TABLE public.store_products TO authenticated;
+
+
+--
+-- Name: COLUMN store_products.max_discount_percent; Type: ACL; Schema: public; Owner: -
+--
+
+GRANT SELECT(max_discount_percent) ON TABLE public.store_products TO anon;
+GRANT SELECT(max_discount_percent) ON TABLE public.store_products TO authenticated;
+
+
+--
+-- Name: COLUMN store_products.is_preorder; Type: ACL; Schema: public; Owner: -
+--
+
+GRANT SELECT(is_preorder) ON TABLE public.store_products TO anon;
+GRANT SELECT(is_preorder) ON TABLE public.store_products TO authenticated;
+
+
+--
+-- Name: COLUMN store_products.preorder_deadline; Type: ACL; Schema: public; Owner: -
+--
+
+GRANT SELECT(preorder_deadline) ON TABLE public.store_products TO anon;
+GRANT SELECT(preorder_deadline) ON TABLE public.store_products TO authenticated;
 
 
 --
@@ -13107,19 +13415,19 @@ DROP POLICY IF EXISTS "Coordinators can delete product images" ON storage.object
 CREATE POLICY "Coordinators can delete product images" ON storage.objects
   AS PERMISSIVE FOR DELETE
   TO authenticated
-  USING (((bucket_id = 'imagens'::text) AND ((storage.foldername(name))[1] = 'products'::text) AND (public.get_my_role() = 'coordenador'::text)));
+  USING (((bucket_id = 'imagens'::text) AND ((storage.foldername(name))[1] = 'products'::text) AND (public.get_my_real_role() = 'coordenador'::text)));
 
 DROP POLICY IF EXISTS "Coordinators can update product images" ON storage.objects;
 CREATE POLICY "Coordinators can update product images" ON storage.objects
   AS PERMISSIVE FOR UPDATE
   TO authenticated
-  USING (((bucket_id = 'imagens'::text) AND ((storage.foldername(name))[1] = 'products'::text) AND (public.get_my_role() = 'coordenador'::text)));
+  USING (((bucket_id = 'imagens'::text) AND ((storage.foldername(name))[1] = 'products'::text) AND (public.get_my_real_role() = 'coordenador'::text)));
 
 DROP POLICY IF EXISTS "Coordinators can upload product images" ON storage.objects;
 CREATE POLICY "Coordinators can upload product images" ON storage.objects
   AS PERMISSIVE FOR INSERT
   TO authenticated
-  WITH CHECK (((bucket_id = 'imagens'::text) AND ((storage.foldername(name))[1] = 'products'::text) AND (public.get_my_role() = 'coordenador'::text)));
+  WITH CHECK (((bucket_id = 'imagens'::text) AND ((storage.foldername(name))[1] = 'products'::text) AND (public.get_my_real_role() = 'coordenador'::text)));
 
 DROP POLICY IF EXISTS "Public Access" ON storage.objects;
 CREATE POLICY "Public Access" ON storage.objects
@@ -13219,3 +13527,10 @@ COMMIT;
 -- UPDATE public.profiles SET role = 'coordenador'
 --  WHERE id = (SELECT id FROM auth.users WHERE email = '<email-da-conta>');
 -- COMMIT;
+
+-- 5.3 Loja: caducidade das encomendas por pagar (opcional). A página da loja e o
+--     /admin já a correm ao abrir; com pg_cron (Database → Extensions) corre
+--     também todas as noites:
+--
+-- SELECT cron.schedule('store-expire-unpaid-orders', '17 3 * * *',
+--                      'SELECT public.expire_unpaid_store_orders();');

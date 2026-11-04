@@ -25,6 +25,8 @@ interface OverviewPanelProps {
   events: any[]
   purchases: any[]
   rateInfo: GoldRateInfo | null
+  // Loja só para coordenadores reais (os ajudantes não mexem em pagamentos).
+  canManageStore: boolean
   attendance: AttendanceRow[]
   suggestions: any[]
   tasks: any[]
@@ -40,7 +42,7 @@ function rateColor(rate: number | null) {
 }
 
 export function OverviewPanel({
-  profile, members, events, purchases, rateInfo, attendance, suggestions, tasks, completions, sectionSuggestions,
+  profile, members, events, purchases, rateInfo, canManageStore, attendance, suggestions, tasks, completions, sectionSuggestions,
 }: OverviewPanelProps) {
   const supabase = createClient()
   const router = useRouter()
@@ -473,6 +475,7 @@ export function OverviewPanel({
       </div>
 
       {/* ── Loja: encomendas + economia ─────────────────────────── */}
+      {canManageStore && (
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-5">
         <Panel
           className="xl:col-span-2"
@@ -614,6 +617,7 @@ export function OverviewPanel({
           </div>
         </Panel>
       </div>
+      )}
     </div>
   )
 }
