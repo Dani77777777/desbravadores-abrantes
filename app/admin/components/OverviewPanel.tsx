@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { computeStoreEconomy, formatEur, type GoldRateInfo } from '@/lib/store-economy'
 import { displayFont } from '@/components/landing/fonts'
+import { PurchaseMoneyDialog, type MoneyAction } from './cofre/PurchaseMoneyDialog'
 import {
   SECTION_LABELS, SECTION_SOLID, TZ, attendanceByEvent, averageRate, daysUntil, fmtParts, relativeDayLabel,
   type AttendanceRow,
@@ -48,6 +49,7 @@ export function OverviewPanel({
   const router = useRouter()
   const [loading, setLoading] = useState<string | null>(null)
   const [now] = useState(() => Date.now())
+  const [moneyAction, setMoneyAction] = useState<MoneyAction | null>(null)
 
   // ── Membros ────────────────────────────────────────────────────────────────
   const totalMembers = members.length
@@ -141,22 +143,10 @@ export function OverviewPanel({
   const itemsSold = validPurchases.reduce((acc, p) => acc + (p.quantity || 1), 0)
   const deliveredCount = purchases.filter(p => p.status === 'delivered').length
 
-  const handlePayAndDeliver = async (purchaseId: string) => {
-    setLoading(purchaseId)
-    try {
-      // Atalho do overview: confirma pagamento e entrega num só passo.
-      const { error } = await supabase.rpc('mark_purchase_paid', { p_purchase_id: purchaseId, p_deliver: true })
-
-      if (error) throw error
-
-      toast.success('Pagamento e entrega confirmados!')
-      router.refresh()
-    } catch (error: any) {
-      toast.error(error.message || 'Erro ao confirmar a encomenda.')
-    } finally {
-      setLoading(null)
-    }
-  }
+  // Atalho do overview: confirma pagamento e entrega num só passo. O diálogo pergunta
+  // como foi pago e quem recebeu (o dinheiro entra no Cofre).
+  const handlePayAndDeliver = (order: any) => setMoneyAction({ mode: 'pay', order, deliver: true })
+  const coordinators = members.filter(m => m.role === 'coordenador').map(m => ({ id: m.id, full_name: m.full_name }))
 
   const handleDeliverOnly = async (purchaseId: string) => {
     setLoading(purchaseId)
@@ -522,7 +512,7 @@ export function OverviewPanel({
                       className={`flex h-8 shrink-0 cursor-pointer items-center gap-1 rounded-full px-3 text-[11px] font-extrabold uppercase transition-colors disabled:opacity-50 ${
                         isPaid ? 'text-emerald-700 ring-1 ring-inset ring-emerald-200 hover:bg-emerald-50' : 'text-blue-700 ring-1 ring-inset ring-blue-200 hover:bg-blue-50'
                       }`}
-                      onClick={() => (isPaid ? handleDeliverOnly(p.id) : handlePayAndDeliver(p.id))}
+                      onClick={() => (isPaid ? handleDeliverOnly(p.id) : handlePayAndDeliver(p))}
                       disabled={loading === p.id}
                     >
                       <Check className="h-3.5 w-3.5" />
@@ -617,6 +607,15 @@ export function OverviewPanel({
           </div>
         </Panel>
       </div>
+      )}
+      {moneyAction && (
+        <PurchaseMoneyDialog
+          key={moneyAction.order.id}
+          action={moneyAction}
+          onClose={() => setMoneyAction(null)}
+          coordinators={coordinators}
+          currentUserId={profile.id}
+        />
       )}
     </div>
   )

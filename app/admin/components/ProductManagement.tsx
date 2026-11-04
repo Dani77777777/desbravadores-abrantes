@@ -182,7 +182,7 @@ export function ProductManagement({ products, profile, members, events, goldRate
       toast.success('Produto apagado.')
       router.refresh()
     } catch (error: any) {
-      toast.error('Erro ao apagar produto.')
+      toast.error(error?.message?.includes('fica no histórico') ? error.message : 'Erro ao apagar produto.')
     }
   }
 

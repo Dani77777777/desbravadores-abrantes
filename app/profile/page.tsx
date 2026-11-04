@@ -39,6 +39,7 @@ export default async function ProfilePage({ searchParams }: { searchParams: Prom
       gold_spent,
       paid_at,
       delivered_at,
+      payment_ref,
       store_products (
         name,
         type,

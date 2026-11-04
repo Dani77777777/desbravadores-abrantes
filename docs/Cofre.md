@@ -10,6 +10,22 @@ Nova ferramenta da coordenação em `/admin/ferramentas/cofre`, ligada à Loja.
 > - A secção 8 é o plano faseado. **A Fase 0 é uma correção de segurança e entra sozinha, já.**
 > - A secção 9 lista armadilhas reais deste repositório. A secção 10 tem as decisões em aberto.
 
+> **Estado (2026-11-04): Fases 0, 1 e 2 feitas, com estas diferenças da spec:**
+> - O Cofre é uma **aba do `/admin`** (`/admin?tab=cofre`, só coordenação real), não uma ferramenta em
+>   `/admin/ferramentas/cofre`. Relatório em `/admin/cofre/relatorio`, Excel em `/admin/cofre/exportar`.
+> - **Sem entregas ao tesoureiro** (`entrega_tesouraria`, confirmação de quatro olhos, "em trânsito") e
+>   **sem pagamento direto à conta da igreja** (Fase 3): a direção ainda está a avaliar. Por isso também
+>   não há limites de aviso (`cofre_warn_*`). O tipo `entrega_tesouraria` e as colunas `treasurer_name`,
+>   `confirmed_by`, `confirmed_at` e `to_church_account` não foram criados; `holder_id` é obrigatório.
+> - A Fase 0 já tinha entrado em `supabase-migration-store-security-fix.sql`.
+> - Encomendas pagas **antes** do Cofre: em vez de só a contagem inicial, cada uma tem o botão
+>   "Quem recebeu?" (`set_purchase_receiver`), que pergunta se o dinheiro ainda está com essa pessoa
+>   (sim → venda no "em mão"; não → fica só o registo).
+> - Novo `correct_purchase_payment`: corrige quem recebeu / como foi pago (estorna a venda e cria a certa).
+> - `purchase_id` é `ON DELETE SET NULL` (não `RESTRICT`), para apagar um membro não falhar; o trigger de
+>   imutabilidade só deixa cair essa ligação. Um artigo com vendas pagas deixou de se poder apagar.
+> - A transparência para os pais (§10.3) fica para depois.
+
 ---
 
 ## 0. TL;DR

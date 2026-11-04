@@ -7,14 +7,20 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
-import { CheckCircle2, RotateCcw, Clock, Check, Banknote, Key, UserX, Coins, CalendarClock, Trash2 } from 'lucide-react'
+import { CheckCircle2, RotateCcw, Clock, Check, Banknote, Key, UserX, Coins, CalendarClock, Trash2, HandCoins, Pencil } from 'lucide-react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { formatEur, formatDeadline, isPreorderOpen } from '@/lib/store-economy'
+import { METHOD_LABELS, type PaymentMethod } from '@/lib/cofre'
+import { PurchaseMoneyDialog, type MoneyAction } from './cofre/PurchaseMoneyDialog'
+import { coordinatorName, type Coordinator } from './cofre/fields'
 
 interface OrderManagementProps {
   initialPurchases: any[]
   profile: any
   products: any[]
+  // Cofre: quem pode ter recebido o dinheiro (coordenadores reais) e quem está a usar.
+  coordinators: Coordinator[]
+  currentUserId: string
 }
 
 const SECTION_LABELS: Record<string, string> = {
@@ -22,10 +28,11 @@ const SECTION_LABELS: Record<string, string> = {
   companheiros: 'Companheiros', embaixadores: 'Embaixadores',
 }
 
-export function OrderManagement({ initialPurchases, profile, products }: OrderManagementProps) {
+export function OrderManagement({ initialPurchases, profile, products, coordinators, currentUserId }: OrderManagementProps) {
   const supabase = createClient()
   const router = useRouter()
   const [loading, setLoading] = useState<string | null>(null)
+  const [moneyAction, setMoneyAction] = useState<MoneyAction | null>(null)
 
   const runAction = async (purchaseId: string, action: () => PromiseLike<{ error: any }>, successMsg: string) => {
     setLoading(purchaseId)
@@ -41,12 +48,8 @@ export function OrderManagement({ initialPurchases, profile, products }: OrderMa
     }
   }
 
-  const handleMarkPaid = (purchaseId: string, deliver: boolean) =>
-    runAction(
-      purchaseId,
-      () => supabase.rpc('mark_purchase_paid', { p_purchase_id: purchaseId, p_deliver: deliver }),
-      deliver ? 'Pagamento e entrega confirmados!' : 'Pagamento confirmado!'
-    )
+  // "Pago" e "Pago + Entregue" perguntam como foi pago e quem recebeu (vai para o Cofre).
+  const handleMarkPaid = (order: any, deliver: boolean) => setMoneyAction({ mode: 'pay', order, deliver })
 
   const handleDeliver = (purchaseId: string) =>
     runAction(
@@ -55,18 +58,28 @@ export function OrderManagement({ initialPurchases, profile, products }: OrderMa
       'Artigo marcado como entregue!'
     )
 
-  const handleRefund = (purchaseId: string, isPaid: boolean, isPreorder = false) => {
-    const restock = isPreorder ? '' : ' e as unidades voltam ao stock'
+  // Compra paga em dinheiro: o diálogo pergunta como foi devolvido (sai do "em mão" no Cofre).
+  const handleRefund = (order: any) => {
+    const isPaid = !!order.paid_at
+    if (isPaid && Number(order.amount_due_eur) > 0) return setMoneyAction({ mode: 'refund', order })
+    const restock = order.store_products?.is_preorder ? '' : ' e as unidades voltam ao stock'
     const msg = isPaid
-      ? `Reembolsar esta compra? O Gold do desconto será devolvido${restock}. O dinheiro tens de o devolver em mãos.`
+      ? `Reembolsar esta compra (paga com Gold)? O Gold será devolvido${restock}.`
       : `Cancelar este pedido? O Gold do desconto será devolvido${restock}.`
     if (!confirm(msg)) return
     runAction(
-      purchaseId,
-      () => supabase.rpc('refund_purchase', { p_purchase_id: purchaseId }),
+      order.id,
+      () => supabase.rpc('refund_purchase', { p_purchase_id: order.id }),
       isPaid ? 'Compra reembolsada!' : 'Pedido cancelado!'
     )
   }
+
+  // Encomendas pagas em dinheiro antes do Cofre, sem registo de quem recebeu.
+  const needsReceiver = (o: any) => !!o.paid_at && o.status !== 'refunded' && Number(o.amount_due_eur) > 0 && !o.received_by
+  const receivedLabel = (o: any) =>
+    o.received_by
+      ? `Recebido por ${coordinatorName(coordinators, o.received_by)}${o.payment_method ? ` · ${METHOD_LABELS[o.payment_method as PaymentMethod]}` : ''}`
+      : null
 
   // Limpar enganos: só registos cancelados que nunca foram pagos (o Gold já foi devolvido).
   // Uma compra que chegou a ser paga fica sempre no histórico.
@@ -82,6 +95,7 @@ export function OrderManagement({ initialPurchases, profile, products }: OrderMa
   const awaitingPayment = initialPurchases.filter(p => p.status === 'pending' && !p.paid_at)
   const awaitingDelivery = initialPurchases.filter(p => p.status === 'pending' && p.paid_at)
   const completedOrders = initialPurchases.filter(p => p.status !== 'pending')
+  const unregisteredDelivered = completedOrders.filter(needsReceiver)
 
   // Artigos por encomenda: quantas unidades pedir (reservas ativas) e quantas já estão pagas.
   const units = (orders: any[]) => orders.reduce((acc, o) => acc + (o.quantity || 1), 0)
@@ -105,6 +119,27 @@ export function OrderManagement({ initialPurchases, profile, products }: OrderMa
   // store_settings.unpaid_expiry_days; as reservas não).
   const daysWaiting = (order: { created_at: string }) => Math.max(0, Math.floor((Date.now() - new Date(order.created_at).getTime()) / 86_400_000))
   const waitingLabel = (days: number) => (days === 0 ? 'hoje' : days === 1 ? 'há 1 dia' : `há ${days} dias`)
+
+  // "Recebido por X · MB Way" + Corrigir, ou o botão "Quem recebeu?" (pagas antes do Cofre).
+  const ReceivedLine = ({ order }: { order: any }) =>
+    needsReceiver(order) ? (
+      <button
+        type="button"
+        onClick={() => setMoneyAction({ mode: 'register', order })}
+        className="mt-1.5 inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-extrabold text-amber-800 hover:bg-amber-200"
+      >
+        <HandCoins className="h-3.5 w-3.5" /> Quem recebeu o dinheiro?
+      </button>
+    ) : order.received_by ? (
+      <div className="mt-1 flex flex-wrap items-center gap-x-2 text-[11px] font-bold text-gray-500">
+        <span className="inline-flex items-center gap-1"><HandCoins className="h-3 w-3" /> {receivedLabel(order)}</span>
+        {order.status !== 'refunded' && (
+          <button type="button" onClick={() => setMoneyAction({ mode: 'correct', order })} className="inline-flex items-center gap-0.5 text-blue-700 hover:underline">
+            <Pencil className="h-3 w-3" /> Corrigir
+          </button>
+        )}
+      </div>
+    ) : null
 
   const OrderCard = ({ order, tone }: { order: any; tone: 'orange' | 'blue' }) => {
     const isGuest = !order.user_id
@@ -134,6 +169,7 @@ export function OrderManagement({ initialPurchases, profile, products }: OrderMa
                   )}
                 </div>
                 <p className="text-xs text-gray-500 font-medium">
+                  {order.payment_ref && <span className="font-mono font-bold text-gray-600">{order.payment_ref} • </span>}
                   {isGuest
                     ? 'Compra sem conta'
                     : SECTION_LABELS[order.profiles?.section] || order.profiles?.section}
@@ -168,6 +204,9 @@ export function OrderManagement({ initialPurchases, profile, products }: OrderMa
                   </span>
                 </div>
               </div>
+              {isPaid && Number(order.amount_due_eur) > 0 && (
+                <ReceivedLine order={order} />
+              )}
               {isDigital && isPaid && order.digital_key_delivered && (
                 <div className="mt-1.5 flex items-center gap-1.5 text-[11px] text-purple-700 font-mono font-bold">
                   <Key className="w-3 h-3 shrink-0" />
@@ -182,7 +221,7 @@ export function OrderManagement({ initialPurchases, profile, products }: OrderMa
                   <Button
                     size="sm"
                     className="bg-green-600 hover:bg-green-700 gap-1.5 h-9"
-                    onClick={() => handleMarkPaid(order.id, false)}
+                    onClick={() => handleMarkPaid(order, false)}
                     disabled={busy}
                   >
                     <Banknote className="w-4 h-4" /> Pago
@@ -190,7 +229,7 @@ export function OrderManagement({ initialPurchases, profile, products }: OrderMa
                   <Button
                     size="sm"
                     className="bg-blue-800 hover:bg-blue-900 gap-1.5 h-9"
-                    onClick={() => handleMarkPaid(order.id, true)}
+                    onClick={() => handleMarkPaid(order, true)}
                     disabled={busy}
                   >
                     <Check className="w-4 h-4" /> Pago + Entregue
@@ -210,7 +249,7 @@ export function OrderManagement({ initialPurchases, profile, products }: OrderMa
                 variant="outline"
                 size="sm"
                 className="text-red-600 border-red-100 hover:bg-red-50 gap-1.5 h-9"
-                onClick={() => handleRefund(order.id, isPaid, isPreorder)}
+                onClick={() => handleRefund(order)}
                 disabled={busy}
               >
                 <RotateCcw className="w-4 h-4" /> {isPaid ? 'Reembolsar' : 'Cancelar'}
@@ -284,6 +323,40 @@ export function OrderManagement({ initialPurchases, profile, products }: OrderMa
         </div>
       )}
 
+      {/* Pagas antes do Cofre, já entregues, sem registo de quem recebeu o dinheiro */}
+      {unregisteredDelivered.length > 0 && (
+        <div className="space-y-3">
+          <h3 className="text-sm font-bold text-amber-600 uppercase tracking-wider flex items-center gap-2">
+            <HandCoins className="w-4 h-4" /> Pagas sem registo de quem recebeu ({unregisteredDelivered.length})
+          </h3>
+          <p className="text-xs text-gray-500 -mt-1">
+            Foram pagas antes de haver Cofre. Diz quem recebeu o dinheiro e se ainda o tem, para o Cofre ficar certo.
+          </p>
+          <div className="space-y-2">
+            {unregisteredDelivered.map(order => (
+              <div key={order.id} className="flex flex-wrap items-center justify-between gap-2 p-3 bg-amber-50/40 border border-amber-100 rounded-lg text-sm">
+                <div className="min-w-0">
+                  <p className="truncate">
+                    <span className="font-bold text-gray-800">{buyerName(order)}</span>
+                    <span className="mx-2 text-gray-300">•</span>
+                    <span className="text-gray-600">{order.store_products?.name}{(order.quantity || 1) > 1 && ` × ${order.quantity}`}</span>
+                  </p>
+                  <p className="text-[11px] text-gray-500">
+                    <span className="font-mono font-bold">{order.payment_ref}</span> • pago a {new Date(order.paid_at).toLocaleDateString('pt-PT')}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <span className="text-xs font-black text-green-800">{formatEur(Number(order.amount_due_eur))}</span>
+                  <Button size="sm" className="h-8 gap-1.5 bg-amber-500 hover:bg-amber-600" onClick={() => setMoneyAction({ mode: 'register', order })}>
+                    <HandCoins className="w-4 h-4" /> Quem recebeu?
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* History Section */}
       {completedOrders.length > 0 && (
         <div className="space-y-3 pt-4 border-t">
@@ -303,7 +376,9 @@ export function OrderManagement({ initialPurchases, profile, products }: OrderMa
                       <span className="text-gray-500">
                         {order.store_products?.name}{(order.quantity || 1) > 1 && ` × ${order.quantity}`}
                       </span>
+                      {order.payment_ref && <span className="ml-2 font-mono text-[10px] font-bold text-gray-400">{order.payment_ref}</span>}
                     </div>
+                    {order.paid_at && Number(order.amount_due_eur) > 0 && <ReceivedLine order={order} />}
                     {order.store_products?.type === 'digital' && order.status === 'delivered' && order.digital_key_delivered && (
                       <div className="flex items-center gap-1 text-[10px] text-purple-600 font-mono font-bold">
                         <Key className="w-3 h-3 shrink-0" />
@@ -322,7 +397,7 @@ export function OrderManagement({ initialPurchases, profile, products }: OrderMa
                       variant="ghost"
                       size="sm"
                       className="h-7 text-[10px] text-gray-400 hover:text-red-600 hover:bg-red-50 font-bold"
-                      onClick={() => handleRefund(order.id, true, !!order.store_products?.is_preorder)}
+                      onClick={() => handleRefund(order)}
                       disabled={loading === order.id}
                     >
                       Reembolsar
@@ -345,6 +420,16 @@ export function OrderManagement({ initialPurchases, profile, products }: OrderMa
             ))}
           </div>
         </div>
+      )}
+
+      {moneyAction && (
+        <PurchaseMoneyDialog
+          key={`${moneyAction.mode}-${moneyAction.order.id}`}
+          action={moneyAction}
+          onClose={() => setMoneyAction(null)}
+          coordinators={coordinators}
+          currentUserId={currentUserId}
+        />
       )}
     </div>
   )

@@ -16,7 +16,9 @@ import { GameAnalyticsPanel } from './components/GameAnalyticsPanel'
 import { ANALYTICS_PERIODS, buildGameAnalytics, lastDays, type AnalyticsPeriod, type GameAnalytics, type GamePlay } from '@/utils/game-analytics'
 import { lisbonDateString } from '@/utils/vana-codigo/day'
 import { ToolsPanel } from './components/ToolsPanel'
-import { Users, ListChecks, Megaphone, MessageSquare, LayoutDashboard, CalendarDays, ShoppingBag, QrCode, Gamepad2, ClipboardList, ScrollText, Wrench } from 'lucide-react'
+import { CofrePanel } from './components/cofre/CofrePanel'
+import type { CashMovement, HolderBalance } from '@/lib/cofre'
+import { Users, ListChecks, Megaphone, MessageSquare, LayoutDashboard, CalendarDays, ShoppingBag, QrCode, Gamepad2, ClipboardList, ScrollText, Wrench, Vault } from 'lucide-react'
 import { effectiveRole, effectiveLeadershipSection, isHelper, helperLabel } from '@/utils/permissions'
 import { fetchGameSettings } from '@/utils/games'
 import { displayFont } from '@/components/landing/fonts'
@@ -202,8 +204,33 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
   // Auditoria e Loja: só coordenadores REAIS (ajudantes de coordenação não se auditam
   // a si próprios nem mexem em pagamentos, preços e chaves).
   const isRealCoordenador = profile.role === 'coordenador'
-  if ((activeTab === 'audit' || activeTab === 'store') && !isRealCoordenador) {
+  if ((activeTab === 'audit' || activeTab === 'store' || activeTab === 'cofre') && !isRealCoordenador) {
     redirect(`/admin?tab=${defaultTab}`)
+  }
+
+  // Cofre (dinheiro do clube): só coordenadores REAIS. A RLS da tabela e da vista
+  // também só deixa a coordenação real ler. null = migração por correr.
+  let cofreMovements: CashMovement[] | null = null
+  let cofreBalances: HolderBalance[] = []
+  if (activeTab === 'cofre' && isRealCoordenador) {
+    const rows: CashMovement[] = []
+    let failed = false
+    for (let page = 0; page < 20; page++) {
+      const { data, error } = await supabase
+        .from('club_cash_movements')
+        .select('*')
+        .order('occurred_on', { ascending: false })
+        .order('created_at', { ascending: false })
+        .range(page * 1000, page * 1000 + 999)
+      if (error) { failed = true; break }
+      rows.push(...(data as CashMovement[]))
+      if (!data || data.length < 1000) break
+    }
+    if (!failed) {
+      cofreMovements = rows
+      const { data: bal } = await supabase.from('cofre_em_mao').select('*')
+      cofreBalances = (bal as HolderBalance[]) || []
+    }
   }
 
   // Disponibilidade dos jogos (aba "Jogos")
@@ -312,6 +339,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
             { id: 'games', label: 'Jogos', icon: Gamepad2, coordOnly: false, count: 0, countColor: 'blue' },
             { id: 'tools', label: 'Ferramentas', icon: Wrench, coordOnly: false, count: 0, countColor: 'blue' },
             { id: 'store', label: 'Loja', icon: ShoppingBag, coordOnly: true, realCoordOnly: true, count: purchases?.filter(p => p.status === 'pending').length || 0, countColor: 'orange' },
+            { id: 'cofre', label: 'Cofre', icon: Vault, coordOnly: true, realCoordOnly: true, count: 0, countColor: 'blue' },
             { id: 'audit', label: 'Auditoria', icon: ScrollText, coordOnly: true, realCoordOnly: true, count: 0, countColor: 'blue' }
           ] as { id: string, label: string, icon: any, coordOnly: boolean, realCoordOnly?: boolean, count: number, countColor: string, href?: string }[])
             .filter(tab => (!tab.coordOnly || isCoordenador) && (!tab.realCoordOnly || isRealCoordenador))
@@ -438,6 +466,25 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
 
         {activeTab === 'surveys' && isCoordenador && (
           <SurveyPanel profile={effProfile} surveys={surveys} />
+        )}
+
+        {/* Cofre tab */}
+        {activeTab === 'cofre' && isRealCoordenador && (
+          cofreMovements === null ? (
+            <div className="rounded-2xl bg-amber-50 p-5 text-amber-900 ring-1 ring-inset ring-amber-200">
+              <p className="font-bold">O Cofre ainda não está na base de dados.</p>
+              <p className="text-sm">Corre o ficheiro <code>supabase-migration-cofre.sql</code> no SQL Editor do Supabase.</p>
+            </div>
+          ) : (
+            <CofrePanel
+              movements={cofreMovements}
+              balances={cofreBalances}
+              coordinators={(members || []).filter(m => m.role === 'coordenador').map(m => ({ id: m.id, full_name: m.full_name }))}
+              currentUserId={profile.id}
+              today={lisbonDateString()}
+              unregisteredPaidCount={purchases.filter((p: any) => p.paid_at && p.status !== 'refunded' && Number(p.amount_due_eur) > 0 && !p.received_by).length}
+            />
+          )
         )}
 
         {/* Store tab */}

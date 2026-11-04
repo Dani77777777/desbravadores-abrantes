@@ -96,6 +96,7 @@ export function PurchaseHistory({ purchases }: PurchaseHistoryProps) {
                   </h4>
                   <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-gray-500 font-medium">
                     <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> {date}</span>
+                    {purchase.payment_ref && <span className="font-mono font-bold text-gray-600">{purchase.payment_ref}</span>}
                     <span className="font-bold text-gray-700">{formatEur(amountDue)}</span>
                     {Number(purchase.volume_discount_eur) > 0 && (
                       <span className="text-emerald-700 font-bold">

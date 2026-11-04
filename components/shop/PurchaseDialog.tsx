@@ -367,6 +367,12 @@ export function PurchaseDialog({ product, userProfile, goldRate, disabled, reaso
               <div className="bg-green-50 border border-green-100 rounded-2xl py-4 px-5 text-center">
                 <p className="text-[10px] font-black uppercase text-green-700 mb-1">Total a pagar em dinheiro</p>
                 <p className="text-3xl font-black text-green-800">{formatEur(Number(result.amount_due_eur))}</p>
+                {result.payment_ref && (
+                  <p className="mt-2 text-xs font-bold text-green-900">
+                    Referência: <span className="font-mono text-sm">{result.payment_ref}</span>
+                    <span className="block text-[10px] font-medium text-green-800/80">Diz esta referência ao coordenador quando pagares (ou escreve-a na descrição do MB Way).</span>
+                  </p>
+                )}
                 {Number(result.volume_discount_eur) > 0 && (
                   <p className="text-[11px] font-bold text-emerald-700 mt-1">
                     Poupaste {formatEur(Number(result.volume_discount_eur))} pela quantidade (−{Number(result.volume_discount_percent)}%)

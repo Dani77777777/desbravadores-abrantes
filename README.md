@@ -79,7 +79,10 @@ Plataforma *mobile-first* de gamificação e gestão do **Clube de Desbravadores
   - preços fixos em euros e o **Gold dá desconto** a uma taxa dinâmica (quanto mais Gold em circulação, mais caro fica o desconto), até um máximo por artigo;
   - membros compram com desconto; **convidados sem conta** compram sem desconto;
   - artigos físicos e **chaves digitais** (a chave só é atribuída quando a compra fica paga), artigos **por encomenda** com prazo, 1 a 10 unidades com desconto de quantidade;
-  - pagamento em dinheiro **a um coordenador do clube**, confirmado pela coordenação (só coordenadores reais; os ajudantes não mexem na loja), e cancelamento pelo próprio enquanto não houver pagamento;
+  - pagamento **a um coordenador do clube** (numerário, MB Way ou transferência para a conta dele), confirmado pela coordenação (só coordenadores reais; os ajudantes não mexem na loja), e cancelamento pelo próprio enquanto não houver pagamento;
+  - cada encomenda tem uma **referência** (`DA-0427`) que o comprador vê no fim da compra e nos seus pedidos, e diz ao coordenador (ou escreve na descrição do MB Way);
+  - ao confirmar o pagamento fica registado **como foi pago e quem recebeu**, e o dinheiro entra no [Cofre](#cofre-dinheiro-do-clube); os reembolsos saem do "em mão" de quem devolve;
+  - um artigo que já teve vendas pagas não se apaga (desativa-se);
   - no máximo **3 encomendas por pagar por membro** e um teto global para convidados (`store_settings.max_guest_unpaid_orders`, 10 por omissão);
   - encomendas físicas por pagar (não as reservas) **caducam** ao fim de `store_settings.unpaid_expiry_days` dias (14 por omissão): o stock e o Gold voltam e o registo é apagado. Corre pelo `pg_cron`, se existir, e sempre que a loja ou o `/admin` abrem;
   - compras que chegaram a ser pagas ficam sempre no histórico (não se apagam);
@@ -104,9 +107,20 @@ Plataforma *mobile-first* de gamificação e gestão do **Clube de Desbravadores
 | Jogos | todos (dirigentes só leem) | disponibilidade de cada jogo, analítica dos jogos a solo, multiplicador de pontos |
 | Ferramentas | todos | ferramentas do projetor (ver abaixo) |
 | Loja | coordenador real | produtos, encomendas, entregas, taxa do Gold, caducidade das encomendas |
+| Cofre | coordenador real | quem tem dinheiro do clube, despesas, outras entradas, estornos, relatório e Excel |
 | Auditoria | coordenador real | auditoria de pontos e reset de fim de época |
 
 Cada jogo tem também uma página de gestão (`/admin/<jogo>`) para bancos de perguntas, versículos, palavras, packs e relatórios por sessão.
+
+### Cofre: dinheiro do clube
+Registo de controlo do dinheiro que passa pelo clube (especificação em `docs/Cofre.md`). **Não é a contabilidade**: a conta do clube é a da igreja. Responde a "quem tem neste momento dinheiro do clube?". Só para coordenadores reais (a aba, a RLS de `club_cash_movements` e as funções `cofre_*`).
+- **Movimentos imutáveis** (`club_cash_movements`): venda da loja, reembolso, outra entrada, despesa, contagem inicial e estorno. Nada se apaga nem se edita (um trigger impede-o, mesmo às funções); os enganos corrigem-se com um **estorno** com motivo.
+- **Em mão** por coordenador (vista `cofre_em_mao`), dividido em numerário e "na conta" (MB Way / transferência para a conta pessoal). As despesas e os reembolsos não podem passar do que a pessoa tem.
+- **Loja ligada:** "Pago" pergunta como foi pago e quem recebeu (`mark_purchase_paid`); "Corrigir" estorna a venda errada e regista a certa (`correct_purchase_payment`); as encomendas pagas **antes do Cofre** têm o botão "Quem recebeu?" (`set_purchase_receiver`), que pergunta se o dinheiro ainda está com essa pessoa.
+- **Arranque:** cada coordenador regista uma vez a **contagem inicial** do dinheiro do clube que já tem.
+- **Comprovativos** (fotos ou PDF, até 5 MB) no bucket privado `cofre-comprovativos`.
+- **Relatório** (`/admin/cofre/relatorio`, para imprimir) e **Excel** (`/admin/cofre/exportar`, com as folhas Resumo, Loja e Movimentos) por período: vendas por artigo com descontos Gold, recebido, custo e margem.
+- **Ainda não:** entregas ao tesoureiro da igreja e pagamento direto à conta da igreja (a direção está a avaliar).
 
 ### Ajudantes
 Um desbravador pode receber **acesso de gestão** de dirigente de uma secção ou de coordenação **sem deixar de ser membro** (continua no ranking e a ganhar pontos). Faz tudo menos gerir cargos. As RLS usam sempre o cargo efetivo.
@@ -342,6 +356,7 @@ Não há ferramenta de migrações: cada `supabase-*.sql` na raiz é corrido à 
 31. `supabase-setup-vana-coro.sql` → `supabase-seed-vana-coro-perguntas.sql` → `-vana-coro-grupos` → `-audit-vanasketch` → `-vana-coro-jogo` → `-vana-coro-duelo` → `-vana-coro-familias`
 32. `supabase-setup-event-checkin.sql` → `-club-families` → `-audit-pergunta-semana`
 33. `-store-security-fix`
+34. `-cofre`
 
 (`-x` = `supabase-migration-x.sql`.)
 </details>
@@ -367,7 +382,7 @@ lib/actions/    server actions (I/O com o Supabase)
 utils/          regras puras e testáveis (pontuação, equipas, sorteio, check-in …)
 types/          tipos de cada jogo
 supabase/       Edge Function send-push, modelos de email e migrações antigas
-docs/           especificações (VanaCoro, VanaEspada, VanaTrilha)
+docs/           especificações (Cofre, VanaCoro, VanaEspada, VanaTrilha)
 NOVO-CLUBE.md   guia para criar o site de outro clube
 supabase-*.sql  setup e migrações; supabase-schema-completo.sql = tudo junto
 ```
@@ -376,7 +391,7 @@ Padrão dos módulos mais recentes: `types/` → `utils/` (regras puras com test
 
 **Rotas principais**
 - Membros: `/`, `/onboarding`, `/login`, `/profile`, `/points-history`, `/leaderboard`, `/shop`, `/suggestions`, `/contacts`, `/codes/[code]`, `/perguntas`, `/presenca/[eventId]`, `/familia/[code]`
-- Gestão: `/admin?tab=…`, `/admin/ferramentas/{ecra,sorteio,equipas,cronometro,tendas}` (+ `/projetor`), `/admin/<jogo>`
+- Gestão: `/admin?tab=…`, `/admin/ferramentas/{ecra,sorteio,equipas,cronometro,tendas}` (+ `/projetor`), `/admin/cofre/{relatorio,exportar}`, `/admin/<jogo>`
 - Jogos: `/jogos`, `/jogos/<jogo>/…`, `/j/[code]` (link curto dos QR para VanaWords, VanaSketch e VanaCoro)
 - Públicas: `/shop`, `/embed/inquerito/[id]`, `/perguntas/[token]`, `/convites/sair`, VanaEspada, VanaSentinela e os ecrãs de projetor
 

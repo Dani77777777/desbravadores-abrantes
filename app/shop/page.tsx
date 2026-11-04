@@ -33,7 +33,7 @@ export default async function ShopPage() {
       // Pedidos em aberto do membro (para poder cancelar um engano aqui mesmo).
       supabase
         .from('store_purchases')
-        .select('id, status, paid_at, created_at, quantity, amount_due_eur, store_products:product_id(name, is_preorder)')
+        .select('id, status, paid_at, created_at, quantity, amount_due_eur, payment_ref, store_products:product_id(name, is_preorder)')
         .eq('user_id', user.id)
         .eq('status', 'pending')
         .order('created_at', { ascending: false }),

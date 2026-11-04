@@ -19,6 +19,7 @@ interface Order {
   amount_due_eur: number
   product_name: string
   is_preorder: boolean
+  payment_ref?: string | null
 }
 
 interface MyOrdersProps {
@@ -35,6 +36,7 @@ const fromMember = (o: any): Order => ({
   amount_due_eur: Number(o.amount_due_eur) || 0,
   product_name: o.store_products?.name || 'Artigo',
   is_preorder: !!o.store_products?.is_preorder,
+  payment_ref: o.payment_ref ?? null,
 })
 
 export function MyOrders({ memberOrders }: MyOrdersProps) {
@@ -130,6 +132,9 @@ export function MyOrders({ memberOrders }: MyOrdersProps) {
                 <span className={`mt-1 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-black uppercase ${status.cls}`}>
                   <Icon className="h-3 w-3" /> {status.label}
                 </span>
+                {order.payment_ref && (
+                  <span className="ml-2 font-mono text-[11px] font-bold text-stone-500">Ref. {order.payment_ref}</span>
+                )}
               </div>
               {canSelfCancel(order) && (
                 <Button

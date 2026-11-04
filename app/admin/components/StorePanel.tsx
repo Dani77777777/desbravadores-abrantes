@@ -168,7 +168,13 @@ export function StorePanel({ profile, products, initialPurchases, members, event
         </TabsContent>
 
         <TabsContent value="orders" className="mt-6">
-          <OrderManagement initialPurchases={initialPurchases} profile={profile} products={products} />
+          <OrderManagement
+            initialPurchases={initialPurchases}
+            profile={profile}
+            products={products}
+            coordinators={members.filter(m => m.role === 'coordenador').map(m => ({ id: m.id, full_name: m.full_name }))}
+            currentUserId={profile.id}
+          />
         </TabsContent>
       </Tabs>
     </div>
