@@ -154,6 +154,7 @@ export const GAMES: GameDefinition[] = [
     requiresAuth: true,
     adminCoordOnly: false,
     singlePlayer: false,
+    isNew: true,
   },
   {
     id: "vana-codigo",
@@ -168,7 +169,6 @@ export const GAMES: GameDefinition[] = [
     requiresAuth: true,
     adminCoordOnly: false,
     singlePlayer: true,
-    isNew: true,
   },
   {
     id: "vana-sentinela",
