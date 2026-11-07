@@ -48,8 +48,10 @@ ALTER TABLE public.club_family_invites ENABLE ROW LEVEL SECURITY;
 -- Sem políticas de propósito: o cliente não lê nem escreve diretamente (evita enumerar famílias).
 
 -- Uma família sem ninguém desaparece (quem sai por último, ou contas apagadas).
+-- SECURITY DEFINER: quando o Auth apaga uma conta, a cascata corre com o papel
+-- supabase_auth_admin, que não tem acesso a estas tabelas.
 CREATE OR REPLACE FUNCTION public.delete_empty_club_family()
-RETURNS trigger LANGUAGE plpgsql AS $$
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path TO 'public' AS $$
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM public.club_family_members WHERE family_id = OLD.family_id) THEN
     DELETE FROM public.club_families WHERE id = OLD.family_id;
@@ -62,6 +64,8 @@ DROP TRIGGER IF EXISTS club_family_members_delete_empty ON public.club_family_me
 CREATE TRIGGER club_family_members_delete_empty
   AFTER DELETE ON public.club_family_members
   FOR EACH ROW EXECUTE FUNCTION public.delete_empty_club_family();
+REVOKE ALL ON FUNCTION public.delete_empty_club_family() FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.delete_empty_club_family() TO service_role;
 
 -- ── Passar as contas familiares que já existem ──────────────────────────────
 -- Cada conta principal com perfis associados passa a ser uma família ("Família" + último

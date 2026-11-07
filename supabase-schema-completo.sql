@@ -1052,7 +1052,8 @@ $$;
 --
 
 CREATE FUNCTION public.delete_empty_club_family() RETURNS trigger
-    LANGUAGE plpgsql
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
     AS $$
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM public.club_family_members WHERE family_id = OLD.family_id) THEN
@@ -11454,8 +11455,7 @@ GRANT ALL ON FUNCTION public.close_event_guests(p_event_id uuid) TO service_role
 -- Name: FUNCTION delete_empty_club_family(); Type: ACL; Schema: public; Owner: -
 --
 
-GRANT ALL ON FUNCTION public.delete_empty_club_family() TO anon;
-GRANT ALL ON FUNCTION public.delete_empty_club_family() TO authenticated;
+REVOKE ALL ON FUNCTION public.delete_empty_club_family() FROM PUBLIC;
 GRANT ALL ON FUNCTION public.delete_empty_club_family() TO service_role;
 
 
