@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { computeStoreEconomy, formatEur, type GoldRateInfo } from '@/lib/store-economy'
 import { displayFont } from '@/components/landing/fonts'
+import { isHiddenFromRanking, isTestAccountName } from '@/utils/ranking'
 import { PurchaseMoneyDialog, type MoneyAction } from './cofre/PurchaseMoneyDialog'
 import {
   SECTION_LABELS, SECTION_SOLID, TZ, attendanceByEvent, averageRate, daysUntil, fmtParts, relativeDayLabel,
@@ -55,9 +56,11 @@ export function OverviewPanel({
   const totalMembers = members.length
   const scouts = members.filter(m => m.role === 'desbravador')
   const leaders = totalMembers - scouts.length
-  const investedMembers = members.filter(m => m.is_invested).length
-  const notInvested = members.filter(m => !m.is_invested)
-  const investmentRate = totalMembers > 0 ? Math.round((investedMembers / totalMembers) * 100) : 0
+  // As contas de teste não contam para a investidura.
+  const realMembers = members.filter(m => !isTestAccountName(m.full_name))
+  const investedMembers = realMembers.filter(m => m.is_invested).length
+  const notInvested = realMembers.filter(m => !m.is_invested)
+  const investmentRate = realMembers.length > 0 ? Math.round((investedMembers / realMembers.length) * 100) : 0
   const totalXP = members.reduce((acc, m) => acc + (m.total_xp || 0), 0)
   const totalGold = members.reduce((acc, m) => acc + (m.current_gold || 0), 0)
   const avgXP = totalMembers > 0 ? Math.round(totalXP / totalMembers) : 0
@@ -111,7 +114,9 @@ export function OverviewPanel({
       key,
       label: SECTION_LABELS[key],
       count: inSection.length,
-      invested: inSection.filter(m => m.is_invested).length,
+      invested: inSection.filter(m => m.is_invested && !isTestAccountName(m.full_name)).length,
+      /** Quem conta para a investidura (sem contas de teste). */
+      investable: inSection.filter(m => !isTestAccountName(m.full_name)).length,
       avgXP: inSection.length ? Math.round(inSection.reduce((a, m) => a + (m.total_xp || 0), 0) / inSection.length) : 0,
       gold: inSection.reduce((a, m) => a + (m.current_gold || 0), 0),
       attendance: rows.length ? Math.round((attended / rows.length) * 100) : null,
@@ -120,7 +125,8 @@ export function OverviewPanel({
   const maxSectionCount = Math.max(1, ...sections.map(s => s.count))
 
   // ── Top XP ─────────────────────────────────────────────────────────────────
-  const topPerformers = [...scouts].sort((a, b) => (b.total_xp || 0) - (a.total_xp || 0)).slice(0, 5)
+  // Como no ranking: sem contas de teste nem contas só com email.
+  const topPerformers = scouts.filter(m => !isHiddenFromRanking(m.full_name)).sort((a, b) => (b.total_xp || 0) - (a.total_xp || 0)).slice(0, 5)
 
   // ── Loja ───────────────────────────────────────────────────────────────────
   const pendingOrders = purchases.filter(p => p.status === 'pending')
@@ -177,7 +183,7 @@ export function OverviewPanel({
 
   const kpis = [
     { icon: Users, label: 'Membros', value: totalMembers.toLocaleString('pt-PT'), sub: `${scouts.length} desbravadores · ${leaders} líderes`, tone: 'from-blue-500 to-blue-700' },
-    { icon: ShieldCheck, label: 'Investidos', value: `${investmentRate}%`, sub: `${investedMembers} de ${totalMembers}`, tone: 'from-emerald-500 to-emerald-700' },
+    { icon: ShieldCheck, label: 'Investidos', value: `${investmentRate}%`, sub: `${investedMembers} de ${realMembers.length}`, tone: 'from-emerald-500 to-emerald-700' },
     { icon: Activity, label: 'Presença média', value: avgAttendance === null ? '—' : `${avgAttendance}%`, sub: attendanceMap.size ? `últimos ${attendanceMap.size} eventos` : 'sem eventos concluídos', tone: 'from-teal-500 to-cyan-700' },
     { icon: CalendarClock, label: 'Próximos eventos', value: upcomingEvents.length, sub: nextEvent ? `${relativeDayLabel(daysUntil(nextEvent.start_at, now))}: ${nextEvent.title}` : 'nada agendado', tone: 'from-indigo-500 to-violet-700' },
     { icon: Trophy, label: 'XP do clube', value: totalXP.toLocaleString('pt-PT'), sub: `média ${avgXP.toLocaleString('pt-PT')} por membro`, tone: 'from-purple-500 to-fuchsia-700' },
@@ -266,7 +272,7 @@ export function OverviewPanel({
             </thead>
             <tbody className="divide-y divide-stone-100">
               {sections.map(s => {
-                const invPct = s.count ? Math.round((s.invested / s.count) * 100) : 0
+                const invPct = s.investable ? Math.round((s.invested / s.investable) * 100) : 0
                 const rc = rateColor(s.attendance)
                 return (
                   <tr key={s.key}>
@@ -284,7 +290,7 @@ export function OverviewPanel({
                       </div>
                     </td>
                     <td className="py-3 pr-3 text-stone-600">
-                      <span className="font-bold text-blue-950">{s.invested}</span>/{s.count}
+                      <span className="font-bold text-blue-950">{s.invested}</span>/{s.investable}
                       <span className="ml-1.5 text-xs text-stone-400">({invPct}%)</span>
                     </td>
                     <td className="py-3 pr-3 text-right font-bold text-indigo-600">{s.avgXP.toLocaleString('pt-PT')}</td>

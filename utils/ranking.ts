@@ -35,6 +35,19 @@ export function isSection(value: unknown): value is Section {
 }
 
 /** Linha devolvida pela RPC `get_leaderboard_at_date`. */
+/** Conta de teste: tem "teste" no nome (ex.: "Daniel Filho - testes"). */
+export function isTestAccountName(name: string | null | undefined): boolean {
+  return !!name && /teste/i.test(name)
+}
+
+/**
+ * Fica fora do ranking: conta de teste, ou que ainda só tem o email (ou nenhum nome).
+ * Igual a `is_hidden_from_ranking` no SQL (supabase-migration-ranking-hide-tests.sql).
+ */
+export function isHiddenFromRanking(name: string | null | undefined): boolean {
+  return !name || name.trim() === '' || name.includes('@') || isTestAccountName(name)
+}
+
 export type RankingMember = {
   id: string
   full_name: string | null

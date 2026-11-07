@@ -3,6 +3,8 @@ import {
   buildRanking,
   dayLabel,
   endOfDayIso,
+  isHiddenFromRanking,
+  isTestAccountName,
   rankingHighlights,
   rankMembers,
   toRankingMembers,
@@ -127,4 +129,15 @@ describe('normalizeClubState', () => {
       by: 'pc',
     })
   })
+})
+
+test('contas de teste e contas só com email ficam fora do ranking', () => {
+  expect(isTestAccountName('Daniel Filho - testes')).toBe(true)
+  expect(isTestAccountName('TESTE')).toBe(true)
+  expect(isTestAccountName('Lorena Bastos')).toBe(false)
+  expect(isHiddenFromRanking('Daniel Filho - testes2')).toBe(true)
+  expect(isHiddenFromRanking('alguem@gmail.com')).toBe(true)
+  expect(isHiddenFromRanking('  ')).toBe(true)
+  expect(isHiddenFromRanking(null)).toBe(true)
+  expect(isHiddenFromRanking('Celeste Miranda')).toBe(false)
 })
