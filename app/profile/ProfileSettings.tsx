@@ -21,6 +21,7 @@ import { GenderChoice } from '@/components/profile/GenderChoice'
 import type { Gender } from '@/utils/name-gender'
 import { ClubFamilyPanel } from '@/components/profile/ClubFamilyPanel'
 import type { MyClubFamily } from '@/lib/actions/club-families'
+import { isManagedEmail } from '@/utils/club-families'
 
 const D = displayFont.className
 
@@ -87,6 +88,8 @@ export default function ProfileSettings({ profile, user, userEmail, purchases, v
   const [gender, setGender] = useState<Gender | null>(savedGender)
   const [loading, setLoading] = useState(false)
   const [newEmail, setNewEmail] = useState('')
+  // Perfil criado pela família: o email é interno e não recebe nada (ver ClubFamilyPanel).
+  const managedProfile = isManagedEmail(userEmail)
   const [emailLoading, setEmailLoading] = useState(false)
   const [emailSent, setEmailSent] = useState(false)
   const router = useRouter()
@@ -203,7 +206,7 @@ export default function ProfileSettings({ profile, user, userEmail, purchases, v
             <div className="min-w-0">
               <h1 className={`${D} text-4xl font-extrabold leading-[0.95] tracking-tight sm:text-5xl`}>{fullName}</h1>
               <p className="mt-2 flex items-center justify-center gap-1.5 text-sm text-blue-100/70 sm:justify-start">
-                <Mail className="h-4 w-4 shrink-0" /> <span className="truncate">{userEmail}</span>
+                <Mail className="h-4 w-4 shrink-0" /> <span className="truncate">{managedProfile ? 'Perfil da família, sem email próprio' : userEmail}</span>
               </p>
               <div className="mt-4 flex flex-wrap justify-center gap-2 sm:justify-start">
                 <span className={`rounded-full px-3 py-1 text-xs font-extrabold uppercase tracking-wide text-white ${sectionColor}`}>
@@ -393,8 +396,18 @@ export default function ProfileSettings({ profile, user, userEmail, purchases, v
           <ClubFamilyPanel data={clubFamily} userId={user.id} fullName={profile.full_name} initialCode={familyCode} />
 
           {/* Alterar email */}
-          <Panel icon={Mail} iconClass="bg-violet-500" title="Alterar Email" description="Será enviado um email de confirmação para o novo endereço.">
-            {emailSent ? (
+          <Panel
+            icon={Mail}
+            iconClass="bg-violet-500"
+            title={managedProfile ? 'Email próprio' : 'Alterar Email'}
+            description={managedProfile ? 'Este perfil foi criado pela família e ainda não tem email.' : 'Será enviado um email de confirmação para o novo endereço.'}
+          >
+            {managedProfile ? (
+              <p className="rounded-2xl bg-stone-50 p-4 text-sm text-stone-600 ring-1 ring-inset ring-stone-200">
+                Um adulto da família pode dar-lhe um email na conta dele, em <b>A minha família</b> (ícone do envelope). Depois chega a esse
+                email um link para escolher a palavra-passe.
+              </p>
+            ) : emailSent ? (
               <div className="rounded-2xl bg-emerald-50 p-5 text-center ring-1 ring-inset ring-emerald-200">
                 <CheckCircle2 className="mx-auto h-8 w-8 text-emerald-500" />
                 <p className="mt-2 font-bold text-emerald-800">Email de confirmação enviado!</p>

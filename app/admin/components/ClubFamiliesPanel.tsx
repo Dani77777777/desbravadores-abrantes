@@ -1,10 +1,10 @@
 'use client'
 
 import { useCallback, useMemo, useState } from 'react'
-import { ChevronDown, Heart, Loader2, Pencil, Plus, Trash2, X } from 'lucide-react'
+import { ChevronDown, Heart, Loader2, Mail, Pencil, Plus, Trash2, X } from 'lucide-react'
 import { toast } from 'sonner'
 import {
-  adminAddToClubFamily, adminCreateClubFamily, adminDeleteClubFamily, adminRemoveFromClubFamily, listClubFamiliesForAdmin,
+  adminAddToClubFamily, adminCreateClubFamily, adminDeleteClubFamily, adminRemoveFromClubFamily, giveOwnEmail, listClubFamiliesForAdmin,
   renameClubFamily, setClubFamilyKind,
 } from '@/lib/actions/club-families'
 import { familyKindLabel, isGrownChild, suggestedFamilyName, type ClubFamily, type FamilyKind } from '@/utils/club-families'
@@ -69,6 +69,16 @@ export function ClubFamiliesPanel({ members }: { members: Member[] }) {
     const name = draft.ids.length === 0 && draft.name === '' ? suggestedFamilyName(nameOf(id)) : draft.name
     setDraft({ name, ids })
     setDraftPick('')
+  }
+
+  const askOwnEmail = (id: string, personName: string) => {
+    const email = window.prompt(`Email próprio para ${personName}. Recebe lá um link para escolher a palavra-passe.`)
+    if (!email?.trim()) return
+    void run(`email:${id}`, async () => {
+      const r = await giveOwnEmail(id, email)
+      if (!r.error && !r.linkSent) toast.warning('O link para a palavra-passe não foi enviado. Usa "Enviar email de recuperação" na ficha do membro.')
+      return r
+    }, 'Email guardado.')
   }
 
   const count = families?.length
@@ -238,6 +248,17 @@ export function ClubFamiliesPanel({ members }: { members: Member[] }) {
                               <span className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-extrabold ${m.kind === 'adult' ? 'bg-blue-50 text-blue-800' : 'bg-amber-50 text-amber-800'}`}>
                                 {familyKindLabel(m.kind, m.gender)}
                               </span>
+                            )}
+                            {canEdit && m.managed && (
+                              <button
+                                type="button"
+                                disabled={busy !== null}
+                                onClick={() => askOwnEmail(m.id, m.name)}
+                                className="shrink-0 rounded p-0.5 text-stone-300 hover:bg-blue-50 hover:text-blue-900"
+                                title="Dar um email próprio"
+                              >
+                                <Mail className="h-3.5 w-3.5" />
+                              </button>
                             )}
                             {canEdit && !m.managed && (
                               <button

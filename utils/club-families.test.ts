@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test'
 import {
-  ageOn, canEnterAccount, cleanFamilyName, defaultFamilyKind, familyKindLabel, isGrownChild, isManagedEmail,
+  ageOn, canEnterAccount, cleanFamilyName, cleanOwnEmail, defaultFamilyKind, familyKindLabel, isGrownChild, isManagedEmail,
   normalizeFamilyCode, sortFamilyMembers, suggestedFamilyName,
 } from './club-families'
 
@@ -65,4 +65,12 @@ test('adultos primeiro', () => {
     { kind: 'adult' as const, name: 'Bia' },
   ])
   expect(sorted.map((m) => m.name)).toEqual(['Bia', 'Zé', 'Ana'])
+})
+
+test('email próprio: limpo, válido e nunca o domínio interno', () => {
+  expect(cleanOwnEmail('  Lorena@Gmail.com ')).toBe('lorena@gmail.com')
+  expect(cleanOwnEmail('sem-arroba')).toBeNull()
+  expect(cleanOwnEmail('a b@gmail.com')).toBeNull()
+  expect(cleanOwnEmail('x@gmail')).toBeNull()
+  expect(cleanOwnEmail('family-1@family.desbravadores-abrantes.invalid')).toBeNull()
 })

@@ -6,8 +6,10 @@ import { createServiceClient } from '@/utils/supabase/service'
 import { effectiveLeadershipSection, effectiveRole } from '@/utils/permissions'
 import { addToClubFamily, createFamily, familyPlaceOf, loadClubFamilies, makeFamilyCode } from '@/lib/club-families'
 import {
-  FAMILY_INVITE_HOURS, cleanFamilyName, defaultFamilyKind, isManagedEmail, normalizeFamilyCode, type ClubFamily, type FamilyKind,
+  FAMILY_INVITE_HOURS, canEnterAccount, cleanFamilyName, cleanOwnEmail, defaultFamilyKind, isManagedEmail, normalizeFamilyCode,
+  type ClubFamily, type FamilyKind,
 } from '@/utils/club-families'
+import { getSiteUrl } from '@/utils/site-url'
 
 type Result = { error?: string }
 type Service = ReturnType<typeof createServiceClient>
@@ -75,6 +77,48 @@ export async function getMyClubFamily(): Promise<MyClubFamily & Result> {
   // O código do convite só aparece a quem pode convidar.
   if (family && place?.kind !== 'adult') family.invite = null
   return { family: family ?? null, myKind: place?.kind ?? null, joinKind: defaultFamilyKind(me.birthDate) }
+}
+
+/**
+ * Dá um email próprio a um perfil criado pela família (um adulto da família ou a coordenação).
+ * O email troca-se direto no servidor: o pedido normal de troca pedia confirmação no email
+ * antigo, que é interno e não recebe nada. Depois vai para o email novo um link para escolher a
+ * palavra-passe. O perfil deixa de ser "sem email" (entra sozinho, pode sair da família, a
+ * coordenação pode passá-lo a adulto), mas continua criança: os adultos continuam a entrar nele.
+ */
+export async function giveOwnEmail(userId: string, rawEmail: string): Promise<Result & { linkSent?: boolean }> {
+  const me = await session()
+  if (!me) return { error: EXPIRED }
+  const email = cleanOwnEmail(rawEmail)
+  if (!email) return { error: 'Escreve um email válido.' }
+  const service = createServiceClient()
+  const place = await familyPlaceOf(service, userId)
+  if (!place?.managed) return { error: 'Este perfil já tem email próprio.' }
+  if (!me.isCoordinator && !canEnterAccount(await familyPlaceOf(service, me.userId), place)) {
+    return { error: 'Só um adulto da família ou a coordenação pode dar um email a este perfil.' }
+  }
+  const { data: target } = await service.auth.admin.getUserById(userId)
+  const oldEmail = target.user?.email
+  if (!target.user || !isManagedEmail(oldEmail)) return { error: 'Este perfil já tem email próprio.' }
+
+  const { error } = await service.auth.admin.updateUserById(userId, {
+    email,
+    email_confirm: true,
+    app_metadata: { ...target.user.app_metadata, family_account: false },
+  })
+  if (error) {
+    return { error: /already|registered|exists/i.test(error.message) ? 'Este email já é usado noutra conta.' : 'Não foi possível guardar o email.' }
+  }
+  const { error: memberError } = await service.from('club_family_members').update({ managed: false }).eq('user_id', userId)
+  if (memberError) {
+    // Sem a família atualizada, o perfil ficava meio de um lado, meio do outro: desfaz.
+    await service.auth.admin.updateUserById(userId, { email: oldEmail, email_confirm: true, app_metadata: target.user.app_metadata })
+    return { error: 'Não foi possível guardar o email.' }
+  }
+
+  const { error: linkError } = await service.auth.resetPasswordForEmail(email, { redirectTo: `${await getSiteUrl()}/login/reset-password` })
+  refresh()
+  return { linkSent: !linkError }
 }
 
 export async function createMyClubFamily(rawName: string): Promise<Result> {

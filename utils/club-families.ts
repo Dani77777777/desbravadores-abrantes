@@ -62,6 +62,13 @@ export function isManagedEmail(email: string | null | undefined): boolean {
   return !!email && email.toLowerCase().endsWith(`@${MANAGED_EMAIL_DOMAIN}`)
 }
 
+/** Email próprio para um perfil criado pela família: limpo e em minúsculas, ou null se não serve. */
+export function cleanOwnEmail(raw: string): string | null {
+  const email = raw.trim().toLowerCase()
+  if (email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || isManagedEmail(email)) return null
+  return email
+}
+
 /** "Adulto", "Adulta" ou "Criança" (o sexo vem do perfil). */
 export function familyKindLabel(kind: FamilyKind, gender: string | null | undefined): string {
   if (kind === 'child') return 'Criança'
