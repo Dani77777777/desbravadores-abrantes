@@ -7,6 +7,8 @@ import { effectiveRole } from '@/utils/permissions'
 import { getSiteUrl } from '@/utils/site-url'
 import { getVanaCoroAdminData } from '@/lib/actions/vana-coro'
 import { QuestionQueueAdmin } from '@/components/vana-coro/QuestionQueueAdmin'
+import { getWeeklyParticipation } from '@/lib/actions/vana-coro-participation'
+import { WeeklyParticipation } from '@/components/vana-coro/WeeklyParticipation'
 
 export const dynamic = 'force-dynamic'
 
@@ -18,7 +20,7 @@ export default async function VanaCoroAdminPage() {
   const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle()
   if (effectiveRole(profile) !== 'coordenador') redirect('/admin?tab=games')
 
-  const [data, siteUrl] = await Promise.all([getVanaCoroAdminData(), getSiteUrl()])
+  const [data, siteUrl, participation] = await Promise.all([getVanaCoroAdminData(), getSiteUrl(), getWeeklyParticipation()])
   if (data === null) redirect('/admin?tab=games')
 
   return (
@@ -47,11 +49,14 @@ export default async function VanaCoroAdminPage() {
             </span>
           </div>
         ) : (
-          <QuestionQueueAdmin
-            settings={data.settings}
-            questions={data.questions}
-            inviteUrl={`${siteUrl}/perguntas/${data.settings.invite_token}`}
-          />
+          <>
+            {participation && <WeeklyParticipation data={participation} />}
+            <QuestionQueueAdmin
+              settings={data.settings}
+              questions={data.questions}
+              inviteUrl={`${siteUrl}/perguntas/${data.settings.invite_token}`}
+            />
+          </>
         )}
       </main>
     </div>
