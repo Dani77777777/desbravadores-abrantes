@@ -203,7 +203,7 @@ export function Navbar({ user, profile }: NavbarProps) {
                       <ChevronDown className="h-4 w-4 text-blue-200 transition-transform group-data-[state=open]:rotate-180" />
                     </button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent className="w-60 rounded-2xl p-2" align="end" forceMount>
+                  <DropdownMenuContent className="w-72 max-w-[calc(100vw-1rem)] rounded-2xl p-2" align="end" forceMount>
                     <DropdownMenuLabel className="font-normal">
                       <div className="flex items-center gap-3">
                         <Avatar className="h-10 w-10">
@@ -211,7 +211,7 @@ export function Navbar({ user, profile }: NavbarProps) {
                           <AvatarFallback className="bg-blue-700 font-bold text-white">{profile?.full_name?.charAt(0) || 'D'}</AvatarFallback>
                         </Avatar>
                         <div className="min-w-0">
-                          <p className="truncate text-sm font-bold leading-tight">{profile?.full_name}</p>
+                          <p className="break-words text-sm font-bold leading-tight">{profile?.full_name}</p>
                           <p className="truncate text-xs capitalize text-muted-foreground">{roleLabel}</p>
                         </div>
                       </div>
@@ -230,9 +230,18 @@ export function Navbar({ user, profile }: NavbarProps) {
                     {familyAccounts.length > 0 && (
                       <>
                         <DropdownMenuSeparator />
-                        {familyAccounts.map((familyAccount) => <DropdownMenuItem key={familyAccount.id} disabled={!!switchingAccountId} onSelect={(event) => { event.preventDefault(); switchFamilyAccount(familyAccount.id) }} className="cursor-pointer rounded-lg text-fuchsia-700 focus:text-fuchsia-700">
-                          {switchingAccountId === familyAccount.id ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ArrowLeftRight className="mr-2 h-4 w-4" />}
-                          <span className="truncate">{familyAccount.relation === 'return' ? 'Voltar para' : 'Mudar para'} {familyAccount.fullName}</span>
+                        {familyAccounts.map((familyAccount) => <DropdownMenuItem key={familyAccount.id} disabled={!!switchingAccountId} onSelect={(event) => { event.preventDefault(); switchFamilyAccount(familyAccount.id) }} className="cursor-pointer items-center gap-3 rounded-lg py-2 text-fuchsia-700 focus:text-fuchsia-700">
+                          <Avatar className="h-8 w-8 shrink-0">
+                            <AvatarImage src={familyAccount.avatarUrl ?? undefined} alt={familyAccount.fullName} className="object-cover" />
+                            <AvatarFallback className="bg-fuchsia-600 text-xs font-bold text-white">{familyAccount.fullName.charAt(0).toUpperCase()}</AvatarFallback>
+                          </Avatar>
+                          <span className="min-w-0 flex-1">
+                            <span className="flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wide text-fuchsia-500">
+                              {switchingAccountId === familyAccount.id ? <Loader2 className="size-3 animate-spin text-fuchsia-500" /> : <ArrowLeftRight className="size-3 text-fuchsia-500" />}
+                              {familyAccount.relation === 'return' ? 'Voltar para' : 'Mudar para'}
+                            </span>
+                            <span className="block break-words text-sm font-bold leading-tight">{familyAccount.fullName}</span>
+                          </span>
                         </DropdownMenuItem>)}
                       </>
                     )}
