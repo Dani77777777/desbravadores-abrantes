@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { AlertTriangle, Baby, CalendarDays, CheckCircle2, Copy, Heart, Link2, Loader2, LogOut, Mail, Pencil, Trash2, UserPlus } from 'lucide-react'
 import { toast } from 'sonner'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import {
   acceptClubFamilyInvite, createClubFamilyInvite, createMyClubFamily, giveOwnEmail, inspectClubFamilyInvite, leaveMyClubFamily,
   renameClubFamily, revokeClubFamilyInvite, type MyClubFamily,
@@ -200,7 +201,10 @@ export function ClubFamilyPanel({ data, userId, fullName, initialCode = '' }: Pr
               return (
                 <li key={m.id} className="rounded-2xl bg-rose-50/60 p-3 ring-1 ring-inset ring-rose-100">
                   <div className="flex items-center gap-3">
-                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-rose-500 text-sm font-extrabold text-white">{m.name.charAt(0).toUpperCase()}</span>
+                    <Avatar className="h-9 w-9 shrink-0">
+                      <AvatarImage src={m.avatarUrl ?? undefined} alt={m.name} className="object-cover" />
+                      <AvatarFallback className="bg-rose-500 text-sm font-extrabold text-white">{m.name.charAt(0).toUpperCase()}</AvatarFallback>
+                    </Avatar>
                     <div className="min-w-0 flex-1">
                       <p className="truncate font-bold text-blue-950">{m.name}{m.id === userId && <span className="font-semibold text-stone-400"> (tu)</span>}</p>
                       {m.managed && <p className="text-[11px] font-semibold text-stone-500">Perfil sem email próprio</p>}
