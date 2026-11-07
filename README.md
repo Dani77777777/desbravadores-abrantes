@@ -74,7 +74,7 @@ Plataforma *mobile-first* de gamificação e gestão do **Clube de Desbravadores
 - Cada membro usa cada código uma vez; limite global opcional. Entrada pela câmara (`/codes/[code]`) ou escrevendo o código no Painel. Os pontos são dados só pelo servidor.
 
 ### Leaderboard e loja
-- **Ranking** público (`/leaderboard`) por XP; os ajudantes continuam no ranking.
+- **Ranking** público (`/leaderboard`) por XP; os ajudantes continuam no ranking. Contas com "teste" no nome ou que ainda só têm o email ficam de fora (`is_hidden_from_ranking`), mas aparecem nos Membros do admin.
 - **Loja** (`/shop`, pública):
   - preços fixos em euros e o **Gold dá desconto** a uma taxa dinâmica (quanto mais Gold em circulação, mais caro fica o desconto), até um máximo por artigo;
   - membros compram com desconto; **convidados sem conta** compram sem desconto;
@@ -357,6 +357,7 @@ Não há ferramenta de migrações: cada `supabase-*.sql` na raiz é corrido à 
 32. `supabase-setup-event-checkin.sql` → `-club-families` → `-audit-pergunta-semana`
 33. `-store-security-fix`
 34. `-cofre`
+35. `-ranking-hide-tests`
 
 (`-x` = `supabase-migration-x.sql`.)
 </details>

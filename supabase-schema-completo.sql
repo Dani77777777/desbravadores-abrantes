@@ -1363,6 +1363,28 @@ $$;
 
 
 --
+-- Name: is_hidden_from_ranking(text); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.is_hidden_from_ranking(name text) RETURNS boolean
+    LANGUAGE sql IMMUTABLE
+    SET search_path TO 'public'
+    AS $$
+  SELECT name IS NULL
+      OR btrim(name) = ''
+      OR position('@' IN name) > 0
+      OR name ILIKE '%teste%'
+$$;
+
+
+--
+-- Name: FUNCTION is_hidden_from_ranking(text); Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON FUNCTION public.is_hidden_from_ranking(text) IS 'Contas de teste (nome com "teste") ou ainda só com o email/sem nome: ficam fora do ranking.';
+
+
+--
 -- Name: get_leaderboard_at_date(timestamp with time zone); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -1384,6 +1406,7 @@ BEGIN
   FROM public.profiles p
   LEFT JOIN public.points_log pl ON p.id = pl.target_user_id AND pl.created_at <= target_date
   WHERE p.role IN ('desbravador', 'dirigente')
+    AND NOT public.is_hidden_from_ranking(p.full_name)
   GROUP BY p.id, p.full_name, p.avatar_url, p.section, p.leadership_section, p.role, p.is_invested;
 END;
 $$;
@@ -4331,7 +4354,7 @@ CREATE VIEW public.leaderboard AS
     (total_xp + current_gold) AS combined_score,
     is_invested
    FROM public.profiles
-  WHERE (role = ANY (ARRAY['desbravador'::public.app_role, 'dirigente'::public.app_role]))
+  WHERE ((role = ANY (ARRAY['desbravador'::public.app_role, 'dirigente'::public.app_role])) AND (NOT public.is_hidden_from_ranking(full_name)))
   ORDER BY total_xp DESC;
 
 
@@ -4339,7 +4362,7 @@ CREATE VIEW public.leaderboard AS
 -- Name: VIEW leaderboard; Type: COMMENT; Schema: public; Owner: -
 --
 
-COMMENT ON VIEW public.leaderboard IS 'Public view for the club leaderboard: desbravadores and dirigentes (not coordenadores).';
+COMMENT ON VIEW public.leaderboard IS 'Public view for the club leaderboard: desbravadores and dirigentes (not coordenadores), without test accounts or accounts that only have an email.';
 
 
 --
