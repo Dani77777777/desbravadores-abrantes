@@ -55,7 +55,7 @@ export function ProjectorLobbyScreen({
     loaded,
     emojis: LOBBY_EMOJIS[game],
   })
-  const qrSize = 'min(210px, 24vh)'
+  const qrSize = 'min(300px, 30vh)'
 
   return (
     <div className={`h-[100dvh] w-screen overflow-hidden flex flex-col ${background}`}>
@@ -76,13 +76,13 @@ export function ProjectorLobbyScreen({
         </div>
       </div>
 
-      <div className="flex-1 min-h-0 flex gap-8 px-10 py-5 max-w-7xl mx-auto w-full">
+      <div className="flex-1 min-h-0 flex gap-8 px-10 py-5 w-full">
         {/* PIN + QR */}
-        <div className="w-[26rem] flex-shrink-0 flex flex-col items-center justify-center gap-5">
+        <div className="w-[clamp(26rem,32vw,38rem)] flex-shrink-0 flex flex-col items-center justify-center gap-5">
           <div className={`w-full backdrop-blur-sm rounded-3xl border p-6 text-center ${theme.card}`}>
             <p className={`${theme.accent} text-xs font-black uppercase tracking-[0.25em] mb-2`}>Entra com o PIN</p>
-            <p className="text-7xl font-black text-white tracking-[0.12em] tabular-nums leading-none">{pin}</p>
-            <p className="text-white/60 text-sm mt-3">
+            <p className="text-[clamp(4.5rem,6.5vw,7.5rem)] font-black text-white tracking-[0.12em] tabular-nums leading-none">{pin}</p>
+            <p className="text-white/60 text-base mt-3">
               em <span className="text-white font-semibold">{joinLabel}</span>
             </p>
           </div>
@@ -100,7 +100,7 @@ export function ProjectorLobbyScreen({
         </div>
       </div>
 
-      <div className="grid grid-cols-[1.35fr_1fr] gap-6 px-10 pb-6 max-w-7xl mx-auto w-full h-36 flex-shrink-0">
+      <div className="grid grid-cols-[1.35fr_1fr] gap-6 px-10 pb-6 w-full h-36 flex-shrink-0">
         <LobbyTips game={game} variant="projector" />
         <LobbyEnergyBar game={game} energy={hype.energy} level={hype.level} />
       </div>

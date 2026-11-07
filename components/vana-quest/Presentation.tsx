@@ -400,7 +400,12 @@ export function Presentation({ sessionId, initialSession, questions, siteUrl }: 
         <p style="color:#7dd3fc;font-size:0.875rem;margin-top:8px">Os browsers exigem uma interacção antes de tocar música</p>
       </div>
     `
-    const handler = () => setAudioUnlocked(true)
+    // O ecrã inteiro tem de ser pedido aqui: ao mudar o estado, o React tira o
+    // listener da janela antes de o clique lá chegar, e o unlock() não corria.
+    const handler = () => {
+      enterFullscreen()
+      setAudioUnlocked(true)
+    }
     overlay.addEventListener('click', handler)
     document.body.appendChild(overlay)
     return () => {
