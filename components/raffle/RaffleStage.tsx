@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import confetti from 'canvas-confetti'
-import { Trophy } from 'lucide-react'
+import { Gift, Trophy } from 'lucide-react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { initials, type RaffleDraw, type RaffleEntry } from '@/utils/raffle'
 import { playTick, playWin } from '@/utils/raffle-sound'
@@ -162,6 +162,7 @@ export function RaffleStage({
             className={isProjector ? 'size-56 ring-8 ring-amber-300' : 'size-32 ring-4 ring-amber-300'}
           />
           <p className={`mt-6 font-black leading-tight text-white ${isProjector ? 'text-7xl' : 'text-4xl'}`}>{w.name}</p>
+          <PrizeLine prize={draw.prize} big={isProjector} />
         </div>
       )
     }
@@ -172,6 +173,9 @@ export function RaffleStage({
           {total} sorteados
         </p>
         <WinnerGrid winners={draw.winners} big={isProjector} />
+        <div className="text-center">
+          <PrizeLine prize={draw.prize} big={isProjector} />
+        </div>
       </div>
     )
   }
@@ -237,6 +241,15 @@ export function RaffleStage({
         </div>
       )}
     </div>
+  )
+}
+
+function PrizeLine({ prize, big }: { prize?: string | null; big: boolean }) {
+  if (!prize) return null
+  return (
+    <p className={`inline-flex items-center gap-3 font-black text-amber-300 ${big ? 'mt-8 text-5xl' : 'mt-4 text-xl'}`}>
+      <Gift className={big ? 'h-12 w-12' : 'h-6 w-6'} /> {prize}
+    </p>
   )
 }
 

@@ -17,7 +17,7 @@ const TOOLS = [
     id: 'sorteio',
     title: 'Sorteador',
     description:
-      'Sorteia pessoas de forma divertida: escolhe um evento para usar as presenças, tira dirigentes ou ajudantes num toque e mostra no projetor ou só no telemóvel.',
+      'Sorteia pessoas de forma divertida: usa as presenças de um evento ou quem respondeu à Pergunta da Semana (com prémio), tira dirigentes ou ajudantes num toque e mostra no projetor ou só no telemóvel.',
     icon: Shuffle,
     color: 'from-blue-600 to-indigo-700',
     href: '/admin/ferramentas/sorteio',

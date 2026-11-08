@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/utils/supabase/server'
 import { Navbar } from '@/components/layout/Navbar'
 import { RaffleClient } from '@/components/raffle/RaffleClient'
+import { getQuestionRaffleData } from '@/lib/actions/question-raffle'
 import { effectiveLeadershipSection, effectiveRole } from '@/utils/permissions'
 import type { RaffleEvent, RaffleMember } from '@/utils/raffle'
 
@@ -42,7 +43,7 @@ export default async function RafflePage() {
     .order('start_at', { ascending: false })
   if (section) eventsQuery = eventsQuery.or(`target_section.is.null,target_section.eq.${section}`)
 
-  const [{ data: members }, { data: events }] = await Promise.all([membersQuery, eventsQuery])
+  const [{ data: members }, { data: events }, questions] = await Promise.all([membersQuery, eventsQuery, getQuestionRaffleData()])
 
   return (
     <div className="min-h-screen bg-stone-50">
@@ -51,6 +52,7 @@ export default async function RafflePage() {
         userId={user.id}
         members={(members || []) as RaffleMember[]}
         events={(events || []) as RaffleEvent[]}
+        initialQuestions={questions ?? []}
       />
     </div>
   )

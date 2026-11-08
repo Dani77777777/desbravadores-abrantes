@@ -9,6 +9,7 @@ import {
   ChevronLeft,
   Copy,
   ExternalLink,
+  Gift,
   Maximize,
   Minimize,
   Minus,
@@ -29,20 +30,24 @@ import {
 } from 'lucide-react'
 import { createClient } from '@/utils/supabase/client'
 import { listCheckinGuests } from '@/lib/actions/checkin'
+import { awardQuestionPrize, getQuestionRaffleData } from '@/lib/actions/question-raffle'
 import { getClubApp } from '@/utils/club-screen'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Switch } from '@/components/ui/switch'
-import { SECTION_LABELS, helperLabel } from '@/utils/permissions'
+import { SECTION_LABELS } from '@/utils/permissions'
 import {
+  EMPTY_PRIZE,
   GUEST_PREFIX,
   PROJECTOR_PATH,
   PROJECTOR_WINDOW_NAME,
+  cleanPrize,
   isGuestId,
   isHelperFor,
   isLeaderFor,
   memberEntry,
   newId,
   pickWinners,
+  prizeLabel,
   raffleLocalChannelName,
   recommendEvent,
   type RaffleDraw,
@@ -50,13 +55,20 @@ import {
   type RaffleEvent,
   type RaffleLocalMessage,
   type RaffleMember,
+  type RafflePrize,
+  type RaffleQuestion,
   type RaffleScreenState,
 } from '@/utils/raffle'
 import { unlockRaffleSound } from '@/utils/raffle-sound'
+import { QuestionRaffleCard } from './QuestionRaffleCard'
+import { PersonRow, QuickButton } from './RaffleParts'
 import { EntryAvatar, RaffleStage } from './RaffleStage'
 
 type AfterMode = 'keep' | 'uncheck' | 'repeat'
 type HistoryEntry = RaffleEntry & { at: number }
+type RaffleSource = 'people' | 'question'
+/** Prémio à espera de confirmação no sorteio que está no ecrã. */
+type PendingAward = { drawId: string; questionId: string; prize: RafflePrize; status: 'idle' | 'saving' | 'done' }
 
 type Saved = {
   v: 1
@@ -69,6 +81,10 @@ type Saved = {
   projector: boolean
   sound: boolean
   history: HistoryEntry[]
+  source?: RaffleSource
+  questionId?: string | null
+  questionOut?: string[]
+  prize?: RafflePrize
 }
 
 /** A seleção e os "já sorteados" são temporários: ao fim de 12h recomeça do zero. */
@@ -102,14 +118,6 @@ function sample<T>(arr: T[], n: number): T[] {
   return pickWinners(arr, n)
 }
 
-function roleLabel(m: RaffleMember): string | null {
-  if (m.role === 'coordenador') return 'Coordenação'
-  if (m.role === 'dirigente') {
-    return `Dirigente${m.leadership_section ? ` · ${SECTION_LABELS[m.leadership_section] || m.leadership_section}` : ''}`
-  }
-  return helperLabel(m)
-}
-
 function formatEventDate(iso: string) {
   return new Date(iso).toLocaleDateString('pt-PT', { weekday: 'short', day: '2-digit', month: '2-digit' })
 }
@@ -123,10 +131,12 @@ export function RaffleClient({
   userId,
   members,
   events,
+  initialQuestions,
 }: {
   userId: string
   members: RaffleMember[]
   events: RaffleEvent[]
+  initialQuestions: RaffleQuestion[]
 }) {
   const [supabase] = useState(() => createClient())
 
@@ -148,6 +158,20 @@ export function RaffleClient({
 
   const [draw, setDraw] = useState<RaffleDraw | null>(null)
   const [drawDone, setDrawDone] = useState(false)
+
+  const [source, setSource] = useState<RaffleSource>('people')
+  const [questions, setQuestions] = useState(initialQuestions)
+  const [questionId, setQuestionId] = useState<string | null>(null)
+  const [questionOut, setQuestionOut] = useState<Set<string>>(new Set())
+  const [prize, setPrize] = useState<RafflePrize>(EMPTY_PRIZE)
+  const [refreshingQuestions, setRefreshingQuestions] = useState(false)
+  const [award, setAward] = useState<PendingAward | null>(null)
+
+  const question = useMemo(
+    () => questions.find((q) => q.id === questionId) ?? questions.find((q) => q.open) ?? questions[0] ?? null,
+    [questions, questionId],
+  )
+  const validPrize = useMemo(() => cleanPrize(prize), [prize])
 
   const memberById = useMemo(() => new Map(members.map((m) => [m.id, m])), [members])
   const event = useMemo(() => events.find((e) => e.id === eventId) ?? null, [events, eventId])
@@ -200,6 +224,12 @@ export function RaffleClient({
     } else if (recommended) {
       applyEvent(recommended, { auto: true })
     }
+    if (fresh) {
+      setSource(saved.source === 'question' ? 'question' : 'people')
+      setQuestionId(saved.questionId ?? null)
+      setQuestionOut(new Set(saved.questionOut ?? []))
+      if (saved.prize) setPrize(saved.prize)
+    }
     setHydrated(true)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -217,13 +247,17 @@ export function RaffleClient({
       projector,
       sound,
       history,
+      source,
+      questionId: question?.id ?? null,
+      questionOut: [...questionOut],
+      prize,
     }
     try {
       localStorage.setItem(storageKey(userId), JSON.stringify(s))
     } catch {
       /* armazenamento indisponível — segue sem guardar */
     }
-  }, [hydrated, userId, selected, guests, eventId, count, afterMode, projector, sound, history])
+  }, [hydrated, userId, selected, guests, eventId, count, afterMode, projector, sound, history, source, question?.id, questionOut, prize])
 
   // ── Quem está em jogo ──────────────────────────────────────
   const historyIds = useMemo(() => new Set(history.map((h) => h.id)), [history])
@@ -235,11 +269,19 @@ export function RaffleClient({
     return list
   }, [members, guests, selected])
 
-  const pool = useMemo(
-    () => (afterMode === 'keep' ? selectedEntries.filter((e) => !historyIds.has(e.id)) : selectedEntries),
-    [selectedEntries, afterMode, historyIds],
-  )
-  const excludedCount = selectedEntries.length - pool.length
+  // Pergunta da Semana: quem respondeu, sem os desmarcados e sem quem já ganhou nesta pergunta.
+  const questionEntries = useMemo(() => {
+    if (!question) return []
+    const respondents = new Set(question.respondentIds)
+    const won = new Set(question.winners.map((w) => w.id))
+    return members.filter((m) => respondents.has(m.id) && !won.has(m.id) && !questionOut.has(m.id)).map(memberEntry)
+  }, [question, members, questionOut])
+
+  const pool = useMemo(() => {
+    if (source === 'question') return questionEntries
+    return afterMode === 'keep' ? selectedEntries.filter((e) => !historyIds.has(e.id)) : selectedEntries
+  }, [source, questionEntries, selectedEntries, afterMode, historyIds])
+  const excludedCount = source === 'question' ? 0 : selectedEntries.length - pool.length
 
   const leadersSelected = useMemo(
     () => members.filter((m) => selected.has(m.id) && isLeaderFor(m, event)),
@@ -331,13 +373,16 @@ export function RaffleClient({
   }
 
   // ── Sincronização com o projetor ───────────────────────────
+  const drawTitle =
+    source === 'question' ? ['Pergunta da Semana', validPrize && prizeLabel(validPrize)].filter(Boolean).join(' · ') : (event?.title ?? null)
+
   const screenState: RaffleScreenState = useMemo(
     () => ({
-      title: event?.title ?? null,
+      title: drawTitle,
       pool: sample(pool, SCREEN_POOL_LIMIT),
       draw,
     }),
-    [event, pool, draw],
+    [drawTitle, pool, draw],
   )
 
   const lastPushedDrawRef = useRef<string>('')
@@ -429,6 +474,11 @@ export function RaffleClient({
     unlockRaffleSound()
     // Tira o foco do botão para o Espaço seguinte ir para os atalhos (e não "clicar" outra vez)
     ;(document.activeElement as HTMLElement | null)?.blur?.()
+    const drawnPrize = source === 'question' ? validPrize : null
+    if (source === 'question' && !drawnPrize) {
+      toast.error('Define primeiro o prémio.')
+      return
+    }
     if (pool.length === 0) {
       toast.error('Não há ninguém no sorteio.')
       return
@@ -440,12 +490,19 @@ export function RaffleClient({
       pool: [...winners, ...sample(others, SCREEN_POOL_LIMIT - winners.length)],
       winners,
       revealAll: false,
+      prize: drawnPrize ? prizeLabel(drawnPrize) : null,
     }
     setDraw(d)
     setDrawDone(false)
+    setAward(drawnPrize && question ? { drawId: d.id, questionId: question.id, prize: drawnPrize, status: 'idle' } : null)
 
-    const now = Date.now()
     const winnerIds = new Set(winners.map((w) => w.id))
+    if (source === 'question') {
+      // Fica fora do histórico dos eventos: ter ganho aqui não impede de sair noutro sorteio.
+      setQuestionOut((prev) => new Set([...prev, ...winnerIds]))
+      return
+    }
+    const now = Date.now()
     setHistory((prev) => [...prev.filter((h) => !winnerIds.has(h.id)), ...winners.map((w) => ({ ...w, at: now }))])
     if (afterMode === 'uncheck') setMany([...winnerIds], false)
   }
@@ -454,6 +511,44 @@ export function RaffleClient({
     if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {})
     setDraw(null)
     setDrawDone(false)
+    setAward(null)
+  }
+
+  // ── Pergunta da Semana ─────────────────────────────────────
+  const reloadQuestions = async () => {
+    setRefreshingQuestions(true)
+    try {
+      const fresh = await getQuestionRaffleData()
+      if (fresh) setQuestions(fresh)
+      else toast.error('Não foi possível atualizar as respostas.')
+    } catch {
+      toast.error('Não foi possível atualizar as respostas.')
+    } finally {
+      setRefreshingQuestions(false)
+    }
+  }
+
+  const giveAward = async () => {
+    if (!draw || !award || award.status !== 'idle') return
+    const { drawId } = award
+    const setStatus = (status: PendingAward['status']) =>
+      setAward((a) => (a?.drawId === drawId ? { ...a, status } : a))
+    setStatus('saving')
+    try {
+      const res = await awardQuestionPrize(award.questionId, draw.winners.map((w) => w.id), award.prize)
+      if ('error' in res) {
+        toast.error(res.error)
+        setStatus('idle')
+        return
+      }
+      setStatus('done')
+      if (res.awarded > 0) toast.success(res.awarded === 1 ? 'Prémio atribuído!' : `${res.awarded} prémios atribuídos!`)
+      if (res.already > 0) toast.info(res.already === 1 ? 'Esta pessoa já tinha recebido o prémio.' : `${res.already} pessoas já tinham recebido o prémio.`)
+      reloadQuestions()
+    } catch {
+      toast.error('Não foi possível atribuir o prémio.')
+      setStatus('idle')
+    }
   }
 
   const nextPoolCount = pool.length
@@ -490,6 +585,27 @@ export function RaffleClient({
           <h1 className="flex items-center gap-2 text-2xl font-bold text-gray-900">
             <Shuffle className="h-6 w-6 text-blue-700" /> Sorteador
           </h1>
+        </div>
+
+        {/* Origem */}
+        <div className="grid grid-cols-2 gap-1 rounded-xl bg-gray-100 p-1">
+          {(
+            [
+              ['people', 'Pessoas e eventos'],
+              ['question', 'Pergunta da Semana'],
+            ] as const
+          ).map(([id, label]) => (
+            <button
+              key={id}
+              type="button"
+              onClick={() => setSource(id)}
+              className={`rounded-lg px-2 py-2.5 text-sm font-bold transition-colors ${
+                source === id ? 'bg-white text-blue-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
         </div>
 
         {/* Projetor */}
@@ -560,8 +676,33 @@ export function RaffleClient({
           </CardContent>
         </Card>
 
+        {source === 'question' && (
+          <QuestionRaffleCard
+            questions={questions}
+            question={question}
+            members={members}
+            out={questionOut}
+            userId={userId}
+            prize={prize}
+            refreshing={refreshingQuestions}
+            onSelectQuestion={(id) => {
+              setQuestionId(id)
+              setQuestionOut(new Set())
+            }}
+            onPrizeChange={setPrize}
+            onSetOut={(ids, isOut) =>
+              setQuestionOut((prev) => {
+                const next = new Set(prev)
+                ids.forEach((id) => (isOut ? next.add(id) : next.delete(id)))
+                return next
+              })
+            }
+            onRefresh={reloadQuestions}
+          />
+        )}
+
         {/* Evento */}
-        <Card>
+        <Card className={source === 'question' ? 'hidden' : undefined}>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
               <CalendarDays className="h-5 w-5 text-blue-700" /> Evento
@@ -619,7 +760,7 @@ export function RaffleClient({
         </Card>
 
         {/* Pessoas */}
-        <Card>
+        <Card className={source === 'question' ? 'hidden' : undefined}>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
               <Users className="h-5 w-5 text-blue-700" /> Quem entra no sorteio
@@ -712,38 +853,15 @@ export function RaffleClient({
             <ul className="max-h-[26rem] divide-y divide-gray-100 overflow-y-auto rounded-xl border border-gray-200">
               {filteredMembers.length === 0 && <li className="px-4 py-6 text-center text-sm text-gray-400">Ninguém encontrado.</li>}
               {filteredMembers.map((m) => {
-                const on = selected.has(m.id)
-                const entry = memberEntry(m)
-                const badge = roleLabel(m)
-                const drawn = historyIds.has(m.id)
                 return (
-                  <li key={m.id}>
-                    <button
-                      type="button"
-                      onClick={() => toggle(m.id)}
-                      className={`flex w-full items-center gap-3 px-3 py-2.5 text-left transition-colors ${on ? 'bg-blue-50/60' : 'hover:bg-gray-50'}`}
-                    >
-                      <span
-                        className={`flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-md border-2 ${
-                          on ? 'border-blue-700 bg-blue-700 text-white' : 'border-gray-300 bg-white'
-                        }`}
-                      >
-                        {on && <Check className="h-3.5 w-3.5" strokeWidth={3} />}
-                      </span>
-                      <EntryAvatar entry={entry} className="size-9" />
-                      <span className="min-w-0 flex-1">
-                        <span className={`block truncate text-sm font-bold ${on ? 'text-gray-900' : 'text-gray-500'}`}>
-                          {m.full_name || entry.name}
-                        </span>
-                        <span className="flex flex-wrap items-center gap-1.5 text-[11px] text-gray-500">
-                          {m.section && <span>{SECTION_LABELS[m.section] || m.section}</span>}
-                          {badge && <span className="rounded bg-slate-100 px-1.5 font-bold text-slate-600">{badge}</span>}
-                          {m.id === userId && <span className="rounded bg-blue-100 px-1.5 font-bold text-blue-700">Eu</span>}
-                          {drawn && <span className="rounded bg-amber-100 px-1.5 font-bold text-amber-700">Já saiu</span>}
-                        </span>
-                      </span>
-                    </button>
-                  </li>
+                  <PersonRow
+                    key={m.id}
+                    member={m}
+                    on={selected.has(m.id)}
+                    isMe={m.id === userId}
+                    note={historyIds.has(m.id) ? 'Já saiu' : undefined}
+                    onToggle={() => toggle(m.id)}
+                  />
                 )
               })}
             </ul>
@@ -818,7 +936,7 @@ export function RaffleClient({
         </Card>
 
         {/* Depois de sair + já sorteados */}
-        <Card>
+        <Card className={source === 'question' ? 'hidden' : undefined}>
           <CardHeader>
             <CardTitle className="text-base">Depois de alguém sair</CardTitle>
             <CardDescription>{AFTER_MODES.find((m) => m.id === afterMode)?.hint}</CardDescription>
@@ -908,14 +1026,16 @@ export function RaffleClient({
           <button
             type="button"
             onClick={startDraw}
-            disabled={pool.length === 0}
+            disabled={pool.length === 0 || (source === 'question' && !validPrize)}
             className="flex h-14 min-w-0 flex-1 flex-col items-center justify-center rounded-2xl bg-gradient-to-r from-blue-800 to-indigo-700 font-black text-white shadow-lg transition-transform active:scale-[0.98] disabled:from-gray-300 disabled:to-gray-300 disabled:shadow-none"
           >
             <span className="flex items-center gap-2 text-lg">
               <Shuffle className="h-5 w-5" /> Sortear
             </span>
             <span className="text-[11px] font-bold text-white/75">
-              {pool.length} em jogo{excludedCount > 0 && ` · ${excludedCount} já saíram`}
+              {source === 'question' && !validPrize
+                ? 'Define o prémio'
+                : `${pool.length} em jogo${excludedCount > 0 ? ` · ${excludedCount} já saíram` : ''}`}
             </span>
           </button>
         </div>
@@ -924,7 +1044,8 @@ export function RaffleClient({
       {draw && (
         <DrawOverlay
           draw={draw}
-          title={event?.title ?? null}
+          title={drawTitle}
+          award={award && { label: prizeLabel(award.prize), kind: award.prize.kind, status: award.status, onGive: giveAward }}
           // Com a janela do projetor ligada, o som toca só lá (senão ouvia-se a dobrar)
           sound={sound && !localProjector}
           onToggleSound={() => setSound((s) => !s)}
@@ -946,6 +1067,7 @@ export function RaffleClient({
 function DrawOverlay({
   draw,
   title,
+  award,
   sound,
   onToggleSound,
   done,
@@ -960,6 +1082,7 @@ function DrawOverlay({
 }: {
   draw: RaffleDraw
   title: string | null
+  award: { label: string; kind: RafflePrize['kind']; status: PendingAward['status']; onGive: () => void } | null
   sound: boolean
   onToggleSound: () => void
   done: boolean
@@ -1029,48 +1152,39 @@ function DrawOverlay({
           )
         ) : (
           <>
+            {award &&
+              (award.status === 'done' ? (
+                <p className="flex h-12 items-center justify-center gap-2 rounded-2xl bg-emerald-500/20 px-6 font-black text-emerald-200">
+                  <Check className="h-5 w-5" /> {award.kind === 'points' ? 'Prémio dado' : 'Prémio registado'}
+                </p>
+              ) : (
+                <button
+                  type="button"
+                  onClick={award.onGive}
+                  disabled={award.status === 'saving'}
+                  className="flex h-12 items-center justify-center gap-2 rounded-2xl bg-amber-400 px-6 font-black text-slate-900 hover:bg-amber-300 disabled:opacity-60"
+                >
+                  <Gift className="h-5 w-5" />
+                  {award.status === 'saving' ? 'A guardar…' : `${award.kind === 'points' ? 'Dar' : 'Registar'} ${award.label}`}
+                </button>
+              ))}
             <button
               type="button"
               onClick={onAgain}
               disabled={nextPoolCount === 0}
-              className="flex h-12 items-center justify-center gap-2 rounded-2xl bg-amber-400 px-6 font-black text-slate-900 hover:bg-amber-300 disabled:opacity-40"
+              className={`flex h-12 items-center justify-center gap-2 rounded-2xl px-6 font-black disabled:opacity-40 ${
+                award && award.status !== 'done' ? 'bg-white/10 text-white hover:bg-white/15' : 'bg-amber-400 text-slate-900 hover:bg-amber-300'
+              }`}
             >
               <Shuffle className="h-5 w-5" /> Sortear de novo ({nextCount} de {nextPoolCount})
             </button>
             <button type="button" onClick={onClose} className="h-12 rounded-2xl bg-white/10 px-6 font-bold text-white hover:bg-white/15">
-              Fechar
+              {award && award.status !== 'done' ? 'Fechar sem dar' : 'Fechar'}
             </button>
           </>
         )}
       </div>
     </div>
-  )
-}
-
-function QuickButton({
-  children,
-  icon,
-  onClick,
-  disabled,
-  title,
-}: {
-  children: React.ReactNode
-  icon: React.ReactNode
-  onClick: () => void
-  disabled?: boolean
-  title?: string
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      title={title}
-      className="inline-flex min-h-10 items-center gap-1.5 rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-bold text-gray-700 transition-colors hover:border-red-200 hover:bg-red-50 hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-gray-200 disabled:hover:bg-white disabled:hover:text-gray-700"
-    >
-      {icon}
-      {children}
-    </button>
   )
 }
 

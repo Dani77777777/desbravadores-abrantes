@@ -44,6 +44,47 @@ export type RaffleDraw = {
   winners: RaffleEntry[]
   /** O anfitrião carregou em "revelar todos". */
   revealAll: boolean
+  /** Prémio em jogo, para mostrar com o resultado. */
+  prize?: string | null
+}
+
+/** Prémio do sorteio da Pergunta da Semana: `name` conta no físico; `xp` e `gold` nos pontos. */
+export type RafflePrize = {
+  kind: 'physical' | 'points'
+  name: string
+  xp: number
+  gold: number
+}
+
+/** Uma Pergunta da Semana já aberta e quem lhe respondeu (dentro do âmbito de quem sorteia). */
+export type RaffleQuestion = {
+  id: string
+  prompt: string
+  closes_at: string
+  open: boolean
+  respondentIds: string[]
+  winners: { id: string; prize: string }[]
+}
+
+export const EMPTY_PRIZE: RafflePrize = { kind: 'points', name: '', xp: 0, gold: 0 }
+export const MAX_PRIZE_NAME = 80
+export const MAX_PRIZE_POINTS = 10000
+
+/** Devolve o prémio limpo, ou null se ainda não estiver bem preenchido. */
+export function cleanPrize(p: RafflePrize): RafflePrize | null {
+  if (p.kind === 'physical') {
+    const name = (p.name ?? '').trim().replace(/\s+/g, ' ')
+    if (!name || name.length > MAX_PRIZE_NAME) return null
+    return { kind: 'physical', name, xp: 0, gold: 0 }
+  }
+  const valid = (n: number) => Number.isInteger(n) && n >= 0 && n <= MAX_PRIZE_POINTS
+  if (p.kind !== 'points' || !valid(p.xp) || !valid(p.gold) || p.xp + p.gold === 0) return null
+  return { kind: 'points', name: '', xp: p.xp, gold: p.gold }
+}
+
+export function prizeLabel(p: RafflePrize): string {
+  if (p.kind === 'physical') return p.name
+  return [p.xp > 0 && `${p.xp} XP`, p.gold > 0 && `${p.gold} Gold`].filter(Boolean).join(' + ')
 }
 
 /**

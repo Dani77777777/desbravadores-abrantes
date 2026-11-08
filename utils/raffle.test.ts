@@ -1,5 +1,40 @@
 import { describe, expect, test } from 'bun:test'
-import { isHelperFor, isLeaderFor, pickWinners, recommendEvent, type RaffleEvent, type RaffleMember } from './raffle'
+import {
+  cleanPrize,
+  isHelperFor,
+  isLeaderFor,
+  MAX_PRIZE_POINTS,
+  pickWinners,
+  prizeLabel,
+  recommendEvent,
+  type RaffleEvent,
+  type RaffleMember,
+} from './raffle'
+
+describe('prémio do sorteio', () => {
+  const points = (xp: number, gold: number) => ({ kind: 'points' as const, name: 'ignorado', xp, gold })
+  const physical = (name: string) => ({ kind: 'physical' as const, name, xp: 9, gold: 9 })
+
+  test('o prémio físico precisa de um nome e ignora os pontos', () => {
+    expect(cleanPrize(physical('  Caixa   de chocolates '))).toEqual({ kind: 'physical', name: 'Caixa de chocolates', xp: 0, gold: 0 })
+    expect(cleanPrize(physical('   '))).toBeNull()
+    expect(cleanPrize(physical('x'.repeat(81)))).toBeNull()
+  })
+
+  test('os pontos precisam de pelo menos um valor inteiro dentro do limite', () => {
+    expect(cleanPrize(points(50, 0))).toEqual({ kind: 'points', name: '', xp: 50, gold: 0 })
+    expect(cleanPrize(points(0, 0))).toBeNull()
+    expect(cleanPrize(points(-5, 10))).toBeNull()
+    expect(cleanPrize(points(1.5, 0))).toBeNull()
+    expect(cleanPrize(points(MAX_PRIZE_POINTS + 1, 0))).toBeNull()
+  })
+
+  test('o nome do prémio mostra só o que foi dado', () => {
+    expect(prizeLabel(points(50, 10))).toBe('50 XP + 10 Gold')
+    expect(prizeLabel(points(0, 10))).toBe('10 Gold')
+    expect(prizeLabel(physical('Boné'))).toBe('Boné')
+  })
+})
 
 const member = (over: Partial<RaffleMember>): RaffleMember => ({
   id: 'x', full_name: 'X', avatar_url: null, role: 'desbravador', section: 'ticoes',

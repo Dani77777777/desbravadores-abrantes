@@ -54,7 +54,8 @@
 --       points_audit (view), points_audit_events, points_seasons,
 --       points_season_standings
 --   Ferramentas do projetor e Tendas e boleias:
---       raffle_screens, timer_screens, team_screens, club_screens, trip_plans
+--       raffle_screens, question_raffle_prizes, timer_screens, team_screens,
+--       club_screens, trip_plans
 --   Centro de Jogos:
 --       game_settings, game_plays
 --   VANTUR:
@@ -4594,6 +4595,20 @@ COMMENT ON TABLE public.qr_scans IS 'Tracks which users have redeemed which code
 
 
 --
+-- Name: question_raffle_prizes; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.question_raffle_prizes (
+    question_id uuid NOT NULL,
+    profile_id uuid NOT NULL,
+    prize text NOT NULL,
+    awarded_by uuid,
+    awarded_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT question_raffle_prizes_prize_check CHECK (((char_length(prize) >= 1) AND (char_length(prize) <= 80)))
+);
+
+
+--
 -- Name: raffle_screens; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -7173,6 +7188,14 @@ ALTER TABLE ONLY public.qr_scans
 
 
 --
+-- Name: question_raffle_prizes question_raffle_prizes_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.question_raffle_prizes
+    ADD CONSTRAINT question_raffle_prizes_pkey PRIMARY KEY (question_id, profile_id);
+
+
+--
 -- Name: raffle_screens raffle_screens_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -8689,6 +8712,30 @@ ALTER TABLE ONLY public.qr_scans
 
 
 --
+-- Name: question_raffle_prizes question_raffle_prizes_question_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.question_raffle_prizes
+    ADD CONSTRAINT question_raffle_prizes_question_id_fkey FOREIGN KEY (question_id) REFERENCES public.vanacoro_questions(id) ON DELETE CASCADE;
+
+
+--
+-- Name: question_raffle_prizes question_raffle_prizes_profile_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.question_raffle_prizes
+    ADD CONSTRAINT question_raffle_prizes_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES public.profiles(id) ON DELETE CASCADE;
+
+
+--
+-- Name: question_raffle_prizes question_raffle_prizes_awarded_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.question_raffle_prizes
+    ADD CONSTRAINT question_raffle_prizes_awarded_by_fkey FOREIGN KEY (awarded_by) REFERENCES public.profiles(id) ON DELETE SET NULL;
+
+
+--
 -- Name: raffle_screens raffle_screens_host_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -10143,6 +10190,12 @@ ALTER TABLE public.qr_codes ENABLE ROW LEVEL SECURITY;
 --
 
 ALTER TABLE public.qr_scans ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: question_raffle_prizes; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.question_raffle_prizes ENABLE ROW LEVEL SECURITY;
 
 --
 -- Name: raffle_screens; Type: ROW SECURITY; Schema: public; Owner: -
@@ -12649,6 +12702,13 @@ GRANT ALL ON TABLE public.qr_codes TO service_role;
 GRANT ALL ON TABLE public.qr_scans TO anon;
 GRANT ALL ON TABLE public.qr_scans TO authenticated;
 GRANT ALL ON TABLE public.qr_scans TO service_role;
+
+
+--
+-- Name: TABLE question_raffle_prizes; Type: ACL; Schema: public; Owner: -
+--
+
+GRANT ALL ON TABLE public.question_raffle_prizes TO service_role;
 
 
 --

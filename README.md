@@ -359,6 +359,7 @@ Não há ferramenta de migrações: cada `supabase-*.sql` na raiz é corrido à 
 34. `-cofre`
 35. `-ranking-hide-tests`
 36. `-club-families-delete-fix`
+37. `-question-raffle-prizes`
 
 (`-x` = `supabase-migration-x.sql`.)
 </details>
