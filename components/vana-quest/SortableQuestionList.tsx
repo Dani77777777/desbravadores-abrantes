@@ -19,13 +19,9 @@ import {
   arrayMove,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { GripVertical, Check, Clock, Zap, Pencil, Trash2, X, Lightbulb } from 'lucide-react'
+import { ArrowDown, ArrowUp, GripVertical, Check, Clock, Zap, Pencil, Trash2, X, Lightbulb } from 'lucide-react'
 import { reorderQuestions } from '@/lib/actions/vana-quest'
-
-const OPTION_COLORS: Record<string, string> = {
-  A: 'bg-red-500', B: 'bg-blue-500', C: 'bg-yellow-400', D: 'bg-green-500',
-}
-const OPTION_LABELS: Record<string, string> = { A: '▲', B: '●', C: '◆', D: '■' }
+import { OPTION_COLORS, OPTION_LABELS, QuestionForm } from './QuestionForm'
 
 interface Question {
   id: string
@@ -45,29 +41,40 @@ interface Props {
   questions: Question[]
   questId: string
   editingId?: string
+  /** A edição em curso está a ser guardada */
+  saving?: boolean
   onEdit: (id: string) => void
   onCancelEdit: () => void
   onDelete: (id: string) => void
   onSaveEdit: (formData: FormData) => void
 }
 
+const ICON_BTN =
+  'w-10 h-10 rounded-lg flex items-center justify-center text-gray-500 transition-colors disabled:opacity-30 disabled:cursor-not-allowed'
+
 function QuestionCard({
   q,
   index,
+  total,
   isEditing,
+  saving,
   onEdit,
   onCancelEdit,
   onDelete,
   onSaveEdit,
+  onMove,
   isDragOverlay = false,
 }: {
   q: Question
   index: number
+  total: number
   isEditing: boolean
+  saving?: boolean
   onEdit: () => void
   onCancelEdit: () => void
   onDelete: () => void
   onSaveEdit: (fd: FormData) => void
+  onMove: (direction: -1 | 1) => void
   isDragOverlay?: boolean
 }) {
   const {
@@ -89,82 +96,132 @@ function QuestionCard({
     <div
       ref={isDragOverlay ? undefined : setNodeRef}
       style={isDragOverlay ? undefined : style}
-      className={`bg-white rounded-2xl border shadow-sm p-5 transition-all ${
+      className={`bg-white rounded-2xl border shadow-sm p-4 sm:p-5 transition-all ${
         isEditing ? 'ring-2 ring-blue-500' : ''
       } ${isDragOverlay ? 'shadow-2xl rotate-1 scale-[1.02]' : ''}`}
     >
       {isEditing ? (
-        <EditForm q={q} index={index} onCancel={onCancelEdit} onSave={onSaveEdit} />
+        <div>
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-sm font-bold text-blue-600 flex items-center gap-1.5">
+              <Pencil className="w-3.5 h-3.5" /> A editar a pergunta {index + 1}
+            </span>
+            <button
+              type="button"
+              onClick={onCancelEdit}
+              aria-label="Cancelar edição"
+              className={`${ICON_BTN} hover:bg-gray-100`}
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+          <QuestionForm
+            initial={q}
+            submitLabel="Guardar alterações"
+            pending={saving}
+            onSubmit={(fd) => onSaveEdit(fd)}
+            onCancel={onCancelEdit}
+          />
+        </div>
       ) : (
-        <div className="flex items-start gap-3">
-          {/* Drag handle */}
-          <button
-            {...attributes}
-            {...listeners}
-            className="mt-1 p-1 text-gray-300 hover:text-gray-500 cursor-grab active:cursor-grabbing touch-none flex-shrink-0"
-            tabIndex={-1}
-          >
-            <GripVertical className="w-5 h-5" />
-          </button>
-
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-2">
-              <span className="w-6 h-6 rounded-full bg-blue-900 text-white text-xs font-black flex items-center justify-center flex-shrink-0">
-                {index + 1}
-              </span>
-              <p className="font-semibold text-gray-900 truncate">{q.question_text}</p>
-            </div>
-
-            <div className="grid grid-cols-2 gap-2 mb-3">
-              {(['A', 'B', 'C', 'D'] as const).map((opt) => {
-                const val = q[`option_${opt.toLowerCase()}` as keyof Question] as string
-                const isCorrect = q.correct_option === opt
-                return (
-                  <div
-                    key={opt}
-                    className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm ${
-                      isCorrect ? 'bg-green-50 border border-green-200' : 'bg-gray-50'
-                    }`}
-                  >
-                    <span className={`w-5 h-5 rounded flex items-center justify-center text-white text-[10px] font-black flex-shrink-0 ${OPTION_COLORS[opt]}`}>
-                      {OPTION_LABELS[opt]}
-                    </span>
-                    <span className={`truncate text-xs ${isCorrect ? 'font-semibold text-green-700' : 'text-gray-600'}`}>{val}</span>
-                    {isCorrect && <Check className="w-3 h-3 text-green-600 flex-shrink-0 ml-auto" />}
-                  </div>
-                )
-              })}
-            </div>
-
-            <div className="flex items-center gap-3 text-xs text-gray-400">
-              <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> {q.time_seconds}s</span>
-              <span className="flex items-center gap-1"><Zap className="w-3 h-3" /> ×{q.points_multiplier}</span>
-              <span className="text-blue-600 font-medium">max {10 * q.points_multiplier} pts</span>
-            </div>
-
-            {q.explanation && (
-              <div className="mt-2.5 flex items-start gap-1.5 text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
-                <Lightbulb className="w-3.5 h-3.5 mt-0.5 flex-shrink-0 text-amber-500" />
-                <span className="leading-snug">{q.explanation}</span>
-              </div>
-            )}
+        <div>
+          <div className="flex items-start gap-2 mb-3">
+            {/* Pega para arrastar */}
+            <button
+              {...attributes}
+              {...listeners}
+              type="button"
+              aria-label={`Arrastar a pergunta ${index + 1} para reordenar`}
+              className="-ml-1.5 -mt-1 w-8 h-9 flex items-center justify-center text-gray-300 hover:text-gray-500 cursor-grab active:cursor-grabbing touch-none flex-shrink-0"
+              tabIndex={-1}
+            >
+              <GripVertical className="w-5 h-5" />
+            </button>
+            <span className="w-6 h-6 mt-0.5 rounded-full bg-blue-900 text-white text-xs font-black flex items-center justify-center flex-shrink-0">
+              {index + 1}
+            </span>
+            <p className="flex-1 min-w-0 font-semibold text-gray-900 break-words">{q.question_text}</p>
           </div>
 
-          <div className="flex items-center gap-1 flex-shrink-0">
-            <button
-              onClick={onEdit}
-              className="p-1.5 rounded-lg text-gray-400 hover:bg-blue-50 hover:text-blue-600 transition-colors"
-              title="Editar"
-            >
-              <Pencil className="w-4 h-4" />
-            </button>
-            <button
-              onClick={onDelete}
-              className="p-1.5 rounded-lg text-gray-400 hover:bg-red-50 hover:text-red-500 transition-colors"
-              title="Eliminar"
-            >
-              <Trash2 className="w-4 h-4" />
-            </button>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-3">
+            {(['A', 'B', 'C', 'D'] as const).map((opt) => {
+              const val = q[`option_${opt.toLowerCase()}` as keyof Question] as string
+              const isCorrect = q.correct_option === opt
+              return (
+                <div
+                  key={opt}
+                  className={`flex items-center gap-2 px-3 py-1.5 rounded-lg ${
+                    isCorrect ? 'bg-green-50 border border-green-200' : 'bg-gray-50'
+                  }`}
+                >
+                  <span aria-hidden className={`w-5 h-5 rounded flex items-center justify-center text-white text-[10px] font-black flex-shrink-0 ${OPTION_COLORS[opt]}`}>
+                    {OPTION_LABELS[opt]}
+                  </span>
+                  <span className={`min-w-0 break-words text-sm sm:text-xs ${isCorrect ? 'font-semibold text-green-700' : 'text-gray-600'}`}>{val}</span>
+                  {isCorrect && (
+                    <span className="ml-auto flex-shrink-0 flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-green-700">
+                      <Check className="w-3.5 h-3.5" /> Certa
+                    </span>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+
+          {q.explanation && (
+            <div className="mb-3 flex items-start gap-1.5 text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
+              <Lightbulb className="w-3.5 h-3.5 mt-0.5 flex-shrink-0 text-amber-500" />
+              <span className="leading-snug break-words min-w-0">{q.explanation}</span>
+            </div>
+          )}
+
+          <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+            <div className="flex items-center gap-3 text-xs text-gray-500">
+              <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> {q.time_seconds}s</span>
+              <span className="flex items-center gap-1"><Zap className="w-3 h-3" /> ×{q.points_multiplier}</span>
+              <span className="text-blue-600 font-medium">máx. {10 * q.points_multiplier} pts</span>
+            </div>
+
+            <div className="flex items-center ml-auto -mr-1.5">
+              <button
+                type="button"
+                onClick={() => onMove(-1)}
+                disabled={index === 0}
+                aria-label={`Subir a pergunta ${index + 1}`}
+                title="Subir"
+                className={`${ICON_BTN} hover:bg-gray-100 hover:text-gray-700`}
+              >
+                <ArrowUp className="w-4 h-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => onMove(1)}
+                disabled={index === total - 1}
+                aria-label={`Descer a pergunta ${index + 1}`}
+                title="Descer"
+                className={`${ICON_BTN} hover:bg-gray-100 hover:text-gray-700`}
+              >
+                <ArrowDown className="w-4 h-4" />
+              </button>
+              <button
+                type="button"
+                onClick={onEdit}
+                aria-label={`Editar a pergunta ${index + 1}`}
+                title="Editar"
+                className={`${ICON_BTN} hover:bg-blue-50 hover:text-blue-600`}
+              >
+                <Pencil className="w-4 h-4" />
+              </button>
+              <button
+                type="button"
+                onClick={onDelete}
+                aria-label={`Eliminar a pergunta ${index + 1}`}
+                title="Eliminar"
+                className={`${ICON_BTN} hover:bg-red-50 hover:text-red-500`}
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -172,124 +229,7 @@ function QuestionCard({
   )
 }
 
-function EditForm({
-  q,
-  index,
-  onCancel,
-  onSave,
-}: {
-  q: Question
-  index: number
-  onCancel: () => void
-  onSave: (fd: FormData) => void
-}) {
-  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault()
-    onSave(new FormData(e.currentTarget))
-  }
-
-  return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <input type="hidden" name="id" value={q.id} />
-      <div className="flex items-center justify-between mb-1">
-        <span className="text-sm font-bold text-blue-600 flex items-center gap-1.5">
-          <Pencil className="w-3.5 h-3.5" /> A editar pergunta {index + 1}
-        </span>
-        <button type="button" onClick={onCancel} className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100 transition-colors">
-          <X className="w-4 h-4" />
-        </button>
-      </div>
-
-      <textarea
-        name="question_text"
-        required
-        defaultValue={q.question_text}
-        rows={2}
-        className="w-full border rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-      />
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        {(['a', 'b', 'c', 'd'] as const).map((opt) => (
-          <div key={opt} className="flex items-center gap-2">
-            <span className={`w-8 h-8 rounded-lg flex items-center justify-center text-white text-xs font-black flex-shrink-0 ${OPTION_COLORS[opt.toUpperCase()]}`}>
-              {OPTION_LABELS[opt.toUpperCase()]}
-            </span>
-            <input
-              name={`option_${opt}`}
-              required
-              defaultValue={q[`option_${opt}` as keyof Question] as string}
-              placeholder={`Opção ${opt.toUpperCase()}`}
-              className="flex-1 border rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-        ))}
-      </div>
-
-      <div>
-        <label className="text-xs font-bold text-gray-500 uppercase tracking-wide block mb-1.5 flex items-center gap-1">
-          <Lightbulb className="w-3 h-3 text-amber-500" /> Nota / Explicação <span className="text-gray-400 normal-case font-medium">(opcional)</span>
-        </label>
-        <textarea
-          name="explanation"
-          defaultValue={q.explanation ?? ''}
-          placeholder="Explica porque é esta a resposta correcta. Aparece ao apresentador depois de todos responderem."
-          rows={2}
-          className="w-full border rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-        />
-      </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div>
-          <label className="text-xs font-bold text-gray-500 uppercase tracking-wide block mb-1.5">Resposta correcta</label>
-          <select name="correct_option" defaultValue={q.correct_option}
-            className="w-full border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-            <option value="A">▲ A</option>
-            <option value="B">● B</option>
-            <option value="C">◆ C</option>
-            <option value="D">■ D</option>
-          </select>
-        </div>
-        <div>
-          <label className="text-xs font-bold text-gray-500 uppercase tracking-wide block mb-1.5 flex items-center gap-1">
-            <Clock className="w-3 h-3" /> Tempo
-          </label>
-          <select name="time_seconds" defaultValue={String(q.time_seconds)}
-            className="w-full border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-            <option value="5">5 segundos</option>
-            <option value="10">10 segundos</option>
-            <option value="20">20 segundos</option>
-            <option value="30">30 segundos</option>
-            <option value="60">60 segundos</option>
-          </select>
-        </div>
-        <div>
-          <label className="text-xs font-bold text-gray-500 uppercase tracking-wide block mb-1.5 flex items-center gap-1">
-            <Zap className="w-3 h-3" /> Pontos
-          </label>
-          <select name="points_multiplier" defaultValue={String(q.points_multiplier)}
-            className="w-full border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-            <option value="1">Normal (×1)</option>
-            <option value="2">Duplo (×2)</option>
-            <option value="3">Triplo (×3)</option>
-          </select>
-        </div>
-      </div>
-
-      <div className="flex gap-3 pt-1">
-        <button type="submit"
-          className="flex-1 bg-blue-900 text-white py-2.5 rounded-xl font-bold hover:bg-blue-800 transition-colors flex items-center justify-center gap-2">
-          <Check className="w-4 h-4" /> Guardar alterações
-        </button>
-        <button type="button" onClick={onCancel}
-          className="px-5 py-2.5 rounded-xl border font-semibold text-gray-600 hover:bg-gray-50 transition-colors text-sm">
-          Cancelar
-        </button>
-      </div>
-    </form>
-  )
-}
-
-export function SortableQuestionList({ questions: initial, questId, onEdit, onCancelEdit, onDelete, onSaveEdit, editingId }: Props) {
+export function SortableQuestionList({ questions: initial, questId, onEdit, onCancelEdit, onDelete, onSaveEdit, editingId, saving: savingEdit }: Props) {
   const [questions, setQuestions] = useState(initial)
   const [activeId, setActiveId] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
@@ -325,21 +265,30 @@ export function SortableQuestionList({ questions: initial, questId, onEdit, onCa
 
     const oldIndex = questions.findIndex((q) => q.id === active.id)
     const newIndex = questions.findIndex((q) => q.id === over.id)
-    const reordered = arrayMove(questions, oldIndex, newIndex)
-    setQuestions(reordered)
+    await persistOrder(arrayMove(questions, oldIndex, newIndex))
+  }
 
+  // Alternativa ao arrastar: setas para subir/descer (teclado e ecrãs táteis)
+  async function handleMove(index: number, direction: -1 | 1) {
+    const target = index + direction
+    if (target < 0 || target >= questions.length) return
+    await persistOrder(arrayMove(questions, index, target))
+  }
+
+  async function persistOrder(reordered: Question[]) {
+    setQuestions(reordered)
     setSaving(true)
-    await reorderQuestions(questId, reordered.map((q) => q.id))
-    setSaving(false)
+    try {
+      await reorderQuestions(questId, reordered.map((q) => q.id))
+    } finally {
+      setSaving(false)
+    }
   }
 
   const activeQuestion = activeId ? questions.find((q) => q.id === activeId) : null
 
   return (
     <div className="space-y-3">
-      {saving && (
-        <p className="text-xs text-blue-600 font-semibold text-center animate-pulse">A guardar ordem...</p>
-      )}
       <DndContext
         sensors={sensors}
         collisionDetection={closestCenter}
@@ -352,11 +301,14 @@ export function SortableQuestionList({ questions: initial, questId, onEdit, onCa
               key={q.id}
               q={q}
               index={i}
+              total={questions.length}
               isEditing={editingId === q.id}
+              saving={savingEdit}
               onEdit={() => onEdit(q.id)}
               onCancelEdit={onCancelEdit}
               onDelete={() => onDelete(q.id)}
               onSaveEdit={onSaveEdit}
+              onMove={(direction) => handleMove(i, direction)}
             />
           ))}
         </SortableContext>
@@ -366,16 +318,21 @@ export function SortableQuestionList({ questions: initial, questId, onEdit, onCa
             <QuestionCard
               q={activeQuestion}
               index={questions.findIndex((q) => q.id === activeId)}
+              total={questions.length}
               isEditing={false}
               onEdit={() => {}}
               onCancelEdit={() => {}}
               onDelete={() => {}}
               onSaveEdit={() => {}}
+              onMove={() => {}}
               isDragOverlay
             />
           )}
         </DragOverlay>
       </DndContext>
+      {saving && (
+        <p role="status" className="text-xs text-blue-600 font-semibold text-center animate-pulse">A guardar ordem...</p>
+      )}
     </div>
   )
 }

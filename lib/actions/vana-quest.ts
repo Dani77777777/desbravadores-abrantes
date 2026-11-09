@@ -14,9 +14,12 @@ export async function createVanaQuest(formData: FormData) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error('Não autorizado')
 
+  const title = ((formData.get('title') as string) || '').trim()
+  if (!title) throw new Error('O título não pode ficar vazio')
+
   const { data, error } = await supabase.from('vana_quests').insert({
-    title: formData.get('title') as string,
-    description: (formData.get('description') as string) || null,
+    title,
+    description: ((formData.get('description') as string) || '').trim() || null,
     created_by: user.id,
   }).select().single()
 
@@ -26,15 +29,56 @@ export async function createVanaQuest(formData: FormData) {
 }
 
 export async function updateVanaQuest(id: string, formData: FormData) {
+  const title = ((formData.get('title') as string) || '').trim()
+  if (!title) throw new Error('O título não pode ficar vazio')
+
   const supabase = await createClient()
   const { error } = await supabase.from('vana_quests').update({
-    title: formData.get('title') as string,
-    description: (formData.get('description') as string) || null,
+    title,
+    description: ((formData.get('description') as string) || '').trim() || null,
     updated_at: new Date().toISOString(),
   }).eq('id', id)
 
   if (error) throw new Error(error.message)
   revalidatePath('/admin/vana-quest')
+  revalidatePath(`/admin/vana-quest/${id}`)
+}
+
+/** Copia um VanaQuest com todas as perguntas. Devolve o id da cópia. */
+export async function duplicateVanaQuest(id: string): Promise<string> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('Não autorizado')
+
+  const { data: original } = await supabase.from('vana_quests').select('title, description').eq('id', id).single()
+  if (!original) throw new Error('VanaQuest não encontrado')
+
+  const { data: copy, error } = await supabase.from('vana_quests').insert({
+    title: `${original.title} (cópia)`,
+    description: original.description,
+    created_by: user.id,
+  }).select('id').single()
+  if (error || !copy) throw new Error(error?.message || 'Não foi possível duplicar')
+
+  const { data: questions } = await supabase
+    .from('vana_quest_questions')
+    .select('question_text, option_a, option_b, option_c, option_d, correct_option, explanation, time_seconds, points_multiplier, question_order')
+    .eq('vana_quest_id', id)
+    .order('question_order')
+
+  if (questions && questions.length > 0) {
+    const { error: qError } = await supabase
+      .from('vana_quest_questions')
+      .insert(questions.map((q) => ({ ...q, vana_quest_id: copy.id })))
+    if (qError) {
+      // Não deixar uma cópia vazia para trás
+      await supabase.from('vana_quests').delete().eq('id', copy.id)
+      throw new Error(qError.message)
+    }
+  }
+
+  revalidatePath('/admin/vana-quest')
+  return copy.id
 }
 
 export async function deleteVanaQuest(id: string) {
