@@ -168,7 +168,9 @@ export interface NightResolution {
  */
 export function resolveNight(actions: VanaCampNightAction[]): NightResolution {
   const infiltratorVotes = actions.filter((a) => a.phase === 'infiltrators')
-  const guardianAction = actions.find((a) => a.phase === 'guardian') ?? null
+  // Pode haver mais de um Conselheiro (distribuição personalizada): basta um
+  // deles proteger o alvo para a sabotagem falhar.
+  const guardianActions = actions.filter((a) => a.phase === 'guardian')
 
   // Contar votos dos infiltrados
   const tally = new Map<string, { count: number; earliest: string }>()
@@ -191,8 +193,12 @@ export function resolveNight(actions: VanaCampNightAction[]): NightResolution {
     sabotage_target_id = sorted[0][0]
   }
 
-  const guardian_target_id = guardianAction?.target_player_id ?? null
-  const saved = sabotage_target_id !== null && sabotage_target_id === guardian_target_id
+  const saved =
+    sabotage_target_id !== null &&
+    guardianActions.some((a) => a.target_player_id === sabotage_target_id)
+  const guardian_target_id = saved
+    ? sabotage_target_id
+    : guardianActions[0]?.target_player_id ?? null
 
   return {
     sabotage_target_id,

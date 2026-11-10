@@ -531,20 +531,22 @@ export async function advanceToRolePreview(sessionId: string): Promise<{ error?:
       )
     )
 
-    // Mayor automático
-    if (session.mayor_mode === 'auto') {
-      const randomIdx = Math.floor(Math.random() * players.length)
-      await service
-        .from('vanacamp_players')
-        .update({ is_mayor: true })
-        .eq('id', players[randomIdx].id)
-    }
-
     // Guarda contagens efetivas
     await service
       .from('vanacamp_sessions')
       .update({ config_json: { ...(session.config_json as object), role_counts: config } })
       .eq('id', sessionId)
+  }
+
+  // Diretor automático — também quando os papéis são atribuídos à mão, senão
+  // o Narrador ficava sem Diretor e a confirmação falhava até escolher um.
+  if (session.mayor_mode === 'auto' && players) {
+    await service.from('vanacamp_players').update({ is_mayor: false }).eq('session_id', sessionId)
+    const randomIdx = Math.floor(Math.random() * players.length)
+    await service
+      .from('vanacamp_players')
+      .update({ is_mayor: true })
+      .eq('id', players[randomIdx].id)
   }
 
   const { error: updateError } = await service
@@ -602,15 +604,20 @@ export async function getRolePreviewData(sessionId: string): Promise<{
   if (!players) return { error: 'Sem jogadores.' }
 
   // Histórico — últimas 3 sessões terminadas por cada user_id
-  const userIds = players.map((p) => p.user_id)
-  const { data: history } = await service
-    .from('vanacamp_players')
-    .select('user_id, role, is_mayor, session_id, vanacamp_sessions!inner(id, ended_at, status)')
-    .in('user_id', userIds)
-    .neq('session_id', sessionId)
-    .eq('vanacamp_sessions.status', 'finished')
-    .order('ended_at', { ascending: false, referencedTable: 'vanacamp_sessions' })
-    .limit(60)
+  // Os bots não têm user_id: um null na lista fazia a consulta falhar e ninguém
+  // ficava com histórico nas sessões de teste.
+  const userIds = players.map((p) => p.user_id).filter((id): id is string => !!id)
+  const { data: history } = userIds.length === 0
+    ? { data: [] }
+    : await service
+        .from('vanacamp_players')
+        .select('user_id, role, is_mayor, session_id, joined_at, vanacamp_sessions!inner(id, ended_at, status)')
+        .in('user_id', userIds)
+        .neq('session_id', sessionId)
+        .eq('vanacamp_sessions.status', 'finished')
+        // Mais recentes primeiro (a ordenação pela tabela embutida não ordena as linhas).
+        .order('joined_at', { ascending: false })
+        .limit(300)
 
   const historyByUser = new Map<string, VanaCampRoleHistoryEntry[]>()
   for (const h of history ?? []) {
@@ -701,6 +708,8 @@ export async function regenerateRoles(sessionId: string): Promise<{ error?: stri
   return {}
 }
 
+const VALID_ROLES: VanaCampRole[] = ['infiltrator', 'seer', 'guardian', 'villager']
+
 /** Define o papel de um único jogador (não valida contagens — só validamos ao confirmar). */
 export async function updatePlayerRole(
   sessionId: string,
@@ -718,6 +727,7 @@ export async function updatePlayerRole(
   if (!session) return { error: 'Sessão não encontrada.' }
   if (session.host_id !== user.id) return { error: 'Apenas o host.' }
   if (session.status !== 'role_preview') return { error: 'Não estás na fase de preview.' }
+  if (!VALID_ROLES.includes(role)) return { error: 'Papel inválido.' }
 
   const { error } = await service
     .from('vanacamp_players')
@@ -749,6 +759,7 @@ export async function swapPlayerRoles(
   const { data: pair } = await service
     .from('vanacamp_players')
     .select('id, role')
+    .eq('session_id', sessionId)
     .in('id', [playerAId, playerBId])
   if (!pair || pair.length !== 2) return { error: 'Jogadores inválidos.' }
 
@@ -781,7 +792,11 @@ export async function setMayor(
   // Limpa todos primeiro
   await service.from('vanacamp_players').update({ is_mayor: false }).eq('session_id', sessionId)
   if (playerId) {
-    await service.from('vanacamp_players').update({ is_mayor: true }).eq('id', playerId)
+    await service
+      .from('vanacamp_players')
+      .update({ is_mayor: true })
+      .eq('id', playerId)
+      .eq('session_id', sessionId)
   }
   return {}
 }
@@ -934,7 +949,9 @@ export async function startMayorElection(sessionId: string): Promise<{ error?: s
       return { error: 'O modo de Mayor desta sessão não é por eleição.' }
     }
     const service = createServiceClient()
-    await setPhase(sessionId, 'mayor_election')
+    if (!(await setPhase(sessionId, 'mayor_election', { from: 'role_reveal' }))) {
+      return { error: PHASE_ALREADY_CHANGED }
+    }
     await service.from('vanacamp_events').insert({
       session_id: sessionId,
       day_number: 0,
@@ -1084,6 +1101,12 @@ export async function resolveMayorElection(sessionId: string): Promise<{ error?:
       ? await service.from('vanacamp_players').select('display_name').eq('id', mayorId).single()
       : { data: null }
 
+    // Avança automaticamente para a primeira noite
+    const newDay = 1
+    if (!(await setPhase(sessionId, 'night_infiltrators', { day_number: newDay, from: 'mayor_election' }))) {
+      return { error: PHASE_ALREADY_CHANGED }
+    }
+
     await service.from('vanacamp_events').insert({
       session_id: sessionId,
       day_number: 0,
@@ -1094,10 +1117,6 @@ export async function resolveMayorElection(sessionId: string): Promise<{ error?:
         counts: Object.fromEntries(tally),
       },
     })
-
-    // Avança automaticamente para a primeira noite
-    const newDay = 1
-    await setPhase(sessionId, 'night_infiltrators', { day_number: newDay })
     await service.from('vanacamp_events').insert({
       session_id: sessionId,
       day_number: newDay,
@@ -1142,12 +1161,13 @@ async function nextNightSubphase(
 
 /**
  * Define a nova fase e seu timer. Não emite eventos (faz isso quem chama).
+ * Com `from`, devolve false (sem alterar nada) se a sessão já não estiver nessa fase.
  */
 async function setPhase(
   sessionId: string,
   newStatus: string,
-  options: { day_number?: number; seconds?: number } = {},
-) {
+  options: { day_number?: number; seconds?: number; from?: string } = {},
+): Promise<boolean> {
   const service = createServiceClient()
   const seconds =
     options.seconds ??
@@ -1162,8 +1182,15 @@ async function setPhase(
     phase_paused_at: null,
   }
   if (options.day_number !== undefined) update.day_number = options.day_number
-  await service.from('vanacamp_sessions').update(update).eq('id', sessionId)
+  let query = service.from('vanacamp_sessions').update(update).eq('id', sessionId)
+  // Só muda se a sessão ainda estiver na fase de onde partimos: dois pedidos
+  // quase simultâneos (dois separadores, toque duplo) não saltam uma fase.
+  if (options.from) query = query.eq('status', options.from)
+  const { data } = await query.select('id')
+  return (data ?? []).length > 0
 }
+
+const PHASE_ALREADY_CHANGED = 'A fase já tinha mudado. Atualiza a página.'
 
 /** Emite vibração para um grupo (resolve targets no servidor). */
 async function emitVibrationForRole(
@@ -1208,7 +1235,9 @@ export async function startNight(sessionId: string): Promise<{ error?: string }>
     const newDay = session.status === 'mayor_election'
       ? session.day_number
       : (session.day_number ?? 0) + 1
-    await setPhase(sessionId, 'night_infiltrators', { day_number: newDay })
+    if (!(await setPhase(sessionId, 'night_infiltrators', { day_number: newDay, from: session.status }))) {
+      return { error: PHASE_ALREADY_CHANGED }
+    }
 
     await service.from('vanacamp_events').insert({
       session_id: sessionId,
@@ -1246,7 +1275,9 @@ export async function advanceNightPhase(sessionId: string): Promise<{ error?: st
     const next = await nextNightSubphase(sessionId, session.status as 'night_infiltrators' | 'night_seer' | 'night_guardian')
 
     if (next) {
-      await setPhase(sessionId, next)
+      if (!(await setPhase(sessionId, next, { from: session.status }))) {
+        return { error: PHASE_ALREADY_CHANGED }
+      }
       await service.from('vanacamp_events').insert({
         session_id: sessionId,
         day_number: session.day_number,
@@ -1260,7 +1291,7 @@ export async function advanceNightPhase(sessionId: string): Promise<{ error?: st
     }
 
     // Acabou a noite — resolve
-    await resolveNightAndAdvanceToDay(sessionId, session.day_number)
+    await resolveNightAndAdvanceToDay(sessionId, session.day_number, session.status)
     revalidatePath(`/jogos/vana-camp/${sessionId}`)
     return {}
   } catch (e) {
@@ -1271,7 +1302,7 @@ export async function advanceNightPhase(sessionId: string): Promise<{ error?: st
 /**
  * Calcula sabotagem, aplica eliminações, regista eventos, verifica vitória.
  */
-async function resolveNightAndAdvanceToDay(sessionId: string, dayNumber: number) {
+async function resolveNightAndAdvanceToDay(sessionId: string, dayNumber: number, fromStatus: string) {
   const service = createServiceClient()
 
   const { data: actions } = await service
@@ -1337,7 +1368,7 @@ async function resolveNightAndAdvanceToDay(sessionId: string, dayNumber: number)
   const winner = checkWinCondition(snapshots.filter((s) => s.role !== null))
 
   if (winner) {
-    await service
+    const { data: finished } = await service
       .from('vanacamp_sessions')
       .update({
         status: 'finished',
@@ -1345,6 +1376,9 @@ async function resolveNightAndAdvanceToDay(sessionId: string, dayNumber: number)
         ended_at: new Date().toISOString(),
       })
       .eq('id', sessionId)
+      .eq('status', fromStatus)
+      .select('id')
+    if (!finished || finished.length === 0) return
     await service.from('vanacamp_events').insert({
       session_id: sessionId,
       day_number: dayNumber,
@@ -1355,7 +1389,7 @@ async function resolveNightAndAdvanceToDay(sessionId: string, dayNumber: number)
   }
 
   // Avança para day_announce
-  await setPhase(sessionId, 'day_announce')
+  if (!(await setPhase(sessionId, 'day_announce', { from: fromStatus }))) return
   await service.from('vanacamp_events').insert({
     session_id: sessionId,
     day_number: dayNumber,
@@ -1802,7 +1836,9 @@ export async function startDayDiscussion(sessionId: string): Promise<{ error?: s
       return { error: 'Só podes começar a discussão depois do anúncio.' }
     }
     const service = createServiceClient()
-    await setPhase(sessionId, 'day_discussion')
+    if (!(await setPhase(sessionId, 'day_discussion', { from: 'day_announce' }))) {
+      return { error: PHASE_ALREADY_CHANGED }
+    }
     await service.from('vanacamp_events').insert({
       session_id: sessionId,
       day_number: session.day_number,
@@ -1824,7 +1860,9 @@ export async function startDayVote(sessionId: string): Promise<{ error?: string 
       return { error: 'Só podes começar a votação depois da discussão.' }
     }
     const service = createServiceClient()
-    await setPhase(sessionId, 'day_vote')
+    if (!(await setPhase(sessionId, 'day_vote', { from: 'day_discussion' }))) {
+      return { error: PHASE_ALREADY_CHANGED }
+    }
     await service.from('vanacamp_events').insert({
       session_id: sessionId,
       day_number: session.day_number,
@@ -2137,7 +2175,7 @@ export async function resolveDayVote(sessionId: string): Promise<{ error?: strin
     const winner = checkWinCondition(snapshots)
 
     if (winner) {
-      await service
+      const { data: finished } = await service
         .from('vanacamp_sessions')
         .update({
           status: 'finished',
@@ -2145,6 +2183,9 @@ export async function resolveDayVote(sessionId: string): Promise<{ error?: strin
           ended_at: new Date().toISOString(),
         })
         .eq('id', sessionId)
+        .eq('status', 'day_vote')
+        .select('id')
+      if (!finished || finished.length === 0) return { error: PHASE_ALREADY_CHANGED }
       await service.from('vanacamp_events').insert({
         session_id: sessionId,
         day_number: session.day_number,
@@ -2155,7 +2196,9 @@ export async function resolveDayVote(sessionId: string): Promise<{ error?: strin
       return {}
     }
 
-    await setPhase(sessionId, 'day_result')
+    if (!(await setPhase(sessionId, 'day_result', { from: 'day_vote' }))) {
+      return { error: PHASE_ALREADY_CHANGED }
+    }
     await service.from('vanacamp_events').insert({
       session_id: sessionId,
       day_number: session.day_number,
@@ -2168,6 +2211,26 @@ export async function resolveDayVote(sessionId: string): Promise<{ error?: strin
   } catch (e) { return { error: e instanceof Error ? e.message : 'Erro.' } }
 }
 
+/** Garante que o utilizador é o Narrador ou um jogador desta sessão. */
+async function requireSessionMember(sessionId: string) {
+  const { user } = await requireUser()
+  const service = createServiceClient()
+  const { data: session } = await service
+    .from('vanacamp_sessions')
+    .select('host_id')
+    .eq('id', sessionId)
+    .maybeSingle()
+  if (!session) throw new Error('Sessão não encontrada.')
+  if (session.host_id === user.id) return
+  const { data: me } = await service
+    .from('vanacamp_players')
+    .select('id')
+    .eq('session_id', sessionId)
+    .eq('user_id', user.id)
+    .maybeSingle()
+  if (!me) throw new Error('Não estás nesta sessão.')
+}
+
 /**
  * Devolve o resultado da votação (para o ecrã de day_result).
  */
@@ -2178,6 +2241,7 @@ export async function getDayResult(sessionId: string, dayNumber: number): Promis
   error?: string
 }> {
   try {
+    await requireSessionMember(sessionId)
     const service = createServiceClient()
     const { data: event } = await service
       .from('vanacamp_events')
@@ -2297,9 +2361,16 @@ async function computeRewards(sessionId: string): Promise<SessionRewardSummary> 
       const guardianActions = (nightActions ?? []).filter(
         (a) => a.phase === 'guardian' && a.actor_player_id === p.id,
       )
-      const saves = guardianActions.filter((ga) =>
-        (events ?? []).some((e) => e.event_type === 'save' && e.day_number === ga.day_number),
-      ).length
+      // Só conta para o Conselheiro que protegeu mesmo o alvo dessa noite
+      // (pode haver mais de um Conselheiro numa distribuição personalizada).
+      const saves = guardianActions.filter((ga) => {
+        const hadSave = (events ?? []).some((e) => e.event_type === 'save' && e.day_number === ga.day_number)
+        if (!hadSave) return false
+        const night = resolveNight(
+          (nightActions ?? []).filter((a) => a.day_number === ga.day_number) as never,
+        )
+        return night.saved && night.sabotage_target_id === ga.target_player_id
+      }).length
       if (saves > 0) {
         const xp = saves * REWARDS.guardian_save.xp
         const gold = saves * REWARDS.guardian_save.gold
@@ -2308,9 +2379,14 @@ async function computeRewards(sessionId: string): Promise<SessionRewardSummary> 
       }
     }
     if (p.is_mayor) {
-      const tiebreaks = (events ?? []).filter(
-        (e) => e.event_type === 'vote_tally' && (e.payload as { mayor_tiebreak_used?: boolean })?.mayor_tiebreak_used,
-      ).length
+      // Por dia (um apuramento repetido não conta duas vezes).
+      const tiebreaks = new Set(
+        (events ?? [])
+          .filter(
+            (e) => e.event_type === 'vote_tally' && (e.payload as { mayor_tiebreak_used?: boolean })?.mayor_tiebreak_used,
+          )
+          .map((e) => e.day_number),
+      ).size
       if (tiebreaks > 0) {
         const xp = tiebreaks * REWARDS.mayor_tiebreak.xp
         const gold = tiebreaks * REWARDS.mayor_tiebreak.gold
@@ -2428,6 +2504,19 @@ export async function awardRewards(sessionId: string): Promise<{
     if (session.rewards_awarded) return { error: 'Os prémios já foram atribuídos a esta sessão.' }
 
     const summary = await computeRewards(sessionId)
+
+    // Tranca primeiro: só o pedido que muda rewards_awarded de false para true
+    // dá os pontos (dois toques seguidos não os dão a dobrar).
+    const { data: claimed } = await service
+      .from('vanacamp_sessions')
+      .update({ rewards_awarded: true })
+      .eq('id', sessionId)
+      .eq('rewards_awarded', false)
+      .select('id')
+    if (!claimed || claimed.length === 0) {
+      return { error: 'Os prémios já foram atribuídos a esta sessão.' }
+    }
+
     let awarded = 0
     let skipped = 0
 
@@ -2449,11 +2538,6 @@ export async function awardRewards(sessionId: string): Promise<{
       awarded++
     }
 
-    await service
-      .from('vanacamp_sessions')
-      .update({ rewards_awarded: true })
-      .eq('id', sessionId)
-
     revalidatePath(`/jogos/vana-camp/${sessionId}`)
     return { ok: true, awarded, skipped_bots: skipped }
   } catch (e) { return { error: e instanceof Error ? e.message : 'Erro.' } }
@@ -2470,7 +2554,8 @@ export async function sendChatMessage(
   actAsPlayerId?: string,
 ): Promise<{ error?: string }> {
   try {
-    const trimmed = content.trim().slice(0, 500)
+    if (!['lobby', 'infiltrators', 'day', 'dead'].includes(channel)) return { error: 'Canal inválido.' }
+    const trimmed = String(content ?? '').trim().slice(0, 500)
     if (!trimmed) return { error: 'Mensagem vazia.' }
 
     const { user } = await requireUser()
@@ -2480,6 +2565,9 @@ export async function sendChatMessage(
     // Verificações por canal
     if (channel === 'infiltrators' && (actor.role !== 'infiltrator' || !actor.is_alive)) {
       return { error: 'Canal restrito a infiltrados vivos.' }
+    }
+    if (channel === 'day' && !actor.is_alive) {
+      return { error: 'Já estás em casa — não podes falar na assembleia.' }
     }
     if (channel === 'dead' && actor.is_alive) {
       return { error: 'Canal restrito a quem já foi para casa.' }

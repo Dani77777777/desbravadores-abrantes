@@ -13,7 +13,7 @@
 -- os ficheiros supabase-teste-*.sql (dados de teste do VanaCoro).
 --
 -- Conteúdo: 7 enums · 92 tabelas · 5 vistas · 120 funções · 26 triggers
---           56 índices · 164 políticas RLS (+ 9 no storage) · trigger de perfil em auth.users
+--           56 índices · 161 políticas RLS (+ 9 no storage) · trigger de perfil em auth.users
 --           457 linhas de dados iniciais (definições, packs, versículos, perguntas)
 --
 -- COMO CORRER
@@ -10536,9 +10536,9 @@ CREATE POLICY vanacamp_events_insert_host ON public.vanacamp_events FOR INSERT T
 -- Name: vanacamp_events vanacamp_events_select; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY vanacamp_events_select ON public.vanacamp_events FOR SELECT TO authenticated USING (((EXISTS ( SELECT 1
+CREATE POLICY vanacamp_events_select ON public.vanacamp_events FOR SELECT TO authenticated USING ((public.vanacamp_is_host(session_id) OR ((event_type <> 'eyes_closed'::text) AND (EXISTS ( SELECT 1
    FROM public.vanacamp_players p
-  WHERE ((p.session_id = vanacamp_events.session_id) AND (p.user_id = auth.uid())))) OR public.vanacamp_is_host(session_id)));
+  WHERE ((p.session_id = vanacamp_events.session_id) AND (p.user_id = auth.uid()) AND ((vanacamp_events.event_type <> 'vibrate'::text) OR (jsonb_typeof((vanacamp_events.payload -> 'target_player_ids'::text)) IS DISTINCT FROM 'array'::text) OR ((vanacamp_events.payload -> 'target_player_ids'::text) ? (p.id)::text))))))));
 
 
 --
@@ -10546,15 +10546,6 @@ CREATE POLICY vanacamp_events_select ON public.vanacamp_events FOR SELECT TO aut
 --
 
 ALTER TABLE public.vanacamp_messages ENABLE ROW LEVEL SECURITY;
-
---
--- Name: vanacamp_messages vanacamp_messages_insert_own; Type: POLICY; Schema: public; Owner: -
---
-
-CREATE POLICY vanacamp_messages_insert_own ON public.vanacamp_messages FOR INSERT TO authenticated WITH CHECK (((EXISTS ( SELECT 1
-   FROM public.vanacamp_players p
-  WHERE ((p.id = vanacamp_messages.sender_player_id) AND (p.user_id = auth.uid())))) AND ((channel = ANY (ARRAY['lobby'::text, 'day'::text])) OR ((channel = 'infiltrators'::text) AND public.vanacamp_is_infiltrator(session_id)) OR ((channel = 'dead'::text) AND public.vanacamp_is_dead_player(session_id)))));
-
 
 --
 -- Name: vanacamp_messages vanacamp_messages_select_by_channel; Type: POLICY; Schema: public; Owner: -
@@ -10570,15 +10561,6 @@ CREATE POLICY vanacamp_messages_select_by_channel ON public.vanacamp_messages FO
 --
 
 ALTER TABLE public.vanacamp_night_actions ENABLE ROW LEVEL SECURITY;
-
---
--- Name: vanacamp_night_actions vanacamp_night_actions_insert_own; Type: POLICY; Schema: public; Owner: -
---
-
-CREATE POLICY vanacamp_night_actions_insert_own ON public.vanacamp_night_actions FOR INSERT TO authenticated WITH CHECK ((EXISTS ( SELECT 1
-   FROM public.vanacamp_players p
-  WHERE ((p.id = vanacamp_night_actions.actor_player_id) AND (p.user_id = auth.uid()) AND (p.is_alive = true)))));
-
 
 --
 -- Name: vanacamp_night_actions vanacamp_night_actions_select_own; Type: POLICY; Schema: public; Owner: -
@@ -10599,21 +10581,25 @@ ALTER TABLE public.vanacamp_players ENABLE ROW LEVEL SECURITY;
 -- Name: vanacamp_players vanacamp_players_delete_self_or_host; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY vanacamp_players_delete_self_or_host ON public.vanacamp_players FOR DELETE TO authenticated USING (((user_id = auth.uid()) OR public.vanacamp_is_host(session_id) OR (public.get_my_role() = 'coordenador'::text)));
+CREATE POLICY vanacamp_players_delete_self_or_host ON public.vanacamp_players FOR DELETE TO authenticated USING ((((user_id = auth.uid()) AND (EXISTS ( SELECT 1
+   FROM public.vanacamp_sessions s
+  WHERE ((s.id = vanacamp_players.session_id) AND (s.status = 'lobby'::text))))) OR public.vanacamp_is_host(session_id) OR (public.get_my_role() = 'coordenador'::text)));
 
 
 --
 -- Name: vanacamp_players vanacamp_players_insert_self; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY vanacamp_players_insert_self ON public.vanacamp_players FOR INSERT TO authenticated WITH CHECK (((user_id = auth.uid()) AND (role IS NULL)));
+CREATE POLICY vanacamp_players_insert_self ON public.vanacamp_players FOR INSERT TO authenticated WITH CHECK (((user_id = auth.uid()) AND (role IS NULL) AND (is_mayor = false) AND (is_alive = true) AND (is_bot = false) AND (EXISTS ( SELECT 1
+   FROM public.vanacamp_sessions s
+  WHERE ((s.id = vanacamp_players.session_id) AND (s.status = 'lobby'::text))))));
 
 
 --
 -- Name: vanacamp_players vanacamp_players_select_self_or_host; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY vanacamp_players_select_self_or_host ON public.vanacamp_players FOR SELECT TO authenticated USING (((user_id = auth.uid()) OR public.vanacamp_is_host(session_id) OR public.vanacamp_is_infiltrator(session_id) OR public.vanacamp_is_dead_player(session_id)));
+CREATE POLICY vanacamp_players_select_self_or_host ON public.vanacamp_players FOR SELECT TO authenticated USING (((user_id = auth.uid()) OR public.vanacamp_is_host(session_id) OR ((role = 'infiltrator'::text) AND public.vanacamp_is_infiltrator(session_id))));
 
 
 --
@@ -10662,15 +10648,6 @@ CREATE POLICY vanacamp_sessions_update ON public.vanacamp_sessions FOR UPDATE TO
 --
 
 ALTER TABLE public.vanacamp_votes ENABLE ROW LEVEL SECURITY;
-
---
--- Name: vanacamp_votes vanacamp_votes_insert_own; Type: POLICY; Schema: public; Owner: -
---
-
-CREATE POLICY vanacamp_votes_insert_own ON public.vanacamp_votes FOR INSERT TO authenticated WITH CHECK ((EXISTS ( SELECT 1
-   FROM public.vanacamp_players p
-  WHERE ((p.id = vanacamp_votes.voter_player_id) AND (p.user_id = auth.uid()) AND (p.is_alive = true)))));
-
 
 --
 -- Name: vanacamp_votes vanacamp_votes_select_all_in_session; Type: POLICY; Schema: public; Owner: -
@@ -13070,7 +13047,6 @@ GRANT ALL ON TABLE public.vanacamp_players TO service_role;
 -- Name: TABLE vanacamp_players_public; Type: ACL; Schema: public; Owner: -
 --
 
-GRANT ALL ON TABLE public.vanacamp_players_public TO anon;
 GRANT ALL ON TABLE public.vanacamp_players_public TO authenticated;
 GRANT ALL ON TABLE public.vanacamp_players_public TO service_role;
 
