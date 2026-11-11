@@ -8,6 +8,7 @@ import { createClient } from '@/utils/supabase/client'
 import { usePlayerList } from './usePlayerList'
 import { useVibrationSignal } from './useVibrationSignal'
 import { VibrationFlash } from './VibrationFlash'
+import { VibrationTest } from './VibrationTest'
 import { usePhaseReload } from './usePhaseReload'
 
 interface Props {
@@ -75,6 +76,9 @@ export function PlayerLobby({ sessionId, code, myPlayerId, impersonatingBotName 
           {code}
         </div>
       </section>
+
+      {/* Bots não têm telemóvel: só os jogadores reais testam a vibração */}
+      {!impersonatingBotName && <VibrationTest />}
 
       <section className="bg-stone-800/60 border border-amber-700/40 rounded-lg p-4">
         <h2 className="text-amber-200 font-semibold flex items-center gap-2 mb-3 text-sm uppercase tracking-wide">
