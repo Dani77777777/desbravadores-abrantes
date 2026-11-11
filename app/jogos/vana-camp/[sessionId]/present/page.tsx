@@ -2,6 +2,7 @@ import { redirect, notFound } from 'next/navigation'
 import { createClient } from '@/utils/supabase/server'
 import { getSiteUrl } from '@/utils/site-url'
 import { Presentation } from '@/components/vana-camp/Presentation'
+import PresentationReceiver from '@/components/presentation-effects/PresentationReceiver'
 
 /**
  * Vista para projetor / TV. Apenas o Narrador (host) pode aceder.
@@ -33,16 +34,20 @@ export default async function VanaCampPresentPage({
   const joinUrl = `${siteUrl}/jogos/vana-camp?code=${session.code}`
 
   return (
-    <Presentation
-      sessionId={sessionId}
-      initialStatus={session.status}
-      initialDayNumber={session.day_number}
-      initialPhaseEndsAt={session.phase_ends_at}
-      initialPhasePausedAt={session.phase_paused_at}
-      initialPhaseStartedAt={session.phase_started_at}
-      code={session.code}
-      joinUrl={joinUrl}
-      winnerSide={session.winner_side}
-    />
+    <>
+      <Presentation
+        sessionId={sessionId}
+        initialStatus={session.status}
+        initialDayNumber={session.day_number}
+        initialPhaseEndsAt={session.phase_ends_at}
+        initialPhasePausedAt={session.phase_paused_at}
+        initialPhaseStartedAt={session.phase_started_at}
+        code={session.code}
+        joinUrl={joinUrl}
+        winnerSide={session.winner_side}
+      />
+      {/* Desenha por cima do jogo os efeitos que o Narrador dispara no painel de controlo */}
+      <PresentationReceiver />
+    </>
   )
 }

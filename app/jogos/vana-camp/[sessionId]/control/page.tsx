@@ -12,6 +12,7 @@ import { DayAnnouncement } from '@/components/vana-camp/DayAnnouncement'
 import { HostDebugOverlay } from '@/components/vana-camp/HostDebugOverlay'
 import { HostChatMonitor } from '@/components/vana-camp/HostChatMonitor'
 import { OpenPresentButton } from '@/components/vana-camp/OpenPresentButton'
+import PresentationController from '@/components/presentation-effects/PresentationController'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -45,8 +46,10 @@ export default async function VanaCampControlPage({
     <div className="min-h-screen bg-gradient-to-br from-stone-900 via-amber-950 to-stone-900">
       <OpenPresentButton sessionId={sessionId} />
       {children}
-      <HostChatMonitor sessionId={sessionId} players={chatPlayers ?? []} raised={session.is_test_session} />
+      <HostChatMonitor sessionId={sessionId} players={chatPlayers ?? []} />
       {session.is_test_session && <HostDebugOverlay sessionId={sessionId} />}
+      {/* Efeitos para o projetor (confettis, cortina, tambores…), os mesmos dos outros jogos */}
+      <PresentationController />
     </div>
   )
 

@@ -9,8 +9,6 @@ interface Props {
   sessionId: string
   /** Todos os jogadores da sessão (vivos, em casa e bots) para resolver nomes. */
   players: { id: string; display_name: string }[]
-  /** Sobe o painel para não colidir com o HostDebugOverlay (sessões de teste). */
-  raised?: boolean
 }
 
 const CHANNEL_META: Record<VanaCampChannel, { label: string; text: string; dot: string }> = {
@@ -32,9 +30,10 @@ const FILTERS: { key: Filter; label: string }[] = [
 /**
  * Painel flutuante do Narrador para ler TODOS os chats da sessão, incluindo o
  * dos infiltrados (RLS já autoriza o host em todos os canais via is_host).
- * Fica em baixo à direita (o HostAlertPanel ocupa a esquerda).
+ * Fica em baixo à esquerda, por cima do HostAlertPanel. O canto inferior
+ * direito é do botão dos efeitos do projetor (PresentationController).
  */
-export function HostChatMonitor({ sessionId, players, raised }: Props) {
+export function HostChatMonitor({ sessionId, players }: Props) {
   const [open, setOpen] = useState(false)
   const [filter, setFilter] = useState<Filter>('all')
   const [messages, setMessages] = useState<VanaCampMessage[]>([])
@@ -77,7 +76,7 @@ export function HostChatMonitor({ sessionId, players, raised }: Props) {
   const unread = messages.length - lastSeen
 
   return (
-    <div className={`fixed ${raised ? 'bottom-24' : 'bottom-4'} right-4 z-40 max-w-[calc(100vw-2rem)]`}>
+    <div className="fixed bottom-20 left-4 z-40 max-w-[calc(100vw-2rem)]">
       {!open ? (
         <button
           onClick={() => setOpen(true)}
