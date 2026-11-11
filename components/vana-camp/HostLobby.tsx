@@ -1,8 +1,9 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
-import { useMemo, useState } from 'react'
-import { Flame, Users, Play, X, AlertTriangle, Bot, Plus, Trash2 } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { Flame, Users, Play, X, AlertTriangle, Bot, Plus, Trash2, Maximize2 } from 'lucide-react'
+import { createClient } from '@/utils/supabase/client'
 import {
   advanceToRolePreview,
   cancelSession,
@@ -49,6 +50,26 @@ export function HostLobby({ sessionId, code, chatMode, mayorMode, assignMode, is
   const [error, setError] = useState<string | null>(null)
   const [botName, setBotName] = useState('')
   const [addingBot, setAddingBot] = useState(false)
+  const [qrZoomed, setQrZoomed] = useState(false)
+  const broadcastRef = useRef<ReturnType<ReturnType<typeof createClient>['channel']> | null>(null)
+
+  // Canal de comandos para o projetor (QR ampliado), como no VanaQuest/VanaEspada.
+  useEffect(() => {
+    const supabase = createClient()
+    const ch = supabase.channel(`vc-present-cmd-${sessionId}`, { config: { broadcast: { self: false } } })
+    ch.subscribe()
+    broadcastRef.current = ch
+    return () => {
+      // Ao sair do lobby (jogo arrancou ou sessão cancelada), fecha o QR no projetor.
+      ch.send({ type: 'broadcast', event: 'cmd', payload: { qrZoomed: false } })
+      supabase.removeChannel(ch)
+      broadcastRef.current = null
+    }
+  }, [sessionId])
+
+  useEffect(() => {
+    broadcastRef.current?.send({ type: 'broadcast', event: 'cmd', payload: { qrZoomed } })
+  }, [qrZoomed])
 
   async function handleAddBot() {
     setError(null)
@@ -111,6 +132,30 @@ export function HostLobby({ sessionId, code, chatMode, mayorMode, assignMode, is
           {code}
         </div>
       </section>
+
+      {/* Ampliar QR no projetor */}
+      <button
+        type="button"
+        onClick={() => setQrZoomed((v) => !v)}
+        className={`w-full rounded-lg p-4 flex items-center gap-4 border active:scale-[0.98] transition-all ${
+          qrZoomed
+            ? 'bg-amber-400 text-amber-950 border-amber-300'
+            : 'bg-stone-800/60 text-amber-100 border-amber-700/40 hover:bg-stone-800'
+        }`}
+      >
+        <div className={`p-3 rounded-lg ${qrZoomed ? 'bg-amber-900/10' : 'bg-stone-900/60'}`}>
+          <Maximize2 className={`w-6 h-6 ${qrZoomed ? 'text-amber-950' : 'text-amber-300'}`} />
+        </div>
+        <div className="flex-1 text-left">
+          <p className="font-bold text-sm">
+            {qrZoomed ? 'A mostrar QR Code grande' : 'Ampliar QR Code na apresentação'}
+          </p>
+          <p className={`text-xs ${qrZoomed ? 'text-amber-950/70' : 'text-stone-400'}`}>
+            {qrZoomed ? 'Toca para fechar' : 'Toca para ampliar no projetor'}
+          </p>
+        </div>
+        {qrZoomed && <span className="w-2 h-2 bg-amber-950 rounded-full animate-pulse" />}
+      </button>
 
       {/* Config resumo */}
       <section className="grid grid-cols-1 md:grid-cols-3 gap-2 text-sm">

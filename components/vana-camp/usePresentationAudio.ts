@@ -10,8 +10,11 @@
  *   - `playSfx` — toca um efeito pontual; enquanto toca, baixa a música de
  *     fundo (ducking) e repõe o volume no fim.
  *
- * Autoplay: se o browser bloquear (projetor aberto sem interação), fica
- * armado um listener que retoma a música ao primeiro click/tecla/toque.
+ * Desbloqueio (mesmo padrão do VanaEspada/VanaQuest): até ao primeiro
+ * clique/tecla/toque na página não toca nada e a Presentation mostra o aviso
+ * "clica para ativar". Esse gesto liga a música da fase atual e põe o
+ * projetor em ecrã inteiro — os browsers só deixam fazer as duas coisas
+ * dentro de um gesto do utilizador.
  */
 
 import { useEffect, useRef, useState } from 'react'
@@ -64,22 +67,15 @@ const DUCK_FACTOR = 0.3
 
 let currentMusic: { key: MusicKey; audio: HTMLAudioElement; baseVolume: number } | null = null
 let duckCount = 0
-let unlockArmed = false
 const fadeTimers = new WeakMap<HTMLAudioElement, ReturnType<typeof setInterval>>()
 
 /**
- * true quando o browser recusou o autoplay e estamos à espera do primeiro
- * gesto do utilizador. A Presentation usa isto para mostrar o overlay
- * "clica para ativar o áudio" (mesmo padrão do VanaQuest/VanaWords).
+ * false até ao primeiro gesto do utilizador na página. Enquanto for false a
+ * Presentation mostra o overlay "clica para ativar o áudio e o ecrã inteiro".
+ * Vive no módulo para sobreviver aos `router.refresh()` entre fases.
  */
-let autoplayBlocked = false
-const blockedListeners = new Set<(blocked: boolean) => void>()
-
-function setAutoplayBlocked(blocked: boolean) {
-  if (autoplayBlocked === blocked) return
-  autoplayBlocked = blocked
-  blockedListeners.forEach((fn) => fn(blocked))
-}
+let audioUnlocked = false
+const unlockListeners = new Set<(unlocked: boolean) => void>()
 
 function clearFade(audio: HTMLAudioElement) {
   const t = fadeTimers.get(audio)
@@ -111,28 +107,20 @@ function musicTargetVolume(): number {
 }
 
 /**
- * Ao primeiro gesto do utilizador, retoma a música que o autoplay bloqueou.
+ * Primeiro gesto do utilizador: ecrã inteiro + música da fase atual.
+ * Tem de correr dentro do handler do clique/tecla/toque.
  */
-function armAutoplayUnlock() {
-  if (unlockArmed || typeof document === 'undefined') return
-  unlockArmed = true
-  const handler = () => {
-    document.removeEventListener('click', handler)
-    document.removeEventListener('keydown', handler)
-    document.removeEventListener('touchstart', handler)
-    unlockArmed = false
-    setAutoplayBlocked(false)
-    enterFullscreen()
-    const m = currentMusic
-    if (m && m.audio.paused) {
-      m.audio.play()
-        .then(() => fadeTo(m.audio, musicTargetVolume(), 800))
-        .catch(() => {})
-    }
+function unlockAudio() {
+  if (audioUnlocked) return
+  audioUnlocked = true
+  unlockListeners.forEach((fn) => fn(true))
+  enterFullscreen()
+  const m = currentMusic
+  if (m && m.audio.paused) {
+    m.audio.play()
+      .then(() => fadeTo(m.audio, musicTargetVolume(), 800))
+      .catch(() => {})
   }
-  document.addEventListener('click', handler)
-  document.addEventListener('keydown', handler)
-  document.addEventListener('touchstart', handler)
 }
 
 function stopMusic(fadeMs = 1000) {
@@ -156,22 +144,18 @@ function playMusic(key: MusicKey | null) {
   audio.volume = 0
   currentMusic = { key, audio, baseVolume: def.volume }
 
+  // Antes do primeiro clique fica só preparada; o unlockAudio() põe-na a tocar.
+  if (!audioUnlocked) return
   audio.play()
-    .then(() => {
-      setAutoplayBlocked(false)
-      fadeTo(audio, musicTargetVolume(), 1200)
-    })
-    .catch(() => {
-      setAutoplayBlocked(true)
-      armAutoplayUnlock()
-    })
+    .then(() => fadeTo(audio, musicTargetVolume(), 1200))
+    .catch(() => {})
 }
 
 /**
  * Toca um efeito sonoro pontual, baixando a música de fundo enquanto dura.
  */
 export function playSfx(name: SfxName, opts: { volume?: number } = {}) {
-  if (typeof Audio === 'undefined') return
+  if (typeof Audio === 'undefined' || !audioUnlocked) return
   const audio = new Audio(`${BASE}/sfx-${name}.mp3`)
   audio.volume = opts.volume ?? 0.9
 
@@ -233,13 +217,24 @@ export function usePresentationAudio(
   const statusRef = useRef(status)
   const prevStatusRef = useRef<string | null>(null)
   const nightWakeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const [audioBlocked, setAudioBlocked] = useState(autoplayBlocked)
+  const [unlocked, setUnlocked] = useState(audioUnlocked)
 
-  // Segue o estado de autoplay bloqueado (para o overlay "clica para ativar")
+  // Primeiro clique/tecla/toque em qualquer sítio da página → áudio + ecrã inteiro
   useEffect(() => {
-    const fn = (blocked: boolean) => setAudioBlocked(blocked)
-    blockedListeners.add(fn)
-    return () => { blockedListeners.delete(fn) }
+    const fn = (u: boolean) => setUnlocked(u)
+    unlockListeners.add(fn)
+    if (audioUnlocked) return () => { unlockListeners.delete(fn) }
+
+    const handler = () => unlockAudio()
+    document.addEventListener('click', handler)
+    document.addEventListener('keydown', handler)
+    document.addEventListener('touchstart', handler)
+    return () => {
+      unlockListeners.delete(fn)
+      document.removeEventListener('click', handler)
+      document.removeEventListener('keydown', handler)
+      document.removeEventListener('touchstart', handler)
+    }
   }, [])
 
   // Música de fundo por fase (crossfade tratado em playMusic)
@@ -311,5 +306,5 @@ export function usePresentationAudio(
     stopMusic(300)
   }, [])
 
-  return { audioBlocked }
+  return { audioBlocked: !unlocked }
 }

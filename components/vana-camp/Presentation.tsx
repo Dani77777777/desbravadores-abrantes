@@ -58,6 +58,18 @@ export function Presentation({
 
   const { audioBlocked } = usePresentationAudio(sessionId, status, liveWinner)
 
+  // QR ampliado, comandado pelo painel do Narrador (mesmo padrão do VanaQuest/VanaEspada).
+  const [qrZoomed, setQrZoomed] = useState(false)
+  useEffect(() => {
+    const supabase = createClient()
+    const ch = supabase.channel(`vc-present-cmd-${sessionId}`, { config: { broadcast: { self: false } } })
+    ch.on('broadcast', { event: 'cmd' }, ({ payload }) => {
+      if (typeof payload?.qrZoomed === 'boolean') setQrZoomed(payload.qrZoomed)
+    })
+    ch.subscribe()
+    return () => { supabase.removeChannel(ch) }
+  }, [sessionId])
+
   let screen: React.ReactNode
   if (status === 'lobby') {
     screen = <PresentLobby sessionId={sessionId} code={code} joinUrl={joinUrl} />
@@ -131,7 +143,21 @@ export function Presentation({
     <>
       {audioBlocked && <AudioUnlockOverlay />}
       {screen}
+      {qrZoomed && status === 'lobby' && <QrZoomOverlay code={code} url={joinUrl} />}
     </>
+  )
+}
+
+/** QR em ecrã inteiro, para quem está no fundo do salão. Comandado pelo Narrador. */
+function QrZoomOverlay({ code, url }: { code: string; url: string }) {
+  return (
+    <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-6 animate-in fade-in duration-300">
+      <div className="bg-white rounded-3xl p-10 shadow-2xl animate-in zoom-in-95 duration-500">
+        <QRCodeSVG value={url} size={500} style={{ width: 'min(500px, 60vh)', height: 'min(500px, 60vh)' }} />
+        <p className="text-center mt-6 text-5xl font-black font-mono text-gray-900 tracking-widest">{code}</p>
+        <p className="text-center text-gray-500 text-lg mt-2">Lê o código ou escreve o código da sala</p>
+      </div>
+    </div>
   )
 }
 
