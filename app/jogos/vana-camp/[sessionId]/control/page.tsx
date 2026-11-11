@@ -43,7 +43,13 @@ export default async function VanaCampControlPage({
     .eq('session_id', sessionId)
 
   const wrap = (children: React.ReactNode) => (
-    <div className="min-h-screen bg-gradient-to-br from-stone-900 via-amber-950 to-stone-900">
+    // `group/host` + data-test: os botões flutuantes da esquerda (debug, chat,
+    // alertas) empilham-se de baixo para cima conforme é ou não sessão de teste.
+    // pb-28: o fim da página não fica escondido atrás dos botões flutuantes.
+    <div
+      data-test={session.is_test_session ? 'true' : 'false'}
+      className="group/host min-h-screen pb-28 bg-gradient-to-br from-stone-900 via-amber-950 to-stone-900"
+    >
       <OpenPresentButton sessionId={sessionId} />
       {children}
       <HostChatMonitor sessionId={sessionId} players={chatPlayers ?? []} />

@@ -38,7 +38,8 @@ export function HostAlertPanel({ sessionId, players }: Props) {
   }
 
   return (
-    <div className="fixed bottom-4 left-4 z-40 max-w-xs">
+    // Por cima do chat na coluna da esquerda (e do debug, em sessões de teste).
+    <div className="fixed bottom-[86px] group-data-[test=true]/host:bottom-[142px] left-6 z-40 max-w-xs">
       {!open ? (
         <button
           onClick={() => setOpen(true)}
