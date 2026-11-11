@@ -11,6 +11,7 @@ import { HostFinishedPanel } from '@/components/vana-camp/HostFinishedPanel'
 import { DayAnnouncement } from '@/components/vana-camp/DayAnnouncement'
 import { HostDebugOverlay } from '@/components/vana-camp/HostDebugOverlay'
 import { HostChatMonitor } from '@/components/vana-camp/HostChatMonitor'
+import { HOST_DOCK_ALERTS_ID } from '@/components/vana-camp/host-dock'
 import { OpenPresentButton } from '@/components/vana-camp/OpenPresentButton'
 import PresentationController from '@/components/presentation-effects/PresentationController'
 
@@ -43,17 +44,20 @@ export default async function VanaCampControlPage({
     .eq('session_id', sessionId)
 
   const wrap = (children: React.ReactNode) => (
-    // `group/host` + data-test: os botões flutuantes da esquerda (debug, chat,
-    // alertas) empilham-se de baixo para cima conforme é ou não sessão de teste.
     // pb-28: o fim da página não fica escondido atrás dos botões flutuantes.
-    <div
-      data-test={session.is_test_session ? 'true' : 'false'}
-      className="group/host min-h-screen pb-28 bg-gradient-to-br from-stone-900 via-amber-950 to-stone-900"
-    >
+    <div className="min-h-screen pb-28 bg-gradient-to-br from-stone-900 via-amber-950 to-stone-900">
       <OpenPresentButton sessionId={sessionId} />
       {children}
-      <HostChatMonitor sessionId={sessionId} players={chatPlayers ?? []} />
-      {session.is_test_session && <HostDebugOverlay sessionId={sessionId} />}
+      {/* Coluna flutuante da esquerda, de baixo para cima: debug → chat → alertas.
+          Numa só coluna (flex-col-reverse), abrir um painel empurra os de cima em
+          vez de ficar por baixo deles. bottom-[30px]: o botão de baixo fica
+          centrado com o dos efeitos (bottom-6, 56px de altura). */}
+      <div className="fixed bottom-[30px] left-6 z-50 flex flex-col-reverse items-start gap-3 max-w-[calc(100vw-3rem)] pointer-events-none">
+        {session.is_test_session && <HostDebugOverlay sessionId={sessionId} />}
+        <HostChatMonitor sessionId={sessionId} players={chatPlayers ?? []} />
+        {/* O HostAlertPanel vive dentro dos monitores de cada fase e entra aqui por portal */}
+        <div id={HOST_DOCK_ALERTS_ID} className="contents" />
+      </div>
       {/* Efeitos para o projetor (confettis, cortina, tambores…), os mesmos dos outros jogos */}
       <PresentationController />
     </div>

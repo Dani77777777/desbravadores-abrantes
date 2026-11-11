@@ -68,9 +68,8 @@ export function HostDebugOverlay({ sessionId }: Props) {
   }, [sessionId])
 
   return (
-    <div className="fixed bottom-[30px] left-6 z-50 max-w-sm">
-      {/* Coluna da esquerda, de baixo para cima: debug → chat → alertas.
-          bottom-[30px]: centrado com o botão dos efeitos (bottom-6, 56px de altura). */}
+    // Vive na coluna flutuante do painel (control/page.tsx), por baixo do chat.
+    <div className="pointer-events-auto max-w-sm">
       {!open ? (
         <button
           onClick={() => setOpen(true)}

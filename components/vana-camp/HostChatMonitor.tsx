@@ -30,9 +30,8 @@ const FILTERS: { key: Filter; label: string }[] = [
 /**
  * Painel flutuante do Narrador para ler TODOS os chats da sessão, incluindo o
  * dos infiltrados (RLS já autoriza o host em todos os canais via is_host).
- * Fica em baixo à esquerda, ao nível do botão dos efeitos do projetor
- * (PresentationController, canto inferior direito). Em sessões de teste sobe
- * um lugar para dar o fundo ao HostDebugOverlay; o HostAlertPanel fica por cima.
+ * Vive na coluna flutuante do canto inferior esquerdo (control/page.tsx), entre
+ * o HostDebugOverlay (em baixo) e o HostAlertPanel (em cima).
  */
 export function HostChatMonitor({ sessionId, players }: Props) {
   const [open, setOpen] = useState(false)
@@ -77,7 +76,7 @@ export function HostChatMonitor({ sessionId, players }: Props) {
   const unread = messages.length - lastSeen
 
   return (
-    <div className="fixed bottom-[30px] group-data-[test=true]/host:bottom-[86px] left-6 z-40 max-w-[calc(100vw-3rem)]">
+    <div className="pointer-events-auto max-w-full">
       {!open ? (
         <button
           onClick={() => setOpen(true)}

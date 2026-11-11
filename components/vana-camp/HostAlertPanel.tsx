@@ -1,6 +1,8 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useSyncExternalStore } from 'react'
+import { createPortal } from 'react-dom'
+import { HOST_DOCK_ALERTS_ID } from './host-dock'
 import { Vibrate, Users, VenetianMask, Eye, Shield, ChevronUp, ChevronDown, Smartphone } from 'lucide-react'
 import { triggerVibration } from '@/lib/actions/vana-camp'
 import { isVibrationSupported } from '@/utils/vibrate'
@@ -23,6 +25,7 @@ export function HostAlertPanel({ sessionId, players }: Props) {
   const [busy, setBusy] = useState(false)
   const [feedback, setFeedback] = useState<string | null>(null)
   const [hostHasVibe, setHostHasVibe] = useState(true)
+  const dock = useHostDock()
 
   useEffect(() => {
     setHostHasVibe(isVibrationSupported())
@@ -37,9 +40,12 @@ export function HostAlertPanel({ sessionId, players }: Props) {
     setTimeout(() => setFeedback(null), 2500)
   }
 
-  return (
-    // Por cima do chat na coluna da esquerda (e do debug, em sessões de teste).
-    <div className="fixed bottom-[86px] group-data-[test=true]/host:bottom-[142px] left-6 z-40 max-w-xs">
+  // Antes de montar (SSR) ou fora do painel do Narrador não há onde pôr o painel.
+  if (!dock) return null
+
+  return createPortal(
+    // Topo da coluna flutuante do painel (control/page.tsx), por cima do chat.
+    <div className="pointer-events-auto max-w-xs">
       {!open ? (
         <button
           onClick={() => setOpen(true)}
@@ -147,6 +153,17 @@ export function HostAlertPanel({ sessionId, players }: Props) {
           </button>
         </div>
       )}
-    </div>
+    </div>,
+    dock,
+  )
+}
+
+const noopSubscribe = () => () => {}
+/** O slot da coluna flutuante (existe desde o primeiro render no cliente). */
+function useHostDock(): HTMLElement | null {
+  return useSyncExternalStore(
+    noopSubscribe,
+    () => document.getElementById(HOST_DOCK_ALERTS_ID),
+    () => null,
   )
 }
