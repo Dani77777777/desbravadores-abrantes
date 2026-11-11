@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
 import {
   Moon, Eye, Shield, VenetianMask, Play, Pause, FastForward, Plus, Check, AlertCircle,
 } from 'lucide-react'
@@ -16,7 +15,7 @@ import {
 import { createClient } from '@/utils/supabase/client'
 import { useLiveSession } from './useLiveSession'
 import { usePhaseCountdown } from './usePhaseCountdown'
-import { usePhaseReload } from './usePhaseReload'
+import { usePhaseReload, useOutOfPhaseRefresh } from './usePhaseReload'
 import { HostAlertPanel } from './HostAlertPanel'
 
 interface Props {
@@ -36,7 +35,6 @@ const PHASE_META: Record<string, { label: string; icon: typeof Moon; color: stri
 
 export function HostNightMonitor(props: Props) {
   const { sessionId, status, dayNumber, phaseEndsAt, phasePausedAt, allPlayers } = props
-  const router = useRouter()
   const live = useLiveSession(sessionId, {
     status,
     phase_ends_at: phaseEndsAt,
@@ -47,19 +45,9 @@ export function HostNightMonitor(props: Props) {
   const remaining = usePhaseCountdown(live.phase_ends_at, live.phase_paused_at)
 
   // Se o status "vivo" saiu da categoria noite, a fase mudou na BD mas o
-  // servidor renderizou esta página com a fase antiga. router.refresh() nem
-  // sempre invalida a route cache de forma fiável → hard reload (a página de
-  // controlo do host não tem dependências de user-activation como Vibration).
+  // servidor renderizou esta página com a fase antiga → refresh até apanhar.
   const outOfPhase = !(live.status in PHASE_META)
-  useEffect(() => {
-    if (outOfPhase) {
-      router.refresh()
-      const t = setTimeout(() => {
-        if (typeof window !== 'undefined') window.location.reload()
-      }, 800)
-      return () => clearTimeout(t)
-    }
-  }, [outOfPhase, router])
+  useOutOfPhaseRefresh(outOfPhase)
 
   const currentStatus = (live.status in PHASE_META ? live.status : status) as keyof typeof PHASE_META
   const liveDayNumber = live.day_number ?? dayNumber

@@ -18,6 +18,17 @@ const CHANNEL_META: Record<VanaCampChannel, { label: string; text: string; dot: 
   dead: { label: 'Em casa', text: 'text-sky-300', dot: 'bg-sky-400' },
 }
 
+/**
+ * Junta mensagens novas às que já temos, sem duplicados, por ordem de envio.
+ * Devolve o mesmo array se não houver nada novo (evita re-renders a cada poll).
+ */
+function mergeMessages(prev: VanaCampMessage[], incoming: VanaCampMessage[]): VanaCampMessage[] {
+  const known = new Set(prev.map((m) => m.id))
+  const fresh = incoming.filter((m) => !known.has(m.id))
+  if (fresh.length === 0) return prev
+  return [...prev, ...fresh].sort((a, b) => a.created_at.localeCompare(b.created_at))
+}
+
 type Filter = 'all' | VanaCampChannel
 const FILTERS: { key: Filter; label: string }[] = [
   { key: 'all', label: 'Todos' },
@@ -42,25 +53,35 @@ export function HostChatMonitor({ sessionId, players }: Props) {
 
   const nameById = new Map(players.map((p) => [p.id, p.display_name]))
 
+  // Realtime + polling. Antes só havia a leitura inicial + realtime: quando o
+  // websocket não entregava (acontecia com o chat dos Infiltrados), o Narrador
+  // só via as mensagens depois de a página recarregar. O polling a 3 s garante
+  // que chegam sempre; o merge por id evita duplicados entre as duas vias.
   useEffect(() => {
     const supabase = createClient()
     let mounted = true
-    supabase
-      .from('vanacamp_messages')
-      .select('*')
-      .eq('session_id', sessionId)
-      .order('created_at', { ascending: true })
-      .limit(300)
-      .then(({ data }) => { if (mounted && data) setMessages(data as VanaCampMessage[]) })
+
+    async function load() {
+      const { data } = await supabase
+        .from('vanacamp_messages')
+        .select('*')
+        .eq('session_id', sessionId)
+        .order('created_at', { ascending: false })
+        .limit(300)
+      if (mounted && data) setMessages((prev) => mergeMessages(prev, data as VanaCampMessage[]))
+    }
+
+    load()
     const ch = supabase
       .channel(`vc_host_chat_${sessionId}`)
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'vanacamp_messages', filter: `session_id=eq.${sessionId}` },
-        (payload) => setMessages((prev) => [...prev, payload.new as VanaCampMessage]),
+        (payload) => setMessages((prev) => mergeMessages(prev, [payload.new as VanaCampMessage])),
       )
-      .subscribe()
-    return () => { mounted = false; supabase.removeChannel(ch) }
+      .subscribe((status) => { if (status === 'SUBSCRIBED') load() })
+    const i = setInterval(load, 3000)
+    return () => { mounted = false; clearInterval(i); supabase.removeChannel(ch) }
   }, [sessionId])
 
   const filtered = filter === 'all' ? messages : messages.filter((m) => m.channel === filter)

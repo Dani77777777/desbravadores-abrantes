@@ -1,14 +1,13 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
 import { Crown, Play, Pause, Plus, FastForward, AlertCircle } from 'lucide-react'
 import {
   pausePhase, resumePhase, extendPhase, resolveMayorElection, getMayorElectionProgress,
 } from '@/lib/actions/vana-camp'
 import { createClient } from '@/utils/supabase/client'
 import { useLiveSession } from './useLiveSession'
-import { usePhaseReload } from './usePhaseReload'
+import { usePhaseReload, useOutOfPhaseRefresh } from './usePhaseReload'
 import { usePhaseCountdown } from './usePhaseCountdown'
 import { HostAlertPanel } from './HostAlertPanel'
 
@@ -30,20 +29,9 @@ export function HostMayorElectionMonitor({ sessionId, phaseEndsAt, phasePausedAt
   const remaining = usePhaseCountdown(live.phase_ends_at, live.phase_paused_at)
   const isPaused = !!live.phase_paused_at
 
-  // Quando a eleição é apurada, a fase passa a night_infiltrators. O soft
-  // router.refresh() nem sempre invalida a route cache do /control de forma
-  // fiável (mesmo problema do HostNightMonitor), por isso forçamos refresh +
-  // hard reload como fallback. O painel do host não depende de user-activation.
-  const router = useRouter()
+  // Quando a eleição é apurada, a fase passa a night_infiltrators → refresh até apanhar.
   const outOfPhase = live.status !== 'mayor_election'
-  useEffect(() => {
-    if (!outOfPhase) return
-    router.refresh()
-    const t = setTimeout(() => {
-      if (typeof window !== 'undefined') window.location.reload()
-    }, 800)
-    return () => clearTimeout(t)
-  }, [outOfPhase, router])
+  useOutOfPhaseRefresh(outOfPhase)
 
   const [tally, setTally] = useState<Record<string, number>>({})
   const [busy, setBusy] = useState(false)

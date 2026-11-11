@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
 import {
   Sun, Sunset, Vote, Play, Pause, FastForward, Plus, Check, AlertCircle, Crown, Moon, Home, Shield,
 } from 'lucide-react'
@@ -17,7 +16,7 @@ import {
 } from '@/lib/actions/vana-camp'
 import { createClient } from '@/utils/supabase/client'
 import { useLiveSession } from './useLiveSession'
-import { usePhaseReload } from './usePhaseReload'
+import { usePhaseReload, useOutOfPhaseRefresh } from './usePhaseReload'
 import { usePhaseCountdown } from './usePhaseCountdown'
 import { HostAlertPanel } from './HostAlertPanel'
 
@@ -39,7 +38,6 @@ const META = {
 
 export function HostDayMonitor(props: Props) {
   const { sessionId, status, dayNumber, phaseEndsAt, phasePausedAt, allPlayers } = props
-  const router = useRouter()
   const live = useLiveSession(sessionId, {
     status,
     phase_ends_at: phaseEndsAt,
@@ -50,15 +48,7 @@ export function HostDayMonitor(props: Props) {
   const remaining = usePhaseCountdown(live.phase_ends_at, live.phase_paused_at)
 
   const outOfPhase = !(live.status in META)
-  useEffect(() => {
-    if (outOfPhase) {
-      router.refresh()
-      const t = setTimeout(() => {
-        if (typeof window !== 'undefined') window.location.reload()
-      }, 800)
-      return () => clearTimeout(t)
-    }
-  }, [outOfPhase, router])
+  useOutOfPhaseRefresh(outOfPhase)
 
   const currentStatus = (live.status in META ? live.status : status) as keyof typeof META
   const liveDay = live.day_number ?? dayNumber
