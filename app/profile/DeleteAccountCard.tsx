@@ -11,10 +11,11 @@ import { AlertTriangle, MailCheck, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { createClient } from '@/utils/supabase/client'
 import { deleteOwnAccount, requestAccountDeletionCode } from './actions'
+import { HeirPicker, type HeirOption } from '@/components/profile/HeirPicker'
 
 const RESEND_COOLDOWN = 60
 
-export function DeleteAccountCard({ userEmail }: { userEmail: string }) {
+export function DeleteAccountCard({ userEmail, userId }: { userEmail: string; userId: string }) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [step, setStep] = useState<'warning' | 'code'>('warning')
@@ -23,6 +24,8 @@ export function DeleteAccountCard({ userEmail }: { userEmail: string }) {
   const [sending, setSending] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [cooldown, setCooldown] = useState(0)
+  const [heirId, setHeirId] = useState<string | null>(null)
+  const [heirOptions, setHeirOptions] = useState<HeirOption[] | null>(null)
 
   useEffect(() => {
     if (cooldown <= 0) return
@@ -30,10 +33,27 @@ export function DeleteAccountCard({ userEmail }: { userEmail: string }) {
     return () => clearTimeout(t)
   }, [cooldown])
 
+  // Lista de quem pode herdar o XP e o Gold, carregada ao abrir o diálogo.
+  useEffect(() => {
+    if (!open || heirOptions) return
+    let cancelled = false
+    createClient()
+      .from('profiles')
+      .select('id, full_name, avatar_url, section')
+      .order('full_name', { ascending: true })
+      .then(({ data }) => {
+        if (!cancelled) setHeirOptions((data || []).filter((p) => p.id !== userId))
+      })
+    return () => { cancelled = true }
+  }, [open, heirOptions, userId])
+
+  const heir = heirOptions?.find((o) => o.id === heirId) ?? null
+
   const reset = () => {
     setStep('warning')
     setUnderstood(false)
     setCode('')
+    setHeirId(null)
   }
 
   const sendCode = async () => {
@@ -58,7 +78,7 @@ export function DeleteAccountCard({ userEmail }: { userEmail: string }) {
     e.preventDefault()
     setDeleting(true)
     try {
-      const result = await deleteOwnAccount(code)
+      const result = await deleteOwnAccount(code, heirId)
       if (result.error) {
         toast.error(result.error)
         return
@@ -99,7 +119,7 @@ export function DeleteAccountCard({ userEmail }: { userEmail: string }) {
       </CardContent>
 
       <Dialog open={open} onOpenChange={(o) => { if (!deleting && !sending) setOpen(o) }}>
-        <DialogContent className="sm:max-w-[420px]">
+        <DialogContent className="max-h-[92vh] overflow-y-auto sm:max-w-[420px]">
           {step === 'warning' ? (
             <>
               <DialogHeader>
@@ -111,10 +131,23 @@ export function DeleteAccountCard({ userEmail }: { userEmail: string }) {
               </DialogHeader>
 
               <ul className="text-sm text-slate-600 space-y-1 list-disc pl-5">
-                <li>Perdes todo o XP e ouro acumulados.</li>
+                <li>
+                  {heir
+                    ? `O teu XP e ouro passam para ${heir.full_name}.`
+                    : 'Perdes todo o XP e ouro acumulados, a não ser que os deixes a alguém.'}
+                </li>
                 <li>O teu histórico de pontos e compras é apagado.</li>
                 <li>Deixas de aparecer no ranking e na tua classe.</li>
               </ul>
+
+              <HeirPicker
+                label="Deixar o teu XP e Gold a alguém (opcional)"
+                options={heirOptions ?? []}
+                loading={!heirOptions}
+                value={heirId}
+                onChange={setHeirId}
+                disabled={sending}
+              />
 
               <label className="flex items-start gap-2 rounded-lg border bg-slate-50 p-3 text-sm cursor-pointer">
                 <input
@@ -144,6 +177,12 @@ export function DeleteAccountCard({ userEmail }: { userEmail: string }) {
                   Enviámos um código de verificação para <span className="font-semibold text-slate-900 break-all">{userEmail}</span>.
                 </DialogDescription>
               </DialogHeader>
+
+              {heir && (
+                <p className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-slate-700">
+                  O teu XP e Gold passam para <span className="font-semibold text-slate-900">{heir.full_name}</span>.
+                </p>
+              )}
 
               <div className="space-y-1.5">
                 <Label htmlFor="deletion-code">Código de verificação</Label>

@@ -452,7 +452,7 @@ export default function ProfileSettings({ profile, user, userEmail, purchases, v
           </Panel>
 
           {/* Apagar conta */}
-          <DeleteAccountCard userEmail={userEmail} />
+          <DeleteAccountCard userEmail={userEmail} userId={user.id} />
         </div>
       </div>
 

@@ -10,35 +10,50 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { AlertTriangle } from 'lucide-react'
 import { toast } from 'sonner'
 import { deleteMemberAccount } from '../actions'
+import { HeirPicker, type HeirOption } from '@/components/profile/HeirPicker'
 
 const CONFIRM_WORD = 'APAGAR'
 
 interface DeleteMemberDialogProps {
   member: any | null
+  /** Todos os membros, para escolher quem herda o XP e o Gold. */
+  members: HeirOption[]
   open: boolean
   onOpenChange: (open: boolean) => void
 }
 
-export function DeleteMemberDialog({ member, open, onOpenChange }: DeleteMemberDialogProps) {
+export function DeleteMemberDialog({ member, members, open, onOpenChange }: DeleteMemberDialogProps) {
   const router = useRouter()
   const [confirmText, setConfirmText] = useState('')
   const [deleting, setDeleting] = useState(false)
+  const [heirId, setHeirId] = useState<string | null>(null)
 
   useEffect(() => {
-    if (open) setConfirmText('')
+    if (open) {
+      setConfirmText('')
+      setHeirId(null)
+    }
   }, [open])
 
   if (!member) return null
 
+  const heirOptions = members.filter((m) => m.id !== member.id)
+  const heir = heirOptions.find((m) => m.id === heirId) ?? null
+  const hasPoints = (member.total_xp ?? 0) > 0 || (member.current_gold ?? 0) > 0
+
   const handleDelete = async () => {
     setDeleting(true)
     try {
-      const result = await deleteMemberAccount(member.id)
+      const result = await deleteMemberAccount(member.id, heirId)
       if (result.error) {
         toast.error(result.error)
         return
       }
-      toast.success(`Conta de ${member.full_name} apagada.`)
+      toast.success(
+        heir
+          ? `Conta de ${member.full_name} apagada. O XP e o Gold passaram para ${heir.full_name}.`
+          : `Conta de ${member.full_name} apagada.`,
+      )
       onOpenChange(false)
       router.refresh()
     } catch (error: any) {
@@ -50,7 +65,7 @@ export function DeleteMemberDialog({ member, open, onOpenChange }: DeleteMemberD
 
   return (
     <Dialog open={open} onOpenChange={(o) => !deleting && onOpenChange(o)}>
-      <DialogContent className="sm:max-w-[420px]">
+      <DialogContent className="max-h-[92vh] overflow-y-auto sm:max-w-[420px]">
         <DialogHeader>
           <div className="mx-auto sm:mx-0 h-12 w-12 rounded-full bg-red-100 text-red-600 flex items-center justify-center mb-1">
             <AlertTriangle className="w-6 h-6" />
@@ -72,9 +87,23 @@ export function DeleteMemberDialog({ member, open, onOpenChange }: DeleteMemberD
 
         <ul className="text-sm text-slate-600 space-y-1 list-disc pl-5">
           <li>O membro deixa de conseguir entrar no site.</li>
-          <li>Perde XP, ouro, histórico de pontos e compras.</li>
+          <li>
+            {heir
+              ? `O XP e o ouro passam para ${heir.full_name}; o histórico de pontos e compras é apagado.`
+              : 'Perde XP, ouro, histórico de pontos e compras.'}
+          </li>
           <li>Desaparece do ranking e das classes.</li>
         </ul>
+
+        {hasPoints && (
+          <HeirPicker
+            label="Deixar o XP e o Gold a outro membro (opcional)"
+            options={heirOptions}
+            value={heirId}
+            onChange={setHeirId}
+            disabled={deleting}
+          />
+        )}
 
         <div className="space-y-1.5">
           <Label htmlFor="confirm-delete" className="text-xs text-slate-600">

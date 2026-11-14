@@ -542,6 +542,7 @@ export function MemberList({ members, currentUserRole, adminProfile, clubMembers
 
       <DeleteMemberDialog
         member={deleteTarget}
+        members={members}
         open={!!deleteTarget}
         onOpenChange={(open) => !open && setDeleteTarget(null)}
       />

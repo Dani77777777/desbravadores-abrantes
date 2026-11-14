@@ -72,7 +72,7 @@ export async function triggerResetPassword(userId: string) {
  * Só o coordenador REAL pode apagar; não pode apagar-se a si próprio (usa o
  * Perfil para isso) nem apagar outro coordenador.
  */
-export async function deleteMemberAccount(memberId: string): Promise<{ success?: boolean; error?: string }> {
+export async function deleteMemberAccount(memberId: string, heirId?: string | null): Promise<{ success?: boolean; error?: string }> {
   const supabase = await createServerClient()
 
   const { data: { user: requester }, error: authError } = await supabase.auth.getUser()
@@ -106,7 +106,7 @@ export async function deleteMemberAccount(memberId: string): Promise<{ success?:
     return { error: 'Não é possível apagar a conta de outro coordenador. Altera primeiro o cargo.' }
   }
 
-  const result = await deleteUserCompletely(memberId)
+  const result = await deleteUserCompletely(memberId, { heirId: heirId || null, awardedBy: requester.id })
   if (result.error) return result
 
   revalidatePath('/admin')

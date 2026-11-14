@@ -99,8 +99,9 @@ export async function requestAccountDeletionCode(): Promise<{ success?: boolean;
 
 /**
  * Passo 2: valida o código recebido por email e apaga a conta do próprio utilizador.
+ * Com `heirId`, o XP e o Gold acumulados passam para essa pessoa antes de a conta desaparecer.
  */
-export async function deleteOwnAccount(code: string): Promise<{ success?: boolean; error?: string }> {
+export async function deleteOwnAccount(code: string, heirId?: string | null): Promise<{ success?: boolean; error?: string }> {
   const supabase = await createClient()
 
   const { data: { user }, error: userError } = await supabase.auth.getUser()
@@ -137,10 +138,11 @@ export async function deleteOwnAccount(code: string): Promise<{ success?: boolea
     return { error: 'Código inválido ou expirado.' }
   }
 
-  const result = await deleteUserCompletely(user.id)
+  const result = await deleteUserCompletely(user.id, { heirId: heirId || null })
   if (result.error) return result
 
   await supabase.auth.signOut().catch(() => {})
   revalidatePath('/', 'layout')
+  revalidatePath('/leaderboard')
   return { success: true }
 }
