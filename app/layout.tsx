@@ -18,6 +18,12 @@ export const metadata: Metadata = {
   verification: {
     google: 'SZS_Lo-vdaAFESv_G192-3wDUL5nAM3lQGeTp90EChE',
   },
+  // Bloqueia a tradução automática do browser: o Google Translate mexe nos nós
+  // de texto por fora do React e provoca erros removeChild/insertBefore nos
+  // ecrãs que atualizam muito (o temporizador do VanaQuest atualiza a cada 50 ms).
+  other: {
+    google: 'notranslate',
+  },
 }
 
 export default function RootLayout({
@@ -26,7 +32,7 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="pt">
+    <html lang="pt" translate="no">
       <body className={inter.className}>
         {children}
         <Toaster />
