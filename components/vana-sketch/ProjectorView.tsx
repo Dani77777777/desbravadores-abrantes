@@ -8,6 +8,7 @@ import { useSketchSession, useSketchPlayers, useSketchGuesses } from './useSketc
 import { CanvasViewer } from './CanvasViewer'
 import { SketchAvatar, CountdownBadge, MaskedWord } from './ui'
 import { useSketchAudio } from './useSketchAudio'
+import { useDrawerRaffle, DrawerRaffleReel } from './raffle'
 import { CinematicPodium } from '@/components/game-podium/CinematicPodium'
 import { VS, VS_SCREEN_STYLE, vsHand, vsSans } from './theme'
 import { Pencil, Users } from 'lucide-react'
@@ -48,9 +49,13 @@ export function ProjectorView({ session: initialSession, initialPlayers }: Proje
     return () => { supabase.removeChannel(ch) }
   }, [session.id])
 
-  const { audioUnlocked, unlock } = useSketchAudio(session, guesses, musicEnabled)
+  // Mini sorteio do desenhador: enquanto roda, o projetor não mostra quem saiu
+  const raffling = useDrawerRaffle(session)
+  const { audioUnlocked, unlock } = useSketchAudio(session, guesses, musicEnabled, raffling)
 
-  const drawer = players.find((p) => p.id === session.drawer_player_id)
+  const drawer = raffling ? undefined : players.find((p) => p.id === session.drawer_player_id)
+  // Quem pode sair no sorteio (quem entrou a meio só palpita)
+  const rotation = useMemo(() => players.filter((p) => p.draw_order !== null), [players])
   const playerById = useMemo(() => new Map(players.map((p) => [p.id, p])), [players])
   const sorted = useMemo(() => [...players].sort((a, b) => b.score - a.score), [players])
 
@@ -93,7 +98,9 @@ export function ProjectorView({ session: initialSession, initialPlayers }: Proje
                     <>
                       <SketchAvatar name={drawer.display_name} avatarUrl={drawer.avatar_url} size={40} highlight />
                       <div>
-                        <p className="text-xs font-bold uppercase tracking-wider" style={{ color: VS.mut }}>A desenhar</p>
+                        <p className="text-xs font-bold uppercase tracking-wider" style={{ color: VS.mut }}>
+                          {session.phase === 'calling' || session.phase === 'choosing' ? 'Vai desenhar' : 'A desenhar'}
+                        </p>
                         <p className="font-bold leading-none">{(drawer.display_name ?? '').split(' ')[0]}</p>
                       </div>
                     </>
@@ -106,7 +113,24 @@ export function ProjectorView({ session: initialSession, initialPlayers }: Proje
                 </div>
               </div>
 
-              {session.phase === 'choosing' ? (
+              {session.phase === 'calling' ? (
+                <div className="flex flex-1 flex-col items-center justify-center gap-4 rounded-2xl border p-6" style={{ background: VS.panel, borderColor: VS.pline }}>
+                  {raffling ? (
+                    <DrawerRaffleReel candidates={rotation} />
+                  ) : (
+                    <div key={session.round_number} className="flex flex-col items-center gap-5 text-center animate-in zoom-in-75 fade-in duration-500">
+                      <SketchAvatar name={drawer?.display_name ?? '?'} avatarUrl={drawer?.avatar_url} size={180} highlight />
+                      <p className={`${vsHand.className} text-8xl font-bold leading-none`} style={{ color: VS.pink }}>
+                        {drawer?.display_name?.split(' ')[0] ?? '…'}
+                      </p>
+                      <p className={`${vsHand.className} text-6xl font-bold leading-none`}>vem até à frente! 🎨</p>
+                      <p className="text-lg font-semibold" style={{ color: VS.mut }}>
+                        As palavras aparecem no teu telemóvel quando chegares.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              ) : session.phase === 'choosing' ? (
                 <div className="flex flex-1 flex-col items-center justify-center gap-4 rounded-2xl border" style={{ background: VS.panel, borderColor: VS.pline }}>
                   <Pencil className="h-16 w-16 animate-bounce" style={{ color: VS.amber }} />
                   <p className={`${vsHand.className} text-5xl font-bold`}>
@@ -132,7 +156,7 @@ export function ProjectorView({ session: initialSession, initialPlayers }: Proje
             {/* Barra lateral: feed + placar */}
             <div className="flex min-h-0 flex-col gap-4">
               <GuessFeed guesses={guesses} playerById={playerById} />
-              <Scoreboard sorted={sorted} drawerId={session.drawer_player_id} />
+              <Scoreboard sorted={sorted} drawerId={raffling ? null : session.drawer_player_id} />
             </div>
           </div>
         )}

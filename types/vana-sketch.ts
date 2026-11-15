@@ -1,5 +1,6 @@
 export type VanaSketchStatus = 'lobby' | 'playing' | 'finished'
-export type VanaSketchPhase = 'choosing' | 'drawing' | 'round_end'
+// calling = o desenhador sorteado vai até à frente; o host revela as opções (→ choosing)
+export type VanaSketchPhase = 'calling' | 'choosing' | 'drawing' | 'round_end'
 export type RoundEndReason = 'all_guessed' | 'timeout' | 'skipped'
 
 export interface VanaSketchSession {

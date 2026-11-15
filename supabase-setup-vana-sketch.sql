@@ -13,7 +13,7 @@ CREATE TABLE IF NOT EXISTS public.vanasketch_sessions (
   status            text        NOT NULL DEFAULT 'lobby'
     CHECK (status IN ('lobby','playing','finished')),
   -- Fase dentro de uma ronda (apenas quando status = 'playing')
-  phase             text        CHECK (phase IN ('choosing','drawing','round_end')),
+  phase             text        CHECK (phase IN ('calling','choosing','drawing','round_end')),
   round_number      int         NOT NULL DEFAULT 0,
   total_rounds      int         NOT NULL DEFAULT 0,
   rounds_per_player int         NOT NULL DEFAULT 1 CHECK (rounds_per_player BETWEEN 1 AND 3),
@@ -181,7 +181,11 @@ BEGIN
   END IF;
 
   RETURN QUERY
-    SELECT r.round_number, r.word_options, r.word
+    SELECT
+      r.round_number,
+      -- Em 'calling' o desenhador ainda não vê as opções (o host revela-as)
+      CASE WHEN s.phase = 'calling' AND NOT v_is_host THEN '[]'::jsonb ELSE r.word_options END,
+      r.word
     FROM public.vanasketch_rounds r
     JOIN public.vanasketch_sessions s ON s.id = r.session_id
     WHERE r.session_id = p_session_id AND r.round_number = s.round_number;

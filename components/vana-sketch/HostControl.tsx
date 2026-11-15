@@ -7,6 +7,7 @@ import { createClient } from '@/utils/supabase/client'
 import {
   startVanaSketchGame,
   chooseSketchWord,
+  revealSketchWordOptions,
   endSketchRound,
   nextSketchRound,
   awardVanaSketchPoints,
@@ -22,7 +23,7 @@ import { SketchAvatar, CountdownBadge, useCountdown } from './ui'
 import { VS, VS_SCREEN_STYLE, vsHand, vsSans } from './theme'
 import {
   Play, MonitorPlay, SkipForward, ArrowRight, Trophy, Trash2, Dices, Eye, Users, Flag,
-  Copy, Check, Maximize2, Bot, Plus, Volume2, VolumeX,
+  Copy, Check, Maximize2, Bot, Plus, Volume2, VolumeX, Footprints,
 } from 'lucide-react'
 
 interface HostControlProps {
@@ -411,7 +412,9 @@ export function HostControl({ session: initialSession, initialPlayers, packs }: 
               <div className="flex items-center gap-3">
                 {drawer && <SketchAvatar name={drawer.display_name} avatarUrl={drawer.avatar_url} size={40} highlight />}
                 <div>
-                  <p className="text-[11px] font-bold uppercase tracking-wider" style={{ color: VS.mut }}>A desenhar</p>
+                  <p className="text-[11px] font-bold uppercase tracking-wider" style={{ color: VS.mut }}>
+                    {session.phase === 'calling' ? 'Sorteado para desenhar' : 'A desenhar'}
+                  </p>
                   <p className="font-bold leading-tight">{drawer?.display_name ?? '…'}</p>
                 </div>
               </div>
@@ -427,6 +430,27 @@ export function HostControl({ session: initialSession, initialPlayers, packs }: 
                 {session.phase === 'drawing' && <CountdownBadge endsAt={session.round_ends_at} />}
               </div>
             </section>
+
+            {session.phase === 'calling' && (
+              <section className="space-y-3 rounded-2xl border p-4 text-center" style={{ background: VS.panel, borderColor: VS.pline }}>
+                <p className="flex items-center justify-center gap-2 font-bold">
+                  <Footprints className="h-5 w-5" style={{ color: VS.amber }} />
+                  {drawer?.display_name?.split(' ')[0] ?? 'O desenhador'} vai até à frente
+                </p>
+                <p className="text-sm" style={{ color: VS.mut }}>
+                  As palavras só aparecem no telemóvel de quem desenha quando carregares no botão.
+                </p>
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => run(() => revealSketchWordOptions(session.id))}
+                  className="flex w-full items-center justify-center gap-2 rounded-2xl py-4 text-lg font-black text-white shadow-lg disabled:opacity-40"
+                  style={{ background: 'linear-gradient(160deg,#ff8fc0,#ff5da2)' }}
+                >
+                  <Eye className="h-5 w-5" /> Já chegou — revelar as palavras
+                </button>
+              </section>
+            )}
 
             {session.phase === 'choosing' && (
               <section className="space-y-3 rounded-2xl border p-4 text-center" style={{ background: VS.panel, borderColor: VS.pline }}>

@@ -9,10 +9,11 @@ import { DrawingCanvas } from './DrawingCanvas'
 import { CanvasViewer } from './CanvasViewer'
 import { SketchAvatar, CountdownBadge, MaskedWord, useCountdown } from './ui'
 import { sketchSound } from './useSketchAudio'
+import { useDrawerRaffle, RAFFLE_PHONE_EXTRA_MS } from './raffle'
 import { vibrate } from '@/utils/vibrate'
 import { useWakeLock } from '@/components/vana-camp/useWakeLock'
 import { VS, VS_SCREEN_STYLE, vsHand, vsSans } from './theme'
-import { Pencil, Send, Check, Trophy, Users, Sparkles } from 'lucide-react'
+import { Pencil, Send, Check, Trophy, Users, Sparkles, Footprints, Dices } from 'lucide-react'
 
 interface PlayerViewProps {
   session: VanaSketchSession
@@ -35,6 +36,12 @@ export function PlayerView({ session: initialSession, myPlayer, initialPlayers, 
   const drawer = players.find((p) => p.id === session.drawer_player_id)
   const playerById = useMemo(() => new Map(players.map((p) => [p.id, p])), [players])
   const iGuessedCorrect = guesses.some((g) => g.player_id === me.id && g.is_correct)
+
+  // Mini sorteio do desenhador: o nome sai primeiro no projetor
+  const raffling = useDrawerRaffle(session, RAFFLE_PHONE_EXTRA_MS)
+  // Ronda em que este telemóvel já avisou "é a tua vez" (som + vibração) — o
+  // aviso toca ao ser chamado à frente e não se repete quando as palavras aparecem
+  const alertedRoundRef = useRef<number | null>(null)
 
   return (
     <div className={`min-h-screen ${vsSans.className}`} style={VS_SCREEN_STYLE}>
@@ -71,9 +78,16 @@ export function PlayerView({ session: initialSession, myPlayer, initialPlayers, 
 
         {session.status === 'lobby' && <LobbyView players={players} meId={me.id} />}
 
+        {session.status === 'playing' && session.phase === 'calling' && (
+          raffling ? <RaffleWaitView />
+            : isDrawer
+              ? <CalledToFrontView roundNumber={session.round_number} alertedRoundRef={alertedRoundRef} />
+              : <WaitingFrontView drawerName={drawer?.display_name ?? '…'} />
+        )}
+
         {session.status === 'playing' && session.phase === 'choosing' && (
           isDrawer
-            ? <WordChoiceView sessionId={session.id} roundNumber={session.round_number} />
+            ? <WordChoiceView sessionId={session.id} roundNumber={session.round_number} alertedRoundRef={alertedRoundRef} />
             : <WaitingChoiceView drawerName={drawer?.display_name ?? '…'} />
         )}
 
@@ -134,15 +148,22 @@ function LobbyView({ players, meId }: { players: VanaSketchPlayer[]; meId: strin
   )
 }
 
-// ── Desenhador: escolher palavra ──────────────────────────────
-function WordChoiceView({ sessionId, roundNumber }: { sessionId: string; roundNumber: number }) {
-  const [options, setOptions] = useState<string[] | null>(null)
-  const [picking, setPicking] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+// ── Aviso "é a tua vez" ───────────────────────────────────────
+// Som + vibração longa (o mesmo padrão da vez dos Infiltrados no VanaCamp) e um
+// anel dourado a piscar à volta do ecrã (para os iPhones, que não vibram).
+// Avisa uma vez por ronda: quem já foi avisado ao ser chamado à frente não volta
+// a sê-lo quando as palavras aparecem.
+type AlertedRoundRef = React.MutableRefObject<number | null>
 
-  // Aviso de que é a vez de desenhar: som + vibração longa (o mesmo padrão da
-  // vez dos Infiltrados no VanaCamp). Sem iPhone a vibrar, fica o anel dourado.
+function TurnAlert({ roundNumber, alertedRoundRef }: { roundNumber: number; alertedRoundRef: AlertedRoundRef }) {
+  const ringRef = useRef<HTMLDivElement | null>(null)
+
   useEffect(() => {
+    if (alertedRoundRef.current === roundNumber) return
+    alertedRoundRef.current = roundNumber
+    // O anel está sempre montado mas invisível; só pisca quando há aviso
+    if (ringRef.current) ringRef.current.style.animation = 'vs-turn-flash .8s ease-in-out 3 both'
+
     const a = new Audio(sketchSound('sfx-your-turn.mp3'))
     a.volume = 0.7
     a.play().catch(() => {})
@@ -154,7 +175,83 @@ function WordChoiceView({ sessionId, roundNumber }: { sessionId: string; roundNu
     const retry = () => vibrate('night_call')
     document.addEventListener('pointerdown', retry, { once: true })
     return () => document.removeEventListener('pointerdown', retry)
-  }, [roundNumber])
+  }, [roundNumber, alertedRoundRef])
+
+  return (
+    <>
+      {/* Anel dourado a piscar à volta do ecrã — como o VibrationFlash do VanaCamp */}
+      <style>{'@keyframes vs-turn-flash{0%,100%{opacity:0}25%,75%{opacity:1}}'}</style>
+      <div
+        ref={ringRef}
+        aria-hidden
+        className="pointer-events-none fixed inset-0 z-[100]"
+        style={{
+          opacity: 0,
+          boxShadow: 'inset 0 0 0 8px rgba(252,211,77,.85), inset 0 0 60px 12px rgba(252,211,77,.3)',
+        }}
+      />
+    </>
+  )
+}
+
+// ── Mini sorteio a decorrer (o nome sai no projetor) ──────────
+function RaffleWaitView() {
+  return (
+    <div className="flex flex-1 flex-col items-center justify-center gap-4 text-center">
+      <Dices className="h-14 w-14 animate-bounce" style={{ color: VS.amber }} />
+      <p className={`${vsHand.className} text-4xl font-bold`}>A sortear o próximo artista…</p>
+      <p className="text-sm" style={{ color: VS.mut }}>Olha para o ecrã grande!</p>
+    </div>
+  )
+}
+
+// ── Desenhador: chamado à frente (as palavras ainda estão escondidas) ──
+function CalledToFrontView({ roundNumber, alertedRoundRef }: { roundNumber: number; alertedRoundRef: AlertedRoundRef }) {
+  return (
+    <div className="flex flex-1 flex-col items-center justify-center gap-6 text-center">
+      <TurnAlert roundNumber={roundNumber} alertedRoundRef={alertedRoundRef} />
+      <Footprints className="h-16 w-16 animate-bounce" style={{ color: VS.amber }} />
+      <div>
+        <p className={`${vsHand.className} text-5xl font-bold leading-tight`} style={{ color: VS.pink }}>
+          É a tua vez de desenhar!
+        </p>
+        <p className={`${vsHand.className} mt-2 text-4xl font-bold`}>Vai até à frente 🚶</p>
+      </div>
+      <p
+        className="rounded-2xl border px-4 py-3 text-sm font-semibold"
+        style={{ background: VS.panel, borderColor: VS.pline, color: VS.mut }}
+      >
+        As palavras aparecem aqui quando lá chegares — é o líder que as revela.
+      </p>
+    </div>
+  )
+}
+
+function WaitingFrontView({ drawerName }: { drawerName: string }) {
+  return (
+    <div className="flex flex-1 flex-col items-center justify-center gap-4 text-center">
+      <Footprints className="h-12 w-12 animate-bounce" style={{ color: VS.amber }} />
+      <p className={`${vsHand.className} text-3xl font-bold`}>
+        {drawerName.split(' ')[0]} vai desenhar!
+      </p>
+      <p className="text-sm" style={{ color: VS.mut }}>Está a ir até à frente…</p>
+    </div>
+  )
+}
+
+// ── Desenhador: escolher palavra ──────────────────────────────
+function WordChoiceView({
+  sessionId,
+  roundNumber,
+  alertedRoundRef,
+}: {
+  sessionId: string
+  roundNumber: number
+  alertedRoundRef: AlertedRoundRef
+}) {
+  const [options, setOptions] = useState<string[] | null>(null)
+  const [picking, setPicking] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -163,9 +260,12 @@ function WordChoiceView({ sessionId, roundNumber }: { sessionId: string; roundNu
     const load = async () => {
       if (loaded) return
       const { data } = await supabase.rpc('get_vanasketch_drawer_info', { p_session_id: sessionId })
-      if (!cancelled && data && data.length > 0) {
+      // Lista vazia = a fase ainda não chegou à base de dados (as opções vêm
+      // escondidas enquanto o desenhador vai até à frente) — volta a tentar
+      const opts = (data?.[0]?.word_options as string[] | undefined) ?? []
+      if (!cancelled && opts.length > 0) {
         loaded = true
-        setOptions((data[0].word_options as string[]) ?? [])
+        setOptions(opts)
       }
     }
     load()
@@ -183,16 +283,8 @@ function WordChoiceView({ sessionId, roundNumber }: { sessionId: string; roundNu
 
   return (
     <div className="flex flex-1 flex-col items-center justify-center gap-6 text-center">
-      {/* Anel dourado a piscar à volta do ecrã — como o VibrationFlash do VanaCamp */}
-      <style>{'@keyframes vs-turn-flash{0%,100%{opacity:0}25%,75%{opacity:1}}'}</style>
-      <div
-        aria-hidden
-        className="pointer-events-none fixed inset-0 z-[100]"
-        style={{
-          boxShadow: 'inset 0 0 0 8px rgba(252,211,77,.85), inset 0 0 60px 12px rgba(252,211,77,.3)',
-          animation: 'vs-turn-flash .8s ease-in-out 3 both',
-        }}
-      />
+      {/* Só avisa aqui se a ronda abriu logo na escolha (sem passar pela chamada à frente) */}
+      <TurnAlert roundNumber={roundNumber} alertedRoundRef={alertedRoundRef} />
       <div>
         <p className={`${vsHand.className} text-4xl font-bold`} style={{ color: VS.pink }}>É a tua vez de desenhar!</p>
         <p className="mt-2 text-sm" style={{ color: VS.mut }}>Escolhe uma palavra — ninguém mais a vê.</p>

@@ -24,6 +24,7 @@ function trackFor(session: VanaSketchSession, left: number | null): Track | null
   if (session.status === 'finished') return { src: sketchSound('VanaSketch - Victory Celebration.mp3'), loop: true }
   if (session.status !== 'playing') return null
   switch (session.phase) {
+    case 'calling':
     case 'choosing':
       return { src: sketchSound('VanaSketch - The Choosing.mp3'), loop: true }
     case 'drawing':
@@ -52,6 +53,7 @@ export function useSketchAudio(
   session: VanaSketchSession,
   guesses: VanaSketchGuess[],
   musicEnabled: boolean,
+  raffling = false, // mini sorteio do desenhador a rodar no projetor
 ) {
   const [audioUnlocked, setAudioUnlocked] = useState(false)
   const musicRef = useRef<HTMLAudioElement | null>(null)
@@ -159,7 +161,8 @@ export function useSketchAudio(
     playSfx(fresh.some((g) => g.is_correct) ? 'correct' : 'wrong')
   }, [guesses, session.round_number, playSfx])
 
-  // SFX: novo desenhador (início da escolha) e fim da ronda por tempo
+  // SFX: novo desenhador (quando o sorteio pára no nome) e fim da ronda por tempo
+  const prevRafflingRef = useRef(raffling)
   const prevPhaseRef = useRef(session.phase)
   const prevRoundRef = useRef(session.round_number)
   const prevEndsAtRef = useRef(session.round_ends_at)
@@ -167,18 +170,24 @@ export function useSketchAudio(
     const prevPhase = prevPhaseRef.current
     const prevRound = prevRoundRef.current
     const prevEndsAt = prevEndsAtRef.current
+    const prevRaffling = prevRafflingRef.current
+    prevRafflingRef.current = raffling
     prevPhaseRef.current = session.phase
     prevRoundRef.current = session.round_number
     prevEndsAtRef.current = session.round_ends_at
 
-    if (session.phase === 'choosing' && (prevPhase !== 'choosing' || prevRound !== session.round_number)) {
+    // O sorteio acabou de parar no nome do desenhador
+    if (session.phase === 'calling' && prevRaffling && !raffling) playSfx('yourTurn')
+    // Sem a fase 'calling' (migração por aplicar) a ronda abre logo na escolha
+    if (session.phase === 'choosing' && prevPhase !== 'calling'
+        && (prevPhase !== 'choosing' || prevRound !== session.round_number)) {
       playSfx('yourTurn')
     }
     if (prevPhase === 'drawing' && session.phase === 'round_end' && prevEndsAt
         && Date.now() >= new Date(prevEndsAt).getTime() - 1500) {
       playSfx('timeUp')
     }
-  }, [session.phase, session.round_number, session.round_ends_at, playSfx])
+  }, [session.phase, session.round_number, session.round_ends_at, raffling, playSfx])
 
   // SFX: tique-taque nos últimos 10 segundos
   const lastTickRef = useRef<number | null>(null)

@@ -1782,7 +1782,11 @@ BEGIN
   END IF;
 
   RETURN QUERY
-    SELECT r.round_number, r.word_options, r.word
+    SELECT
+      r.round_number,
+      -- Em 'calling' o desenhador ainda não vê as opções (o host revela-as)
+      CASE WHEN s.phase = 'calling' AND NOT v_is_host THEN '[]'::jsonb ELSE r.word_options END,
+      r.word
     FROM public.vanasketch_rounds r
     JOIN public.vanasketch_sessions s ON s.id = r.session_id
     WHERE r.session_id = p_session_id AND r.round_number = s.round_number;
@@ -5663,7 +5667,7 @@ CREATE TABLE public.vanasketch_sessions (
     ended_at timestamp with time zone,
     pack_ids uuid[] DEFAULT '{}'::uuid[] NOT NULL,
     CONSTRAINT vanasketch_sessions_draw_seconds_check CHECK (((draw_seconds >= 30) AND (draw_seconds <= 300))),
-    CONSTRAINT vanasketch_sessions_phase_check CHECK ((phase = ANY (ARRAY['choosing'::text, 'drawing'::text, 'round_end'::text]))),
+    CONSTRAINT vanasketch_sessions_phase_check CHECK ((phase = ANY (ARRAY['calling'::text, 'choosing'::text, 'drawing'::text, 'round_end'::text]))),
     CONSTRAINT vanasketch_sessions_rounds_per_player_check CHECK (((rounds_per_player >= 1) AND (rounds_per_player <= 3))),
     CONSTRAINT vanasketch_sessions_status_check CHECK ((status = ANY (ARRAY['lobby'::text, 'playing'::text, 'finished'::text])))
 );

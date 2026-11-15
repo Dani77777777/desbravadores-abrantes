@@ -362,6 +362,7 @@ Não há ferramenta de migrações: cada `supabase-*.sql` na raiz é corrido à 
 37. `-question-raffle-prizes`
 38. `-vana-camp-security-fix`
 39. `-client-errors`
+40. `-vana-sketch-calling`
 
 (`-x` = `supabase-migration-x.sql`.)
 </details>

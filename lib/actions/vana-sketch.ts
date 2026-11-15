@@ -188,7 +188,25 @@ async function startRound(
 
   if (!players || players.length === 0) return { error: 'Sem jogadores na rotação.' }
 
-  const drawer = players[(roundNumber - 1) % players.length]
+  // Mini sorteio: sai à sorte um dos que desenharam menos vezes — toda a gente
+  // desenha o mesmo número de rondas, mas a ordem nunca se adivinha. Quem acabou
+  // de desenhar não repete logo a seguir (na passagem de uma volta para a outra).
+  const { data: pastRounds } = await service
+    .from('vanasketch_rounds')
+    .select('round_number, drawer_player_id')
+    .eq('session_id', sessionId)
+    .lt('round_number', roundNumber)
+    .order('round_number')
+  const timesDrawn = new Map<string, number>()
+  for (const r of pastRounds ?? []) {
+    timesDrawn.set(r.drawer_player_id, (timesDrawn.get(r.drawer_player_id) ?? 0) + 1)
+  }
+  const lastDrawerId = pastRounds?.length ? pastRounds[pastRounds.length - 1].drawer_player_id : null
+  const fewest = Math.min(...players.map((p) => timesDrawn.get(p.id) ?? 0))
+  let candidates = players.filter((p) => (timesDrawn.get(p.id) ?? 0) === fewest)
+  if (candidates.length > 1) candidates = candidates.filter((p) => p.id !== lastDrawerId)
+  const drawer = candidates[Math.floor(Math.random() * candidates.length)]
+
   const options = await pickWordOptions(service, sessionId)
 
   const { error: roundError } = await service.from('vanasketch_rounds').insert({
@@ -209,15 +227,25 @@ async function startRound(
     .eq('id', sessionId)
     .single()
 
-  await service.from('vanasketch_sessions').update({
+  // A ronda abre em 'calling': o sorteado vai até à frente e só vê as opções
+  // quando o host as revelar (revealSketchWordOptions).
+  const next = {
     round_number: roundNumber,
     drawer_player_id: drawer.id,
-    phase: 'choosing',
     word_masked: null,
     revealed_word: null,
     round_ends_at: null,
     canvas_version: (session?.canvas_version ?? 0) + 1,
-  }).eq('id', sessionId)
+  }
+  const { error: callingError } = await service
+    .from('vanasketch_sessions').update({ ...next, phase: 'calling' }).eq('id', sessionId)
+  if (callingError) {
+    // Base de dados sem a migração da fase 'calling' (o CHECK recusa-a):
+    // salta directamente para a escolha da palavra, como antes.
+    const { error } = await service
+      .from('vanasketch_sessions').update({ ...next, phase: 'choosing' }).eq('id', sessionId)
+    if (error) return { error: error.message }
+  }
 
   return {}
 }
@@ -277,7 +305,9 @@ export async function startVanaSketchGame(
     }
   }
 
-  // Baralhar a ordem de desenho
+  // Pôr toda a gente na rotação (draw_order não nulo = pode ser sorteado para
+  // desenhar; quem entra a meio fica a null e só palpita). A ordem em si já não
+  // manda: o desenhador de cada ronda sai do mini sorteio em startRound.
   const shuffled = [...players].sort(() => Math.random() - 0.5)
   await Promise.all(
     shuffled.map((p, i) =>
@@ -286,6 +316,34 @@ export async function startVanaSketchGame(
   )
 
   return startRound(service, sessionId, 1)
+}
+
+// ── Host revela as opções ao desenhador (já chegou à frente) ──
+export async function revealSketchWordOptions(sessionId: string): Promise<{ error?: string }> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Não autenticado' }
+
+  const service = createServiceClient()
+  const { data: session } = await service
+    .from('vanasketch_sessions')
+    .select('host_id, status, phase')
+    .eq('id', sessionId)
+    .maybeSingle()
+
+  if (!session || session.host_id !== user.id) return { error: 'Sem permissão' }
+  if (session.status !== 'playing') return { error: 'Estado inválido' }
+  // Duplo clique: já foram reveladas
+  if (session.phase === 'choosing') return {}
+  if (session.phase !== 'calling') return { error: 'Estado inválido' }
+
+  const { error } = await service
+    .from('vanasketch_sessions')
+    .update({ phase: 'choosing' })
+    .eq('id', sessionId)
+    .eq('phase', 'calling')
+  if (error) return { error: error.message }
+  return {}
 }
 
 // ── Desenhador escolhe a palavra ──────────────────────────────
@@ -537,7 +595,7 @@ export async function endSketchRound(
     if (!me || me.id !== session.drawer_player_id) return { error: 'Sem permissão' }
   }
   if (session.status !== 'playing') return { error: 'Estado inválido' }
-  if (session.phase !== 'drawing' && session.phase !== 'choosing') {
+  if (session.phase !== 'drawing' && session.phase !== 'choosing' && session.phase !== 'calling') {
     return { error: 'A ronda já terminou.' }
   }
 
