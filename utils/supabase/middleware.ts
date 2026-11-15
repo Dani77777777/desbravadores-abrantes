@@ -94,6 +94,8 @@ export async function updateSession(request: NextRequest) {
     !request.nextUrl.pathname.startsWith('/api/perguntas') &&
     // A rota responde 401 sozinha (sem redirecionar para o login)
     !request.nextUrl.pathname.startsWith('/api/jogos/vana-sentinela') &&
+    // Registo de erros do cliente: os convidados dos jogos também têm erros
+    !request.nextUrl.pathname.startsWith('/api/client-error') &&
     !request.nextUrl.pathname.startsWith('/jogos/vana-trilha/como-jogar') &&
     !request.nextUrl.pathname.startsWith('/jogos/indisponivel') &&
     !request.nextUrl.pathname.startsWith('/embed') &&

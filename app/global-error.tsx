@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect } from 'react'
+import { reportClientError } from '@/components/game-error/report-client-error'
 
 /**
  * Última rede de segurança do site todo: apanha erros no layout raiz, que
@@ -17,6 +18,8 @@ export default function GlobalError({
 }) {
   useEffect(() => {
     console.error('[global-error] erro não recuperado', error)
+    // Regista o erro (uma vez por erro, sem esperar pela resposta).
+    reportClientError(error)
   }, [error])
 
   return (

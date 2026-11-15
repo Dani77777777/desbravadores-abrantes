@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { RefreshCw } from 'lucide-react'
+import { reportClientError } from './report-client-error'
 
 /**
  * Ecrã de erro partilhado pelos jogos (usado nos error.tsx de app/jogos).
@@ -74,6 +75,8 @@ export function GameErrorScreen({
   // Uma tentativa por erro apanhado.
   useEffect(() => {
     console.error('[jogo] erro de render — a tentar recuperar', error)
+    // Regista o erro (uma vez por erro, sem esperar pela resposta).
+    reportClientError(error)
     // Decide uma só vez por erro (o efeito pode correr mais de uma vez para o
     // mesmo erro, por exemplo em StrictMode, e não deve gastar duas tentativas).
     let canRetry = decisions.get(error)

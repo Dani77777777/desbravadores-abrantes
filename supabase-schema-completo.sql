@@ -9,11 +9,11 @@
 -- Realtime e os dados iniciais dos jogos.
 --
 -- É o estado final de todas as migrações supabase-*.sql e supabase/migrations/*
--- do repositório (até 2026-11-04), aplicadas por ordem cronológica. Não inclui
+-- do repositório (até 2026-11-15), aplicadas por ordem cronológica. Não inclui
 -- os ficheiros supabase-teste-*.sql (dados de teste do VanaCoro).
 --
--- Conteúdo: 7 enums · 92 tabelas · 5 vistas · 120 funções · 26 triggers
---           56 índices · 161 políticas RLS (+ 9 no storage) · trigger de perfil em auth.users
+-- Conteúdo: 7 enums · 93 tabelas · 5 vistas · 120 funções · 26 triggers
+--           57 índices · 163 políticas RLS (+ 9 no storage) · trigger de perfil em auth.users
 --           457 linhas de dados iniciais (definições, packs, versículos, perguntas)
 --
 -- COMO CORRER
@@ -58,6 +58,8 @@
 --       club_screens, trip_plans
 --   Centro de Jogos:
 --       game_settings, game_plays
+--   Registo de erros do cliente (ecrãs de erro):
+--       client_error_logs
 --   VANTUR:
 --       vantur_sessions, vantur_dictionary, portuguese_words
 --   VanaQuest:
@@ -14460,6 +14462,58 @@ GRANT EXECUTE ON FUNCTION public.cofre_store_summary(date, date) TO authenticate
 -- Compra e encomendas dos convidados: abertas (como antes).
 GRANT EXECUTE ON FUNCTION public.process_purchase(uuid, numeric, text, integer) TO anon, authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.get_guest_purchases(uuid[]) TO anon, authenticated, service_role;
+
+
+--
+-- Registo de erros do cliente (supabase-migration-client-errors.sql, 2026-11-15):
+-- uma linha por erro apanhado pelos ecrãs de erro (GameErrorScreen e global-error).
+-- Qualquer pessoa insere; só a coordenação real lê.
+--
+
+CREATE TABLE IF NOT EXISTS public.client_error_logs (
+  id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  created_at  timestamptz NOT NULL DEFAULT now(),
+  user_id     uuid REFERENCES public.profiles(id) ON DELETE SET NULL,
+  url         text,
+  game        text,          -- 'vana-quest', 'vana-camp', ... ou NULL fora dos jogos
+  session_id  text,          -- sessão do jogo, quando o endereço a tem
+  message     text,
+  stack       text,
+  digest      text,          -- identificador do Next.js para erros do servidor
+  user_agent  text,
+
+  CONSTRAINT client_error_logs_sizes_check CHECK (
+    char_length(COALESCE(url, '')) <= 500
+    AND char_length(COALESCE(game, '')) <= 50
+    AND char_length(COALESCE(session_id, '')) <= 100
+    AND char_length(COALESCE(message, '')) <= 500
+    AND char_length(COALESCE(stack, '')) <= 4000
+    AND char_length(COALESCE(digest, '')) <= 100
+    AND char_length(COALESCE(user_agent, '')) <= 400
+  )
+);
+
+CREATE INDEX IF NOT EXISTS client_error_logs_created_idx
+  ON public.client_error_logs (created_at DESC);
+
+ALTER TABLE public.client_error_logs ENABLE ROW LEVEL SECURITY;
+
+-- Inserir: aberto a todos, mas ninguém regista um erro em nome de outra pessoa.
+DROP POLICY IF EXISTS "Erros do cliente: qualquer pessoa regista" ON public.client_error_logs;
+CREATE POLICY "Erros do cliente: qualquer pessoa regista" ON public.client_error_logs
+  FOR INSERT TO anon, authenticated
+  WITH CHECK (user_id IS NULL OR user_id = auth.uid());
+
+-- Ler: só a coordenação real.
+DROP POLICY IF EXISTS "Erros do cliente: coordenação real lê" ON public.client_error_logs;
+CREATE POLICY "Erros do cliente: coordenação real lê" ON public.client_error_logs
+  FOR SELECT TO authenticated
+  USING (public.get_my_real_role() = 'coordenador');
+
+REVOKE ALL ON public.client_error_logs FROM PUBLIC, anon, authenticated;
+GRANT INSERT ON public.client_error_logs TO anon, authenticated;
+GRANT SELECT ON public.client_error_logs TO authenticated;
+GRANT ALL ON public.client_error_logs TO service_role;
 
 
 --
