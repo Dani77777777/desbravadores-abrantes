@@ -123,7 +123,7 @@ export function HostControl({ sessionId, initialSession, questions, siteUrl }: P
         const gender = detectGender(winner.display_name)
         const article = articleFor(gender) // o / a
         const word = winnerWord(gender)    // vencedor / vencedora
-        const firstName = winner.display_name.split(' ')[0]
+        const firstName = (winner.display_name ?? '').split(' ')[0]
         text = `🎯 VanaQuest "${questTitle}" — ${today}\n\n👑 ${article.toUpperCase()} ${word} foi ${article} ${firstName} com ${winner.total_points.toFixed(1)} pontos!\n\nNão participaste? Junta-te ao próximo VanaQuest e podes ser tu ${article === 'a' ? 'a próxima' : 'o próximo'} a brilhar! 🌟`
       } else {
         text = `🎯 VanaQuest "${questTitle}" — ${today}\n\nNão percas o próximo desafio! 🌟`

@@ -204,7 +204,7 @@ export function PlayerScreen({ sessionId, userId, initialSession, serverNow, all
   const { gold, xp } = calcEspadaRewards(totalPoints)
 
   const filteredMembers = allMembers
-    .filter((m) => m.full_name.toLowerCase().includes(donationSearch.toLowerCase()))
+    .filter((m) => (m.full_name ?? '').toLowerCase().includes(donationSearch.toLowerCase()))
     .slice(0, 30)
 
   async function handleDonate(recipientId: string) {

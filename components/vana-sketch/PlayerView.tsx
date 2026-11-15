@@ -125,7 +125,7 @@ function LobbyView({ players, meId }: { players: VanaSketchPlayer[]; meId: strin
           {players.map((p) => (
             <div key={p.id} className="flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 py-1 pl-1 pr-3">
               <SketchAvatar name={p.display_name} avatarUrl={p.avatar_url} size={26} highlight={p.id === meId} />
-              <span className="text-xs font-semibold">{p.display_name.split(' ')[0]}</span>
+              <span className="text-xs font-semibold">{(p.display_name ?? '').split(' ')[0]}</span>
             </div>
           ))}
         </div>
@@ -350,7 +350,7 @@ function GuesserView({
           <p className="text-center text-xs" style={{ color: VS.mut }}>Os palpites aparecem aqui…</p>
         )}
         {guesses.map((g) => {
-          const name = playerById.get(g.player_id)?.display_name.split(' ')[0] ?? '?'
+          const name = playerById.get(g.player_id)?.display_name?.split(' ')[0] ?? '?'
           return g.is_correct ? (
             <p key={g.id} className="font-bold" style={{ color: VS.teal }}>
               ✓ {name} acertou! <span className="text-xs font-semibold opacity-70">+{g.points}</span>
@@ -421,7 +421,7 @@ function RoundEndView({
       </div>
       {drawer && (
         <p className="text-sm" style={{ color: VS.mut }}>
-          Desenhado por <span className="font-bold text-white">{drawer.display_name.split(' ')[0]}</span>
+          Desenhado por <span className="font-bold text-white">{(drawer.display_name ?? '').split(' ')[0]}</span>
         </p>
       )}
       <div className="w-full max-w-xs space-y-1.5 rounded-2xl border p-4" style={{ background: VS.panel, borderColor: VS.pline }}>
@@ -433,7 +433,7 @@ function RoundEndView({
             return (
               <div key={g.id} className="flex items-center justify-between text-sm">
                 <span className={`font-semibold ${g.player_id === meId ? 'text-white' : 'text-white/80'}`}>
-                  {p?.display_name.split(' ')[0] ?? '?'}
+                  {p?.display_name?.split(' ')[0] ?? '?'}
                 </span>
                 <span className="font-black tabular-nums" style={{ color: VS.teal }}>+{g.points}</span>
               </div>

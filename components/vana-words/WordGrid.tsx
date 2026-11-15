@@ -150,7 +150,7 @@ export function WordGrid({
                       ${large ? 'text-[clamp(0.6rem,1.4vh,0.875rem)] max-w-[5rem]' : 'text-[9px] max-w-[2rem]'}`}
                     title={p.display_name}
                   >
-                    {p.display_name.split(' ')[0]}
+                    {(p.display_name ?? '').split(' ')[0]}
                   </span>
                 ))}
                 {guessers.length > 4 && (

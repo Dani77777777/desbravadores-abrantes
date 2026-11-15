@@ -217,7 +217,7 @@ function Face({ player, color }: { player: VanaCoroPlayer; color: string }) {
             style={{ width: '100%', height: '100%', objectFit: 'cover' }}
           />
         ) : (
-          <span style={{ fontSize: 34, fontWeight: 900 }}>{player.display_name[0]?.toUpperCase()}</span>
+          <span style={{ fontSize: 34, fontWeight: 900 }}>{(player.display_name ?? '')[0]?.toUpperCase()}</span>
         )}
       </span>
       <span
@@ -231,7 +231,7 @@ function Face({ player, color }: { player: VanaCoroPlayer; color: string }) {
           whiteSpace: 'nowrap',
         }}
       >
-        {player.display_name.split(' ')[0]}
+        {(player.display_name ?? '').split(' ')[0]}
       </span>
     </div>
   )

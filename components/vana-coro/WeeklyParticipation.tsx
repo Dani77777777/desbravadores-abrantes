@@ -163,7 +163,7 @@ function PeopleList({ people }: { people: ParticipationMember[] }) {
         <li key={m.id} className="flex items-center gap-2 rounded-lg bg-white px-2 py-1.5 text-sm">
           <Avatar className="h-6 w-6">
             <AvatarImage src={m.avatar_url || undefined} className="object-cover" />
-            <AvatarFallback className="bg-stone-200 text-[10px] font-bold text-stone-600">{m.name.charAt(0)}</AvatarFallback>
+            <AvatarFallback className="bg-stone-200 text-[10px] font-bold text-stone-600">{(m.name ?? '').charAt(0)}</AvatarFallback>
           </Avatar>
           <span className="min-w-0 flex-1 truncate font-medium text-gray-800">{m.name}</span>
           {m.is_leader && <span className="text-[10px] font-bold uppercase text-blue-700">Dirigente</span>}

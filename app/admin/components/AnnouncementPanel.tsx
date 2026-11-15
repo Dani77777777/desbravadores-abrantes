@@ -208,7 +208,7 @@ export function AnnouncementPanel({ profile, members, sentAnnouncements, sentRec
                 <div key={m.id} className="flex items-center gap-3 bg-white p-2 pr-3 rounded-full border border-pink-200 shadow-sm">
                   <Avatar className="w-8 h-8">
                     <AvatarImage src={m.avatar_url} className="object-cover" />
-                    <AvatarFallback className="bg-pink-100 text-pink-600 font-bold text-xs">{m.full_name.charAt(0).toUpperCase()}</AvatarFallback>
+                    <AvatarFallback className="bg-pink-100 text-pink-600 font-bold text-xs">{(m.full_name ?? '').charAt(0).toUpperCase()}</AvatarFallback>
                   </Avatar>
                   <div className="flex flex-col">
                     <span className="text-sm font-semibold text-gray-800 leading-tight">{m.full_name}</span>

@@ -114,7 +114,7 @@ export const VanaCampVictoryCard = forwardRef<HTMLDivElement, Props>(
                           className="font-black text-white drop-shadow"
                           style={{ fontSize: `${Math.round(sz * 0.42)}px` }}
                         >
-                          {w.display_name[0]?.toUpperCase()}
+                          {(w.display_name ?? '')[0]?.toUpperCase()}
                         </span>
                       )}
                     </div>

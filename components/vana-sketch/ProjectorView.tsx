@@ -94,7 +94,7 @@ export function ProjectorView({ session: initialSession, initialPlayers }: Proje
                       <SketchAvatar name={drawer.display_name} avatarUrl={drawer.avatar_url} size={40} highlight />
                       <div>
                         <p className="text-xs font-bold uppercase tracking-wider" style={{ color: VS.mut }}>A desenhar</p>
-                        <p className="font-bold leading-none">{drawer.display_name.split(' ')[0]}</p>
+                        <p className="font-bold leading-none">{(drawer.display_name ?? '').split(' ')[0]}</p>
                       </div>
                     </>
                   )}
@@ -110,7 +110,7 @@ export function ProjectorView({ session: initialSession, initialPlayers }: Proje
                 <div className="flex flex-1 flex-col items-center justify-center gap-4 rounded-2xl border" style={{ background: VS.panel, borderColor: VS.pline }}>
                   <Pencil className="h-16 w-16 animate-bounce" style={{ color: VS.amber }} />
                   <p className={`${vsHand.className} text-5xl font-bold`}>
-                    {drawer?.display_name.split(' ')[0] ?? '…'} está a escolher a palavra…
+                    {drawer?.display_name?.split(' ')[0] ?? '…'} está a escolher a palavra…
                   </p>
                 </div>
               ) : (
@@ -143,7 +143,7 @@ export function ProjectorView({ session: initialSession, initialPlayers }: Proje
       {session.status === 'finished' && (
         <div className="fixed inset-0 z-40">
           <CinematicPodium
-            entries={sorted.map((p) => ({ id: p.id, name: p.display_name.split(' ')[0], avatarUrl: p.avatar_url, points: p.score }))}
+            entries={sorted.map((p) => ({ id: p.id, name: (p.display_name ?? '').split(' ')[0], avatarUrl: p.avatar_url, points: p.score }))}
             backgroundStyle={VS_SCREEN_STYLE}
             ringOffsetClassName="ring-offset-[#0d0a22]"
             displayFontClassName={vsHand.className}
@@ -212,7 +212,7 @@ function ProjectorLobby({ session, players, joinUrl }: { session: VanaSketchSess
           players.map((p) => (
             <div key={p.id} className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 py-1.5 pl-1.5 pr-4 animate-in fade-in zoom-in duration-300">
               <SketchAvatar name={p.display_name} avatarUrl={p.avatar_url} size={34} />
-              <span className="font-bold">{p.display_name.split(' ')[0]}</span>
+              <span className="font-bold">{(p.display_name ?? '').split(' ')[0]}</span>
             </div>
           ))
         )}
@@ -235,7 +235,7 @@ function GuessFeed({ guesses, playerById }: { guesses: VanaSketchGuess[]; player
       <div ref={ref} className="flex-1 space-y-1.5 overflow-y-auto p-4 text-lg" style={{ minHeight: 200 }}>
         {guesses.length === 0 && <p className="text-sm" style={{ color: VS.mut }}>Ainda sem palpites…</p>}
         {guesses.map((g) => {
-          const name = playerById.get(g.player_id)?.display_name.split(' ')[0] ?? '?'
+          const name = playerById.get(g.player_id)?.display_name?.split(' ')[0] ?? '?'
           return g.is_correct ? (
             <p key={g.id} className="font-black" style={{ color: VS.teal }}>✓ {name} acertou! +{g.points}</p>
           ) : (
@@ -261,7 +261,7 @@ function Scoreboard({ sorted, drawerId }: { sorted: VanaSketchPlayer[]; drawerId
             <span className="w-6 text-center text-sm font-black" style={{ color: VS.mut }}>{i + 1}</span>
             <SketchAvatar name={p.display_name} avatarUrl={p.avatar_url} size={30} highlight={p.id === drawerId} />
             <span className="min-w-0 flex-1 truncate text-sm font-bold">
-              {p.display_name.split(' ')[0]}
+              {(p.display_name ?? '').split(' ')[0]}
               {p.id === drawerId && <Pencil className="ml-1.5 inline h-3.5 w-3.5" style={{ color: VS.amber }} />}
             </span>
             <span className="font-black tabular-nums" style={{ color: VS.amber }}>{p.score}</span>

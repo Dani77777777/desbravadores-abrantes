@@ -300,7 +300,7 @@ function Avatar({
         {entry.avatarUrl ? (
           <img src={entry.avatarUrl} alt={entry.name} className="h-full w-full object-cover" referrerPolicy="no-referrer" />
         ) : (
-          <span className={`font-black text-white drop-shadow-lg ${s.initial}`}>{entry.name[0]?.toUpperCase()}</span>
+          <span className={`font-black text-white drop-shadow-lg ${s.initial}`}>{(entry.name ?? '')[0]?.toUpperCase()}</span>
         )}
       </div>
       {rank === 0 && (

@@ -302,7 +302,7 @@ export function GoldTransferDialog({ currentUserId, currentGold, triggerClassNam
               {loading ? (
                 <><Loader2 className="h-5 w-5 animate-spin" /> A enviar...</>
               ) : canSend ? (
-                <><Check className="h-5 w-5" /> Enviar {numAmount} para {selectedProfile?.full_name.split(' ')[0]}</>
+                <><Check className="h-5 w-5" /> Enviar {numAmount} para {selectedProfile?.full_name?.split(' ')[0]}</>
               ) : (
                 'Confirmar Envio'
               )}

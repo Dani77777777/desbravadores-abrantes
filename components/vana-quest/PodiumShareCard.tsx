@@ -115,7 +115,7 @@ export const PodiumShareCard = forwardRef<HTMLDivElement, Props>(
                         />
                       ) : (
                         <span className="text-4xl font-black text-white drop-shadow-lg">
-                          {p!.display_name[0]?.toUpperCase()}
+                          {(p!.display_name ?? '')[0]?.toUpperCase()}
                         </span>
                       )}
                     </div>

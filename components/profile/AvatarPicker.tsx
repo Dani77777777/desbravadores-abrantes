@@ -40,7 +40,7 @@ export function AvatarPicker({
   const preview = filePreview ?? (value.url && !broken ? value.url : null)
   const hasPhoto = !!value.file || !!value.url
 
-  const parts = name.trim().split(/\s+/).filter(Boolean)
+  const parts = (name ?? '').trim().split(/\s+/).filter(Boolean)
   const initials = parts.length
     ? (parts[0][0] + (parts.length > 1 ? parts[parts.length - 1][0] : '')).toUpperCase()
     : null

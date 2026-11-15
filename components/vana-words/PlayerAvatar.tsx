@@ -19,7 +19,7 @@ export function PlayerAvatar({ avatarUrl, name, className, fallbackClassName }: 
   if (!avatarUrl || broken) {
     return (
       <span className={fallbackClassName}>
-        {name.charAt(0).toUpperCase()}
+        {(name ?? '').charAt(0).toUpperCase()}
       </span>
     )
   }

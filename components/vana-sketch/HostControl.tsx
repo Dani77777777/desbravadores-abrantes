@@ -214,7 +214,7 @@ export function HostControl({ session: initialSession, initialPlayers, packs }: 
                     <div key={p.id} className="flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 py-1 pl-1 pr-3">
                       <SketchAvatar name={p.display_name} avatarUrl={p.avatar_url} size={26} />
                       <span className="text-xs font-semibold">
-                        {p.is_bot && '🤖 '}{p.display_name.split(' ')[0]}
+                        {p.is_bot && '🤖 '}{(p.display_name ?? '').split(' ')[0]}
                       </span>
                     </div>
                   ))}
@@ -431,7 +431,7 @@ export function HostControl({ session: initialSession, initialPlayers, packs }: 
             {session.phase === 'choosing' && (
               <section className="space-y-3 rounded-2xl border p-4 text-center" style={{ background: VS.panel, borderColor: VS.pline }}>
                 <p style={{ color: VS.mut }}>
-                  {drawer?.display_name.split(' ')[0] ?? 'O desenhador'} está a escolher a palavra…
+                  {drawer?.display_name?.split(' ')[0] ?? 'O desenhador'} está a escolher a palavra…
                 </p>
                 <button
                   type="button"

@@ -203,7 +203,7 @@ export function ClubFamilyPanel({ data, userId, fullName, initialCode = '' }: Pr
                   <div className="flex items-center gap-3">
                     <Avatar className="h-9 w-9 shrink-0">
                       <AvatarImage src={m.avatarUrl ?? undefined} alt={m.name} className="object-cover" />
-                      <AvatarFallback className="bg-rose-500 text-sm font-extrabold text-white">{m.name.charAt(0).toUpperCase()}</AvatarFallback>
+                      <AvatarFallback className="bg-rose-500 text-sm font-extrabold text-white">{(m.name ?? '').charAt(0).toUpperCase()}</AvatarFallback>
                     </Avatar>
                     <div className="min-w-0 flex-1">
                       <p className="truncate font-bold text-blue-950">{m.name}{m.id === userId && <span className="font-semibold text-stone-400"> (tu)</span>}</p>

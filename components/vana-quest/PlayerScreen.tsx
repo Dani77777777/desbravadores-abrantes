@@ -441,7 +441,7 @@ export function PlayerScreen({ sessionId, userId, userProfile, initialSession, q
   }
 
   const filteredMembers = allMembers.filter((m) =>
-    m.full_name.toLowerCase().includes(donationSearch.toLowerCase())
+    (m.full_name ?? '').toLowerCase().includes(donationSearch.toLowerCase())
   )
 
   // Calculated rewards (rounded half-up, com limite por sessão — ver calcSessionRewards)

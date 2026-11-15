@@ -80,7 +80,7 @@ export function BestDrawingShare({ sessionId, players, gameDate }: Props) {
         '',
         `O desenho da sessão: «${drawing.word}», desenhado por ${drawing.drawerName}` +
           (drawing.correctCount > 0 ? ` — ${drawing.correctCount} de ${drawing.guesserCount} acertaram! 👏` : '!'),
-        winner ? `🏆 Vencedor: ${winner.display_name.split(' ')[0]} com ${winner.score} pontos` : '',
+        winner ? `🏆 Vencedor: ${(winner.display_name ?? '').split(' ')[0]} com ${winner.score} pontos` : '',
         '',
         'Não jogaste? Junta-te ao próximo VanaSketch e mostra o artista que há em ti! 🖍️',
       ].filter((line, i, all) => line !== '' || all[i - 1] !== '').join('\n')
@@ -240,7 +240,7 @@ const SketchShareCard = forwardRef<HTMLDivElement, CardProps>(({ drawing, imageU
         style={{ padding: '22px 56px', background: 'rgba(255,255,255,.06)', borderTop: `1px solid ${VS.pline}` }}
       >
         <p style={{ color: VS.amber, fontSize: '24px', fontWeight: 800 }}>
-          {winner ? `🏆 ${winner.display_name.split(' ')[0]} · ${winner.score} pts` : '🏆 VanaSketch'}
+          {winner ? `🏆 ${(winner.display_name ?? '').split(' ')[0]} · ${winner.score} pts` : '🏆 VanaSketch'}
         </p>
         <p style={{ color: VS.ink, fontSize: '22px', fontWeight: 700 }}>Junta-te ao próximo jogo! 🖍️</p>
       </div>
