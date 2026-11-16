@@ -38,7 +38,7 @@ Plataforma *mobile-first* de gamificação e gestão do **Clube de Desbravadores
 ### Conta, perfil e família
 - **Registo e entrada** com email e palavra-passe (não há login com Google). O registo passa sempre pela verificação de email; `/login/reset-password` recupera a palavra-passe.
 - **Onboarding** (`/onboarding`): nome, foto, data de nascimento (define a classe inicial) e sexo (obrigatório e fixo; só a coordenação o corrige).
-- **Perfil** (`/profile`): dados pessoais, avatar, histórico de compras da loja, progresso no VanaTrilha, transferências de Gold e **apagar a conta** com um código enviado por email.
+- **Perfil** (`/profile`): dados pessoais, avatar, histórico de compras da loja, progresso no VanaTrilha, transferências de Gold e **apagar a conta** com um código enviado por email. Quem sai pode **deixar o XP e o Gold a outro membro** (fica no histórico como "Herança de …"); a coordenação tem a mesma opção ao apagar um membro.
 - **Transferir Gold** a outro membro, para incentivar a cooperação (RPC `transfer_gold`, fica no histórico).
 - **Histórico de pontos** (`/points-history`): todos os movimentos de XP e Gold do membro.
 - **A minha família**: uma pessoa é **Adulto** ou **Criança**.
@@ -108,7 +108,7 @@ Plataforma *mobile-first* de gamificação e gestão do **Clube de Desbravadores
 | Ferramentas | todos | ferramentas do projetor (ver abaixo) |
 | Loja | coordenador real | produtos, encomendas, entregas, taxa do Gold, caducidade das encomendas |
 | Cofre | coordenador real | quem tem dinheiro do clube, despesas, outras entradas, estornos, relatório e Excel |
-| Auditoria | coordenador real | auditoria de pontos e reset de fim de época |
+| Auditoria | coordenador real | auditoria de pontos, corrigir ou apagar movimentos e reset de fim de época |
 
 Cada jogo tem também uma página de gestão (`/admin/<jogo>`) para bancos de perguntas, versículos, palavras, packs e relatórios por sessão.
 
@@ -130,6 +130,7 @@ A classe é calculada pela idade só na criação do perfil. Depois só a coorde
 
 ### Auditoria e reset de pontos
 - Vista com todos os movimentos, a origem deduzida e sinais de alerta (auto-atribuições, totais que não batem com o histórico), com correção de totais.
+- **Corrigir ou apagar um movimento** (ex.: um prémio com o Gold errado) sem ir ao SQL Editor: `audit_edit_movement` e `audit_delete_movement`, com motivo opcional. Os movimentos da Loja, as Transferências e o Reset de época não se mexem aqui, e a correção não pode deixar o membro com XP ou Gold negativo. Fica registado em "Alterações e correções" quem alterou, o antes e o depois (`points_audit_events`).
 - **Reset de fim de época** sem apagar o histórico: insere movimentos de compensação, arquiva a classificação final da época e exige escrever "RESETAR".
 
 ### Ferramentas do projetor
@@ -138,7 +139,7 @@ Todas abrem uma **janela de projetor** controlada pelo PC (sem base de dados, po
 | Ferramenta | O que faz |
 | :--- | :--- |
 | **Ecrã do Clube** | projetor fixo que mostra o logo, o **ranking animado** ("ontem" → "hoje", quem subiu e desceu), o cronómetro, o sorteio, as equipas ou as **presenças por QR** |
-| **Sorteador** | sorteio de pessoas com animação de *slot*, a partir das presenças de um evento (com visitas), atalhos "Tirar dirigentes" / "Tirar ajudantes", não repetir |
+| **Sorteador** | sorteio de pessoas com animação de *slot*, a partir das presenças de um evento (com visitas), atalhos "Tirar dirigentes" / "Tirar ajudantes", não repetir; **sorteio com prémio** (XP e Gold ou outro) entre quem respondeu à Pergunta da Semana |
 | **Formador de equipas** | equipas equilibradas (idades, secções, rapazes/raparigas, dirigentes, pares a não juntar), nomes de animais e revelação no projetor; **modo Famílias** com as famílias reais juntas, nomes bíblicos e sorteio de quem joga |
 | **Cronómetro** | contagem decrescente, cronómetro, chegadas de equipas com ranking e sequência de rondas |
 | **Tendas e boleias** | distribui as pessoas de um evento por tendas e carros, com pontos de encontro no mapa e horas por paragem, e publica para cada membro ver no Painel |
@@ -149,6 +150,8 @@ Todas abrem uma **janela de projetor** controlada pelo PC (sem base de dados, po
 
 `/jogos` é o hub. Cada jogo pode ser **ativado/desativado**, limitado por cargo ou **escondido** (para surpresas) na aba Jogos. Os jogos a solo têm **analítica** (quem joga, vitórias, assiduidade) e campanhas de **pontos multiplicados** (até ×10).
 
+Se um ecrã de jogo falhar, aparece um **ecrã de recuperação** (`GameErrorScreen`, com `app/global-error.tsx` como última rede) em vez de uma página em branco, e o erro fica em `client_error_logs` (enviado por `POST /api/client-error`; só a coordenação real o lê, no Table Editor do Supabase).
+
 ### Ao vivo (projetor + telemóveis)
 Todos têm controlo do anfitrião, ecrã de projetor e ecrã de jogador; entra-se por PIN ou código/QR. Os pontos são atribuídos no fim pelo anfitrião; os convidados escolhem um desbravador para receber os seus pontos.
 
@@ -157,7 +160,7 @@ Todos têm controlo do anfitrião, ecrã de projetor e ecrã de jogador; entra-s
 | **VanaQuest** | quiz em tempo real estilo Kahoot: rapidez, sequências de acertos, multiplicador por pergunta, sala de espera com reações, pódio cinematográfico |
 | **VanaEspada** | "Onde está?": aparece um excerto da Bíblia (ACF) e cada um adivinha livro → capítulo → versículo; pontuação por proximidade, prémios sem teto |
 | **VanaWords** | estilo Codenames: grelha 5×5, equipas Leão e Águia, um Arauto por equipa, sessões de teste com bots |
-| **VanaSketch** | estilo Pictionary: desenho no telemóvel em tempo real no projetor, packs de palavras, música e efeitos, imagem do melhor desenho |
+| **VanaSketch** | estilo Pictionary: desenho no telemóvel em tempo real no projetor, packs de palavras, música e efeitos, imagem do melhor desenho; **chamada à frente** (o próximo desenhador é sorteado com uma roleta no projetor e só vê as palavras quando o anfitrião as revela) |
 | **VanaCamp: Infiltrados** | estilo Lobisomem (tom IASD: ninguém morre, "vai para casa"), 5 a 25 jogadores, fases com temporizador, Diretor, só para membros |
 | **VanaCoro** | estilo Family Feud com as respostas da Pergunta da Semana (agrupadas por IA e revistas pelo anfitrião): duelo, 3 falhas, roubo, ronda ×2; as equipas podem ser as famílias sorteadas no Formador |
 
@@ -286,10 +289,10 @@ npm run lint
 ### Projeto novo: um só ficheiro
 [`supabase-schema-completo.sql`](supabase-schema-completo.sql) cria **toda** a base de dados de uma vez, numa só transação:
 
-- 5 enums, 91 tabelas, 4 vistas, 106 funções/RPCs, 23 triggers, 53 índices e 164 políticas RLS;
+- 7 enums, 94 tabelas, 5 vistas, 125 funções/RPCs, 26 triggers, 57 índices e 163 políticas RLS (mais 9 no storage);
 - as permissões exatas (incluindo as permissões por coluna do `anon` e as RPCs só para o `service_role`);
 - o trigger que cria o perfil quando alguém se regista (`on_auth_user_created`);
-- o bucket `imagens` e as suas políticas (avatares e produtos da loja);
+- os buckets `imagens` (público: avatares e produtos da loja) e `cofre-comprovativos` (privado: comprovativos do Cofre), com as suas políticas;
 - as 25 tabelas publicadas no Realtime (com `REPLICA IDENTITY FULL` onde é preciso);
 - os dados iniciais: definições dos jogos e da loja, perguntas do VanaTrilha, versículos do VanaEspada, packs do VanaSketch e o banco inicial da Pergunta da Semana.
 
@@ -363,6 +366,7 @@ Não há ferramenta de migrações: cada `supabase-*.sql` na raiz é corrido à 
 38. `-vana-camp-security-fix`
 39. `-client-errors`
 40. `-vana-sketch-calling`
+41. `-audit-edit-movements`
 
 (`-x` = `supabase-migration-x.sql`.)
 </details>
@@ -382,7 +386,7 @@ Regras ao escrever uma migração nova:
 app/            rotas (páginas, server actions e route handlers)
   admin/        painel de gestão, ferramentas e gestão de cada jogo
   jogos/        um diretório por jogo (control / present / play / as)
-  api/          family-accounts, push/subscribe, perguntas, convites/sair, pontuação do VanaSentinela
+  api/          family-accounts, push/subscribe, perguntas, convites/sair, client-error, pontuação do VanaSentinela
 components/     UI por domínio (events/, shop/, vana-quest/, game-lobby/, game-podium/, ui/ …)
 lib/actions/    server actions (I/O com o Supabase)
 utils/          regras puras e testáveis (pontuação, equipas, sorteio, check-in …)
@@ -409,6 +413,8 @@ Padrão dos módulos mais recentes: `types/` → `utils/` (regras puras com test
 - O "dia" do clube é o de **Lisboa** (`Europe/Lisbon`); o servidor corre em UTC.
 - Interface em **português de Portugal**, com tom adventista (IASD). Nos jogos nunca se diz "apostar".
 - Só o plano gratuito da Vercel e do Supabase: sem workers pagos, e os telemóveis enviam por `httpSend` em vez de subscreverem canais com muito tráfego.
+- A **tradução automática do browser está bloqueada** (`translate="no"` e `notranslate` em `app/layout.tsx`): mexia no DOM e rebentava os ecrãs dos jogos.
+- Nunca chamar server actions dentro de um *error boundary*: os ecrãs de erro registam por `POST /api/client-error`.
 - Nunca automatizar inscrições no site da Juventude Adventista.
 - Nos filtros por secção usa-se sempre a secção pessoal, também para coordenadores.
 

@@ -46,6 +46,7 @@ Trocar "Desbravadores (de) Abrantes", "DBV Abrantes" e "Abrantes" pelo nome do c
 | Embed dos inquéritos | `app/embed/inquerito/[id]/page.tsx` (109) |
 | Ecrã do Clube (logo e ranking) | `components/club-screen/LogoStage.tsx` (29), `components/club-screen/RankingBoard.tsx` (295) |
 | Imagem de partilha dos eventos | `components/events/EventShareDialog.tsx` (297, 373) |
+| Relatório e Excel do Cofre (título, autor e nome do ficheiro) | `app/admin/cofre/relatorio/page.tsx` (71), `app/admin/cofre/exportar/route.ts` (39, 45, 152) |
 | Imagens de partilha e projetores dos jogos | `components/vana-camp/VanaCampVictoryCard.tsx` (144), `components/vana-coro/WinnersShare.tsx` (421), `components/vana-quest/PodiumShareCard.tsx` (181), `components/vana-words/ProjectorView.tsx` (551), `components/vana-words/WinnersShareCard.tsx` (166) |
 | Emails dos convites (remetente e texto) | `lib/email.ts` (`CLUB_NAME`, linha 13) |
 | Notificações push (título por omissão) | `public/sw.js` (2, 19) |
@@ -93,8 +94,8 @@ O "dia do clube" (prémios diários, jogos a solo, rankings semanais, datas nos 
 Tem de ser mudado **no código e no SQL ao mesmo tempo**:
 
 - **Código:** trocar `Europe/Lisbon` por `Atlantic/Azores` em:
-  `app/admin/components/event-utils.ts`, `app/jogos/page.tsx`, `app/points-history/page.tsx`, `components/events/EventShareDialog.tsx`, `components/landing/NextEventCard.tsx`, `components/perguntas/QuestionBoard.tsx`, `components/vana-coro/QuestionQueueAdmin.tsx`, `lib/actions/daily-game-stats.ts`, `lib/email.ts`, `utils/event-rsvp.ts`, `utils/game-analytics.ts`, `utils/vana-codigo/day.ts`, `utils/vana-coro/schedule.ts`, `utils/vana-trilha.ts` (e os testes que o usem).
-- **SQL:** em `supabase-schema-completo.sql`, **antes de o correr**, trocar `Europe/Lisbon` por `Atlantic/Azores` (8 sítios: `award_vantur_rewards`, `award_vana_sentinela_rewards`, `get_vana_sentinela_ranking`, `log_singleplayer_play`, `log_vana_sentinela_play`, `vana_codigo_day_start` e o valor por omissão de `vanatrilha_daily_runs.run_date`).
+  `app/admin/cofre/exportar/route.ts`, `app/admin/cofre/relatorio/page.tsx`, `app/admin/components/cofre/CofrePanel.tsx`, `app/admin/components/event-utils.ts`, `app/admin/vana-quest/page.tsx`, `app/jogos/page.tsx`, `app/points-history/page.tsx`, `components/events/EventShareDialog.tsx`, `components/landing/NextEventCard.tsx`, `components/perguntas/QuestionBoard.tsx`, `components/vana-coro/QuestionQueueAdmin.tsx`, `components/vana-coro/WeeklyParticipation.tsx`, `lib/actions/daily-game-stats.ts`, `lib/email.ts`, `utils/event-rsvp.ts`, `utils/game-analytics.ts`, `utils/vana-codigo/day.ts`, `utils/vana-coro/schedule.ts`, `utils/vana-trilha.ts` (e os testes que o usem).
+- **SQL:** em `supabase-schema-completo.sql`, **antes de o correr**, trocar `Europe/Lisbon` por `Atlantic/Azores` em todo o ficheiro (14 linhas: `award_vantur_rewards`, `award_vana_sentinela_rewards`, `get_vana_sentinela_ranking`, `log_singleplayer_play`, `log_vana_sentinela_play`, `vana_codigo_day_start`, o valor por omissão de `vanatrilha_daily_runs.run_date` e, no Cofre, o valor por omissão de `club_cash_movements.occurred_on` e as funções `set_purchase_receiver`, `cofre_register`, `cofre_reverse` e `cofre_store_summary`).
 
 Comando para fazer as duas coisas de uma vez (Git Bash):
 ```bash
@@ -127,7 +128,7 @@ grep -rniE "abrantes|Europe/Lisbon" app components lib utils public supabase/fun
 
 1. Criar um projeto novo no [Supabase](https://supabase.com/dashboard) (região da UE, ex.: Frankfurt ou Londres).
 2. Confirmar o fuso do SQL (ponto 2.7).
-3. SQL Editor → colar `supabase-schema-completo.sql` → **Run**. Cria tudo numa só transação: tabelas, funções, RLS, permissões, bucket `imagens`, Realtime, o trigger que cria o perfil no registo e os dados iniciais dos jogos. Não traz nenhum dado de Abrantes (membros, eventos, pontos, produtos).
+3. SQL Editor → colar `supabase-schema-completo.sql` → **Run**. Cria tudo numa só transação: tabelas, funções, RLS, permissões, os buckets `imagens` e `cofre-comprovativos`, Realtime, o trigger que cria o perfil no registo e os dados iniciais dos jogos. Não traz nenhum dado de Abrantes (membros, eventos, pontos, produtos).
 
 > [!WARNING]
 > Se depois disso entrar uma migração nova neste repositório (`supabase-migration-*.sql`), corre-se também no projeto do clube novo. Ver a ordem das migrações no `README.md`.
@@ -189,6 +190,7 @@ grep -rniE "abrantes|Europe/Lisbon" app components lib utils public supabase/fun
    - **Membros:** nomear dirigentes (com a secção) e ajudantes, à medida que os membros se registam.
    - **Jogos:** escolher que jogos ficam ativos (desativar o VanaSentinela se não houver packs próprios).
    - **Loja:** criar os produtos e rever a taxa do Gold.
+   - **Cofre:** cada coordenador regista a contagem inicial do dinheiro do clube que já tem.
    - **Eventos:** criar os primeiros eventos.
    - Pergunta da Semana (`/admin/vana-coro`): gerar um link de convite novo e agendar a fila de perguntas.
 
