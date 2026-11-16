@@ -9,9 +9,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import {
   AlertOctagon, AlertTriangle, ArrowDownRight, ArrowUpRight, Bot, CalendarCheck, ChevronLeft, ChevronRight,
   ClipboardList, Coins, Download, Gamepad2, Hand, History, ListChecks, MessageCircleQuestion, MessageSquare, QrCode, Repeat,
-  RotateCcw, Search, ShieldCheck, ShoppingBag, Trophy, Users, Wrench, X,
+  Pencil, RotateCcw, Search, ShieldCheck, ShoppingBag, Trash2, Trophy, Users, Wrench, X,
 } from 'lucide-react'
 import { toast } from 'sonner'
+import { useRouter } from 'next/navigation'
+import { LOCKED_CATEGORIES, MovementCorrectionDialog, type MovementCorrection } from './MovementCorrectionDialog'
 import { SECTION_LABELS, helperLabel } from '@/utils/permissions'
 import { ROLE_LABELS } from './member-constants'
 import { PointsResetCard } from './PointsResetCard'
@@ -101,6 +103,8 @@ function applyFilters(query: any, f: Filters) {
 
 export function AuditPanel({ members }: { members: any[] }) {
   const supabase = createClient()
+  const router = useRouter()
+  const [correction, setCorrection] = useState<MovementCorrection | null>(null)
 
   const [filters, setFilters] = useState<Filters>({
     period: '30d', search: '', category: 'all', memberId: 'all',
@@ -476,7 +480,7 @@ export function AuditPanel({ members }: { members: any[] }) {
 
         <div className={loading ? 'opacity-60 transition-opacity' : 'transition-opacity'}>
           {view === 'movements' ? (
-            <MovementsTable rows={rows} loading={loading} />
+            <MovementsTable rows={rows} loading={loading} onCorrect={setCorrection} />
           ) : (
             <ChangesTable rows={changes} loading={loading} />
           )}
@@ -498,6 +502,16 @@ export function AuditPanel({ members }: { members: any[] }) {
       </div>
 
       <PointsResetCard onDone={() => { setPage(0); setOverviewKey((k) => k + 1) }} />
+
+      <MovementCorrectionDialog
+        target={correction}
+        onClose={() => setCorrection(null)}
+        onDone={() => {
+          setCorrection(null)
+          setOverviewKey((k) => k + 1) // recarrega o resumo e a tabela
+          router.refresh()             // saldo no cabeçalho, se o movimento era meu
+        }}
+      />
     </div>
   )
 }
@@ -589,7 +603,7 @@ function CategoryBadge({ category }: { category: string }) {
   )
 }
 
-function MovementsTable({ rows, loading }: { rows: any[]; loading: boolean }) {
+function MovementsTable({ rows, loading, onCorrect }: { rows: any[]; loading: boolean; onCorrect: (c: MovementCorrection) => void }) {
   if (!loading && rows.length === 0) {
     return (
       <div className="flex flex-col items-center py-14 text-slate-400">
@@ -610,6 +624,7 @@ function MovementsTable({ rows, loading }: { rows: any[]; loading: boolean }) {
             <th className="px-4 py-2 font-semibold">Origem</th>
             <th className="px-4 py-2 font-semibold min-w-[14rem]">Descrição</th>
             <th className="px-4 py-2 font-semibold">Atribuído por</th>
+            <th className="px-2 py-2"><span className="sr-only">Ações</span></th>
           </tr>
         </thead>
         <tbody className="divide-y">
@@ -647,6 +662,30 @@ function MovementsTable({ rows, loading }: { rows: any[]; loading: boolean }) {
                   <p className="text-[11px] text-slate-400">
                     {awarderRoleLabel(r.awarded_by_role, r.awarded_by_real_role, r.awarded_by_helper_role, r.awarded_by_helper_section)}
                   </p>
+                )}
+              </td>
+              <td className="px-2 py-2.5 whitespace-nowrap text-right">
+                {!LOCKED_CATEGORIES.includes(r.category) && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => onCorrect({ mode: 'edit', row: r })}
+                      title="Corrigir XP/Ouro"
+                      aria-label="Corrigir movimento"
+                      className="inline-flex h-8 w-8 items-center justify-center rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-900"
+                    >
+                      <Pencil className="w-4 h-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onCorrect({ mode: 'delete', row: r })}
+                      title="Apagar movimento"
+                      aria-label="Apagar movimento"
+                      className="inline-flex h-8 w-8 items-center justify-center rounded-md text-slate-400 hover:bg-red-50 hover:text-red-600"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </>
                 )}
               </td>
             </tr>
@@ -706,7 +745,10 @@ function ChangesTable({ rows, loading }: { rows: any[]; loading: boolean }) {
                     ? <span className="text-slate-400">removido</span>
                     : isFix ? `${nf.format(r.new_xp)} XP · ${nf.format(r.new_gold)} Ouro` : `${signed(r.new_xp)} XP · ${signed(r.new_gold)} Ouro`}
                 </td>
-                <td className="px-4 py-2.5 text-xs text-slate-600">{r.description}</td>
+                <td className="px-4 py-2.5 text-xs text-slate-600">
+                  {r.description}
+                  {r.reason && <p className="text-slate-500 mt-0.5"><span className="font-semibold">Motivo:</span> {r.reason}</p>}
+                </td>
                 <td className="px-4 py-2.5 text-xs text-slate-700 whitespace-nowrap">{r.performed_by_name || 'Sistema'}</td>
               </tr>
             )
