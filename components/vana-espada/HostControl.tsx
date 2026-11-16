@@ -14,7 +14,7 @@ import {
   kickPlayer, nextRound, startGame,
 } from '@/lib/actions/vana-espada'
 import {
-  calcEspadaRewards, formatGuess, formatReference, toAnswerViews, toEspadaPlayer,
+  calcEspadaRewards, ESPADA_MAX_GOLD, ESPADA_MAX_XP, formatGuess, formatReference, toAnswerViews, toEspadaPlayer,
 } from '@/utils/vana-espada'
 import { ESPADA_STATUS_LABELS } from '@/utils/vana-espada-labels'
 import { getBook } from '@/utils/bible-books'
@@ -474,7 +474,7 @@ export function HostControl({ sessionId, initialSession, rounds, siteUrl, server
 
             {session.status === 'finished' && (
               <p className="text-sky-300/70 text-[11px] mb-2">
-                Cada 10 pontos valem 1 Gold, e o XP é o dobro (4826 pts → 482🪙 + 964⭐).
+                Cada 10 pontos valem 1 Gold, e o XP é o dobro, até {ESPADA_MAX_GOLD}🪙 + {ESPADA_MAX_XP}⭐ por jogador (1240 pts → 124🪙 + 248⭐).
               </p>
             )}
 

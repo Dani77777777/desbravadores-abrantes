@@ -173,7 +173,7 @@ export function ArautoView({ session: initSession, myPlayer, initialPlayers }: A
         {iWon ? (
           <p className="text-emerald-400 text-lg font-semibold">Parabéns! A tua equipa ganhou 100 XP e 50 Gold!</p>
         ) : (
-          <p style={{ color: VW.mut }}>Boa sorte na próxima vez!</p>
+          <p style={{ color: VW.mut }}>Boa sorte na próxima vez!{winner ? ' A tua equipa recebe 40 XP e 20 Gold de participação.' : ''}</p>
         )}
         {session.win_reason === 'black_hit' && (
           <p className="text-red-400 text-sm">A palavra preta foi revelada! 💀</p>

@@ -887,31 +887,46 @@ export async function awardVanaWordsPoints(sessionId: string): Promise<{ error?:
   if (session.rewards_awarded) return { error: 'Pontos já atribuídos.' }
   if (!session.winner_team) return { error: 'Sem vencedor definido.' }
 
-  const { data: winners } = await service
-    .from('vanawords_players')
-    .select('user_id')
-    .eq('session_id', sessionId)
-    .eq('team', session.winner_team)
-    .not('user_id', 'is', null)
-
-  if (winners && winners.length > 0) {
-    const { error: logError } = await service.from('points_log').insert(
-      winners.map((p) => ({
-        target_user_id: p.user_id!,
-        awarded_by_user_id: user.id,
-        amount_xp: 100,
-        amount_gold: 50,
-        description: 'Vitória no VanaWords',
-      }))
-    )
-    if (logError) return { error: logError.message }
-    // O gatilho on_points_log_change recalcula total_xp/current_gold nos perfis
-  }
-
-  await service
+  // Marcar primeiro, de forma condicional — dois cliques/separadores não dão
+  // XP e Gold a dobrar. Se a inserção falhar, desfaz-se a marca.
+  const { data: claimed } = await service
     .from('vanawords_sessions')
     .update({ rewards_awarded: true })
     .eq('id', sessionId)
+    .eq('rewards_awarded', false)
+    .select('id')
+  if (!claimed?.length) return { error: 'Pontos já atribuídos.' }
+
+  // Bots e jogadores sem conta (user_id null) não recebem nada, nem quem
+  // ficou sem equipa. Vencedores: 100 XP + 50 Gold; quem perde: 40 XP + 20 Gold.
+  const { data: players } = await service
+    .from('vanawords_players')
+    .select('user_id, team')
+    .eq('session_id', sessionId)
+    .not('user_id', 'is', null)
+    .not('team', 'is', null)
+
+  const rewards = (players ?? [])
+    .filter((p): p is typeof p & { user_id: string } => !!p.user_id)
+    .map((p) => {
+      const won = p.team === session.winner_team
+      return {
+        target_user_id: p.user_id,
+        awarded_by_user_id: user.id,
+        amount_xp: won ? 100 : 40,
+        amount_gold: won ? 50 : 20,
+        description: won ? 'Vitória no VanaWords' : 'Participação no VanaWords',
+      }
+    })
+
+  if (rewards.length > 0) {
+    const { error: logError } = await service.from('points_log').insert(rewards)
+    if (logError) {
+      await service.from('vanawords_sessions').update({ rewards_awarded: false }).eq('id', sessionId)
+      return { error: logError.message }
+    }
+    // O gatilho on_points_log_change recalcula total_xp/current_gold nos perfis
+  }
 
   return {}
 }

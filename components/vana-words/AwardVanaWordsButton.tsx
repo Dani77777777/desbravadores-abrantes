@@ -15,7 +15,7 @@ interface Props {
   compact?: boolean
 }
 
-/** Atribui os 100 XP / 50 Gold à equipa vencedora — mesmo padrão do AwardSessionButton do VanaQuest */
+/** Atribui 100 XP / 50 Gold à equipa vencedora e 40 XP / 20 Gold de participação à outra — mesmo padrão do AwardSessionButton do VanaQuest */
 export function AwardVanaWordsButton({ sessionId, alreadyAwarded, winnerTeam, compact = false }: Props) {
   const router = useRouter()
   const [pending, startTransition] = useTransition()
@@ -25,7 +25,7 @@ export function AwardVanaWordsButton({ sessionId, alreadyAwarded, winnerTeam, co
   function handleAward() {
     if (done) return
     const ok = confirm(
-      `Atribuir 100 XP e 50 Gold à Equipa ${TEAM_LABELS[winnerTeam]}?\n\nEsta acção é definitiva — apenas pode ser feita uma vez.`
+      `Atribuir 100 XP e 50 Gold à Equipa ${TEAM_LABELS[winnerTeam]}?\nA outra equipa recebe 40 XP e 20 Gold de participação.\n\nEsta acção é definitiva — apenas pode ser feita uma vez.`
     )
     if (!ok) return
     setError(null)
@@ -75,7 +75,7 @@ export function AwardVanaWordsButton({ sessionId, alreadyAwarded, winnerTeam, co
           <CheckCircle2 className="w-5 h-5" />
         </div>
         <p className="font-bold text-green-800 text-sm">
-          XP e Gold atribuídos à Equipa {TEAM_LABELS[winnerTeam]}
+          XP e Gold atribuídos (vitória da Equipa {TEAM_LABELS[winnerTeam]})
         </p>
       </div>
     )
@@ -91,6 +91,7 @@ export function AwardVanaWordsButton({ sessionId, alreadyAwarded, winnerTeam, co
         <Trophy className="w-4 h-4" />
         {pending ? 'A atribuir…' : `Atribuir 100 XP e 50 Gold à Equipa ${TEAM_LABELS[winnerTeam]}`}
       </button>
+      <p className="text-xs text-center text-gray-500">A equipa que perde recebe 40 XP e 20 Gold de participação.</p>
       {error && (
         <p className="text-red-600 text-xs text-center font-semibold">{error}</p>
       )}

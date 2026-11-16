@@ -20,7 +20,7 @@ Jogo #5 do Centro de Jogos dos Desbravadores de Abrantes.
 > - **Errar** tira 1 vida e troca a pergunta por outra da mesma dificuldade (`reserve_ids`),
 >   para o peão conseguir chegar à casa 8. **Jornada Perfeita** = completa com `mistakes = 0`.
 > - **Tábuas da Lei** no diário: acertar o V/F dá **+1 casa** (não +3); errar não custa nada.
-> - **Milagre**: +2 Gold só pagos se a etapa ficar completa (coluna `bonus_gold`).
+> - **Milagre**: +10 Gold só pagos se a etapa ficar completa (coluna `bonus_gold`).
 > - `questionIndex` = coluna `turn` (n.º de respostas dadas), usada como trinco otimista.
 > - As opções são baralhadas no servidor por (data, pergunta).
 > - `vanatrilha_daily_questions` só pode ser chamada pelo service role (devolve `correct_index`).
@@ -146,11 +146,11 @@ O coração da Fase 1. Reinicia todos os dias à meia-noite (hora de Lisboa).
 
 | Resultado | XP | Gold |
 |---|---|---|
-| Etapa completa | 2 | 2 |
-| Bónus "Jornada Perfeita" (8/8 sem erros) | +1 | +1 |
+| Etapa completa | 10 | 10 |
+| Bónus "Jornada Perfeita" (8/8 sem erros) | +5 | +5 |
 | Etapa falhada (vidas esgotadas) | 0 | 0 |
 
-Escala deliberadamente baixa, alinhada com o VANTUR (1–4 XP/dia), para não
+Escala deliberadamente baixa, alinhada com o VANTUR (5–20 XP/dia), para não
 desequilibrar a economia da loja.
 
 **Insígnia:** completar as 7 estações diferentes (em dias não consecutivos conta)
@@ -194,7 +194,7 @@ copiar exatamente o padrão de `awardRewards` em `lib/actions/vana-camp.ts`.
 | **Coluna de Nuvem** | Avança automaticamente até à casa da estação seguinte | Evento |
 | **Serpente Ardente** | Perde a ronda seguinte (não responde nem avança) | Evento |
 | **Murmuração** | Recua 2 casas | Evento |
-| **Milagre** | +2 Gold, sem efeito no tabuleiro | Ambos |
+| **Milagre** | +10 Gold, sem efeito no tabuleiro | Ambos |
 | **Tábuas da Lei** | Pergunta bónus Verdadeiro/Falso: acertar avança +3 casas | Ambos |
 | **Fonte de Elim** | Casa de descanso: a ronda seguinte não penaliza erro | Ambos |
 
@@ -732,8 +732,8 @@ Fonte de Elim. (Só as do Modo Diário na Fase 1. Acrescentar as outras quando o
 Modo Evento existir.)
 
 **g) "O que ganhas"**
-Tabela simples e honesta: etapa completa = 2 XP + 2 Gold; sem nenhum erro = 3 XP +
-3 Gold. Uma linha a dizer que o Gold se gasta na loja do clube. E a insígnia
+Tabela simples e honesta: etapa completa = 10 XP + 10 Gold; sem nenhum erro = 15 XP +
+15 Gold. Uma linha a dizer que o Gold se gasta na loja do clube. E a insígnia
 "Peregrino da Promessa" para quem completar as 7 estações.
 
 **h) "Também dá para jogar em grupo"** *(só quando a Fase 2 existir)*
@@ -871,7 +871,7 @@ Não dar a Fase 1 por concluída sem passar tudo isto:
 - [ ] Etapa completa → `points_log` ganha **uma** linha; `profiles.total_xp` e
       `current_gold` sobem em conformidade.
 - [ ] Chamar `claimDailyRewards` duas vezes não dá pontos a dobrar.
-- [ ] 8/8 sem erros dá 3 XP + 3 Gold e mostra "Jornada Perfeita".
+- [ ] 8/8 sem erros dá 15 XP + 15 Gold e mostra "Jornada Perfeita".
 - [ ] Esgotar as 3 vidas fecha a corrida como `failed`, sem pontos, e o jogo diz
       claramente que amanhã há outra etapa.
 - [ ] À meia-noite de Lisboa a etapa muda (testar com `run_date` forçada).

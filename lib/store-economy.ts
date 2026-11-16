@@ -53,7 +53,9 @@ export const levelOf = (xp: number) => Math.floor((xp || 0) / 1000) + 1
 // ---------------------------------------------------------------------------
 // Loja V2 — preços fixos em € + Gold como desconto a taxa dinâmica.
 // A taxa (gold por €) vem do RPC get_gold_rate_info e sobe/desce com o Gold
-// total em circulação no clube.
+// em circulação no clube: o de desbravadores e dirigentes (cargo real), visíveis
+// no ranking e com movimentos no points_log nos últimos 90 dias. Esse total
+// (GoldRateInfo.total_gold) é o único a mostrar como "Gold em circulação".
 // ---------------------------------------------------------------------------
 
 export interface GoldRateInfo {

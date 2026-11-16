@@ -18,7 +18,7 @@ const REGRAS = [
   { icon: Zap, texto: 'Cada acerto vale 100 pontos, mais um bónus até +50 por rapidez.' },
   { icon: Flame, texto: 'Acertos seguidos multiplicam: 3 → ×2, 6 → ×3, 10 → ×4.' },
   { icon: Trophy, texto: 'Toda a gente entra no ranking: os membros com o nome, os convidados com uma alcunha.' },
-  { icon: Coins, texto: 'Membros do clube: a primeira ronda do dia em cada cidade dá XP e Gold (1, 2 com 11 certas, 3 com 14).' },
+  { icon: Coins, texto: 'Membros do clube: a primeira ronda do dia em cada cidade dá XP e Gold (5, 10 com 11 certas, 15 com 14).' },
 ]
 
 export default function PackLobby({

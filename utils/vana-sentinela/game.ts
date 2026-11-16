@@ -268,13 +268,13 @@ export function motivoPontuacaoImpossivel(p: PontuacaoEnviada): string | null {
 
 // ── Prémios dos membros ─────────────────────────────────────────────────────
 // Só a primeira ronda do dia em cada pack (dia de Lisboa). Os valores têm de bater
-// certo com award_vana_sentinela_rewards em supabase-setup-vana-sentinela.sql.
+// certo com award_vana_sentinela_rewards em supabase-migration-points-rebalance.sql.
 
 /** XP e Gold (iguais) pela primeira ronda do dia, conforme as certas. */
 export function recompensaPorAcertos(acertos: number): number {
-  if (acertos >= 14) return 3
-  if (acertos >= 11) return 2
-  return 1
+  if (acertos >= 14) return 15
+  if (acertos >= 11) return 10
+  return 5
 }
 
 // ── Convidados ──────────────────────────────────────────────────────────────

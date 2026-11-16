@@ -269,11 +269,12 @@ export function RaffleClient({
     return list
   }, [members, guests, selected])
 
-  // Pergunta da Semana: quem respondeu, sem os desmarcados e sem quem já ganhou nesta pergunta.
+  // Pergunta da Semana: quem respondeu, sem os desmarcados, sem quem já ganhou nesta
+  // pergunta e sem quem já ganhou o sorteio de outra (o servidor volta a confirmar).
   const questionEntries = useMemo(() => {
     if (!question) return []
     const respondents = new Set(question.respondentIds)
-    const won = new Set(question.winners.map((w) => w.id))
+    const won = new Set([...question.winners.map((w) => w.id), ...(question.pastWinnerIds ?? [])])
     return members.filter((m) => respondents.has(m.id) && !won.has(m.id) && !questionOut.has(m.id)).map(memberEntry)
   }, [question, members, questionOut])
 

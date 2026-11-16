@@ -100,6 +100,7 @@ export function StorePanel({ profile, products, initialPurchases, members, event
             <form onSubmit={handleSaveEconomy} className="space-y-4 py-2">
               <div className="rounded-xl border border-yellow-100 bg-yellow-50/50 p-3 space-y-1 text-xs text-gray-600">
                 <p>Gold em circulação: <span className="font-black text-gray-900">{totalGold.toLocaleString()} 🪙</span></p>
+                <p className="text-[11px] text-gray-400 leading-relaxed">Conta só o Gold de desbravadores e dirigentes que estão no ranking e tiveram movimentos de pontos nos últimos 90 dias.</p>
                 <p>Taxa atual: <span className="font-black text-yellow-700">1 € ≈ {goldRate} 🪙</span> (multiplicador ×{rateInfo?.multiplier ?? 1})</p>
                 <p className="text-[11px] text-gray-400 leading-relaxed pt-1">
                   A taxa ajusta-se sozinha: com mais Gold em circulação do que a referência, o desconto fica mais caro em Gold; com menos, fica mais barato (entre ×{Number(settings?.min_rate_multiplier) || 0.5} e ×{Number(settings?.max_rate_multiplier) || 3}).

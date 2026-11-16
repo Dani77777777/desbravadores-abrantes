@@ -135,12 +135,12 @@ export interface VanaTrilhaTodayStats {
 
 export const VANATRILHA_DAILY_LENGTH = 8
 export const VANATRILHA_DAILY_LIVES = 3
-export const VANATRILHA_MILAGRE_GOLD = 2
+export const VANATRILHA_MILAGRE_GOLD = 10
 export const VANATRILHA_TABUAS_STEPS = 1
-export const VANATRILHA_REWARD_XP = 2
-export const VANATRILHA_REWARD_GOLD = 2
-export const VANATRILHA_PERFECT_BONUS_XP = 1
-export const VANATRILHA_PERFECT_BONUS_GOLD = 1
+export const VANATRILHA_REWARD_XP = 10
+export const VANATRILHA_REWARD_GOLD = 10
+export const VANATRILHA_PERFECT_BONUS_XP = 5
+export const VANATRILHA_PERFECT_BONUS_GOLD = 5
 export const VANATRILHA_BADGE_NAME = 'Peregrino da Promessa'
 
 export const VANATRILHA_STATIONS: VanaTrilhaStation[] = [

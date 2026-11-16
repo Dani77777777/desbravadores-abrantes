@@ -6,6 +6,7 @@ import {
   MAX_PRIZE_POINTS,
   pickWinners,
   prizeLabel,
+  questionRaffleExclusions,
   recommendEvent,
   type RaffleEvent,
   type RaffleMember,
@@ -33,6 +34,53 @@ describe('prémio do sorteio', () => {
     expect(prizeLabel(points(50, 10))).toBe('50 XP + 10 Gold')
     expect(prizeLabel(points(0, 10))).toBe('10 Gold')
     expect(prizeLabel(physical('Boné'))).toBe('Boné')
+  })
+})
+
+describe('sorteio da Pergunta da Semana: não repetir vencedores', () => {
+  const win = (question_id: string, profile_id: string) => ({ question_id, profile_id })
+
+  test('sem vencedores anteriores entram todos', () => {
+    expect(questionRaffleExclusions('q3', ['a', 'b', 'c'], [])).toEqual({ excludedIds: [], allWonBefore: false })
+  })
+
+  test('quem ganhou o sorteio de outra pergunta fica de fora', () => {
+    const wins = [win('q1', 'a'), win('q2', 'c')]
+    expect(questionRaffleExclusions('q3', ['a', 'b', 'c', 'd'], wins)).toEqual({ excludedIds: ['a', 'c'], allWonBefore: false })
+  })
+
+  test('vale qualquer pergunta anterior, por mais antiga que seja, e conta uma vez', () => {
+    const wins = [win('q1', 'a'), win('q2', 'a')]
+    expect(questionRaffleExclusions('q9', ['a', 'b'], wins).excludedIds).toEqual(['a'])
+  })
+
+  test('vencedores que não responderam a esta pergunta não contam', () => {
+    expect(questionRaffleExclusions('q3', ['b'], [win('q1', 'a')])).toEqual({ excludedIds: [], allWonBefore: false })
+  })
+
+  test('quem já ganhou NESTA pergunta não entra na contagem dos que ficaram de fora', () => {
+    // 'a' ganhou agora (fica travado pela chave primária); 'c' ganhou noutra semana.
+    const wins = [win('q3', 'a'), win('q1', 'c')]
+    expect(questionRaffleExclusions('q3', ['a', 'b', 'c'], wins)).toEqual({ excludedIds: ['c'], allWonBefore: false })
+  })
+
+  test('se todos os que responderam já ganharam alguma vez, voltam todos a entrar', () => {
+    const wins = [win('q1', 'a'), win('q2', 'b'), win('q2', 'c')]
+    expect(questionRaffleExclusions('q3', ['a', 'b', 'c'], wins)).toEqual({ excludedIds: [], allWonBefore: true })
+  })
+
+  test('basta um que nunca ganhou para os outros continuarem de fora', () => {
+    const wins = [win('q1', 'a'), win('q2', 'b')]
+    expect(questionRaffleExclusions('q3', ['a', 'b', 'c'], wins)).toEqual({ excludedIds: ['a', 'b'], allWonBefore: false })
+  })
+
+  test('depois de o único que nunca tinha ganho sair, os restantes voltam a entrar', () => {
+    const wins = [win('q1', 'a'), win('q2', 'b'), win('q3', 'c')]
+    expect(questionRaffleExclusions('q3', ['a', 'b', 'c'], wins)).toEqual({ excludedIds: [], allWonBefore: true })
+  })
+
+  test('sem respostas não há ninguém de fora nem regresso de todos', () => {
+    expect(questionRaffleExclusions('q3', [], [win('q1', 'a')])).toEqual({ excludedIds: [], allWonBefore: false })
   })
 })
 

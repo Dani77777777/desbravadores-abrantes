@@ -13,7 +13,7 @@
 -- os ficheiros supabase-teste-*.sql (dados de teste do VanaCoro).
 --
 -- Conteúdo: 7 enums · 94 tabelas · 5 vistas · 125 funções · 26 triggers
---           57 índices · 163 políticas RLS (+ 9 no storage) · trigger de perfil em auth.users
+--           58 índices · 163 políticas RLS (+ 9 no storage) · trigger de perfil em auth.users
 --           457 linhas de dados iniciais (definições, packs, versículos, perguntas)
 --
 -- COMO CORRER
@@ -540,14 +540,14 @@ DECLARE
   v_multiplier numeric := 1;
 BEGIN
   -- Só o próprio pode reclamar as suas recompensas
-  IF p_user_id IS DISTINCT FROM auth.uid() THEN
+  IF auth.uid() IS NULL OR p_user_id IS DISTINCT FROM auth.uid() THEN
     RAISE EXCEPTION 'Não autorizado.';
   END IF;
 
   v_amount := CASE p_mode
-    WHEN 'recruta' THEN 1
-    WHEN 'explorador' THEN 2
-    WHEN 'mestre' THEN 4
+    WHEN 'recruta' THEN 5
+    WHEN 'explorador' THEN 10
+    WHEN 'mestre' THEN 20
     ELSE NULL
   END;
 
@@ -653,7 +653,7 @@ BEGIN
     );
   END IF;
 
-  v_amount := CASE WHEN v_score.correct >= 14 THEN 3 WHEN v_score.correct >= 11 THEN 2 ELSE 1 END;
+  v_amount := CASE WHEN v_score.correct >= 14 THEN 15 WHEN v_score.correct >= 11 THEN 10 ELSE 5 END;
   v_desc := v_desc_base || ' (' || v_score.correct || '/' || v_score.total || ' certas)';
 
   v_multiplier := public.game_points_multiplier('vana-sentinela');
@@ -698,15 +698,17 @@ BEGIN
   SELECT * INTO v_run FROM public.vanatrilha_daily_runs WHERE id = p_run_id FOR UPDATE;
 
   IF NOT FOUND THEN RETURN jsonb_build_object('ok', false, 'reason', 'not_found'); END IF;
-  IF auth.uid() IS NULL OR v_run.user_id <> auth.uid() THEN
+  IF auth.uid() IS NULL OR v_run.user_id IS DISTINCT FROM auth.uid() THEN
     RETURN jsonb_build_object('ok', false, 'reason', 'forbidden');
   END IF;
-  IF v_run.status <> 'completed' THEN RETURN jsonb_build_object('ok', false, 'reason', 'not_completed'); END IF;
+  IF v_run.status IS DISTINCT FROM 'completed' THEN RETURN jsonb_build_object('ok', false, 'reason', 'not_completed'); END IF;
   IF v_run.rewards_awarded THEN RETURN jsonb_build_object('ok', false, 'reason', 'already_awarded'); END IF;
 
   v_perfect := (v_run.mistakes = 0);
-  v_xp   := 2 + CASE WHEN v_perfect THEN 1 ELSE 0 END;
-  v_gold := 2 + CASE WHEN v_perfect THEN 1 ELSE 0 END + COALESCE(v_run.bonus_gold, 0);
+  -- 10 pela etapa, +5 pela Jornada Perfeita; o Milagre (bonus_gold) vem da corrida.
+  -- Tem de coincidir com dailyRewards em utils/vana-trilha.ts.
+  v_xp   := 10 + CASE WHEN v_perfect THEN 5 ELSE 0 END;
+  v_gold := 10 + CASE WHEN v_perfect THEN 5 ELSE 0 END + COALESCE(v_run.bonus_gold, 0);
 
   v_station_name := CASE v_run.station
     WHEN 1 THEN 'Egito'
@@ -771,14 +773,14 @@ DECLARE
   v_multiplier numeric := 1;
 BEGIN
   -- Só o próprio pode reclamar as suas recompensas
-  IF v_user_id IS DISTINCT FROM auth.uid() THEN
+  IF auth.uid() IS NULL OR v_user_id IS DISTINCT FROM auth.uid() THEN
     RAISE EXCEPTION 'Não autorizado.';
   END IF;
 
   v_amount := CASE v_mode
-    WHEN 'solo' THEN 1
-    WHEN 'mix' THEN 2
-    WHEN 'plex' THEN 4
+    WHEN 'solo' THEN 5
+    WHEN 'mix' THEN 10
+    WHEN 'plex' THEN 20
     ELSE NULL
   END;
 
@@ -1305,6 +1307,7 @@ $$;
 
 CREATE FUNCTION public.get_gold_rate_info() RETURNS jsonb
     LANGUAGE plpgsql STABLE SECURITY DEFINER
+    SET search_path TO 'public'
     AS $$
 DECLARE
   v_base numeric := 100;
@@ -1323,7 +1326,18 @@ BEGIN
     v_base := 100; v_ref := 10000; v_min := 0.5; v_max := 3;
   END IF;
 
-  SELECT COALESCE(SUM(current_gold), 0) INTO v_total FROM public.profiles;
+  -- Só conta o Gold de quem participa: desbravadores e dirigentes (cargo REAL, não o
+  -- de ajudante), visíveis no ranking e com pelo menos um movimento de pontos nos
+  -- últimos 90 dias. Coordenadores, contas de teste e contas paradas ficam de fora.
+  SELECT COALESCE(SUM(p.current_gold), 0) INTO v_total
+  FROM public.profiles p
+  WHERE p.role IN ('desbravador', 'dirigente')
+    AND NOT public.is_hidden_from_ranking(p.full_name)
+    AND EXISTS (
+      SELECT 1 FROM public.points_log pl
+      WHERE pl.target_user_id = p.id
+        AND pl.created_at >= now() - interval '90 days'
+    );
 
   v_mult := LEAST(v_max, GREATEST(v_min, v_total / NULLIF(v_ref, 0)));
   v_rate := GREATEST(1, CEIL(v_base * COALESCE(v_mult, 1)))::integer;
@@ -7960,6 +7974,13 @@ CREATE INDEX idx_points_audit_events_created ON public.points_audit_events USING
 --
 
 CREATE INDEX idx_points_log_event_id ON public.points_log USING btree (event_id);
+
+
+--
+-- Name: idx_points_log_target_created; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_points_log_target_created ON public.points_log USING btree (target_user_id, created_at DESC);
 
 
 --

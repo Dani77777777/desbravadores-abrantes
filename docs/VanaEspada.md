@@ -537,9 +537,10 @@ Sem I/O, 100% testáveis:
 - `formatReference(ref)` → `"1 Samuel 17:45-47"` (usa `utils/bible-books.ts`)
 - `pickRounds(pool, { count, kind, difficulty, excludeVerseIds })` com um RNG injetável
   (para testes deterministas)
-- `calcEspadaRewards(totalPoints, topPoints)`: **reutiliza `calcSessionRewards` do
-  VanaQuest com os pontos a dividir por 100**. Uma ronda vale até ~1000 pontos, enquanto
-  no VanaQuest vale ~10; sem esta escala toda a gente batia no limite de 500 Gold.
+- `calcEspadaRewards(totalPoints)`: `gold = floor(pontos / 10)`, `xp = gold × 2`, com um
+  **teto individual de 150 Gold + 300 XP por jogador por sessão** (`ESPADA_MAX_GOLD`,
+  `ESPADA_MAX_XP`). Ao contrário do `calcSessionRewards` do VanaQuest, não escala em
+  proporção do 1.º: quem fez menos que o teto recebe exatamente o que fez.
 
 ---
 

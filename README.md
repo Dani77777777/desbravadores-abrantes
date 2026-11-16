@@ -157,15 +157,15 @@ Todos têm controlo do anfitrião, ecrã de projetor e ecrã de jogador; entra-s
 
 | Jogo | Em que consiste |
 | :--- | :--- |
-| **VanaQuest** | quiz em tempo real estilo Kahoot: rapidez, sequências de acertos, multiplicador por pergunta, sala de espera com reações, pódio cinematográfico |
-| **VanaEspada** | "Onde está?": aparece um excerto da Bíblia (ACF) e cada um adivinha livro → capítulo → versículo; pontuação por proximidade, prémios sem teto |
-| **VanaWords** | estilo Codenames: grelha 5×5, equipas Leão e Águia, um Arauto por equipa, sessões de teste com bots |
+| **VanaQuest** | quiz em tempo real estilo Kahoot: rapidez, sequências de acertos, multiplicador por pergunta, sala de espera com reações, pódio cinematográfico; prémios até 150 Gold + 300 XP por sessão (se o 1.º passar o teto, os outros descem na mesma proporção) |
+| **VanaEspada** | "Onde está?": aparece um excerto da Bíblia (ACF) e cada um adivinha livro → capítulo → versículo; pontuação por proximidade; cada 10 pontos valem 1 Gold (XP a dobrar), até 150 Gold + 300 XP por jogador |
+| **VanaWords** | estilo Codenames: grelha 5×5, equipas Leão e Águia, um Arauto por equipa, sessões de teste com bots; 100 XP + 50 Gold para quem ganha e 40 XP + 20 Gold de participação para quem perde |
 | **VanaSketch** | estilo Pictionary: desenho no telemóvel em tempo real no projetor, packs de palavras, música e efeitos, imagem do melhor desenho; **chamada à frente** (o próximo desenhador é sorteado com uma roleta no projetor e só vê as palavras quando o anfitrião as revela) |
 | **VanaCamp: Infiltrados** | estilo Lobisomem (tom IASD: ninguém morre, "vai para casa"), 5 a 25 jogadores, fases com temporizador, Diretor, só para membros |
 | **VanaCoro** | estilo Family Feud com as respostas da Pergunta da Semana (agrupadas por IA e revistas pelo anfitrião): duelo, 3 falhas, roubo, ronda ×2; as equipas podem ser as famílias sorteadas no Formador |
 
 ### A solo (desafio diário)
-Pagam uma vez por modo por dia, com o multiplicador ativo.
+Pagam uma vez por modo (ou pack) por dia, com o multiplicador ativo. XP e Gold iguais: VANTUR e VanaCódigo 5 / 10 / 20 conforme o modo; VanaSentinela 5 / 10 / 15 (com 11 e 14 certas); VanaTrilha 10 pela etapa, +5 pela Jornada Perfeita e +10 Gold do Milagre.
 
 | Jogo | Em que consiste |
 | :--- | :--- |
@@ -183,6 +183,9 @@ Pagam uma vez por modo por dia, com o multiplicador ativo.
 - **Regra de ouro:** todos os pontos entram como uma linha em `points_log`. Os totais do perfil são recalculados por trigger e o trigger `protect_point_totals` rejeita qualquer outro valor.
 - Origens: presenças em eventos, QR codes, tarefas, sugestões, inquéritos, Pergunta da Semana, jogos e atribuição manual (dirigentes só à sua classe).
 - As descrições dos movimentos identificam a origem na Auditoria e na analítica: não se mudam sem atualizar essas contagens.
+- **Tetos dos jogos ao vivo:** VanaQuest e VanaEspada pagam no máximo 150 Gold + 300 XP por jogador por sessão. No VanaQuest o teto é da sessão (o 1.º recebe o máximo e os outros são reduzidos na mesma proporção); no VanaEspada é individual (quem fez menos recebe exatamente o que fez).
+- **Sorteio da Pergunta da Semana:** o prémio é definido pelo anfitrião; quem já ganhou um sorteio fica de fora dos seguintes, a não ser que todos os que responderam já tenham ganho.
+- **Taxa do Gold da loja** (`get_gold_rate_info`): o "Gold em circulação" soma só o Gold de desbravadores e dirigentes (cargo real), visíveis no ranking e com pelo menos um movimento no `points_log` nos últimos 90 dias. A referência ajusta-se em `store_settings.reference_total_gold` (Gestão → Loja).
 
 ---
 
@@ -289,7 +292,7 @@ npm run lint
 ### Projeto novo: um só ficheiro
 [`supabase-schema-completo.sql`](supabase-schema-completo.sql) cria **toda** a base de dados de uma vez, numa só transação:
 
-- 7 enums, 94 tabelas, 5 vistas, 125 funções/RPCs, 26 triggers, 57 índices e 163 políticas RLS (mais 9 no storage);
+- 7 enums, 94 tabelas, 5 vistas, 125 funções/RPCs, 26 triggers, 58 índices e 163 políticas RLS (mais 9 no storage);
 - as permissões exatas (incluindo as permissões por coluna do `anon` e as RPCs só para o `service_role`);
 - o trigger que cria o perfil quando alguém se regista (`on_auth_user_created`);
 - os buckets `imagens` (público: avatares e produtos da loja) e `cofre-comprovativos` (privado: comprovativos do Cofre), com as suas políticas;
@@ -367,6 +370,7 @@ Não há ferramenta de migrações: cada `supabase-*.sql` na raiz é corrido à 
 39. `-client-errors`
 40. `-vana-sketch-calling`
 41. `-audit-edit-movements`
+42. `-points-rebalance`
 
 (`-x` = `supabase-migration-x.sql`.)
 </details>

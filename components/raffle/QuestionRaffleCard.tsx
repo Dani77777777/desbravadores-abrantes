@@ -55,11 +55,15 @@ export function QuestionRaffleCard({
     return members.filter((m) => ids.has(m.id))
   }, [members, question])
   const prizeOf = useMemo(() => new Map(question?.winners.map((w) => [w.id, w.prize])), [question])
+  // Quem já ganhou o sorteio de outra pergunta fica de fora (regra confirmada no servidor).
+  const pastWinners = useMemo(() => new Set(question?.pastWinnerIds ?? []), [question])
+  const blocked = (id: string) => prizeOf.has(id) || pastWinners.has(id)
+  const pastWinnersOut = respondents.filter((m) => pastWinners.has(m.id) && !prizeOf.has(m.id)).length
 
-  const inPlay = respondents.filter((m) => !out.has(m.id) && !prizeOf.has(m.id))
+  const inPlay = respondents.filter((m) => !out.has(m.id) && !blocked(m.id))
   const leaders = inPlay.filter((m) => isLeaderFor(m, null))
   const helpers = inPlay.filter((m) => isHelperFor(m, null))
-  const unticked = respondents.filter((m) => out.has(m.id) && !prizeOf.has(m.id))
+  const unticked = respondents.filter((m) => out.has(m.id) && !blocked(m.id))
 
   const field = 'h-11 w-full rounded-xl border border-gray-200 bg-white px-3 text-sm'
 
@@ -70,7 +74,7 @@ export function QuestionRaffleCard({
           <CardTitle className="flex items-center gap-2 text-base">
             <MessageCircleQuestion className="h-5 w-5 text-blue-700" /> Pergunta da Semana
           </CardTitle>
-          <CardDescription>Entram os membros que responderam à pergunta escolhida. Os convidados não entram, porque não têm nome.</CardDescription>
+          <CardDescription>Entram os membros que responderam à pergunta escolhida. Os convidados não entram, porque não têm nome. Quem já ganhou um sorteio da Pergunta da Semana fica de fora dos seguintes.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-2">
           {question ? (
@@ -223,17 +227,30 @@ export function QuestionRaffleCard({
                     </button>
                   )}
                 </div>
+                {pastWinnersOut > 0 && (
+                  <p className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800">
+                    {pastWinnersOut === 1
+                      ? '1 pessoa ficou de fora por já ter ganho um sorteio da Pergunta da Semana.'
+                      : `${pastWinnersOut} pessoas ficaram de fora por já terem ganho um sorteio da Pergunta da Semana.`}
+                  </p>
+                )}
+                {question.allWonBefore && (
+                  <p className="rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-medium text-blue-800">
+                    Todos os que responderam já ganharam um sorteio: voltam todos a entrar.
+                  </p>
+                )}
                 <ul className="max-h-[26rem] divide-y divide-gray-100 overflow-y-auto rounded-xl border border-gray-200">
                   {respondents.map((m) => {
                     const won = prizeOf.get(m.id)
+                    const wonBefore = !won && pastWinners.has(m.id)
                     return (
                       <PersonRow
                         key={m.id}
                         member={m}
-                        on={!won && !out.has(m.id)}
+                        on={!won && !wonBefore && !out.has(m.id)}
                         isMe={m.id === userId}
-                        note={won ? `Ganhou: ${won}` : undefined}
-                        disabled={!!won}
+                        note={won ? `Ganhou: ${won}` : wonBefore ? 'Já ganhou noutro sorteio' : undefined}
+                        disabled={!!won || wonBefore}
                         onToggle={() => onSetOut([m.id], !out.has(m.id))}
                       />
                     )

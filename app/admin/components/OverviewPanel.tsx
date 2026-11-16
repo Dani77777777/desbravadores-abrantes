@@ -62,7 +62,11 @@ export function OverviewPanel({
   const notInvested = realMembers.filter(m => !m.is_invested)
   const investmentRate = realMembers.length > 0 ? Math.round((investedMembers / realMembers.length) * 100) : 0
   const totalXP = members.reduce((acc, m) => acc + (m.total_xp || 0), 0)
-  const totalGold = members.reduce((acc, m) => acc + (m.current_gold || 0), 0)
+  // O mesmo total que faz a taxa da loja (get_gold_rate_info): só desbravadores e
+  // dirigentes visíveis no ranking e ativos nos últimos 90 dias.
+  const totalGold = rateInfo
+    ? Number(rateInfo.total_gold) || 0
+    : members.reduce((acc, m) => acc + (m.current_gold || 0), 0)
   const avgXP = totalMembers > 0 ? Math.round(totalXP / totalMembers) : 0
   const newMembers30 = members.filter(m => m.created_at && now - new Date(m.created_at).getTime() <= 30 * 86_400_000).length
 

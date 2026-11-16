@@ -10,6 +10,8 @@ import { TILE_EMOJI, TILE_LABEL } from '@/utils/vana-trilha-labels'
 import {
   VANATRILHA_DAILY_LENGTH,
   VANATRILHA_DAILY_LIVES,
+  VANATRILHA_PERFECT_BONUS_XP,
+  VANATRILHA_REWARD_XP,
   VANATRILHA_STATIONS,
   getStation,
   type VanaTrilhaAnswerResult,
@@ -193,7 +195,7 @@ export default function DailyGame({ initialState, initialProgress, playerName }:
           </div>
           <div className="rounded-2xl border border-amber-100 bg-white p-3 shadow-sm">
             <Sparkles className="mx-auto h-5 w-5 text-yellow-500" />
-            <p className="mt-1 text-sm font-black text-slate-900">Até 3 XP</p>
+            <p className="mt-1 text-sm font-black text-slate-900">Até {VANATRILHA_REWARD_XP + VANATRILHA_PERFECT_BONUS_XP} XP</p>
           </div>
         </div>
 

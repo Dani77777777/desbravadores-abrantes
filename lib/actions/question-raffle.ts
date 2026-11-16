@@ -4,7 +4,7 @@ import { createClient } from '@/utils/supabase/server'
 import { createServiceClient } from '@/utils/supabase/service'
 import { effectiveLeadershipSection, effectiveRole } from '@/utils/permissions'
 import { isHiddenFromRanking } from '@/utils/ranking'
-import { cleanPrize, prizeLabel, type RafflePrize, type RaffleQuestion } from '@/utils/raffle'
+import { cleanPrize, prizeLabel, questionRaffleExclusions, type RafflePrize, type RaffleQuestion } from '@/utils/raffle'
 
 // Sorteio entre quem respondeu à Pergunta da Semana. As respostas só se leem com a
 // service role, por isso o cargo e a secção são confirmados aqui. Só saem os ids das
@@ -42,14 +42,19 @@ async function eligibleIds({ service, section, userId }: Host): Promise<Set<stri
   return new Set((data ?? []).filter((p) => !isHiddenFromRanking(p.full_name) && p.id !== userId).map((p) => p.id as string))
 }
 
-async function loadWinners(service: Service, questionIds: string[]) {
+/**
+ * Todos os prémios de sorteio destas pessoas, em QUALQUER pergunta: quem já ganhou
+ * um sorteio fica de fora dos seguintes (ver questionRaffleExclusions).
+ */
+async function loadWins(service: Service, profileIds: string[]) {
+  type Win = { question_id: string; profile_id: string; prize: string }
+  if (profileIds.length === 0) return { data: [] as Win[], failed: false }
   const { data, error } = await service
     .from('question_raffle_prizes')
     .select('question_id, profile_id, prize')
-    .in('question_id', questionIds)
-  // Sem a migração o sorteio continua a mostrar quem respondeu; só falha ao dar o prémio.
+    .in('profile_id', profileIds)
   if (error) console.error('Sorteador: erro a ler os prémios', error)
-  return data ?? []
+  return { data: (data ?? []) as Win[], failed: !!error }
 }
 
 export async function getQuestionRaffleData(): Promise<RaffleQuestion[] | null> {
@@ -74,10 +79,11 @@ export async function getQuestionRaffleData(): Promise<RaffleQuestion[] | null> 
   if (questions.length === 0) return []
   const ids = questions.map((q) => q.id as string)
 
-  const [answersRes, prizes] = await Promise.all([
-    service.from('vanacoro_answers').select('question_id, profile_id').in('question_id', ids).not('profile_id', 'is', null),
-    loadWinners(service, ids),
-  ])
+  const answersRes = await service
+    .from('vanacoro_answers')
+    .select('question_id, profile_id')
+    .in('question_id', ids)
+    .not('profile_id', 'is', null)
   if (answersRes.error) return null
 
   const respondents = new Map<string, Set<string>>()
@@ -87,14 +93,24 @@ export async function getQuestionRaffleData(): Promise<RaffleQuestion[] | null> 
     respondents.get(a.question_id)!.add(a.profile_id)
   }
 
-  return questions.map((q) => ({
-    id: q.id,
-    prompt: q.prompt,
-    closes_at: q.closes_at,
-    open: !!q.closes_at && q.closes_at > now,
-    respondentIds: [...(respondents.get(q.id) ?? [])],
-    winners: prizes.filter((p) => p.question_id === q.id && eligible.has(p.profile_id)).map((p) => ({ id: p.profile_id, prize: p.prize })),
-  }))
+  // Sem a migração dos prémios o sorteio continua a mostrar quem respondeu; só falha ao dar o prémio.
+  const everyone = [...new Set([...respondents.values()].flatMap((set) => [...set]))]
+  const { data: wins } = await loadWins(service, everyone)
+
+  return questions.map((q) => {
+    const respondentIds = [...(respondents.get(q.id) ?? [])]
+    const { excludedIds, allWonBefore } = questionRaffleExclusions(q.id, respondentIds, wins)
+    return {
+      id: q.id,
+      prompt: q.prompt,
+      closes_at: q.closes_at,
+      open: !!q.closes_at && q.closes_at > now,
+      respondentIds,
+      winners: wins.filter((p) => p.question_id === q.id).map((p) => ({ id: p.profile_id, prize: p.prize })),
+      pastWinnerIds: excludedIds,
+      allWonBefore,
+    }
+  })
 }
 
 /**
@@ -115,14 +131,26 @@ export async function awardQuestionPrize(
   const ids = [...new Set(profileIds)]
   if (ids.length === 0 || ids.length > MAX_WINNERS) return { error: 'Não há ninguém para receber o prémio.' }
 
+  // Todos os que responderam (não só os sorteados): a regra de quem fica de fora
+  // depende de todos já terem ganho ou não.
   const [eligible, answersRes] = await Promise.all([
     eligibleIds(host),
-    service.from('vanacoro_answers').select('profile_id').eq('question_id', questionId).in('profile_id', ids),
+    service.from('vanacoro_answers').select('profile_id').eq('question_id', questionId).not('profile_id', 'is', null),
   ])
   if (!eligible || answersRes.error) return { error: 'Não foi possível confirmar quem respondeu.' }
-  const answered = new Set((answersRes.data ?? []).map((a) => a.profile_id as string))
-  if (!ids.every((id) => eligible.has(id) && answered.has(id))) {
+  const respondents = [...new Set((answersRes.data ?? []).map((a) => a.profile_id as string))].filter((id) => eligible.has(id))
+  const answered = new Set(respondents)
+  if (!ids.every((id) => answered.has(id))) {
     return { error: 'Só quem respondeu a esta pergunta pode receber o prémio.' }
+  }
+
+  // Quem já ganhou o sorteio de outra pergunta fica de fora (a não ser que todos já
+  // tenham ganho). Confirmado aqui para não se contornar pelo cliente.
+  const winsRes = await loadWins(service, respondents)
+  if (winsRes.failed) return { error: 'Não foi possível confirmar quem já ganhou um sorteio.' }
+  const excluded = new Set(questionRaffleExclusions(questionId, respondents, winsRes.data).excludedIds)
+  if (ids.some((id) => excluded.has(id))) {
+    return { error: 'Quem já ganhou um sorteio da Pergunta da Semana fica de fora dos seguintes.' }
   }
 
   const label = prizeLabel(prize)

@@ -244,7 +244,7 @@ describe('ecrã final', () => {
 
 describe('membros e convidados', () => {
   test('prémio da primeira ronda do dia', () => {
-    expect([0, 10, 11, 13, 14, 15].map(recompensaPorAcertos)).toEqual([1, 1, 2, 2, 3, 3])
+    expect([0, 10, 11, 13, 14, 15].map(recompensaPorAcertos)).toEqual([5, 5, 10, 10, 15, 15])
   })
 
   test('alcunhas aceites e recusadas', () => {

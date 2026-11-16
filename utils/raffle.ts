@@ -64,6 +64,41 @@ export type RaffleQuestion = {
   open: boolean
   respondentIds: string[]
   winners: { id: string; prize: string }[]
+  /** Respondentes que ficam de fora por já terem ganho o sorteio de outra pergunta. */
+  pastWinnerIds: string[]
+  /** Todos os que responderam já ganharam alguma vez: voltam todos a entrar. */
+  allWonBefore: boolean
+}
+
+/** Uma linha de `question_raffle_prizes` (quem ganhou o sorteio de que pergunta). */
+export type QuestionRaffleWin = { question_id: string; profile_id: string }
+
+/**
+ * Sorteio da Pergunta da Semana: quem já ganhou o sorteio de OUTRA pergunta fica de
+ * fora dos seguintes. Exceção: se todos os que responderam a esta pergunta já tiverem
+ * ganho alguma vez (nesta ou noutra), voltam todos a entrar.
+ *
+ * Quem já ganhou NESTA pergunta não entra em `excludedIds`: continua travado pela
+ * chave primária de `question_raffle_prizes` e aparece como "Ganhou: …".
+ * Usada na lista (getQuestionRaffleData) e na validação do servidor (awardQuestionPrize).
+ */
+export function questionRaffleExclusions(
+  questionId: string,
+  respondentIds: string[],
+  wins: QuestionRaffleWin[],
+): { excludedIds: string[]; allWonBefore: boolean } {
+  const wonHere = new Set<string>()
+  const wonElsewhere = new Set<string>()
+  for (const w of wins) (w.question_id === questionId ? wonHere : wonElsewhere).add(w.profile_id)
+
+  const respondents = [...new Set(respondentIds)]
+  if (respondents.length > 0 && respondents.every((id) => wonHere.has(id) || wonElsewhere.has(id))) {
+    return { excludedIds: [], allWonBefore: true }
+  }
+  return {
+    excludedIds: respondents.filter((id) => wonElsewhere.has(id) && !wonHere.has(id)),
+    allWonBefore: false,
+  }
 }
 
 export const EMPTY_PRIZE: RafflePrize = { kind: 'points', name: '', xp: 0, gold: 0 }

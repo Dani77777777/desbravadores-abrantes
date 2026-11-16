@@ -197,7 +197,7 @@ export default async function VanturGamePage() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8 w-full max-w-6xl mt-8">
               <ModeCard 
                 title="Solo" 
-                description="Uma palavra. 6 tentativas. Recompensa: 1 XP, 1 Gold"
+                description="Uma palavra. 6 tentativas. Recompensa: 5 XP, 5 Gold"
                 mode="solo"
                 icon={<Brain className={`w-12 h-12 ${finishedModes.includes('solo') ? 'text-gray-300' : 'text-blue-500'}`} />}
                 userId={user.id}
@@ -207,7 +207,7 @@ export default async function VanturGamePage() {
               />
               <ModeCard 
                 title="Mix" 
-                description="Duas palavras. 7 tentativas. Recompensa: 2 XP, 2 Gold"
+                description="Duas palavras. 7 tentativas. Recompensa: 10 XP, 10 Gold"
                 mode="mix"
                 icon={<Zap className={`w-12 h-12 ${finishedModes.includes('mix') ? 'text-gray-300' : 'text-amber-500'}`} />}
                 userId={user.id}
@@ -217,7 +217,7 @@ export default async function VanturGamePage() {
               />
               <ModeCard 
                 title="Plex" 
-                description="Quatro palavras. 9 tentativas. Recompensa: 4 XP, 4 Gold"
+                description="Quatro palavras. 9 tentativas. Recompensa: 20 XP, 20 Gold"
                 mode="plex"
                 icon={<Layers className={`w-12 h-12 ${finishedModes.includes('plex') ? 'text-gray-300' : 'text-purple-500'}`} />}
                 userId={user.id}

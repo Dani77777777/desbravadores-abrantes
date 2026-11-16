@@ -207,17 +207,24 @@ export function shuffle<T>(items: T[], rng: () => number = Math.random): T[] {
 /** Pontos do jogo por cada Gold. */
 export const ESPADA_POINTS_PER_GOLD = 10
 
+/** Teto de prémios por jogador, por sessão de VanaEspada. */
+export const ESPADA_MAX_GOLD = 150
+export const ESPADA_MAX_XP = 300 // = ESPADA_MAX_GOLD * 2 (XP é sempre gold × 2)
+
 /**
- * Pontos → Gold/XP: tira-se a última casa e o XP é o dobro.
- *   4826 pts → 482 🪙 + 964 ⭐
+ * Pontos → Gold/XP: tira-se a última casa e o XP é o dobro, até ao teto de
+ * 150 Gold + 300 XP por jogador por sessão.
+ *   1240 pts → 124 🪙 + 248 ⭐
+ *   4826 pts → 150 🪙 + 300 ⭐ (teto)
  *
- * Arredonda para baixo (482,6 dá 482, não 483) e NÃO tem o teto de 500 Gold
- * por sessão do VanaQuest, de propósito: este jogo é para premiar quem sabe
- * mesmo a Bíblia, e a conta de cada um não pode depender de quanto fez o 1.º
- * (com o teto, se o 1.º passasse os 5000 pontos todos levavam menos).
+ * Arredonda para baixo (124,6 dá 124, não 125). O teto é INDIVIDUAL, ao
+ * contrário do VanaQuest: a conta de cada um não depende de quanto fez o 1.º
+ * (não se escala proporcionalmente). Quem fez menos que o teto recebe
+ * exatamente o que fez.
  */
 export function calcEspadaRewards(totalPoints: number): { gold: number; xp: number } {
-  const gold = Math.floor(Math.max(0, totalPoints) / ESPADA_POINTS_PER_GOLD)
+  const earned = Math.floor(Math.max(0, totalPoints) / ESPADA_POINTS_PER_GOLD)
+  const gold = Math.min(earned, ESPADA_MAX_GOLD)
   return { gold, xp: gold * 2 }
 }
 

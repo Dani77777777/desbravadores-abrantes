@@ -167,7 +167,7 @@ export default async function VanaCodigoGamePage() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8 w-full max-w-6xl mt-8">
               <ModeCard
                 title="Recruta"
-                description="Palavra curta. 5 tentativas. Recompensa: 1 XP, 1 Gold"
+                description="Palavra curta. 5 tentativas. Recompensa: 5 XP, 5 Gold"
                 mode="recruta"
                 icon={<Flag className={`w-12 h-12 ${finishedModes.includes('recruta') ? 'text-gray-300' : 'text-emerald-500'}`} />}
                 userId={user.id}
@@ -176,7 +176,7 @@ export default async function VanaCodigoGamePage() {
               />
               <ModeCard
                 title="Explorador"
-                description="Palavra longa. 5 tentativas. Recompensa: 2 XP, 2 Gold"
+                description="Palavra longa. 5 tentativas. Recompensa: 10 XP, 10 Gold"
                 mode="explorador"
                 icon={<Radio className={`w-12 h-12 ${finishedModes.includes('explorador') ? 'text-gray-300' : 'text-teal-500'}`} />}
                 userId={user.id}
@@ -185,7 +185,7 @@ export default async function VanaCodigoGamePage() {
               />
               <ModeCard
                 title="Mestre"
-                description="Frase secreta. 6 tentativas. Recompensa: 4 XP, 4 Gold"
+                description="Frase secreta. 6 tentativas. Recompensa: 20 XP, 20 Gold"
                 mode="mestre"
                 icon={<KeyRound className={`w-12 h-12 ${finishedModes.includes('mestre') ? 'text-gray-300' : 'text-indigo-500'}`} />}
                 userId={user.id}

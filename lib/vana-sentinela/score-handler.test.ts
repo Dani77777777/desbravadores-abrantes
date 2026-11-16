@@ -24,7 +24,7 @@ function deps(over: Partial<ScoreDeps> = {}) {
     },
     award: async (id) => {
       awarded.push(id)
-      return { awarded: true, xp: 1, gold: 1 }
+      return { awarded: true, xp: 5, gold: 5 }
     },
     now: () => AGORA,
     ...over,
@@ -39,7 +39,7 @@ describe('POST pontuação — membros', () => {
     const { d, inserted, awarded } = deps()
     const res = await handleScorePost({ ...valido, user_id: 'outro-utilizador' }, d)
     expect(res.status).toBe(201)
-    expect(res.body.recompensa).toEqual({ awarded: true, xp: 1, gold: 1 })
+    expect(res.body.recompensa).toEqual({ awarded: true, xp: 5, gold: 5 })
     expect(inserted).toEqual([
       { pack: 'abrantes', user_id: 'user-1', guest_id: null, guest_name: null, points: 1500, correct: 10, total: 15, max_combo: 5, duration_ms: 40_000 },
     ])

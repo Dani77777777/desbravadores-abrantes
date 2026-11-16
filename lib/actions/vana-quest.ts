@@ -655,7 +655,7 @@ export async function kickParticipant(
  * XP/Gold awards são baseados nos pontos totais ganhos no jogo.
  * Arredondamento half-up: 15.5 → 16, 15.4 → 15
  * Gold = round(total_points), XP = gold * 2 — com limite por sessão
- * (500 gold / 1000 XP): se o melhor jogador ultrapassar, recebe o máximo
+ * (150 gold / 300 XP): se o melhor jogador ultrapassar, recebe o máximo
  * e os restantes são escalados na mesma proporção (ver calcSessionRewards).
  *
  * Protecção: se já foi atribuído antes (points_awarded_at != null), não duplica.

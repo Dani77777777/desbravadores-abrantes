@@ -5,6 +5,8 @@ import {
   MAX_LOCATE_POINTS,
   answerTier,
   calcEspadaRewards,
+  ESPADA_MAX_GOLD,
+  ESPADA_MAX_XP,
   formatGuess,
   formatReference,
   pickRounds,
@@ -227,18 +229,32 @@ describe('pickRounds', () => {
 })
 
 describe('calcEspadaRewards', () => {
-  test('tira a última casa: 4826 pontos dão 482 Gold e o dobro de XP', () => {
-    expect(calcEspadaRewards(4_826)).toEqual({ gold: 482, xp: 964 })
+  test('tira a última casa: 1246 pontos dão 124 Gold e o dobro de XP', () => {
+    expect(calcEspadaRewards(1_246)).toEqual({ gold: 124, xp: 248 })
   })
 
   test('arredonda sempre para baixo', () => {
-    expect(calcEspadaRewards(4_829)).toEqual({ gold: 482, xp: 964 })
+    expect(calcEspadaRewards(1_249)).toEqual({ gold: 124, xp: 248 })
     expect(calcEspadaRewards(9)).toEqual({ gold: 0, xp: 0 })
     expect(calcEspadaRewards(10)).toEqual({ gold: 1, xp: 2 })
   })
 
-  test('não tem teto: um jogo perfeito de 15 rondas paga tudo', () => {
-    expect(calcEspadaRewards(15_000)).toEqual({ gold: 1_500, xp: 3_000 })
+  test('teto de 150 Gold + 300 XP por jogador', () => {
+    expect(ESPADA_MAX_GOLD).toBe(150)
+    expect(ESPADA_MAX_XP).toBe(300)
+    expect(calcEspadaRewards(1_499)).toEqual({ gold: 149, xp: 298 })
+    expect(calcEspadaRewards(1_500)).toEqual({ gold: 150, xp: 300 })
+    expect(calcEspadaRewards(1_510)).toEqual({ gold: 150, xp: 300 })
+    expect(calcEspadaRewards(4_826)).toEqual({ gold: 150, xp: 300 })
+    expect(calcEspadaRewards(15_000)).toEqual({ gold: 150, xp: 300 })
+  })
+
+  test('o teto é individual: quem fez menos recebe exatamente o que fez, faça o 1.º o que fizer', () => {
+    // Uma sessão em que o 1.º rebenta o teto: os outros não são escalados.
+    const session = [15_000, 1_490, 800, 35]
+    expect(session.map((pts) => calcEspadaRewards(pts).gold)).toEqual([150, 149, 80, 3])
+    // A mesma pontuação paga o mesmo numa sessão sem ninguém acima do teto.
+    expect(calcEspadaRewards(800)).toEqual({ gold: 80, xp: 160 })
   })
 
   test('pontos a zero ou negativos não dão prémio', () => {

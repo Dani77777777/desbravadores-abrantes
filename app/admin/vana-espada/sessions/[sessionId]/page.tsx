@@ -15,7 +15,7 @@ import { SECTION_COLORS, SECTION_LABELS, getBook, type BibleSection } from '@/ut
 import {
   ANSWER_TIERS,
   answerTier,
-  calcEspadaRewards,
+  calcEspadaRewards, ESPADA_MAX_GOLD, ESPADA_MAX_XP,
   foundTheBook,
   formatGuess,
   formatReference,
@@ -319,7 +319,7 @@ export default async function EspadaSessionDetailPage({
           ) : (
             <div className="space-y-1.5">
               <p className="text-xs text-gray-500">
-                Cada 10 pontos valem 1 Gold, e o XP é o dobro (4826 pts → 482🪙 + 964⭐).
+                Cada 10 pontos valem 1 Gold, e o XP é o dobro, até {ESPADA_MAX_GOLD}🪙 + {ESPADA_MAX_XP}⭐ por jogador (1240 pts → 124🪙 + 248⭐).
               </p>
               {players.map((p, i) => {
                 const s = strengths.get(p.id)

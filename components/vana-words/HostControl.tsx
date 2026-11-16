@@ -966,6 +966,10 @@ export function HostControl({ session: initSession, initialPlayers, initialWords
           </button>
         )}
 
+        {!session.rewards_awarded && winner && (
+          <p className="text-white/60 text-sm -mt-3">A equipa que perde recebe 40 XP e 20 Gold de participação.</p>
+        )}
+
         {session.rewards_awarded && (
           <p className="text-emerald-400 font-semibold flex items-center gap-2">
             <CheckCircle2 className="w-5 h-5" /> XP e Gold atribuídos!

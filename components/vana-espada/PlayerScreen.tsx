@@ -11,7 +11,7 @@ import { useWakeLock } from '@/components/vana-camp/useWakeLock'
 import { getMyAnswer, setRewardsRecipient, skipRewards, submitLocate } from '@/lib/actions/vana-espada'
 import {
   breakdownHeadline,
-  calcEspadaRewards,
+  calcEspadaRewards, ESPADA_MAX_GOLD, ESPADA_MAX_XP,
   formatGuess,
   formatReference,
   toEspadaPlayer,
@@ -471,7 +471,7 @@ export function PlayerScreen({ sessionId, userId, initialSession, serverNow, all
             <p className="text-sky-200 text-sm">Podes enviar ao teu Desbravador:</p>
             <p className="text-amber-300 font-black text-2xl mt-1">{gold} 🪙 + {xp} ⭐ XP</p>
             <p className="text-sky-300/70 text-[11px] mt-1">
-              Cada 10 pontos valem 1 Gold, e o XP é o dobro.
+              Cada 10 pontos valem 1 Gold, e o XP é o dobro, até {ESPADA_MAX_GOLD} 🪙 + {ESPADA_MAX_XP} ⭐.
             </p>
           </div>
 

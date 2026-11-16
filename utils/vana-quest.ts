@@ -71,14 +71,14 @@ export function calcPoints(
 }
 
 /** Limites máximos de prémios por sessão de VanaQuest. */
-export const MAX_SESSION_GOLD = 500
-export const MAX_SESSION_XP = 1000 // = MAX_SESSION_GOLD * 2 (XP é sempre gold × 2)
+export const MAX_SESSION_GOLD = 150
+export const MAX_SESSION_XP = 300 // = MAX_SESSION_GOLD * 2 (XP é sempre gold × 2)
 
 /**
  * Converte os pontos do jogo em Gold/XP, com limite máximo por sessão.
  *
  * Gold = round(pontos), XP = gold × 2. Se o melhor jogador da sessão
- * ultrapassar o limite (500 gold / 1000 XP), ele recebe exatamente o máximo
+ * ultrapassar o limite (150 gold / 300 XP), ele recebe exatamente o máximo
  * e todos os outros são reduzidos na mesma proporção — mantém a
  * classificação relativa sem prémios exorbitantes.
  */
