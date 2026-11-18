@@ -169,18 +169,18 @@ export function CofrePanel({ movements, balances, coordinators, currentUserId, t
 
       {/* ── Ações ───────────────────────────────────────────────── */}
       <div className="fixed inset-x-0 bottom-0 z-30 border-t border-stone-200 bg-white/95 p-3 backdrop-blur sm:static sm:z-auto sm:border-0 sm:bg-transparent sm:p-0 sm:backdrop-blur-none print:hidden">
-        <div className="mx-auto flex max-w-7xl flex-wrap gap-2">
-          <Button onClick={() => setDialog('despesa')} className="h-10 flex-1 gap-1.5 bg-rose-600 hover:bg-rose-700 sm:flex-none">
+        <div className="mx-auto flex max-w-7xl gap-2 sm:flex-wrap">
+          <Button onClick={() => setDialog('despesa')} className="h-10 min-w-0 flex-1 gap-1.5 bg-rose-600 px-3 hover:bg-rose-700 sm:flex-none">
             <Minus className="h-4 w-4" /> Despesa
           </Button>
-          <Button onClick={() => setDialog('entrada_outra')} className="h-10 flex-1 gap-1.5 bg-emerald-600 hover:bg-emerald-700 sm:flex-none">
-            <Plus className="h-4 w-4" /> Outra entrada
+          <Button onClick={() => setDialog('entrada_outra')} className="h-10 min-w-0 flex-1 gap-1.5 bg-emerald-600 px-3 hover:bg-emerald-700 sm:flex-none">
+            <Plus className="h-4 w-4" /> <span className="truncate">Outra entrada</span>
           </Button>
-          <Button asChild variant="outline" className="h-10 gap-1.5">
-            <Link href={`/admin/cofre/relatorio?${query}`}><Printer className="h-4 w-4" /> <span className="hidden sm:inline">Relatório</span></Link>
+          <Button asChild variant="outline" className="h-10 w-10 shrink-0 gap-1.5 px-0 sm:w-auto sm:px-4">
+            <Link href={`/admin/cofre/relatorio?${query}`} title="Relatório" aria-label="Relatório"><Printer className="h-4 w-4" /> <span className="hidden sm:inline">Relatório</span></Link>
           </Button>
-          <Button asChild variant="outline" className="h-10 gap-1.5">
-            <a href={`/admin/cofre/exportar?${query}`}><FileSpreadsheet className="h-4 w-4" /> <span className="hidden sm:inline">Exportar Excel</span></a>
+          <Button asChild variant="outline" className="h-10 w-10 shrink-0 gap-1.5 px-0 sm:w-auto sm:px-4">
+            <a href={`/admin/cofre/exportar?${query}`} title="Exportar Excel" aria-label="Exportar Excel"><FileSpreadsheet className="h-4 w-4" /> <span className="hidden sm:inline">Exportar Excel</span></a>
           </Button>
         </div>
       </div>
@@ -367,13 +367,15 @@ function MovementRow({ m, cents, reversed, holder, createdBy, onReceipt, onRever
 
 function HeaderStat({ icon: Icon, tone, label, value, sub }: { icon: React.ElementType; tone: string; label: string; value: string; sub: string }) {
   return (
-    <div className="relative overflow-hidden rounded-2xl bg-white/[0.07] p-4 ring-1 ring-inset ring-white/10">
-      <span className={`flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br text-white shadow-md ${tone}`}>
+    <div className="relative flex items-center gap-3 overflow-hidden rounded-2xl bg-white/[0.07] p-3 ring-1 ring-inset ring-white/10 sm:block sm:p-4">
+      <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br text-white shadow-md ${tone}`}>
         <Icon className="h-4 w-4" />
       </span>
-      <p className="mt-3 text-[11px] font-extrabold uppercase tracking-wider text-blue-100/70">{label}</p>
-      <p className={`${D} text-2xl font-extrabold leading-tight sm:text-3xl`}>{value}</p>
-      <p className="mt-0.5 truncate text-[11px] text-blue-100/60" title={sub}>{sub}</p>
+      <div className="min-w-0 flex-1">
+        <p className="text-[11px] font-extrabold uppercase tracking-wider text-blue-100/70 sm:mt-3">{label}</p>
+        <p className={`${D} text-2xl font-extrabold leading-tight sm:text-3xl`}>{value}</p>
+        <p className="mt-0.5 truncate text-[11px] text-blue-100/60" title={sub}>{sub}</p>
+      </div>
     </div>
   )
 }
