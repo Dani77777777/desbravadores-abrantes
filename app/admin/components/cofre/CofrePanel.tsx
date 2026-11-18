@@ -168,7 +168,8 @@ export function CofrePanel({ movements, balances, coordinators, currentUserId, t
       )}
 
       {/* ── Ações ───────────────────────────────────────────────── */}
-      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-stone-200 bg-white/95 p-3 backdrop-blur sm:static sm:z-auto sm:border-0 sm:bg-transparent sm:p-0 sm:backdrop-blur-none print:hidden">
+      {/* max-sm:!mb-0: o space-y-6 do contentor dá margem a este filho e, sendo fixed, levantava a barra 24px */}
+      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-stone-200 bg-white/95 p-3 pb-[max(env(safe-area-inset-bottom),0.75rem)] backdrop-blur max-sm:!mb-0 sm:static sm:z-auto sm:border-0 sm:bg-transparent sm:p-0 sm:backdrop-blur-none print:hidden">
         <div className="mx-auto flex max-w-7xl gap-2 sm:flex-wrap">
           <Button onClick={() => setDialog('despesa')} className="h-10 min-w-0 flex-1 gap-1.5 bg-rose-600 px-3 hover:bg-rose-700 sm:flex-none">
             <Minus className="h-4 w-4" /> Despesa

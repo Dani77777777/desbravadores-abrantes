@@ -613,7 +613,8 @@ function MovementsTable({ rows, loading, onCorrect }: { rows: any[]; loading: bo
     )
   }
   return (
-    <div className="overflow-x-auto">
+    // `relative`: o <span class="sr-only"> (absolute) do cabeçalho fica preso aqui; sem isto escapava ao scroll e alargava a página no mobile
+    <div className="relative overflow-x-auto">
       <table className="w-full text-sm">
         <thead>
           <tr className="text-left text-[11px] uppercase tracking-wider text-slate-500 border-b bg-slate-50/50">
@@ -713,7 +714,8 @@ function ChangesTable({ rows, loading }: { rows: any[]; loading: boolean }) {
     )
   }
   return (
-    <div className="overflow-x-auto">
+    // `relative`: o <span class="sr-only"> (absolute) do cabeçalho fica preso aqui; sem isto escapava ao scroll e alargava a página no mobile
+    <div className="relative overflow-x-auto">
       <table className="w-full text-sm">
         <thead>
           <tr className="text-left text-[11px] uppercase tracking-wider text-slate-500 border-b bg-slate-50/50">
