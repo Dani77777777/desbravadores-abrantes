@@ -225,7 +225,7 @@ export function AuditPanel({ members }: { members: any[] }) {
   const pages = Math.max(1, Math.ceil(count / PAGE_SIZE))
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 min-w-0">
       {/* Cabeçalho */}
       <div className="bg-white rounded-2xl border p-5 space-y-4">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
@@ -233,14 +233,14 @@ export function AuditPanel({ members }: { members: any[] }) {
             <h2 className="text-lg font-bold text-slate-900">Auditoria de pontos</h2>
             <p className="text-sm text-slate-500">Todos os movimentos de XP e Ouro no site, quem os fez e de onde vieram.</p>
           </div>
-          <div className="flex items-center gap-2">
-            <div className="inline-flex p-1 bg-slate-100 rounded-lg">
+          <div className="flex items-center gap-2 min-w-0">
+            <div className="flex flex-1 md:flex-none min-w-0 p-1 bg-slate-100 rounded-lg">
               {PERIODS.map((p) => (
                 <button
                   key={p.id}
                   type="button"
                   onClick={() => setFilter('period', p.id)}
-                  className={`px-3 h-8 rounded-md text-xs font-semibold transition-colors ${
+                  className={`flex-1 md:flex-none px-2 sm:px-3 h-8 rounded-md text-xs font-semibold whitespace-nowrap transition-colors ${
                     filters.period === p.id ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-800'
                   }`}
                 >
@@ -248,8 +248,8 @@ export function AuditPanel({ members }: { members: any[] }) {
                 </button>
               ))}
             </div>
-            <Button variant="outline" size="sm" onClick={exportCsv} disabled={exporting} className="h-10">
-              <Download className="w-4 h-4" /> {exporting ? 'A exportar...' : 'CSV'}
+            <Button variant="outline" size="sm" onClick={exportCsv} disabled={exporting} className="h-10 shrink-0" title="Exportar CSV">
+              <Download className="w-4 h-4" /> {exporting ? '...' : 'CSV'}
             </Button>
           </div>
         </div>
@@ -334,7 +334,7 @@ export function AuditPanel({ members }: { members: any[] }) {
 
       {/* Origem + tops */}
       <div className="grid lg:grid-cols-3 gap-4">
-        <div className="lg:col-span-2 bg-white rounded-2xl border p-5">
+        <div className="lg:col-span-2 min-w-0 bg-white rounded-2xl border p-5">
           <h3 className="text-sm font-semibold text-slate-900">Movimentos por origem</h3>
           <p className="text-xs text-slate-500 mb-4">Carrega numa origem para filtrar a tabela.</p>
           {byCategory.length === 0 ? (
@@ -350,7 +350,7 @@ export function AuditPanel({ members }: { members: any[] }) {
                       type="button"
                       onClick={() => { setView('movements'); setFilter('category', active ? 'all' : c.category) }}
                       title={`${cfg.label}: ${c.movements} movimentos · XP +${c.xp_in} / −${c.xp_out} · Ouro +${c.gold_in} / −${c.gold_out}`}
-                      className={`group w-full grid grid-cols-[7.5rem_1fr_auto] sm:grid-cols-[9.5rem_1fr_auto] items-center gap-3 rounded-lg px-2 py-1 text-left transition-colors ${active ? 'bg-indigo-50' : 'hover:bg-slate-50'}`}
+                      className={`group w-full grid grid-cols-[7.5rem_minmax(0,1fr)_auto] sm:grid-cols-[9.5rem_minmax(0,1fr)_auto] items-center gap-3 rounded-lg px-2 py-1 text-left transition-colors ${active ? 'bg-indigo-50' : 'hover:bg-slate-50'}`}
                     >
                       <span className="flex items-center gap-2 text-xs font-medium text-slate-700 truncate">
                         <cfg.icon className="w-3.5 h-3.5 text-slate-400 shrink-0" /> {cfg.label}
@@ -373,7 +373,7 @@ export function AuditPanel({ members }: { members: any[] }) {
           )}
         </div>
 
-        <div className="bg-white rounded-2xl border p-5 space-y-5">
+        <div className="min-w-0 bg-white rounded-2xl border p-5 space-y-5">
           <TopList
             title="Quem mais recebeu XP"
             items={(overview?.top_receivers || []).map((r: any) => ({
@@ -420,7 +420,7 @@ export function AuditPanel({ members }: { members: any[] }) {
                   className="pl-9 h-10 bg-white"
                 />
               </div>
-              <div className="grid grid-cols-2 sm:grid-cols-4 lg:flex gap-2">
+              <div className="grid grid-cols-2 sm:grid-cols-4 lg:flex gap-2 [&>*]:min-w-0">
                 <Select value={filters.memberId} onValueChange={(v) => setFilter('memberId', v)}>
                   <SelectTrigger className="h-10 w-full lg:w-44 bg-white"><SelectValue /></SelectTrigger>
                   <SelectContent>
@@ -523,7 +523,7 @@ function StatTile({ label, value, sub, icon, onClick }: { label: string; value: 
   return (
     <Comp
       {...(onClick ? { type: 'button', onClick } : {})}
-      className={`rounded-xl border bg-white p-4 text-left ${onClick ? 'hover:border-slate-300 hover:bg-slate-50 transition-colors' : ''}`}
+      className={`min-w-0 break-words rounded-xl border bg-white p-4 text-left ${onClick ? 'hover:border-slate-300 hover:bg-slate-50 transition-colors' : ''}`}
     >
       <p className="flex items-center gap-1.5 text-xs font-medium text-slate-500">{icon}{label}</p>
       <p className="text-2xl font-bold text-slate-900 tabular-nums mt-1">{value}</p>
