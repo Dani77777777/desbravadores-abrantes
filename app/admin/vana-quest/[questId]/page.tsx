@@ -38,6 +38,7 @@ export default async function QuestEditorPage({
           questId={questId}
           title={quest.title}
           description={quest.description}
+          theme={quest.theme ?? 'normal'}
           questionCount={questions?.length || 0}
         />
 

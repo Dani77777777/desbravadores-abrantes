@@ -40,6 +40,31 @@ interface Props {
   displayFontClassName?: string
   formatPoints?: (points: number) => string
   title?: string
+  /**
+   * Celebração própria (ex.: estrelas douradas e flocos no tema de Natal do VanaQuest).
+   * Sem ela, ficam os confettis coloridos de sempre.
+   */
+  celebration?: PodiumCelebrationOptions
+}
+
+export interface PodiumCelebrationOptions {
+  colors: string[]
+  shapes?: Array<'square' | 'circle' | 'star'>
+  /** Emojis/caracteres usados como partículas (ex.: '❄'). */
+  textShapes?: string[]
+  scalar?: number
+}
+
+/** Formas e tamanho das partículas (só no browser: shapeFromText usa canvas). */
+function celebrationParticles(c?: PodiumCelebrationOptions): Pick<confetti.Options, 'shapes' | 'scalar'> {
+  if (!c) return {}
+  const shapes: confetti.Shape[] = [...(c.shapes ?? [])]
+  for (const text of c.textShapes ?? []) {
+    try {
+      shapes.push(confetti.shapeFromText({ text, scalar: c.scalar ?? 1 }))
+    } catch {}
+  }
+  return { ...(shapes.length ? { shapes } : {}), ...(c.scalar ? { scalar: c.scalar } : {}) }
 }
 
 type Step =
@@ -110,6 +135,7 @@ export function CinematicPodium({
   displayFontClassName = '',
   formatPoints = (n) => String(Math.round(n)),
   title = '🏆 Pódio Final',
+  celebration,
 }: Props) {
   // `entries` chega como um array novo a cada render (os jogos atualizam o
   // ecrã de poucos em poucos segundos) — por isso nada aqui depende da
@@ -144,7 +170,7 @@ export function CinematicPodium({
     >
       <style>{KEYFRAMES}</style>
 
-      {isFinal && <ConfettiCannons />}
+      {isFinal && <ConfettiCannons celebration={celebration} />}
 
       <h1
         className={`z-10 text-center text-4xl font-black tracking-tight text-white drop-shadow-2xl md:text-6xl animate-in fade-in zoom-in-50 duration-1000 ${displayFontClassName}`}
@@ -269,6 +295,7 @@ export function CinematicPodium({
           ringOffsetClassName={ringOffsetClassName}
           displayFontClassName={displayFontClassName}
           formatPoints={formatPoints}
+          celebration={celebration}
         />
       )}
 
@@ -315,19 +342,23 @@ function WinnerTakeover({
   ringOffsetClassName,
   displayFontClassName,
   formatPoints,
+  celebration,
 }: {
   entry: PodiumEntry
   ringOffsetClassName: string
   displayFontClassName: string
   formatPoints: (n: number) => string
+  celebration?: PodiumCelebrationOptions
 }) {
   // Explosão de confettis à entrada do vencedor
   useEffect(() => {
-    const colors = ['#fde047', '#facc15', '#f59e0b', '#ffffff', '#fb7185', '#60a5fa']
-    confetti({ particleCount: 160, spread: 100, startVelocity: 55, origin: { y: 0.6 }, colors })
-    const t1 = setTimeout(() => confetti({ particleCount: 90, angle: 60, spread: 70, origin: { x: 0, y: 0.75 }, colors }), 350)
-    const t2 = setTimeout(() => confetti({ particleCount: 90, angle: 120, spread: 70, origin: { x: 1, y: 0.75 }, colors }), 550)
+    const colors = celebration?.colors ?? ['#fde047', '#facc15', '#f59e0b', '#ffffff', '#fb7185', '#60a5fa']
+    const extra = celebrationParticles(celebration)
+    confetti({ particleCount: 160, spread: 100, startVelocity: 55, origin: { y: 0.6 }, colors, ...extra })
+    const t1 = setTimeout(() => confetti({ particleCount: 90, angle: 60, spread: 70, origin: { x: 0, y: 0.75 }, colors, ...extra }), 350)
+    const t2 = setTimeout(() => confetti({ particleCount: 90, angle: 120, spread: 70, origin: { x: 1, y: 0.75 }, colors, ...extra }), 550)
     return () => { clearTimeout(t1); clearTimeout(t2) }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   return (
@@ -369,18 +400,20 @@ function CountUp({ value, format, duration = 1200 }: { value: number; format: (n
 }
 
 // Confettis contínuos dos dois lados, depois de o pódio estar completo
-function ConfettiCannons() {
+function ConfettiCannons({ celebration }: { celebration?: PodiumCelebrationOptions }) {
   useEffect(() => {
-    const colors = ['#fbbf24', '#ef4444', '#3b82f6', '#10b981', '#f59e0b', '#ec4899', '#8b5cf6']
+    const colors = celebration?.colors ?? ['#fbbf24', '#ef4444', '#3b82f6', '#10b981', '#f59e0b', '#ec4899', '#8b5cf6']
+    const extra = celebrationParticles(celebration)
     let running = true
     const fire = () => {
       if (!running) return
-      confetti({ particleCount: 6, angle: 60, spread: 55, origin: { x: 0, y: 0.9 }, colors })
-      confetti({ particleCount: 6, angle: 120, spread: 55, origin: { x: 1, y: 0.9 }, colors })
+      confetti({ particleCount: 6, angle: 60, spread: 55, origin: { x: 0, y: 0.9 }, colors, ...extra })
+      confetti({ particleCount: 6, angle: 120, spread: 55, origin: { x: 1, y: 0.9 }, colors, ...extra })
       setTimeout(fire, 450)
     }
     fire()
     return () => { running = false }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
   return null
 }

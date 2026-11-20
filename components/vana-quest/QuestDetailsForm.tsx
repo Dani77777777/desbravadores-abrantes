@@ -2,10 +2,14 @@
 
 import { useId, useState } from 'react'
 import { Check } from 'lucide-react'
+import { ThemePicker } from './ThemePicker'
+import { normalizeVanaQuestThemeId } from './themes'
 
 interface Props {
   initialTitle?: string
   initialDescription?: string | null
+  /** Tema atual (normal, natal, ...). */
+  initialTheme?: string | null
   submitLabel: string
   pending?: boolean
   autoFocus?: boolean
@@ -13,10 +17,11 @@ interface Props {
   onCancel?: () => void
 }
 
-/** Título + descrição de um VanaQuest. Serve para criar e para mudar o nome. */
+/** Título + descrição + tema de um VanaQuest. Serve para criar e para editar. */
 export function QuestDetailsForm({
   initialTitle = '',
   initialDescription = '',
+  initialTheme,
   submitLabel,
   pending,
   autoFocus,
@@ -25,6 +30,7 @@ export function QuestDetailsForm({
 }: Props) {
   const id = useId()
   const [title, setTitle] = useState(initialTitle)
+  const [theme, setTheme] = useState(() => normalizeVanaQuestThemeId(initialTheme))
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -69,6 +75,12 @@ export function QuestDetailsForm({
           placeholder="Para que serve ou a quem se destina"
           className={inputClass}
         />
+      </div>
+      <div>
+        <p id={`${id}-theme`} className="text-xs font-bold text-gray-500 uppercase tracking-wide block mb-1.5">
+          Tema
+        </p>
+        <ThemePicker value={theme} onChange={setTheme} labelId={`${id}-theme`} />
       </div>
       <div className="flex flex-col-reverse sm:flex-row gap-2">
         {onCancel && (

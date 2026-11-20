@@ -11,6 +11,7 @@ import {
   UserX, Gift, AlertTriangle, XCircle, ArrowUp, ArrowDown
 } from 'lucide-react'
 import { PodiumShareCard } from './PodiumShareCard'
+import { getVanaQuestTheme } from './themes'
 import { detectGender, articleFor, winnerWord } from '@/utils/name-gender'
 import { PlayerAvatar } from './PlayerAvatar'
 import { useLiveSession } from './useLiveSession'
@@ -66,10 +67,13 @@ interface Props {
   initialSession: Session
   questions: Question[]
   siteUrl: string
+  /** Tema da quest (normal, natal, ...). O painel de controlo não muda de aspeto. */
+  themeId?: string | null
 }
 
-export function HostControl({ sessionId, initialSession, questions, siteUrl }: Props) {
+export function HostControl({ sessionId, initialSession, questions, siteUrl, themeId }: Props) {
   const supabase = createClient()
+  const theme = getVanaQuestTheme(themeId)
   const [session, setSession] = useState<Session>(initialSession)
   const [participants, setParticipants] = useState<Participant[]>([])
   // Espelho dos participantes para ler nomes dentro de closures (ex.: timers de presença)
@@ -106,7 +110,7 @@ export function HostControl({ sessionId, initialSession, questions, siteUrl }: P
       const dataUrl = await toPng(node, {
         pixelRatio: 2,
         cacheBust: true,
-        backgroundColor: '#0c1a3d',
+        backgroundColor: theme.shareCard?.captureBackground ?? '#0c1a3d',
       })
 
       const questTitle = (initialSession.vana_quests as any)?.title || 'VanaQuest'
@@ -463,6 +467,9 @@ export function HostControl({ sessionId, initialSession, questions, siteUrl }: P
             <div className="min-w-0">
               <p className="text-sky-300 text-[10px] font-bold uppercase tracking-widest">Controlo</p>
               <p className="font-bold text-sm truncate">{(initialSession.vana_quests as any)?.title}</p>
+              {theme.id !== 'normal' && (
+                <p className="text-[10px] text-white/60 font-semibold">{theme.emoji} Tema {theme.name}</p>
+              )}
             </div>
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
@@ -1129,6 +1136,7 @@ export function HostControl({ sessionId, initialSession, questions, siteUrl }: P
             ref={podiumCardRef}
             participants={participants}
             questTitle={(initialSession.vana_quests as any)?.title || 'VanaQuest'}
+            theme={theme}
           />
         </div>
       )}

@@ -11,6 +11,8 @@ import { CinematicPodium } from '@/components/game-podium/CinematicPodium'
 import { ProjectorLobbyScreen } from '@/components/game-lobby/ProjectorLobby'
 import { GameReactionsOverlay } from '@/components/game-lobby/GameReactions'
 import { enterFullscreen } from '@/utils/fullscreen'
+import { resolveVanaQuestSound, type ResolvedSound, type VanaQuestSoundKey } from './themes'
+import { ThemedTitle, useVanaQuestTheme } from './themes/VanaQuestThemeScope'
 
 const OPTION_COLORS = ['bg-red-500', 'bg-blue-500', 'bg-yellow-400', 'bg-green-500']
 const OPTION_LABELS = ['▲', '●', '◆', '■']
@@ -64,6 +66,8 @@ interface Props {
 
 export function Presentation({ sessionId, initialSession, questions, siteUrl }: Props) {
   const supabase = createClient()
+  // Tema da quest (vem do VanaQuestThemeScope da página; por omissão o normal)
+  const theme = useVanaQuestTheme()
   const [session, setSession] = useState<Session>(initialSession)
   const [participants, setParticipants] = useState<Participant[]>([])
   const [participantsLoaded, setParticipantsLoaded] = useState(false)
@@ -98,7 +102,10 @@ export function Presentation({ sessionId, initialSession, questions, siteUrl }: 
   const sfxLightningRef = useRef<HTMLAudioElement | null>(null)
   const sfxEarningRef = useRef<HTMLAudioElement | null>(null)
   const sfxEndRef = useRef<HTMLAudioElement | null>(null)
-  const currentTrackRef = useRef<string>('')
+  // Música atual: chave + ficheiro (do tema) + fallback (normal) se o do tema falhar
+  const currentTrackRef = useRef<ResolvedSound | null>(null)
+  // A música devia estar a tocar? (o fallback só retoma se sim)
+  const musicWantedRef = useRef(false)
   const knownAnswersRef = useRef<Set<string>>(new Set())
 
   const currentQuestion = session.current_question_index >= 0
@@ -210,25 +217,24 @@ export function Presentation({ sessionId, initialSession, questions, siteUrl }: 
   }, [session.status, session.current_question_index, showMultiplierWarning, currentQuestion?.id])
 
   // ── ÁUDIO ─────────────────────────────────────────────────────
-  // encodeURI para escapar espaços/caracteres especiais nos nomes dos ficheiros
-  // (essencial em produção / Vercel)
-  const SOUNDS = '/sounds/VanaQuest - soundboard'
-  const sound = (file: string) => encodeURI(`${SOUNDS}/${file}`)
-  const trackForStatus = (status: string): string => {
+  // Os ficheiros vêm do tema (themes/<tema>.tsx → sounds). O que o tema não tem, ou
+  // não consegue carregar, toca o do tema normal — nunca fica em silêncio.
+  // encodeURI dos nomes é feito em resolveVanaQuestSound (essencial em produção / Vercel).
+  const trackForStatus = (status: string): VanaQuestSoundKey | null => {
     switch (status) {
       case 'waiting':
       case 'quest_intro':
-        return sound('VanaQuest - Lobby Theme.mp3')
+        return 'lobby'
       case 'question_intro':
       case 'question_active':
-        return sound('VanaQuest - Think Fast.mp3')
+        return 'thinkFast'
       case 'question_leaderboard':
-        return sound('VanaQuest - Standings.mp3')
+        return 'standings'
       case 'finished':
-        return sound('VanaQuest - Podium Intro.mp3')
+        return 'podiumIntro'
       // question_results: silêncio (deixa o SFX 'theend' destacar-se)
       default:
-        return ''
+        return null
     }
   }
 
@@ -242,73 +248,105 @@ export function Presentation({ sessionId, initialSession, questions, siteUrl }: 
     } catch {}
   }
 
+  // Toca uma música do tema. Podium Intro NÃO faz loop (transita para Victory).
+  function startTrack(el: HTMLAudioElement, key: VanaQuestSoundKey, label = 'Music') {
+    const track = resolveVanaQuestSound(theme, key)
+    currentTrackRef.current = track
+    musicWantedRef.current = true
+    el.src = track.src
+    el.loop = key !== 'podiumIntro'
+    el.volume = 0.5
+    el.play().catch((err) => console.warn(`[VQ] ${label} play error:`, err, 'src:', track.src))
+  }
+
   // Mudar de música conforme estado / musicEnabled
   useEffect(() => {
     const el = musicRef.current
     if (!el) return
 
     if (!musicEnabled || !audioUnlocked) {
+      musicWantedRef.current = false
       el.pause()
       return
     }
 
     const next = trackForStatus(session.status)
     if (!next) {
+      musicWantedRef.current = false
       el.pause()
       return
     }
 
-    if (currentTrackRef.current !== next) {
-      currentTrackRef.current = next
-      el.src = next
-      el.loop = session.status !== 'finished' // Podium Intro NÃO faz loop (transita para Victory)
-      el.volume = 0.5
-      el.play().catch((err) => console.warn('[VQ] Music play error:', err, 'src:', next))
+    if (currentTrackRef.current?.key !== next) {
+      startTrack(el, next)
     } else if (el.paused) {
+      musicWantedRef.current = true
       el.play().catch((err) => console.warn('[VQ] Music resume error:', err))
     }
   }, [session.status, musicEnabled, audioUnlocked])
 
-  // Quando Podium Intro acaba → muda para Victory Celebration (loop)
-  // Usa decodeURIComponent para apanhar nomes com %20 (espaços codificados)
+  // Quando Podium Intro acaba → muda para a Victory Celebration do mesmo tema (loop)
   function handleMusicEnded() {
     const el = musicRef.current
     if (!el) return
-    const current = decodeURIComponent(currentTrackRef.current || '')
-    if (current.includes('Podium Intro')) {
-      const victory = sound('VanaQuest - Victory Celebration.mp3')
-      currentTrackRef.current = victory
-      el.src = victory
-      el.loop = true
-      el.volume = 0.5
-      el.play().catch((err) => console.warn('[VQ] Victory celebration play error:', err))
+    if (currentTrackRef.current?.key === 'podiumIntro') {
+      startTrack(el, 'victory', 'Victory celebration')
     }
+  }
+
+  // Ficheiro de música do tema não existe / deu erro → troca para o do tema normal
+  // e continua a tocar (se era para estar a tocar).
+  function handleMusicError() {
+    const el = musicRef.current
+    const track = currentTrackRef.current
+    if (!el || !track) return // src vazio inicial
+    if (!track.fallback) {
+      console.warn('[VQ] Failed to load music:', track.src, el.error)
+      return
+    }
+    console.warn('[VQ] Theme music failed, falling back to normal:', track.src, '→', track.fallback)
+    const fallback = track.fallback
+    currentTrackRef.current = { ...track, src: fallback, fallback: null }
+    el.src = fallback
+    if (musicWantedRef.current) el.play().catch((err) => console.warn('[VQ] Fallback music play error:', err))
   }
 
   // Criar elementos <audio> uma vez (vivem fora da árvore JSX para sobreviver a re-renders entre estados)
   useEffect(() => {
     if (typeof window === 'undefined') return
-    const make = (src: string, label: string) => {
+    // SFX do tema, com fallback para o normal se o ficheiro falhar ao carregar
+    const makeSfx = (key: VanaQuestSoundKey) => {
+      const { src, fallback } = resolveVanaQuestSound(theme, key)
       const a = new Audio()
+      let wanted = false
+      a.addEventListener('play', () => { wanted = true })
+      a.addEventListener('error', () => {
+        if (fallback && a.src !== new URL(fallback, window.location.href).href) {
+          console.warn(`[VQ] Theme SFX '${key}' failed, falling back to normal:`, src, '→', fallback)
+          a.src = fallback
+          if (wanted) a.play().catch(() => {})
+          return
+        }
+        console.warn(`[VQ] Failed to load sfx-${key}:`, a.src, a.error)
+      })
       a.src = src
       a.preload = 'auto'
-      a.addEventListener('error', () => {
-        console.warn(`[VQ] Failed to load ${label}:`, src, a.error)
-      })
+      a.volume = 0.7
       return a
     }
-    musicRef.current = make('', 'music')
-    musicRef.current.addEventListener('ended', handleMusicEnded)
-    sfxAnsweredRef.current = make(sound('player-answered.mp3'), 'sfx-answered')
-    sfxLightningRef.current = make(sound('lightning - x2 and x3 points.mp3'), 'sfx-lightning')
-    sfxEarningRef.current = make(sound('earning points.mp3'), 'sfx-earning')
-    sfxEndRef.current = make(sound('theend.mp3'), 'sfx-end')
-    ;[sfxAnsweredRef, sfxLightningRef, sfxEarningRef, sfxEndRef].forEach((r) => {
-      if (r.current) r.current.volume = 0.7
-    })
+    const music = new Audio()
+    music.preload = 'auto'
+    music.addEventListener('ended', handleMusicEnded)
+    music.addEventListener('error', handleMusicError)
+    musicRef.current = music
+    sfxAnsweredRef.current = makeSfx('answered')
+    sfxLightningRef.current = makeSfx('lightning')
+    sfxEarningRef.current = makeSfx('earning')
+    sfxEndRef.current = makeSfx('end')
     return () => {
-      musicRef.current?.pause()
-      musicRef.current?.removeEventListener('ended', handleMusicEnded)
+      music.pause()
+      music.removeEventListener('ended', handleMusicEnded)
+      music.removeEventListener('error', handleMusicError)
       musicRef.current = null
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -324,13 +362,7 @@ export function Presentation({ sessionId, initialSession, questions, siteUrl }: 
       const el = musicRef.current
       if (el && musicEnabled) {
         const next = trackForStatus(session.status)
-        if (next) {
-          currentTrackRef.current = next
-          el.src = next
-          el.loop = session.status !== 'finished'
-          el.volume = 0.5
-          el.play().catch(() => {})
-        }
+        if (next) startTrack(el, next)
       }
     }
     window.addEventListener('click', unlock, { once: true })
@@ -427,8 +459,8 @@ export function Presentation({ sessionId, initialSession, questions, siteUrl }: 
         joinLabel={`${siteUrl.replace(/^https?:\/\//, '')}/jogos/vana-quest`}
         logo={<img src="/images/VanaQuest.png" alt="" className="w-14 h-14 object-contain drop-shadow-lg" />}
         eyebrow="VanaQuest"
-        title={(initialSession.vana_quests as any)?.title || 'VanaQuest'}
-        background="bg-gradient-to-br from-blue-950 via-blue-900 to-indigo-900"
+        title={<ThemedTitle>{(initialSession.vana_quests as any)?.title || 'VanaQuest'}</ThemedTitle>}
+        background="vq-bg bg-gradient-to-br from-blue-950 via-blue-900 to-indigo-900"
         emptyIcon={<Users className="w-7 h-7 text-sky-400" />}
       >
         {qrZoomed && <QrZoomOverlay pin={session.pin} url={joinUrl} />}
@@ -452,7 +484,7 @@ export function Presentation({ sessionId, initialSession, questions, siteUrl }: 
   if (session.status === 'quest_intro') {
     const title = (initialSession.vana_quests as any)?.title || 'VanaQuest'
     return withReactions(
-      <div className="min-h-screen bg-gradient-to-br from-blue-950 via-blue-900 to-indigo-950 flex flex-col items-center justify-center p-8 relative overflow-hidden">
+      <div className="vq-bg min-h-screen bg-gradient-to-br from-blue-950 via-blue-900 to-indigo-950 flex flex-col items-center justify-center p-8 relative overflow-hidden">
         {/* Spotlight */}
         <div
           className="absolute left-1/2 -top-32 w-[900px] h-[1100px] -translate-x-1/2 opacity-40 pointer-events-none"
@@ -482,10 +514,10 @@ export function Presentation({ sessionId, initialSession, questions, siteUrl }: 
 
           {/* Quiz title - dramático */}
           <h1
-            className="text-white text-6xl md:text-8xl font-black drop-shadow-2xl leading-tight animate-in fade-in zoom-in-90 duration-1000"
+            className="vq-title text-white text-6xl md:text-8xl font-black drop-shadow-2xl leading-tight animate-in fade-in zoom-in-90 duration-1000"
             style={{ animationDelay: '1000ms', animationFillMode: 'backwards' }}
           >
-            {title}
+            <ThemedTitle>{title}</ThemedTitle>
           </h1>
 
           {/* Prepara-te */}
@@ -558,7 +590,7 @@ export function Presentation({ sessionId, initialSession, questions, siteUrl }: 
 
     // Fase 2: pergunta normal
     return withReactions(
-      <div className="h-screen w-screen bg-gradient-to-br from-indigo-950 via-blue-900 to-blue-950 flex flex-col items-center justify-center p-8 md:p-12 relative">
+      <div className="vq-bg h-screen w-screen bg-gradient-to-br from-indigo-950 via-blue-900 to-blue-950 flex flex-col items-center justify-center p-8 md:p-12 relative">
         <div className="absolute top-6 left-6 flex items-center gap-2 bg-white/10 rounded-2xl px-4 py-2 border border-white/10">
           <span className="text-white/60 text-sm font-bold">{session.current_question_index + 1} / {questions.length}</span>
           {currentQuestion.points_multiplier > 1 && (
@@ -579,7 +611,7 @@ export function Presentation({ sessionId, initialSession, questions, siteUrl }: 
         </div>
 
         <div className="absolute bottom-12 flex flex-col items-center gap-3">
-          <div className="text-8xl md:text-9xl font-black text-white/80 tabular-nums animate-in zoom-in duration-500" key={introCountdown}>
+          <div className="vq-num text-8xl md:text-9xl font-black text-white/80 tabular-nums animate-in zoom-in duration-500" key={introCountdown}>
             {introCountdown || ''}
           </div>
           <p className="text-sky-300 text-sm font-semibold">Prepara-te...</p>
@@ -594,7 +626,7 @@ export function Presentation({ sessionId, initialSession, questions, siteUrl }: 
     const timerPct = (timeLeft / currentQuestion.time_seconds) * 100
 
     return withReactions(
-      <div className="h-screen w-screen bg-gradient-to-br from-slate-950 to-indigo-950 flex flex-col p-4 md:p-6 gap-3 overflow-hidden relative">
+      <div className="vq-bg h-screen w-screen bg-gradient-to-br from-slate-950 to-indigo-950 flex flex-col p-4 md:p-6 gap-3 overflow-hidden relative">
         {/* Top bar */}
         <div className="flex items-center justify-between flex-shrink-0">
           <span className="bg-white/10 text-white text-sm font-bold px-3 py-1.5 rounded-full">
@@ -612,7 +644,7 @@ export function Presentation({ sessionId, initialSession, questions, siteUrl }: 
         <div className="absolute right-4 md:right-8 top-1/2 -translate-y-1/2 z-20 flex flex-col items-center gap-2">
           <div
             key={answerPulseKey}
-            className="bg-gradient-to-br from-blue-500 to-indigo-700 rounded-full shadow-2xl border-4 border-white/30 flex flex-col items-center justify-center transition-transform animate-in zoom-in-90 duration-300"
+            className="vq-counter bg-gradient-to-br from-blue-500 to-indigo-700 rounded-full shadow-2xl border-4 border-white/30 flex flex-col items-center justify-center transition-transform animate-in zoom-in-90 duration-300"
             style={{ width: 'clamp(6rem, 9vw, 10rem)', height: 'clamp(6rem, 9vw, 10rem)' }}
           >
             <Users className="text-white/80" style={{ width: 'clamp(1.25rem, 2vw, 2rem)', height: 'clamp(1.25rem, 2vw, 2rem)' }} />
@@ -636,13 +668,13 @@ export function Presentation({ sessionId, initialSession, questions, siteUrl }: 
               style={{ width: `${timerPct}%` }}
             />
           </div>
-          <p className="text-5xl md:text-6xl font-black text-white tabular-nums leading-none min-w-[3.5rem] text-right">
+          <p className="vq-num text-5xl md:text-6xl font-black text-white tabular-nums leading-none min-w-[3.5rem] text-right">
             {Math.ceil(timeLeft)}
           </p>
         </div>
 
         {/* Question — takes remaining space at top */}
-        <div className="bg-white/10 backdrop-blur rounded-3xl border border-white/20 px-6 py-5 md:py-7 flex items-center justify-center flex-shrink-0">
+        <div className="vq-card bg-white/10 backdrop-blur rounded-3xl border border-white/20 px-6 py-5 md:py-7 flex items-center justify-center flex-shrink-0">
           <p
             className="text-white font-bold text-center leading-tight"
             style={{ fontSize: questionFontSize(currentQuestion.question_text) }}
@@ -659,7 +691,7 @@ export function Presentation({ sessionId, initialSession, questions, siteUrl }: 
           {options.map((opt, i) => (
             <div
               key={i}
-              className={`${OPTION_COLORS[i]} rounded-2xl p-4 md:p-6 flex items-center gap-5 shadow-xl min-h-0 overflow-hidden`}
+              className={`vq-option ${OPTION_COLORS[i]} rounded-2xl p-4 md:p-6 flex items-center gap-5 shadow-xl min-h-0 overflow-hidden`}
             >
               <span
                 className="text-white font-black flex-shrink-0 drop-shadow-lg"
@@ -687,10 +719,10 @@ export function Presentation({ sessionId, initialSession, questions, siteUrl }: 
     const maxCount = Math.max(...answerCounts, 1)
 
     return withReactions(
-      <div className="min-h-screen bg-gradient-to-br from-slate-950 to-indigo-950 flex flex-col p-8 gap-6">
+      <div className="vq-bg min-h-screen bg-gradient-to-br from-slate-950 to-indigo-950 flex flex-col p-8 gap-6">
         <div className="text-center space-y-3 animate-in slide-in-from-top duration-500">
           <p className="text-sky-300 text-sm font-black uppercase tracking-[0.3em]">Resposta correcta</p>
-          <div className={`inline-flex items-center gap-5 px-10 py-6 rounded-3xl ${OPTION_COLORS[correctIdx]} shadow-2xl`}>
+          <div className={`vq-option inline-flex items-center gap-5 px-10 py-6 rounded-3xl ${OPTION_COLORS[correctIdx]} shadow-2xl`}>
             <span className="text-white text-5xl md:text-6xl font-black drop-shadow-lg">{OPTION_LABELS[correctIdx]}</span>
             <span className="text-white text-4xl md:text-5xl font-black drop-shadow-md">{options[correctIdx]}</span>
             <CheckCircle2 className="w-10 h-10 text-white" />
@@ -702,10 +734,10 @@ export function Presentation({ sessionId, initialSession, questions, siteUrl }: 
         <div className="flex-1 grid grid-cols-4 gap-4 items-end max-w-4xl mx-auto w-full">
           {options.map((opt, i) => (
             <div key={i} className="flex flex-col items-center gap-2 h-full">
-              <span className="text-white text-3xl font-black">{answerCounts[i]}</span>
+              <span className="vq-num text-white text-3xl font-black">{answerCounts[i]}</span>
               <div className="flex-1 w-full flex items-end">
                 <div
-                  className={`w-full rounded-t-2xl transition-all duration-1000 ${OPTION_COLORS[i]} ${i !== correctIdx ? 'opacity-30' : 'shadow-2xl'}`}
+                  className={`w-full rounded-t-2xl transition-all duration-1000 ${OPTION_COLORS[i]} ${i !== correctIdx ? 'opacity-30 vq-bar-dim' : 'shadow-2xl'}`}
                   style={{ height: `${Math.max(8, (answerCounts[i] / maxCount) * 100)}%` }}
                 />
               </div>
@@ -734,6 +766,7 @@ export function Presentation({ sessionId, initialSession, questions, siteUrl }: 
 // PÓDIO FINAL — componente cinematográfico partilhado (components/game-podium)
 // ─────────────────────────────────────────────────────────────────
 function VanaQuestPodium({ participants }: { participants: Participant[] }) {
+  const theme = useVanaQuestTheme()
   const podium = [...participants].sort((a, b) => b.total_points - a.total_points)
   return (
     <CinematicPodium
@@ -748,8 +781,9 @@ function VanaQuestPodium({ participants }: { participants: Participant[] }) {
           </p>
         ) : null,
       }))}
-      backgroundClassName="bg-gradient-to-b from-blue-950 via-blue-900 to-indigo-950"
-      ringOffsetClassName="ring-offset-blue-950"
+      backgroundClassName="vq-bg bg-gradient-to-b from-blue-950 via-blue-900 to-indigo-950"
+      ringOffsetClassName={theme.podium?.ringOffsetClassName ?? 'ring-offset-blue-950'}
+      celebration={theme.podium?.celebration}
       formatPoints={(n) => n.toFixed(1)}
     />
   )
@@ -866,10 +900,10 @@ function LeaderboardScreen({
   const rowHeight = 158 // px entre rows (com respiro entre cards, mas a caber sem scroll)
 
   return (
-    <div className="h-screen w-screen bg-gradient-to-br from-blue-950 via-indigo-900 to-blue-950 flex flex-col p-6 md:p-8 gap-4 overflow-hidden relative [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+    <div className="vq-bg h-screen w-screen bg-gradient-to-br from-blue-950 via-indigo-900 to-blue-950 flex flex-col p-6 md:p-8 gap-4 overflow-hidden relative [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
       <div className="text-center space-y-1">
         <p className="text-sky-300 text-base font-black uppercase tracking-[0.3em]">Classificação</p>
-        <h2 className="text-white font-black flex items-center justify-center gap-3" style={{ fontSize: 'clamp(2.5rem, 5vw, 4.5rem)' }}>
+        <h2 className="vq-title text-white font-black flex items-center justify-center gap-3" style={{ fontSize: 'clamp(2.5rem, 5vw, 4.5rem)' }}>
           <Trophy className="w-12 h-12 md:w-16 md:h-16 text-yellow-400" /> Top jogadores
         </h2>
       </div>
@@ -893,7 +927,7 @@ function LeaderboardScreen({
                 transition: 'transform 1200ms cubic-bezier(0.22, 1, 0.36, 1)',
               }}
             >
-              <div className={`flex items-center gap-5 rounded-3xl p-5 md:p-6 border-2 ${
+              <div className={`vq-card flex items-center gap-5 rounded-3xl p-5 md:p-6 border-2 ${
                 i === 0 ? 'bg-yellow-400/20 border-yellow-400/40' :
                 i === 1 ? 'bg-gray-300/15 border-gray-300/30' :
                 i === 2 ? 'bg-amber-600/15 border-amber-600/30' :
@@ -942,7 +976,7 @@ function LeaderboardScreen({
 
                 <div className="text-right min-w-[8rem] md:min-w-[10rem]">
                   <p
-                    className="text-white font-black tabular-nums leading-none"
+                    className="vq-num text-white font-black tabular-nums leading-none"
                     style={{ fontSize: 'clamp(2.5rem, 4.5vw, 4rem)' }}
                   >
                     {value.toFixed(1)}

@@ -1,4 +1,5 @@
 import { createClient } from '@/utils/supabase/server'
+import { themeIdFromQuestJoin } from '@/components/vana-quest/themes'
 import { redirect } from 'next/navigation'
 import { HostControl } from '@/components/vana-quest/HostControl'
 import { getSiteUrl } from '@/utils/site-url'
@@ -17,7 +18,7 @@ export default async function ControlPage({ params }: { params: Promise<{ sessio
 
   const { data: session } = await supabase
     .from('vana_quest_sessions')
-    .select('*, vana_quests(title)')
+    .select('*, vana_quests(*)')
     .eq('id', sessionId)
     .single()
 
@@ -38,6 +39,7 @@ export default async function ControlPage({ params }: { params: Promise<{ sessio
         initialSession={session}
         questions={questions || []}
         siteUrl={siteUrl}
+        themeId={themeIdFromQuestJoin(session.vana_quests)}
       />
       <PresentationController />
     </>

@@ -1,7 +1,9 @@
 import { createClient } from '@/utils/supabase/server'
+import { themeIdFromQuestJoin } from '@/components/vana-quest/themes'
 import { Presentation } from '@/components/vana-quest/Presentation'
 import { getSiteUrl } from '@/utils/site-url'
 import PresentationReceiver from '@/components/presentation-effects/PresentationReceiver'
+import { VanaQuestThemeScope } from '@/components/vana-quest/themes/VanaQuestThemeScope'
 
 export default async function PresentPage({ params }: { params: Promise<{ sessionId: string }> }) {
   const { sessionId } = await params
@@ -9,7 +11,7 @@ export default async function PresentPage({ params }: { params: Promise<{ sessio
 
   const { data: session } = await supabase
     .from('vana_quest_sessions')
-    .select('*, vana_quests(title)')
+    .select('*, vana_quests(*)')
     .eq('id', sessionId)
     .single()
 
@@ -31,12 +33,15 @@ export default async function PresentPage({ params }: { params: Promise<{ sessio
 
   return (
     <>
-      <Presentation
-        sessionId={sessionId}
-        initialSession={session}
-        questions={questions || []}
-        siteUrl={siteUrl}
-      />
+      {/* Tema da quest (normal, natal, ...) — desconhecido ou sem migração → normal */}
+      <VanaQuestThemeScope themeId={themeIdFromQuestJoin(session.vana_quests)} surface="projector">
+        <Presentation
+          sessionId={sessionId}
+          initialSession={session}
+          questions={questions || []}
+          siteUrl={siteUrl}
+        />
+      </VanaQuestThemeScope>
       <PresentationReceiver />
     </>
   )

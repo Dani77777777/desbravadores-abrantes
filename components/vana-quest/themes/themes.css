@@ -1,0 +1,187 @@
+/*
+ * Temas do VanaQuest — regras GENÉRICAS, iguais para todos os temas.
+ *
+ * Só se aplicam dentro de [data-vq-skin] (posto pelo VanaQuestThemeScope quando o
+ * tema tem `skin`). O tema normal não tem skin, por isso nada disto lhe toca.
+ * Os valores vêm das variáveis CSS de cada tema (themes/<tema>.tsx → skin):
+ *
+ *   --vq-bg              fundo de todo o jogo
+ *   --vq-panel           fundo das janelas (modais) do telemóvel
+ *   --vq-title           cor dos títulos (.vq-title)
+ *   --vq-number          cor dos números grandes (.vq-num, PIN da sala de espera)
+ *   --vq-number-shadow   sombra dos números
+ *   --vq-counter-bg      bola "quantos responderam" no projetor
+ *   --vq-option-ring     borda dos botões de resposta (as cores A/B/C/D não mudam)
+ *   --vq-option-ornament enfeite no canto dos botões de resposta (ex.: '"❄"')
+ *   --vq-card-ornament   enfeite nos cantos dos cartões
+ *   --color-sky-*        (opcional) troca a cor de destaque azul-céu do jogo
+ *
+ * Classes-marcador nos ecrãs (sem estilo nenhum fora de um tema com skin):
+ *   .vq-bg .vq-panel .vq-title .vq-num .vq-counter .vq-option .vq-card .vq-bar-dim
+ */
+
+/* ── Camadas: fundo → efeitos → conteúdo ─────────────────────────── */
+[data-vq-skin] .vq-skin-bg {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  background: var(--vq-bg);
+  pointer-events: none;
+}
+
+[data-vq-skin] .vq-fx-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+[data-vq-skin] .vq-skin-content {
+  position: relative;
+  z-index: 1;
+}
+
+/* ── Ecrãs ───────────────────────────────────────────────────────── */
+/* O fundo de cada ecrã fica transparente: vê-se o fundo do tema e os efeitos. */
+[data-vq-skin] .vq-bg {
+  background: transparent;
+}
+
+[data-vq-skin] .vq-panel {
+  background: var(--vq-panel, transparent);
+}
+
+[data-vq-skin] .vq-title {
+  color: var(--vq-title, inherit);
+}
+
+[data-vq-skin] .vq-num,
+[data-vq-skin] .game-lobby-pin {
+  color: var(--vq-number, inherit);
+  text-shadow: var(--vq-number-shadow, none);
+}
+
+[data-vq-skin] .vq-counter {
+  background: var(--vq-counter-bg, none);
+}
+
+/* Botões de resposta: mantêm a cor; ganham borda e um enfeite pequeno no canto. */
+[data-vq-skin] .vq-option {
+  position: relative;
+  outline: 3px solid var(--vq-option-ring, transparent);
+  outline-offset: -3px;
+}
+
+[data-vq-skin] .vq-option::after {
+  content: var(--vq-option-ornament, none);
+  position: absolute;
+  top: 0.35rem;
+  right: 0.55rem;
+  font-size: clamp(0.9rem, 1.6vw, 1.5rem);
+  line-height: 1;
+  color: #fff;
+  opacity: 0.9;
+  text-shadow: 0 0 6px rgba(255, 255, 255, 0.8);
+  pointer-events: none;
+}
+
+/* Barras das respostas erradas (resultados): no fundo do tema, a transparência
+   podia fazer uma barra desaparecer (ex.: vermelho sobre vermelho) → contorno claro. */
+[data-vq-skin] .vq-bar-dim {
+  opacity: 0.5;
+  outline: 2px solid rgba(255, 255, 255, 0.55);
+  outline-offset: -2px;
+}
+
+/* Cartões: enfeite subtil em dois cantos. */
+[data-vq-skin] .vq-card,
+[data-vq-skin] .game-lobby-card {
+  position: relative;
+}
+
+[data-vq-skin] .vq-card::before,
+[data-vq-skin] .vq-card::after,
+[data-vq-skin] .game-lobby-card::before,
+[data-vq-skin] .game-lobby-card::after {
+  content: var(--vq-card-ornament, none);
+  position: absolute;
+  font-size: 0.85rem;
+  line-height: 1;
+  color: #fff;
+  opacity: 0.4;
+  pointer-events: none;
+}
+
+[data-vq-skin] .vq-card::before,
+[data-vq-skin] .game-lobby-card::before {
+  top: 0.45rem;
+  right: 0.65rem;
+}
+
+[data-vq-skin] .vq-card::after,
+[data-vq-skin] .game-lobby-card::after {
+  bottom: 0.45rem;
+  left: 0.65rem;
+  font-size: 0.65rem;
+}
+
+/* ── Efeitos usados pelos temas ──────────────────────────────────── */
+[data-vq-skin] .vq-fx-lights {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: clamp(22px, 3.6vh, 40px);
+  z-index: 0;
+  pointer-events: none;
+}
+
+[data-vq-skin] .vq-bulb {
+  position: absolute;
+  width: 9px;
+  height: 13px;
+  border-radius: 50% 50% 45% 45%;
+  transform: translateX(-50%);
+  animation: vq-twinkle 3.2s ease-in-out infinite alternate;
+}
+
+[data-vq-skin] .vq-star {
+  position: absolute;
+  color: #fcd34d;
+  opacity: 0.55;
+  transform: translate(-50%, -50%);
+  filter: drop-shadow(0 0 6px rgba(252, 211, 77, 0.7));
+  animation: vq-star 4.5s ease-in-out infinite alternate;
+}
+
+@keyframes vq-twinkle {
+  from {
+    opacity: 0.35;
+    box-shadow: 0 0 2px 0 currentColor;
+  }
+  to {
+    opacity: 1;
+    box-shadow: 0 0 12px 4px currentColor;
+  }
+}
+
+@keyframes vq-star {
+  from {
+    opacity: 0.2;
+    transform: translate(-50%, -50%) scale(0.8);
+  }
+  to {
+    opacity: 0.75;
+    transform: translate(-50%, -50%) scale(1.1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-vq-skin] .vq-bulb,
+  [data-vq-skin] .vq-star {
+    animation: none;
+  }
+}

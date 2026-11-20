@@ -32,6 +32,7 @@ export default async function VanaQuestAdminPage() {
     id: quest.id,
     title: quest.title,
     description: quest.description,
+    theme: quest.theme ?? 'normal',
     createdLabel: new Date(quest.created_at).toLocaleDateString('pt-PT', { timeZone: 'Europe/Lisbon' }),
     questionCount: (quest.vana_quest_questions as any)?.[0]?.count ?? 0,
     sessionCount: (quest.vana_quest_sessions as any)?.[0]?.count ?? 0,

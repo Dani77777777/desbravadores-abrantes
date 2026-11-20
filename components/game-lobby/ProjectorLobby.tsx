@@ -41,7 +41,8 @@ export function ProjectorLobbyScreen({
   joinLabel: string
   logo: ReactNode
   eyebrow: string
-  title: string
+  /** Nome do quiz/jogo (pode levar um enfeite, ex.: tema de Natal do VanaQuest). */
+  title: ReactNode
   /** Classes do fundo (gradiente de cada jogo). */
   background: string
   emptyIcon: ReactNode
@@ -79,9 +80,9 @@ export function ProjectorLobbyScreen({
       <div className="flex-1 min-h-0 flex gap-8 px-10 py-5 w-full">
         {/* PIN + QR */}
         <div className="w-[clamp(26rem,32vw,38rem)] flex-shrink-0 flex flex-col items-center justify-center gap-5">
-          <div className={`w-full backdrop-blur-sm rounded-3xl border p-6 text-center ${theme.card}`}>
+          <div className={`game-lobby-card w-full backdrop-blur-sm rounded-3xl border p-6 text-center ${theme.card}`}>
             <p className={`${theme.accent} text-xs font-black uppercase tracking-[0.25em] mb-2`}>Entra com o PIN</p>
-            <p className="text-[clamp(4.5rem,6.5vw,7.5rem)] font-black text-white tracking-[0.12em] tabular-nums leading-none">{pin}</p>
+            <p className="game-lobby-pin text-[clamp(4.5rem,6.5vw,7.5rem)] font-black text-white tracking-[0.12em] tabular-nums leading-none">{pin}</p>
             <p className="text-white/60 text-base mt-3">
               em <span className="text-white font-semibold">{joinLabel}</span>
             </p>
@@ -92,7 +93,7 @@ export function ProjectorLobbyScreen({
         </div>
 
         {/* Jogadores na sala */}
-        <div className={`flex-1 min-w-0 backdrop-blur-sm rounded-3xl border p-6 flex flex-col min-h-0 ${theme.card}`}>
+        <div className={`game-lobby-card flex-1 min-w-0 backdrop-blur-sm rounded-3xl border p-6 flex flex-col min-h-0 ${theme.card}`}>
           <p className={`${theme.accent} text-xs font-black uppercase tracking-widest mb-3 flex items-center gap-2 flex-shrink-0`}>
             <Users className="w-4 h-4" /> Jogadores na sala
           </p>

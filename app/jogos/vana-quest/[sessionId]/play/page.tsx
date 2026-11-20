@@ -1,6 +1,8 @@
 import { createClient } from '@/utils/supabase/server'
+import { themeIdFromQuestJoin } from '@/components/vana-quest/themes'
 import { createServiceClient } from '@/utils/supabase/service'
 import { PlayerScreen } from '@/components/vana-quest/PlayerScreen'
+import { VanaQuestThemeScope } from '@/components/vana-quest/themes/VanaQuestThemeScope'
 
 export default async function PlayPage({ params }: { params: Promise<{ sessionId: string }> }) {
   const { sessionId } = await params
@@ -20,7 +22,7 @@ export default async function PlayPage({ params }: { params: Promise<{ sessionId
 
   const { data: session } = await supabase
     .from('vana_quest_sessions')
-    .select('*, vana_quests(title)')
+    .select('*, vana_quests(*)')
     .eq('id', sessionId)
     .single()
 
@@ -70,13 +72,16 @@ export default async function PlayPage({ params }: { params: Promise<{ sessionId
   }))
 
   return (
-    <PlayerScreen
-      sessionId={sessionId}
-      userId={user?.id || null}
-      userProfile={profile}
-      initialSession={session}
-      questions={questions || []}
-      allMembers={allMembers || []}
-    />
+    // Tema da quest (normal, natal, ...) — desconhecido ou sem migração → normal
+    <VanaQuestThemeScope themeId={themeIdFromQuestJoin(session.vana_quests)} surface="phone">
+      <PlayerScreen
+        sessionId={sessionId}
+        userId={user?.id || null}
+        userProfile={profile}
+        initialSession={session}
+        questions={questions || []}
+        allMembers={allMembers || []}
+      />
+    </VanaQuestThemeScope>
   )
 }

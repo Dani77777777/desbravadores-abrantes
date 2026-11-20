@@ -3,6 +3,7 @@
 import { forwardRef } from 'react'
 import { Flame } from 'lucide-react'
 import { PlayerAvatar } from './PlayerAvatar'
+import type { VanaQuestTheme } from './themes'
 
 interface Participant {
   id: string
@@ -17,6 +18,8 @@ interface Participant {
 interface Props {
   participants: Participant[]
   questTitle: string
+  /** Tema da quest: troca o fundo, a cor de destaque e o emoji do título (se o tema os definir). */
+  theme?: VanaQuestTheme
 }
 
 /**
@@ -26,7 +29,8 @@ interface Props {
  *  - Pronto para ser capturado por html-to-image
  */
 export const PodiumShareCard = forwardRef<HTMLDivElement, Props>(
-  ({ participants, questTitle }, ref) => {
+  ({ participants, questTitle, theme }, ref) => {
+    const card = theme?.shareCard
     const podium = [...participants].sort((a, b) => b.total_points - a.total_points)
 
     const pedestalBg: Record<number, string> = {
@@ -53,6 +57,7 @@ export const PodiumShareCard = forwardRef<HTMLDivElement, Props>(
           width: '1080px',
           height: '1080px',
           padding: '40px',
+          ...(card ? { background: card.background } : {}),
         }}
       >
         {/* Logo + título */}
@@ -63,9 +68,9 @@ export const PodiumShareCard = forwardRef<HTMLDivElement, Props>(
             style={{ width: '80px', height: '80px', objectFit: 'contain' }}
             crossOrigin="anonymous"
           />
-          <p className="text-sky-300 text-sm font-black uppercase tracking-[0.3em]">VanaQuest</p>
+          <p className="text-sky-300 text-sm font-black uppercase tracking-[0.3em]" style={card ? { color: card.accent } : undefined}>VanaQuest</p>
           <h1 className="text-white font-black text-center px-6" style={{ fontSize: '3rem', lineHeight: '1.1' }}>
-            🏆 {questTitle}
+            {card?.titleEmoji ?? '🏆'} {questTitle}
           </h1>
           <p className="text-white/50 text-base font-bold mt-1">
             {participants.length} jogador{participants.length !== 1 ? 'es' : ''} ·{' '}

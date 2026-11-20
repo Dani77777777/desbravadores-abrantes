@@ -6,6 +6,7 @@ import { revalidatePath } from 'next/cache'
 import { calcPoints, calcSessionRewards } from '@/utils/vana-quest'
 import { gameUnavailableError } from '@/utils/game-access'
 import { generatePin } from '@/utils/pin'
+import { normalizeVanaQuestThemeId } from '@/components/vana-quest/themes'
 
 // ── Admin: VanaQuest management ────────────────────────────────────
 
@@ -20,6 +21,8 @@ export async function createVanaQuest(formData: FormData) {
   const { data, error } = await supabase.from('vana_quests').insert({
     title,
     description: ((formData.get('description') as string) || '').trim() || null,
+    // Tema desconhecido ou vazio → 'normal' (a lista de temas válidos está no registo central)
+    theme: normalizeVanaQuestThemeId(formData.get('theme')),
     created_by: user.id,
   }).select().single()
 
@@ -36,6 +39,8 @@ export async function updateVanaQuest(id: string, formData: FormData) {
   const { error } = await supabase.from('vana_quests').update({
     title,
     description: ((formData.get('description') as string) || '').trim() || null,
+    // Só muda o tema se o formulário o enviar
+    ...(formData.has('theme') ? { theme: normalizeVanaQuestThemeId(formData.get('theme')) } : {}),
     updated_at: new Date().toISOString(),
   }).eq('id', id)
 
@@ -50,12 +55,13 @@ export async function duplicateVanaQuest(id: string): Promise<string> {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error('Não autorizado')
 
-  const { data: original } = await supabase.from('vana_quests').select('title, description').eq('id', id).single()
+  const { data: original } = await supabase.from('vana_quests').select('title, description, theme').eq('id', id).single()
   if (!original) throw new Error('VanaQuest não encontrado')
 
   const { data: copy, error } = await supabase.from('vana_quests').insert({
     title: `${original.title} (cópia)`,
     description: original.description,
+    theme: normalizeVanaQuestThemeId(original.theme),
     created_by: user.id,
   }).select('id').single()
   if (error || !copy) throw new Error(error?.message || 'Não foi possível duplicar')

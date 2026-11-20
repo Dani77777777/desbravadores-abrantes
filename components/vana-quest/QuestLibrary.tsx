@@ -13,11 +13,13 @@ import {
   updateVanaQuest,
 } from '@/lib/actions/vana-quest'
 import { QuestDetailsForm } from './QuestDetailsForm'
+import { getVanaQuestTheme } from './themes'
 
 export interface LibraryQuest {
   id: string
   title: string
   description: string | null
+  theme: string
   createdLabel: string
   questionCount: number
   sessionCount: number
@@ -66,8 +68,8 @@ export function QuestLibrary({ quests }: { quests: LibraryQuest[] }) {
       await updateVanaQuest(id, formData)
       setRenamingId(null)
       router.refresh()
-      toast.success('Nome guardado.')
-    }, 'Não foi possível guardar o nome.')
+      toast.success('Guardado.')
+    }, 'Não foi possível guardar.')
   }
 
   function handleStart(quest: LibraryQuest) {
@@ -171,16 +173,18 @@ export function QuestLibrary({ quests }: { quests: LibraryQuest[] }) {
         {visible.map((quest) => {
           const busy = pending && busyId === quest.id
           const empty = quest.questionCount === 0
+          const theme = getVanaQuestTheme(quest.theme)
 
           if (renamingId === quest.id) {
             return (
               <li key={quest.id} className="bg-white rounded-2xl border shadow-sm p-4 sm:p-5 ring-2 ring-blue-500">
                 <p className="text-sm font-bold text-blue-600 flex items-center gap-1.5 mb-3">
-                  <Type className="w-3.5 h-3.5" /> Mudar o nome
+                  <Type className="w-3.5 h-3.5" /> Editar nome e tema
                 </p>
                 <QuestDetailsForm
                   initialTitle={quest.title}
                   initialDescription={quest.description}
+                  initialTheme={quest.theme}
                   submitLabel="Guardar"
                   autoFocus
                   pending={busy}
@@ -197,7 +201,10 @@ export function QuestLibrary({ quests }: { quests: LibraryQuest[] }) {
               className={`bg-white rounded-2xl border shadow-sm p-4 sm:p-5 space-y-3 transition-opacity ${busy ? 'opacity-60' : ''}`}
             >
               <div className="min-w-0">
-                <h3 className="font-bold text-gray-900 break-words">{quest.title}</h3>
+                <h3 className="font-bold text-gray-900 break-words">
+                  <span className="mr-1.5" role="img" aria-label={`Tema ${theme.name}`} title={`Tema ${theme.name}`}>{theme.emoji}</span>
+                  {quest.title}
+                </h3>
                 {quest.description && (
                   <p className="text-sm text-gray-500 break-words">{quest.description}</p>
                 )}
@@ -233,7 +240,7 @@ export function QuestLibrary({ quests }: { quests: LibraryQuest[] }) {
 
                 <div className="flex gap-2 sm:gap-0 sm:ml-auto">
                   <button type="button" onClick={() => setRenamingId(quest.id)} disabled={busy} className={secondaryBtn}>
-                    <Type className="w-4 h-4" /> Renomear
+                    <Type className="w-4 h-4" /> Editar
                   </button>
                   <button type="button" onClick={() => handleDuplicate(quest)} disabled={busy} className={secondaryBtn}>
                     <Copy className="w-4 h-4" /> Duplicar

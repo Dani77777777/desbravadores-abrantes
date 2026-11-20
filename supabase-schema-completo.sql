@@ -4987,7 +4987,9 @@ CREATE TABLE public.vana_quests (
     description text,
     created_by uuid,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
-    updated_at timestamp with time zone DEFAULT now() NOT NULL
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    theme text DEFAULT 'normal'::text NOT NULL,
+    CONSTRAINT vana_quests_theme_check CHECK ((theme ~ '^[a-z0-9-]{1,30}$'::text))
 );
 
 

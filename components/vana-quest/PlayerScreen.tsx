@@ -10,6 +10,7 @@ import { LobbyReactionPad } from '@/components/game-lobby/LobbyReactionPad'
 import { LobbyTips } from '@/components/game-lobby/LobbyTips'
 import { useStillInRoom, type RoomGoneReason } from '@/components/game-lobby/useStillInRoom'
 import { calcSessionRewards, streakMultiplier, MAX_SESSION_GOLD, MAX_SESSION_XP } from '@/utils/vana-quest'
+import { ThemedTitle } from './themes/VanaQuestThemeScope'
 
 const OPTION_COLORS = [
   'bg-red-500 active:bg-red-700',
@@ -464,7 +465,7 @@ export function PlayerScreen({ sessionId, userId, userProfile, initialSession, q
   if (kicked) {
     const inactive = kickReason === 'inactive'
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-950 to-indigo-950 flex flex-col items-center justify-center p-6 gap-5 text-center">
+      <div className="vq-bg min-h-screen bg-gradient-to-br from-slate-900 via-blue-950 to-indigo-950 flex flex-col items-center justify-center p-6 gap-5 text-center">
         <div className={`w-20 h-20 rounded-full flex items-center justify-center ${inactive ? 'bg-amber-500/20 border border-amber-400/30' : 'bg-red-500/20 border border-red-400/30'}`}>
           {inactive ? <span className="text-4xl">😴</span> : <XCircle className="w-10 h-10 text-red-400" />}
         </div>
@@ -489,12 +490,12 @@ export function PlayerScreen({ sessionId, userId, userProfile, initialSession, q
   // ── WAITING ────────────────────────────────────────────────────
   if (session.status === 'waiting') {
     return (
-      <div className="min-h-[100dvh] bg-gradient-to-br from-blue-900 via-blue-900 to-indigo-900 flex flex-col items-center justify-center p-5 gap-5 text-center">
+      <div className="vq-bg min-h-[100dvh] bg-gradient-to-br from-blue-900 via-blue-900 to-indigo-900 flex flex-col items-center justify-center p-5 gap-5 text-center">
         <div className="flex items-center gap-3">
           <img src="/images/VanaQuest.png" alt="" className="w-12 h-12 object-contain" />
-          <h1 className="text-2xl font-black text-white text-left leading-tight">{questTitle}</h1>
+          <h1 className="vq-title text-2xl font-black text-white text-left leading-tight"><ThemedTitle>{questTitle}</ThemedTitle></h1>
         </div>
-        <div className="w-full max-w-sm flex items-center gap-3 bg-white/10 backdrop-blur rounded-2xl px-4 py-3 border border-white/20">
+        <div className="vq-card w-full max-w-sm flex items-center gap-3 bg-white/10 backdrop-blur rounded-2xl px-4 py-3 border border-white/20">
           <PlayerAvatar
             name={userProfile?.full_name || 'C'}
             avatarUrl={userProfile?.avatar_url}
@@ -523,7 +524,7 @@ export function PlayerScreen({ sessionId, userId, userProfile, initialSession, q
   // ── QUEST INTRO (uma vez no arranque) ─────────────────────────
   if (session.status === 'quest_intro') {
     return withReactions(
-      <div className="min-h-screen pb-24 bg-gradient-to-br from-blue-950 via-blue-900 to-indigo-950 flex flex-col items-center justify-center p-6 gap-5 text-center">
+      <div className="vq-bg min-h-screen pb-24 bg-gradient-to-br from-blue-950 via-blue-900 to-indigo-950 flex flex-col items-center justify-center p-6 gap-5 text-center">
         <img
           src="/images/VanaQuest.png"
           alt=""
@@ -536,10 +537,10 @@ export function PlayerScreen({ sessionId, userId, userProfile, initialSession, q
           Bem-vindo ao
         </p>
         <h1
-          className="text-white text-4xl font-black drop-shadow-lg leading-tight animate-in fade-in zoom-in-90 duration-700"
+          className="vq-title text-white text-4xl font-black drop-shadow-lg leading-tight animate-in fade-in zoom-in-90 duration-700"
           style={{ animationDelay: '700ms', animationFillMode: 'backwards' }}
         >
-          {questTitle}
+          <ThemedTitle>{questTitle}</ThemedTitle>
         </h1>
         <p
           className="text-sky-200 font-bold text-sm mt-4 animate-pulse"
@@ -595,7 +596,7 @@ export function PlayerScreen({ sessionId, userId, userProfile, initialSession, q
     }
 
     return withReactions(
-      <div className="min-h-screen pb-24 bg-gradient-to-br from-indigo-950 via-blue-900 to-blue-950 flex flex-col items-center justify-center p-6 text-center">
+      <div className="vq-bg min-h-screen pb-24 bg-gradient-to-br from-indigo-950 via-blue-900 to-blue-950 flex flex-col items-center justify-center p-6 text-center">
         <p className="text-sky-300 text-xs font-black uppercase tracking-[0.3em] mb-2">Pergunta {session.current_question_index + 1}</p>
         <p className="text-white text-3xl font-black animate-pulse mb-6">Prepara-te...</p>
         <div className="flex items-center gap-2 text-sky-300">
@@ -611,7 +612,7 @@ export function PlayerScreen({ sessionId, userId, userProfile, initialSession, q
     const timerPct = (timeLeft / currentQuestion.time_seconds) * 100
 
     return withReactions(
-      <div className={`min-h-screen bg-slate-900 flex flex-col p-3 gap-3 relative ${answerResult ? 'pb-20' : ''}`}>
+      <div className={`vq-bg min-h-screen bg-slate-900 flex flex-col p-3 gap-3 relative ${answerResult ? 'pb-20' : ''}`}>
         {/* Top bar */}
         <div className="flex items-center justify-between text-xs">
           <div className="flex items-center gap-2">
@@ -646,7 +647,7 @@ export function PlayerScreen({ sessionId, userId, userProfile, initialSession, q
             style={{ width: `${timerPct}%` }}
           />
         </div>
-        <p className="text-center text-2xl font-black text-white tabular-nums">{Math.ceil(timeLeft)}</p>
+        <p className="vq-num text-center text-2xl font-black text-white tabular-nums">{Math.ceil(timeLeft)}</p>
 
         {/* Falha de envio — botões reativam, jogador pode tocar outra vez */}
         {submitError && !answerResult && (
@@ -673,7 +674,7 @@ export function PlayerScreen({ sessionId, userId, userProfile, initialSession, q
                 key={letter}
                 onClick={() => handleAnswer(letter)}
                 disabled={submitting || timeLeft === 0}
-                className={`${OPTION_COLORS[i]} rounded-3xl flex items-center justify-center transition-all active:scale-95 disabled:opacity-50 shadow-2xl relative overflow-hidden group`}
+                className={`vq-option ${OPTION_COLORS[i]} rounded-3xl flex items-center justify-center transition-all active:scale-95 disabled:opacity-50 shadow-2xl relative overflow-hidden group`}
               >
                 <span className="text-white text-7xl font-black drop-shadow-lg group-active:scale-90 transition-transform">
                   {OPTION_SYMBOLS[i]}
@@ -705,7 +706,7 @@ export function PlayerScreen({ sessionId, userId, userProfile, initialSession, q
   // ── RESULTS ────────────────────────────────────────────────────
   if (session.status === 'question_results') {
     return withReactions(
-      <div className="min-h-screen pb-24 bg-slate-900 flex flex-col items-center justify-center p-6 gap-5 text-center">
+      <div className="vq-bg min-h-screen pb-24 bg-slate-900 flex flex-col items-center justify-center p-6 gap-5 text-center">
         {answerResult ? (
           answerResult.isCorrect ? (
             <>
@@ -732,9 +733,9 @@ export function PlayerScreen({ sessionId, userId, userProfile, initialSession, q
           </>
         )}
 
-        <div className="bg-white/10 rounded-2xl p-4 mt-2 w-full max-w-xs">
+        <div className="vq-card bg-white/10 rounded-2xl p-4 mt-2 w-full max-w-xs">
           <p className="text-sky-300 text-xs font-bold uppercase tracking-wide mb-1">Total acumulado</p>
-          <p className="text-white font-black text-3xl tabular-nums">{totalPoints.toFixed(3)} pts</p>
+          <p className="vq-num text-white font-black text-3xl tabular-nums">{totalPoints.toFixed(3)} pts</p>
         </div>
       </div>
     )
@@ -744,7 +745,7 @@ export function PlayerScreen({ sessionId, userId, userProfile, initialSession, q
   if (session.status === 'question_leaderboard') {
     const isLeader = rankInfo.rank === 1
     return withReactions(
-      <div className="min-h-screen pb-24 bg-gradient-to-br from-blue-900 to-indigo-950 flex flex-col items-center justify-center p-6 gap-4 text-center">
+      <div className="vq-bg min-h-screen pb-24 bg-gradient-to-br from-blue-900 to-indigo-950 flex flex-col items-center justify-center p-6 gap-4 text-center">
         {isLeader ? <Crown className="w-16 h-16 text-yellow-400" /> : <Trophy className="w-14 h-14 text-yellow-400" />}
 
         {/* Posição em destaque */}
@@ -754,16 +755,16 @@ export function PlayerScreen({ sessionId, userId, userProfile, initialSession, q
               {isLeader ? '👑 Estás em 1º!' : 'A tua posição'}
             </p>
             <div className="flex items-baseline gap-2">
-              <span className="text-white text-7xl font-black tabular-nums leading-none">{rankInfo.rank}º</span>
+              <span className="vq-num text-white text-7xl font-black tabular-nums leading-none">{rankInfo.rank}º</span>
               <span className="text-white/40 text-2xl font-bold">/ {rankInfo.total}</span>
             </div>
           </div>
         )}
 
         {/* Pontuação */}
-        <div className="bg-white/10 rounded-2xl px-6 py-3 mt-1">
+        <div className="vq-card bg-white/10 rounded-2xl px-6 py-3 mt-1">
           <p className="text-sky-300 text-[10px] font-bold uppercase tracking-widest">A tua pontuação</p>
-          <p className="text-white text-4xl font-black tabular-nums">{totalPoints.toFixed(1)}</p>
+          <p className="vq-num text-white text-4xl font-black tabular-nums">{totalPoints.toFixed(1)}</p>
         </div>
 
         {/* Quanto falta para subir */}
@@ -798,7 +799,7 @@ export function PlayerScreen({ sessionId, userId, userProfile, initialSession, q
     // Guest donation flow
     if (isGuest && !donationSuccess && !donationSkipped) {
       return withReactions(
-        <div className="min-h-screen bg-gradient-to-br from-blue-900 to-indigo-900 flex flex-col p-6 gap-5 overflow-y-auto">
+        <div className="vq-bg min-h-screen bg-gradient-to-br from-blue-900 to-indigo-900 flex flex-col p-6 gap-5 overflow-y-auto">
           <div className="text-center pt-4">
             <img src="/images/VanaQuest.png" alt="" className="w-14 h-14 object-contain mx-auto mb-2" />
             <h2 className="text-2xl font-black text-white">Jogo terminado!</h2>
@@ -806,7 +807,7 @@ export function PlayerScreen({ sessionId, userId, userProfile, initialSession, q
           </div>
 
           {goldEarned > 0 ? (
-            <div className="bg-white/10 rounded-2xl p-5 border border-white/20 space-y-4">
+            <div className="vq-card bg-white/10 rounded-2xl p-5 border border-white/20 space-y-4">
               <div className="text-center">
                 <p className="text-sky-200 text-sm">Podes enviar ao teu Desbravador:</p>
                 <p className="text-yellow-400 font-black text-2xl mt-1">{goldEarned} 🪙 + {xpEarned} ⭐ XP</p>
@@ -858,7 +859,7 @@ export function PlayerScreen({ sessionId, userId, userProfile, initialSession, q
                 >
                   <div
                     onClick={(e) => e.stopPropagation()}
-                    className="bg-gradient-to-br from-slate-900 via-blue-900 to-indigo-950 border border-white/20 rounded-3xl shadow-2xl max-w-sm w-full p-6 space-y-5 animate-in zoom-in-95 fade-in duration-300"
+                    className="vq-panel bg-gradient-to-br from-slate-900 via-blue-900 to-indigo-950 border border-white/20 rounded-3xl shadow-2xl max-w-sm w-full p-6 space-y-5 animate-in zoom-in-95 fade-in duration-300"
                   >
                     <div className="text-center space-y-3">
                       <div className="text-6xl">😮</div>
@@ -900,7 +901,7 @@ export function PlayerScreen({ sessionId, userId, userProfile, initialSession, q
                 >
                   <div
                     onClick={(e) => e.stopPropagation()}
-                    className="bg-gradient-to-br from-slate-900 via-blue-900 to-indigo-950 border border-white/20 rounded-3xl shadow-2xl max-w-sm w-full p-6 space-y-5 animate-in zoom-in-95 fade-in duration-300"
+                    className="vq-panel bg-gradient-to-br from-slate-900 via-blue-900 to-indigo-950 border border-white/20 rounded-3xl shadow-2xl max-w-sm w-full p-6 space-y-5 animate-in zoom-in-95 fade-in duration-300"
                   >
                     <div className="text-center space-y-3">
                       <PlayerAvatar
@@ -951,7 +952,7 @@ export function PlayerScreen({ sessionId, userId, userProfile, initialSession, q
 
     if (donationSuccess) {
       return withReactions(
-        <div className="min-h-screen pb-24 bg-gradient-to-br from-blue-900 to-indigo-900 flex flex-col items-center justify-center p-6 gap-5 text-center">
+        <div className="vq-bg min-h-screen pb-24 bg-gradient-to-br from-blue-900 to-indigo-900 flex flex-col items-center justify-center p-6 gap-5 text-center">
           <div className="w-20 h-20 rounded-full bg-green-500 flex items-center justify-center"><CheckCircle2 className="w-10 h-10 text-white" /></div>
           <h2 className="text-3xl font-black text-white">Enviado!</h2>
           <p className="text-sky-200">O teu desbravador receberá os prémios.</p>
@@ -961,13 +962,13 @@ export function PlayerScreen({ sessionId, userId, userProfile, initialSession, q
     }
 
     return withReactions(
-      <div className="min-h-screen pb-24 bg-gradient-to-br from-blue-900 to-indigo-900 flex flex-col items-center justify-center p-6 gap-6 text-center">
+      <div className="vq-bg min-h-screen pb-24 bg-gradient-to-br from-blue-900 to-indigo-900 flex flex-col items-center justify-center p-6 gap-6 text-center">
         <img src="/images/VanaQuest.png" alt="" className="w-20 h-20 object-contain" />
-        <h1 className="text-3xl font-black text-white">🏆 Concluído!</h1>
-        <div className="bg-white/10 backdrop-blur rounded-3xl p-6 border border-white/20 w-full max-w-sm space-y-4">
+        <h1 className="vq-title text-3xl font-black text-white">🏆 Concluído!</h1>
+        <div className="vq-card bg-white/10 backdrop-blur rounded-3xl p-6 border border-white/20 w-full max-w-sm space-y-4">
           <div>
             <p className="text-sky-300 text-xs font-bold uppercase tracking-wide">Pontuação final</p>
-            <p className="text-white font-black text-4xl tabular-nums">{totalPoints.toFixed(3)}</p>
+            <p className="vq-num text-white font-black text-4xl tabular-nums">{totalPoints.toFixed(3)}</p>
           </div>
           <div className="flex justify-around border-t border-white/10 pt-4">
             <div><p className="text-yellow-400 font-black text-2xl">+{goldEarned}</p><p className="text-sky-300 text-xs">🪙 Gold</p></div>

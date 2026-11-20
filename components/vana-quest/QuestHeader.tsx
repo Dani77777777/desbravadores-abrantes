@@ -7,16 +7,19 @@ import { toast } from 'sonner'
 import { ChevronLeft, Play, Type } from 'lucide-react'
 import { startSession, updateVanaQuest } from '@/lib/actions/vana-quest'
 import { QuestDetailsForm } from './QuestDetailsForm'
+import { getVanaQuestTheme } from './themes'
 
 interface Props {
   questId: string
   title: string
   description: string | null
+  theme: string
   questionCount: number
 }
 
 /** Cabeçalho do editor: voltar, nome (editável) e iniciar sessão. */
-export function QuestHeader({ questId, title, description, questionCount }: Props) {
+export function QuestHeader({ questId, title, description, theme: themeId, questionCount }: Props) {
+  const theme = getVanaQuestTheme(themeId)
   const router = useRouter()
   const [renaming, setRenaming] = useState(false)
   const [saving, startSaving] = useTransition()
@@ -28,9 +31,9 @@ export function QuestHeader({ questId, title, description, questionCount }: Prop
         await updateVanaQuest(questId, formData)
         setRenaming(false)
         router.refresh()
-        toast.success('Nome guardado.')
+        toast.success('Guardado.')
       } catch {
-        toast.error('Não foi possível guardar o nome.')
+        toast.error('Não foi possível guardar.')
       }
     })
   }
@@ -60,6 +63,7 @@ export function QuestHeader({ questId, title, description, questionCount }: Prop
           <QuestDetailsForm
             initialTitle={title}
             initialDescription={description}
+            initialTheme={themeId}
             submitLabel="Guardar"
             autoFocus
             pending={saving}
@@ -75,8 +79,8 @@ export function QuestHeader({ questId, title, description, questionCount }: Prop
               <button
                 type="button"
                 onClick={() => setRenaming(true)}
-                aria-label="Mudar o nome e a descrição"
-                title="Mudar o nome"
+                aria-label="Mudar o nome, a descrição e o tema"
+                title="Mudar o nome e o tema"
                 className="flex-shrink-0 w-9 h-9 -mt-0.5 rounded-lg flex items-center justify-center text-gray-400 hover:bg-blue-50 hover:text-blue-600 transition-colors"
               >
                 <Type className="w-4 h-4" />
@@ -85,6 +89,8 @@ export function QuestHeader({ questId, title, description, questionCount }: Prop
             {description && <p className="text-sm text-gray-600 break-words">{description}</p>}
             <p className="text-sm text-gray-500">
               {questionCount === 0 ? 'Sem perguntas' : `${questionCount} pergunta${questionCount !== 1 ? 's' : ''}`}
+              {' · '}
+              <span title="Tema">{theme.emoji} {theme.name}</span>
             </p>
           </div>
           <button
