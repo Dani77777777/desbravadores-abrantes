@@ -9,7 +9,7 @@
 -- Realtime e os dados iniciais dos jogos.
 --
 -- É o estado final de todas as migrações supabase-*.sql e supabase/migrations/*
--- do repositório (até 2026-11-16), aplicadas por ordem cronológica. Não inclui
+-- do repositório (até 2026-11-20), aplicadas por ordem cronológica. Não inclui
 -- os ficheiros supabase-teste-*.sql (dados de teste do VanaCoro).
 --
 -- Conteúdo: 7 enums · 94 tabelas · 5 vistas · 125 funções · 26 triggers

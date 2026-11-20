@@ -157,7 +157,7 @@ Todos têm controlo do anfitrião, ecrã de projetor e ecrã de jogador; entra-s
 
 | Jogo | Em que consiste |
 | :--- | :--- |
-| **VanaQuest** | quiz em tempo real estilo Kahoot: rapidez, sequências de acertos, multiplicador por pergunta, sala de espera com reações, pódio cinematográfico; prémios até 150 Gold + 300 XP por sessão (se o 1.º passar o teto, os outros descem na mesma proporção) |
+| **VanaQuest** | quiz em tempo real estilo Kahoot: rapidez, sequências de acertos, multiplicador por pergunta, sala de espera com reações, pódio cinematográfico; temas por quiz (normal, Natal) com cores, efeitos e música próprios; prémios até 150 Gold + 300 XP por sessão (se o 1.º passar o teto, os outros descem na mesma proporção) |
 | **VanaEspada** | "Onde está?": aparece um excerto da Bíblia (ACF) e cada um adivinha livro → capítulo → versículo; pontuação por proximidade; cada 10 pontos valem 1 Gold (XP a dobrar), até 150 Gold + 300 XP por jogador |
 | **VanaWords** | estilo Codenames: grelha 5×5, equipas Leão e Águia, um Arauto por equipa, sessões de teste com bots; 100 XP + 50 Gold para quem ganha e 40 XP + 20 Gold de participação para quem perde |
 | **VanaSketch** | estilo Pictionary: desenho no telemóvel em tempo real no projetor, packs de palavras, música e efeitos, imagem do melhor desenho; **chamada à frente** (o próximo desenhador é sorteado com uma roleta no projetor e só vê as palavras quando o anfitrião as revela) |
@@ -371,6 +371,7 @@ Não há ferramenta de migrações: cada `supabase-*.sql` na raiz é corrido à 
 40. `-vana-sketch-calling`
 41. `-audit-edit-movements`
 42. `-points-rebalance`
+43. `-vana-quest-themes`
 
 (`-x` = `supabase-migration-x.sql`.)
 </details>
