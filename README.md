@@ -148,7 +148,7 @@ Todas abrem uma **janela de projetor** controlada pelo PC (sem base de dados, po
 
 ## 🎮 Jogos
 
-`/jogos` é o hub. Cada jogo pode ser **ativado/desativado**, limitado por cargo ou **escondido** (para surpresas) na aba Jogos. Os jogos a solo têm **analítica** (quem joga, vitórias, assiduidade) e campanhas de **pontos multiplicados** (até ×10).
+`/jogos` é o hub. Os jogos aparecem em dois grupos, **Ao vivo** e **A solo**, no Centro de Jogos e na landing, cada um com um cabeçalho (como se joga e o que é preciso). O grupo sai de `singlePlayer` no registo `GAMES` (`groupGamesByMode` em `utils/games.ts`), por isso um jogo novo entra sozinho no grupo certo. Cada jogo pode ser **ativado/desativado**, limitado por cargo ou **escondido** (para surpresas) na aba Jogos. Os jogos a solo têm **analítica** (quem joga, vitórias, assiduidade; no VanaArca, partidas e média de pontos) e campanhas de **pontos multiplicados** (até ×10).
 
 Se um ecrã de jogo falhar, aparece um **ecrã de recuperação** (`GameErrorScreen`, com `app/global-error.tsx` como última rede) em vez de uma página em branco, e o erro fica em `client_error_logs` (enviado por `POST /api/client-error`; só a coordenação real o lê, no Table Editor do Supabase).
 
@@ -189,6 +189,7 @@ Pagam uma vez por modo (ou pack) por dia, com o multiplicador ativo. XP e Gold i
 - Origens: presenças em eventos, QR codes, tarefas, sugestões, inquéritos, Pergunta da Semana, jogos e atribuição manual (dirigentes só à sua classe).
 - As descrições dos movimentos identificam a origem na Auditoria e na analítica: não se mudam sem atualizar essas contagens.
 - **Tetos dos jogos ao vivo:** VanaQuest e VanaEspada pagam no máximo 150 Gold + 300 XP por jogador por sessão. No VanaQuest o teto é da sessão (o 1.º recebe o máximo e os outros são reduzidos na mesma proporção); no VanaEspada é individual (quem fez menos recebe exatamente o que fez).
+- **Prémios semanais do VanaArca** (top 3 e Disputa de Famílias): pagos pelo sistema (`awarded_by_user_id` vazio, "Sistema" na Auditoria), sem multiplicador de campanha; a tabela `vanaarca_weekly_payouts` garante que cada semana só se paga uma vez.
 - **Sorteio da Pergunta da Semana:** o prémio é definido pelo anfitrião; quem já ganhou um sorteio fica de fora dos seguintes, a não ser que todos os que responderam já tenham ganho.
 - **Taxa do Gold da loja** (`get_gold_rate_info`): o "Gold em circulação" soma só o Gold de desbravadores e dirigentes (cargo real), visíveis no ranking e com pelo menos um movimento no `points_log` nos últimos 90 dias. A referência ajusta-se em `store_settings.reference_total_gold` (Gestão → Loja).
 
@@ -297,12 +298,13 @@ npm run lint
 ### Projeto novo: um só ficheiro
 [`supabase-schema-completo.sql`](supabase-schema-completo.sql) cria **toda** a base de dados de uma vez, numa só transação:
 
-- 7 enums, 94 tabelas, 5 vistas, 125 funções/RPCs, 26 triggers, 58 índices e 163 políticas RLS (mais 9 no storage);
+- 7 enums, 97 tabelas, 5 vistas, 133 funções/RPCs, 27 triggers, 60 índices e 165 políticas RLS (mais 9 no storage);
 - as permissões exatas (incluindo as permissões por coluna do `anon` e as RPCs só para o `service_role`);
 - o trigger que cria o perfil quando alguém se regista (`on_auth_user_created`);
 - os buckets `imagens` (público: avatares e produtos da loja) e `cofre-comprovativos` (privado: comprovativos do Cofre), com as suas políticas;
 - as 25 tabelas publicadas no Realtime (com `REPLICA IDENTITY FULL` onde é preciso);
-- os dados iniciais: definições dos jogos e da loja, perguntas do VanaTrilha, versículos do VanaEspada, packs do VanaSketch e o banco inicial da Pergunta da Semana.
+- os dados iniciais: definições dos jogos e da loja, perguntas do VanaTrilha, versículos do VanaEspada, packs do VanaSketch e o banco inicial da Pergunta da Semana;
+- se a extensão `pg_cron` estiver ligada, o job `vanaarca-weekly-payout` (de 5 em 5 minutos) que paga o top semanal e a Disputa de Famílias do VanaArca. Sem `pg_cron`, o pagamento corre quando alguém abre `/jogos/vana-arca` ou `/admin/vana-arca`.
 
 Corre-se no **SQL Editor** do Supabase (colar tudo → Run) ou com `psql`:
 ```bash
@@ -403,7 +405,7 @@ lib/actions/    server actions (I/O com o Supabase)
 utils/          regras puras e testáveis (pontuação, equipas, sorteio, check-in …)
 types/          tipos de cada jogo
 supabase/       Edge Function send-push, modelos de email e migrações antigas
-docs/           especificações (Cofre, VanaCoro, VanaEspada, VanaTrilha)
+docs/           especificações (Cofre, VanaArca, VanaCoro, VanaEspada, VanaTrilha)
 NOVO-CLUBE.md   guia para criar o site de outro clube
 supabase-*.sql  setup e migrações; supabase-schema-completo.sql = tudo junto
 ```

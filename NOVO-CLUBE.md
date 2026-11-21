@@ -94,8 +94,8 @@ O "dia do clube" (prémios diários, jogos a solo, rankings semanais, datas nos 
 Tem de ser mudado **no código e no SQL ao mesmo tempo**:
 
 - **Código:** trocar `Europe/Lisbon` por `Atlantic/Azores` em:
-  `app/admin/cofre/exportar/route.ts`, `app/admin/cofre/relatorio/page.tsx`, `app/admin/components/cofre/CofrePanel.tsx`, `app/admin/components/event-utils.ts`, `app/admin/vana-quest/page.tsx`, `app/jogos/page.tsx`, `app/points-history/page.tsx`, `components/events/EventShareDialog.tsx`, `components/landing/NextEventCard.tsx`, `components/perguntas/QuestionBoard.tsx`, `components/vana-coro/QuestionQueueAdmin.tsx`, `components/vana-coro/WeeklyParticipation.tsx`, `lib/actions/daily-game-stats.ts`, `lib/email.ts`, `utils/event-rsvp.ts`, `utils/game-analytics.ts`, `utils/vana-codigo/day.ts`, `utils/vana-coro/schedule.ts`, `utils/vana-trilha.ts` (e os testes que o usem).
-- **SQL:** em `supabase-schema-completo.sql`, **antes de o correr**, trocar `Europe/Lisbon` por `Atlantic/Azores` em todo o ficheiro (14 linhas: `award_vantur_rewards`, `award_vana_sentinela_rewards`, `get_vana_sentinela_ranking`, `log_singleplayer_play`, `log_vana_sentinela_play`, `vana_codigo_day_start`, o valor por omissão de `vanatrilha_daily_runs.run_date` e, no Cofre, o valor por omissão de `club_cash_movements.occurred_on` e as funções `set_purchase_receiver`, `cofre_register`, `cofre_reverse` e `cofre_store_summary`).
+  `app/admin/cofre/exportar/route.ts`, `app/admin/cofre/relatorio/page.tsx`, `app/admin/components/cofre/CofrePanel.tsx`, `app/admin/components/event-utils.ts`, `app/admin/vana-quest/page.tsx`, `app/jogos/page.tsx`, `app/points-history/page.tsx`, `components/events/EventShareDialog.tsx`, `components/landing/NextEventCard.tsx`, `components/perguntas/QuestionBoard.tsx`, `components/vana-arca/ArcaBoards.tsx`, `components/vana-arca/VanaArcaAdmin.tsx`, `components/vana-coro/QuestionQueueAdmin.tsx`, `components/vana-coro/WeeklyParticipation.tsx`, `lib/actions/daily-game-stats.ts`, `lib/email.ts`, `utils/event-rsvp.ts`, `utils/game-analytics.ts`, `utils/vana-arca.ts`, `utils/vana-codigo/day.ts`, `utils/vana-coro/schedule.ts`, `utils/vana-trilha.ts` (e os testes que o usem).
+- **SQL:** em `supabase-schema-completo.sql`, **antes de o correr**, trocar `Europe/Lisbon` por `Atlantic/Azores` em todo o ficheiro (18 linhas: `award_vantur_rewards`, `award_vana_sentinela_rewards`, `get_vana_sentinela_ranking`, `log_singleplayer_play`, `log_vana_sentinela_play`, `vana_codigo_day_start`, o valor por omissão de `vanatrilha_daily_runs.run_date`, no Cofre o valor por omissão de `club_cash_movements.occurred_on` e as funções `set_purchase_receiver`, `cofre_register`, `cofre_reverse` e `cofre_store_summary`, e no VanaArca `vanaarca_start_run` e `vanaarca_next_prize_at`).
 
 Comando para fazer as duas coisas de uma vez (Git Bash):
 ```bash
@@ -188,7 +188,7 @@ grep -rniE "abrantes|Europe/Lisbon" app components lib utils public supabase/fun
    ```
 3. No painel `/admin`:
    - **Membros:** nomear dirigentes (com a secção) e ajudantes, à medida que os membros se registam.
-   - **Jogos:** escolher que jogos ficam ativos (desativar o VanaSentinela se não houver packs próprios).
+   - **Jogos:** escolher que jogos ficam ativos (desativar o VanaSentinela se não houver packs próprios). O VanaArca nasce escondido e só para a liderança: ao abri-lo a todos, correr uma vez o `UPDATE … launched_at = now()` do fim de `supabase-setup-vana-arca.sql` para a primeira semana do ranking não contar as partidas de teste.
    - **Loja:** criar os produtos e rever a taxa do Gold.
    - **Cofre:** cada coordenador regista a contagem inicial do dinheiro do clube que já tem.
    - **Eventos:** criar os primeiros eventos.
