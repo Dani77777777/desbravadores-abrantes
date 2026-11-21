@@ -248,7 +248,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
     for (let page = 0; page < 20; page++) {
       const { data, error } = await supabase
         .from('game_plays')
-        .select('game_id, user_id, mode, play_date, started_at, is_finished, is_won, attempts')
+        .select('*') // '*': points_total (VanaArca) só existe depois de supabase-migration-game-analytics-vana-arca.sql
         .gte('play_date', from)
         .order('id')
         .range(page * 1000, page * 1000 + 999)

@@ -16,12 +16,13 @@ import {
 
 const D = displayFont.className
 
-// Cor fixa por jogo (paleta categórica validada, 4 primeiras posições) — nunca muda com filtros.
+// Cor fixa por jogo (paleta categórica validada) — nunca muda com filtros.
 const GAME_COLOR: Record<SingleplayerGameId, string> = {
   'vana-trilha': '#2a78d6',
   vantur: '#eb6834',
   'vana-codigo': '#1baf7a',
   'vana-sentinela': '#8d4fd8',
+  'vana-arca': '#eda100',
 }
 const TOTAL_COLOR = '#57534e'
 
@@ -188,7 +189,8 @@ function ModeBar({ mode, gameId }: { mode: GameStats['modes'][number]; gameId: S
   const metrics = GAME_METRICS[gameId]
   const lost = mode.finished - mode.won
   const open = mode.plays - mode.finished
-  const segments = [
+  const scoreOnly = metrics.outcome === 'score'
+  const segments = scoreOnly ? [{ n: mode.plays, bg: color, label: 'dias com partidas' }] : [
     { n: mode.won, bg: color, label: metrics.outcomeLabels[0] },
     { n: lost, bg: color, opacity: 0.4, label: metrics.outcomeLabels[1] },
     { n: open, bg: '#d6d3d1', label: 'ficou a meio' },
@@ -199,8 +201,18 @@ function ModeBar({ mode, gameId }: { mode: GameStats['modes'][number]; gameId: S
       <div className="mb-1 flex items-baseline justify-between gap-2 text-xs">
         <span className="font-bold text-stone-700">{mode.label}</span>
         <span className="tabular-nums text-stone-500">
-          {mode.plays} {mode.plays === 1 ? 'partida' : 'partidas'}
-          {mode.avgAttempts !== null && ` · ${dec(mode.avgAttempts)} ${metrics.attemptsLabel}`}
+          {scoreOnly ? (
+            <>
+              {mode.plays} {mode.plays === 1 ? 'dia de jogo' : 'dias de jogo'}
+              {mode.avgAttempts !== null && ` · ${dec(mode.avgAttempts)} ${metrics.attemptsLabel}`}
+              {mode.avgPoints !== null && ` · ${dec(mode.avgPoints)} pts/partida`}
+            </>
+          ) : (
+            <>
+              {mode.plays} {mode.plays === 1 ? 'partida' : 'partidas'}
+              {mode.avgAttempts !== null && ` · ${dec(mode.avgAttempts)} ${metrics.attemptsLabel}`}
+            </>
+          )}
         </span>
       </div>
       {mode.plays === 0 ? (
@@ -229,8 +241,12 @@ function GameCard({ stats, period, guestRounds }: { stats: GameStats; period: nu
 
   const tiles = [
     { v: String(week.players), l: week.players === 1 ? 'jogador' : 'jogadores' },
-    { v: pct(week.winRate), l: metrics.winLabel },
-    metrics.canAbandon
+    metrics.outcome === 'score'
+      ? { v: dec(stats.avgPoints), l: 'pts/partida' }
+      : { v: pct(week.winRate), l: metrics.winLabel },
+    metrics.outcome === 'score'
+      ? { v: String(stats.attemptsTotal), l: stats.attemptsTotal === 1 ? 'partida' : 'partidas' }
+      : metrics.canAbandon
       ? { v: pct(week.completionRate), l: 'acabadas' }
       : { v: String(stats.attemptsTotal), l: stats.attemptsTotal === 1 ? 'ronda' : 'rondas' },
   ]
@@ -307,6 +323,7 @@ function insights(a: GameAnalytics, totalMembers: number, guestRounds: number | 
   if (quits) out.push(`${Math.round(quits.rate * 100)}% deixam a partida a meio no ${title(quits.g.gameId)} (${quits.m.label}). Pode estar difícil demais.`)
 
   const hard = a.games
+    .filter((g) => GAME_METRICS[g.gameId].outcome !== 'score')
     .flatMap((g) => g.modes.map((m) => ({ g, m })))
     .filter(({ m }) => m.finished >= 3 && m.won / m.finished < 0.3)[0]
   if (hard && !quits) {
@@ -526,10 +543,10 @@ export function GameAnalyticsPanel({ analytics, sentinelaGuestRounds, memberName
           <span className="flex items-center gap-1.5"><span className="h-2.5 w-4 rounded-sm bg-stone-600" /> ganhou</span>
           <span className="flex items-center gap-1.5"><span className="h-2.5 w-4 rounded-sm bg-stone-600/40" /> perdeu</span>
           <span className="flex items-center gap-1.5"><span className="h-2.5 w-4 rounded-sm bg-stone-300" /> ficou a meio</span>
-          <span className="text-stone-400">· no {title('vana-sentinela')}, ganhar = 11 ou mais certas</span>
+          <span className="text-stone-400">· no {title('vana-sentinela')}, ganhar = 11 ou mais certas · no {title('vana-arca')} conta quem jogou e a média de pontos</span>
         </div>
       </div>
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 2xl:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 2xl:grid-cols-3">
         {a.games.map((g) => (
           <GameCard
             key={g.gameId}

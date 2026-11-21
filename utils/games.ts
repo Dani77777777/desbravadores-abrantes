@@ -184,6 +184,23 @@ export const GAMES: GameDefinition[] = [
     singlePlayer: true,
   },
   {
+    id: "vana-arca",
+    title: "VanaArca",
+    description:
+      "Carrega a arca dois a dois sem a deixar virar! Joga as vezes que quiseres.",
+    image: "/images/VanaArca.jpeg",
+    href: "/jogos/vana-arca",
+    loginHref: "/login?next=/jogos/vana-arca",
+    adminHref: "/admin/vana-arca",
+    color: "from-sky-600 via-blue-800 to-amber-500",
+    requiresAuth: true,
+    adminCoordOnly: true,
+    singlePlayer: true,
+    isNew: true,
+    // Até correr o SQL: escondido e só para a liderança (igual à linha que o SQL cria).
+    defaultAccess: { allowed_roles: ["dirigente", "coordenador"], hidden: true },
+  },
+  {
     id: "vana-coro",
     title: "VanaCoro",
     description:

@@ -4,7 +4,7 @@
 
 import { lisbonDateString } from '@/utils/vana-codigo/day'
 
-export const SINGLEPLAYER_GAMES = ['vantur', 'vana-trilha', 'vana-codigo', 'vana-sentinela'] as const
+export const SINGLEPLAYER_GAMES = ['vantur', 'vana-trilha', 'vana-codigo', 'vana-sentinela', 'vana-arca'] as const
 export type SingleplayerGameId = (typeof SINGLEPLAYER_GAMES)[number]
 
 export const MODE_LABELS: Record<SingleplayerGameId, Record<string, string>> = {
@@ -13,12 +13,15 @@ export const MODE_LABELS: Record<SingleplayerGameId, Record<string, string>> = {
   'vana-trilha': { diario: 'Desafio diário' },
   // No VanaSentinela o "modo" é o pack (cidade da pregação).
   'vana-sentinela': { abrantes: 'Abrantes', entroncamento: 'Entroncamento', ourem: 'Ourém', tomar: 'Tomar' },
+  'vana-arca': { partida: 'Partidas' },
 }
 
 /**
  * O que "ganhar" e "tentativas" querem dizer em cada jogo.
  *  • VanaSentinela: não há derrota nem desistência (só se grava a ronda acabada);
  *    "ganhou" = 11 ou mais certas em 15 e `attempts` = rondas jogadas nesse dia.
+ *  • VanaArca: não há "ganhar" (outcome 'score'): conta quem jogou e a média de
+ *    pontos; `attempts` = partidas acabadas nesse dia e `points_total` = a soma.
  */
 export type GameMetrics = {
   /** Etiqueta da taxa de "vitórias" no cartão do jogo. */
@@ -32,6 +35,8 @@ export type GameMetrics = {
   canAbandon: boolean
   /** true → só mostra os modos que alguém jogou (packs que vão aparecendo). */
   onlyPlayedModes: boolean
+  /** 'score' → sem vitórias: o cartão mostra a média de pontos por partida. */
+  outcome?: 'win' | 'score'
 }
 
 export const GAME_METRICS: Record<SingleplayerGameId, GameMetrics> = {
@@ -39,6 +44,7 @@ export const GAME_METRICS: Record<SingleplayerGameId, GameMetrics> = {
   'vana-trilha': { winLabel: 'vitórias', outcomeLabels: ['ganhou', 'perdeu'], attemptsOver: 'won', attemptsLabel: 'resp./vitória', canAbandon: true, onlyPlayedModes: false },
   'vana-codigo': { winLabel: 'vitórias', outcomeLabels: ['ganhou', 'perdeu'], attemptsOver: 'won', attemptsLabel: 'tent./vitória', canAbandon: true, onlyPlayedModes: false },
   'vana-sentinela': { winLabel: '≥ 11 certas', outcomeLabels: ['≥ 11 certas', 'menos'], attemptsOver: 'all', attemptsLabel: 'rondas/dia', canAbandon: false, onlyPlayedModes: true },
+  'vana-arca': { winLabel: 'média de pontos', outcomeLabels: ['jogou', ''], attemptsOver: 'all', attemptsLabel: 'partidas/dia', canAbandon: false, onlyPlayedModes: false, outcome: 'score' },
 }
 
 export const ANALYTICS_PERIODS = [7, 30] as const
@@ -53,6 +59,8 @@ export type GamePlay = {
   is_finished: boolean
   is_won: boolean
   attempts: number | null
+  /** Só no VanaArca: soma das pontuações das partidas desse dia. */
+  points_total?: number | null
 }
 
 /** Os `count` dias até `today` (inclusive), do mais antigo para o mais recente. */
@@ -101,7 +109,16 @@ function totals(plays: GamePlay[]): Totals {
   }
 }
 
-export type ModeStats = { mode: string; label: string; plays: number; finished: number; won: number; avgAttempts: number | null }
+export type ModeStats = {
+  mode: string
+  label: string
+  plays: number
+  finished: number
+  won: number
+  avgAttempts: number | null
+  /** Pontos por partida (só nos jogos com outcome 'score'). */
+  avgPoints: number | null
+}
 
 export type GameStats = {
   gameId: SingleplayerGameId
@@ -110,8 +127,10 @@ export type GameStats = {
   /** Jogadores distintos por dia (alinhado com `days`). */
   daily: number[]
   modes: ModeStats[]
-  /** Soma das tentativas (no VanaSentinela: rondas jogadas). */
+  /** Soma das tentativas (no VanaSentinela: rondas jogadas; no VanaArca: partidas). */
   attemptsTotal: number
+  /** Pontos por partida no período (só nos jogos com outcome 'score'). */
+  avgPoints: number | null
 }
 
 export type TopPlayer = { userId: string; days: number; plays: number; won: number; games: SingleplayerGameId[] }
@@ -134,6 +153,13 @@ export type GameAnalytics = {
 
 function avg(xs: number[]): number | null {
   return xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null
+}
+
+/** Soma dos pontos ÷ soma das partidas (null sem partidas). */
+function pointsPerPlay(list: GamePlay[]): number | null {
+  const plays = list.reduce((s, r) => s + (r.attempts ?? 0), 0)
+  if (!plays) return null
+  return list.reduce((s, r) => s + (r.points_total ?? 0), 0) / plays
 }
 
 function lisbonHour(iso: string): number {
@@ -181,6 +207,7 @@ export function buildGameAnalytics(rows: GamePlay[], now: Date = new Date(), per
           finished: m.filter((r) => r.is_finished).length,
           won: m.filter((r) => r.is_won).length,
           avgAttempts: avg(base.filter((r) => r.attempts != null).map((r) => r.attempts!)),
+          avgPoints: pointsPerPlay(m),
         }
       })
       .filter((m) => !metrics.onlyPlayedModes || m.plays > 0)
@@ -191,6 +218,7 @@ export function buildGameAnalytics(rows: GamePlay[], now: Date = new Date(), per
       daily: playersPerDay(gWeek),
       modes,
       attemptsTotal: gWeek.reduce((s, r) => s + (r.attempts ?? 0), 0),
+      avgPoints: metrics.outcome === 'score' ? pointsPerPlay(gWeek) : null,
     }
   })
 

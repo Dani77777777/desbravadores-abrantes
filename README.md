@@ -174,6 +174,11 @@ Pagam uma vez por modo (ou pack) por dia, com o multiplicador ativo. XP e Gold i
 | **VanaTrilha: A Rota da Promessa** | tabuleiro bíblico pelo Êxodo: 7 estações, 8 casas, 3 vidas, casas especiais, insígnia "Peregrino da Promessa" |
 | **VanaSentinela** | "Verdade ou Distorção?": *swipe* de citações por pack, combo e rapidez, ranking com membros e convidados (público) |
 
+### A solo (várias vezes por dia)
+| Jogo | Em que consiste |
+| :--- | :--- |
+| **VanaArca: Carrega a Arca** | arcade de equilíbrio em canvas: largar os pares de animais nos 3 andares da arca sem a deixar virar (14°). Só as 3 primeiras partidas do dia dão prémio (5 / 10 / 15 conforme os pares, com o multiplicador); cada partida começada gasta uma vaga. Top 3 semanal (100 / 60 / 40) e Disputa de Famílias (50 a cada membro que jogou da família com melhor média), pagos sozinhos no dia e hora do admin (domingo às 21:00). O servidor repete cada partida a partir da semente e dos toques (`utils/vana-arca.ts`, motor determinista). Ver `docs/VanaArca.md` |
+
 ---
 
 ## 💰 Pontos: XP e Gold
@@ -372,6 +377,7 @@ Não há ferramenta de migrações: cada `supabase-*.sql` na raiz é corrido à 
 41. `-audit-edit-movements`
 42. `-points-rebalance`
 43. `-vana-quest-themes`
+44. `supabase-setup-vana-arca.sql` → `-game-analytics-vana-arca`
 
 (`-x` = `supabase-migration-x.sql`.)
 </details>

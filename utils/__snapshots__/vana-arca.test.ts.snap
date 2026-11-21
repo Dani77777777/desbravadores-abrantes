@@ -1,0 +1,21 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`motor — determinismo valores fixos (se mudarem, o motor mudou e as partidas antigas deixam de bater certo) 1`] = `
+{
+  "endReason": "full",
+  "endTicks": 526,
+  "filas": 0,
+  "ok": true,
+  "pares": 9,
+  "score": 9,
+  "species": {
+    "camelos": 1,
+    "coelhos": 1,
+    "hipopotamos": 2,
+    "leoes": 1,
+    "lobos": 1,
+    "ovelhas": 2,
+    "raposas": 1,
+  },
+}
+`;
