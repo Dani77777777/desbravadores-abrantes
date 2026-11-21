@@ -3,7 +3,8 @@ import { createClient } from '@/utils/supabase/server';
 import { Navbar } from '@/components/layout/Navbar';
 import { Gamepad2, Trophy, Lock, LogIn, Ban, Settings, Coins, Play, Zap, Sparkles, ArrowRight } from 'lucide-react';
 import Link from 'next/link';
-import { GAMES, fetchGameSettings, formatMultiplier, gameAvailabilitySummary, gameVisibilityFor, multiplierStatus } from '@/utils/games';
+import { GAMES, fetchGameSettings, formatMultiplier, gameAvailabilitySummary, gameVisibilityFor, groupGamesByMode, multiplierStatus } from '@/utils/games';
+import { GameModeHeader } from '@/components/games/GameModeHeader';
 import { effectiveRole } from '@/utils/permissions';
 import { displayFont } from '@/components/landing/fonts';
 import { SiteFooter } from '@/components/landing/SiteFooter';
@@ -152,149 +153,156 @@ export default async function GamesHubPage() {
             )}
           </header>
 
-          {/* ── Jogos ─────────────────────────────────────────── */}
-          <div className="mt-14 grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {games.map((game, i) => {
-              const isAvailable = game.available;
-              const needsLogin = isAvailable && game.requiresAuth && !user;
-              const destination = needsLogin ? game.loginHref : game.href;
+          {/* ── Jogos, agrupados: ao vivo (projetor) e a solo ─── */}
+          {groupGamesByMode(games).map(({ mode, games: group }, gi, groups) => (
+            <section key={mode.id} className="mt-16 first-of-type:mt-14" aria-label={`Jogos ${mode.title.toLowerCase()}`}>
+              <GameModeHeader mode={mode} count={group.length} className="lp-rise" />
+              <div className="mt-8 grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+                {group.map((game, i) => {
+                  const isAvailable = game.available;
+                  const needsLogin = isAvailable && game.requiresAuth && !user;
+                  const destination = needsLogin ? game.loginHref : game.href;
 
-              return (
-                <article
-                  key={game.id}
-                  className={`lp-rise group relative flex flex-col overflow-hidden rounded-[1.75rem] bg-white/[0.06] ring-1 ring-inset ring-white/10 transition-all duration-300 ${
-                    isAvailable ? 'hover:-translate-y-1.5 hover:bg-white/[0.09] hover:ring-white/25 hover:shadow-2xl hover:shadow-black/30' : ''
-                  }`}
-                  style={delay(350 + (i % 3) * 90)}
-                >
-                  <div className={`relative flex h-44 items-center justify-center overflow-hidden bg-gradient-to-br ${game.color} ${isAvailable ? '' : 'grayscale'}`}>
-                    <div
-                      aria-hidden
-                      className="absolute inset-0 opacity-30"
-                      style={{
-                        backgroundImage: 'radial-gradient(circle at 1px 1px, rgba(255,255,255,.6) 1px, transparent 0)',
-                        backgroundSize: '14px 14px',
-                      }}
-                    />
-                    {/* Cópia gigante e esbatida do ícone no fundo */}
-                    <img
-                      aria-hidden
-                      src={game.image}
-                      alt=""
-                      className="absolute -right-6 -top-6 h-40 w-40 rotate-12 rounded-3xl object-contain opacity-20 blur-[2px] transition-transform duration-700 group-hover:rotate-0 group-hover:scale-125"
-                    />
-                    <div className="relative z-10 rounded-[1.4rem] bg-white p-3 shadow-2xl transition-transform duration-300 group-hover:-rotate-6 group-hover:scale-110">
-                      <img src={game.image} alt={game.title} className="h-20 w-20 rounded-xl object-contain" />
-                    </div>
-
-                    <span
-                      className={`absolute right-3 top-3 z-20 inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-extrabold uppercase tracking-wider ${
-                        !isAvailable
-                          ? 'bg-black/50 text-white'
-                          : needsLogin
-                            ? 'bg-blue-950/60 text-yellow-300 backdrop-blur'
-                            : 'bg-emerald-400 text-emerald-950'
+                  return (
+                    <article
+                      key={game.id}
+                      className={`lp-rise group relative flex flex-col overflow-hidden rounded-[1.75rem] bg-white/[0.06] ring-1 ring-inset ring-white/10 transition-all duration-300 ${
+                        isAvailable ? 'hover:-translate-y-1.5 hover:bg-white/[0.09] hover:ring-white/25 hover:shadow-2xl hover:shadow-black/30' : ''
                       }`}
+                      style={delay(350 + (i % 3) * 90)}
                     >
-                      {!isAvailable ? (
-                        <><Ban className="h-3 w-3" /> Indisponível</>
-                      ) : needsLogin ? (
-                        <><Lock className="h-3 w-3" /> Com conta</>
-                      ) : (
-                        <><Zap className="h-3 w-3" /> Disponível</>
-                      )}
-                    </span>
+                      <div className={`relative flex h-44 items-center justify-center overflow-hidden bg-gradient-to-br ${game.color} ${isAvailable ? '' : 'grayscale'}`}>
+                        <div
+                          aria-hidden
+                          className="absolute inset-0 opacity-30"
+                          style={{
+                            backgroundImage: 'radial-gradient(circle at 1px 1px, rgba(255,255,255,.6) 1px, transparent 0)',
+                            backgroundSize: '14px 14px',
+                          }}
+                        />
+                        {/* Cópia gigante e esbatida do ícone no fundo */}
+                        <img
+                          aria-hidden
+                          src={game.image}
+                          alt=""
+                          className="absolute -right-6 -top-6 h-40 w-40 rotate-12 rounded-3xl object-contain opacity-20 blur-[2px] transition-transform duration-700 group-hover:rotate-0 group-hover:scale-125"
+                        />
+                        <div className="relative z-10 rounded-[1.4rem] bg-white p-3 shadow-2xl transition-transform duration-300 group-hover:-rotate-6 group-hover:scale-110">
+                          <img src={game.image} alt={game.title} className="h-20 w-20 rounded-xl object-contain" />
+                        </div>
 
-                    {isAvailable && game.bonus && (
-                      <span className="absolute left-3 top-3 z-20 inline-flex items-center gap-1 rounded-full bg-amber-400 px-2.5 py-1 text-[11px] font-black uppercase tracking-wider text-amber-950 shadow-lg">
-                        <Sparkles className="h-3 w-3" /> Pontos ×{formatMultiplier(game.bonus.multiplier)}
-                      </span>
-                    )}
-                    {isAvailable && !game.bonus && game.isNew && (
-                      <span className="absolute left-3 top-3 z-20 inline-flex items-center gap-1 rounded-full bg-pink-500 px-2.5 py-1 text-[11px] font-black uppercase tracking-wider text-white shadow-lg">
-                        <Sparkles className="h-3 w-3" /> Novo
-                      </span>
-                    )}
-                  </div>
-
-                  <div className="flex flex-1 flex-col p-6">
-                    <h2 className={`${D} text-2xl font-extrabold text-white`}>{game.title}</h2>
-                    <p className="mt-2 min-h-[3rem] text-sm leading-relaxed text-blue-100/70">{game.description}</p>
-
-                    {isAvailable && game.bonus && (
-                      <p className="mt-3 flex items-center gap-1.5 text-xs font-bold text-amber-300">
-                        <Sparkles className="h-3 w-3" />
-                        Pontos a {game.bonus.multiplier === 2 ? 'dobrar' : `×${formatMultiplier(game.bonus.multiplier)}`}
-                        {game.bonus.endsAt && ` até ${game.bonus.endsAt.toLocaleString('pt-PT', { timeZone: 'Europe/Lisbon', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}`}
-                      </p>
-                    )}
-
-                    {isAvailable && game.restriction && game.restriction.tone !== 'green' && (
-                      <p className="mt-3 flex items-center gap-1.5 text-xs font-semibold text-amber-300">
-                        <Lock className="h-3 w-3" /> {game.restriction.label}
-                        {game.restriction.hidden && ' · escondido dos restantes'}
-                      </p>
-                    )}
-                    {needsLogin && (
-                      <p className="mt-3 flex items-center gap-1.5 text-xs font-semibold text-amber-300">
-                        <Lock className="h-3 w-3" /> Requer conta para jogar
-                      </p>
-                    )}
-                    {!isAvailable && (
-                      <p className="mt-3 flex items-center gap-1.5 text-xs font-semibold text-blue-200/60">
-                        <Ban className="h-3 w-3" /> De momento este jogo não está disponível.
-                      </p>
-                    )}
-
-                    <div className="mt-auto pt-6">
-                      {isAvailable ? (
-                        <Link
-                          href={destination}
-                          className={`flex w-full items-center justify-center gap-2 rounded-2xl py-3.5 text-lg font-extrabold transition-all active:scale-[0.98] ${
-                            needsLogin
-                              ? 'bg-white/10 text-white ring-1 ring-inset ring-white/20 hover:bg-white/20'
-                              : 'bg-yellow-400 text-blue-950 shadow-[0_12px_30px_-12px_rgba(250,204,21,.7)] hover:bg-yellow-300'
+                        <span
+                          className={`absolute right-3 top-3 z-20 inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-extrabold uppercase tracking-wider ${
+                            !isAvailable
+                              ? 'bg-black/50 text-white'
+                              : needsLogin
+                                ? 'bg-blue-950/60 text-yellow-300 backdrop-blur'
+                                : 'bg-emerald-400 text-emerald-950'
                           }`}
                         >
-                          {needsLogin ? (
-                            <><LogIn className="h-4 w-4" /> Fazer Login</>
+                          {!isAvailable ? (
+                            <><Ban className="h-3 w-3" /> Indisponível</>
+                          ) : needsLogin ? (
+                            <><Lock className="h-3 w-3" /> Com conta</>
                           ) : (
-                            <><Play className="h-5 w-5 fill-current" /> Jogar Agora</>
+                            <><Zap className="h-3 w-3" /> Disponível</>
                           )}
-                        </Link>
-                      ) : (
-                        <span className="flex w-full cursor-not-allowed items-center justify-center rounded-2xl bg-white/5 py-3.5 text-lg font-bold text-blue-200/40">
-                          Indisponível
                         </span>
-                      )}
-                      {!isAvailable && canManageGames && (
-                        <Link href="/admin?tab=games" className="mt-3 flex items-center justify-center gap-1 text-xs font-bold text-yellow-300 hover:underline">
-                          <Settings className="h-3 w-3" /> Gerir disponibilidade
-                        </Link>
-                      )}
-                    </div>
-                  </div>
-                </article>
-              );
-            })}
 
-            {/* Próximos jogos */}
-            <article
-              className="lp-rise relative flex flex-col items-center justify-center overflow-hidden rounded-[1.75rem] border-2 border-dashed border-white/15 p-8 text-center"
-              style={delay(350 + (games.length % 3) * 90)}
-            >
-              <div className={`${D} lp-float flex h-24 w-24 -rotate-6 items-center justify-center rounded-3xl bg-white/[0.07] text-5xl font-extrabold text-yellow-300 ring-1 ring-inset ring-white/15`}>
-                ?
+                        {isAvailable && game.bonus && (
+                          <span className="absolute left-3 top-3 z-20 inline-flex items-center gap-1 rounded-full bg-amber-400 px-2.5 py-1 text-[11px] font-black uppercase tracking-wider text-amber-950 shadow-lg">
+                            <Sparkles className="h-3 w-3" /> Pontos ×{formatMultiplier(game.bonus.multiplier)}
+                          </span>
+                        )}
+                        {isAvailable && !game.bonus && game.isNew && (
+                          <span className="absolute left-3 top-3 z-20 inline-flex items-center gap-1 rounded-full bg-pink-500 px-2.5 py-1 text-[11px] font-black uppercase tracking-wider text-white shadow-lg">
+                            <Sparkles className="h-3 w-3" /> Novo
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="flex flex-1 flex-col p-6">
+                        <h2 className={`${D} text-2xl font-extrabold text-white`}>{game.title}</h2>
+                        <p className="mt-2 min-h-[3rem] text-sm leading-relaxed text-blue-100/70">{game.description}</p>
+
+                        {isAvailable && game.bonus && (
+                          <p className="mt-3 flex items-center gap-1.5 text-xs font-bold text-amber-300">
+                            <Sparkles className="h-3 w-3" />
+                            Pontos a {game.bonus.multiplier === 2 ? 'dobrar' : `×${formatMultiplier(game.bonus.multiplier)}`}
+                            {game.bonus.endsAt && ` até ${game.bonus.endsAt.toLocaleString('pt-PT', { timeZone: 'Europe/Lisbon', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}`}
+                          </p>
+                        )}
+
+                        {isAvailable && game.restriction && game.restriction.tone !== 'green' && (
+                          <p className="mt-3 flex items-center gap-1.5 text-xs font-semibold text-amber-300">
+                            <Lock className="h-3 w-3" /> {game.restriction.label}
+                            {game.restriction.hidden && ' · escondido dos restantes'}
+                          </p>
+                        )}
+                        {needsLogin && (
+                          <p className="mt-3 flex items-center gap-1.5 text-xs font-semibold text-amber-300">
+                            <Lock className="h-3 w-3" /> Requer conta para jogar
+                          </p>
+                        )}
+                        {!isAvailable && (
+                          <p className="mt-3 flex items-center gap-1.5 text-xs font-semibold text-blue-200/60">
+                            <Ban className="h-3 w-3" /> De momento este jogo não está disponível.
+                          </p>
+                        )}
+
+                        <div className="mt-auto pt-6">
+                          {isAvailable ? (
+                            <Link
+                              href={destination}
+                              className={`flex w-full items-center justify-center gap-2 rounded-2xl py-3.5 text-lg font-extrabold transition-all active:scale-[0.98] ${
+                                needsLogin
+                                  ? 'bg-white/10 text-white ring-1 ring-inset ring-white/20 hover:bg-white/20'
+                                  : 'bg-yellow-400 text-blue-950 shadow-[0_12px_30px_-12px_rgba(250,204,21,.7)] hover:bg-yellow-300'
+                              }`}
+                            >
+                              {needsLogin ? (
+                                <><LogIn className="h-4 w-4" /> Fazer Login</>
+                              ) : (
+                                <><Play className="h-5 w-5 fill-current" /> Jogar Agora</>
+                              )}
+                            </Link>
+                          ) : (
+                            <span className="flex w-full cursor-not-allowed items-center justify-center rounded-2xl bg-white/5 py-3.5 text-lg font-bold text-blue-200/40">
+                              Indisponível
+                            </span>
+                          )}
+                          {!isAvailable && canManageGames && (
+                            <Link href="/admin?tab=games" className="mt-3 flex items-center justify-center gap-1 text-xs font-bold text-yellow-300 hover:underline">
+                              <Settings className="h-3 w-3" /> Gerir disponibilidade
+                            </Link>
+                          )}
+                        </div>
+                      </div>
+                    </article>
+                  );
+                })}
+
+                {/* Próximos jogos (no fim do último grupo) */}
+                {gi === groups.length - 1 && (
+                  <article
+                    className="lp-rise relative flex flex-col items-center justify-center overflow-hidden rounded-[1.75rem] border-2 border-dashed border-white/15 p-8 text-center"
+                    style={delay(350 + (group.length % 3) * 90)}
+                  >
+                    <div className={`${D} lp-float flex h-24 w-24 -rotate-6 items-center justify-center rounded-3xl bg-white/[0.07] text-5xl font-extrabold text-yellow-300 ring-1 ring-inset ring-white/15`}>
+                      ?
+                    </div>
+                    <h2 className={`${D} mt-6 text-2xl font-extrabold text-white`}>Em breve...</h2>
+                    <p className="mt-2 max-w-xs text-sm text-blue-100/60">
+                      Mais desafios estão a ser preparados pelos teus líderes!
+                    </p>
+                    <span className="mt-5 rounded-full bg-white/[0.07] px-3 py-1 text-[11px] font-extrabold uppercase tracking-wider text-blue-200/60">
+                      Bloqueado
+                    </span>
+                  </article>
+                )}
               </div>
-              <h2 className={`${D} mt-6 text-2xl font-extrabold text-white`}>Em breve...</h2>
-              <p className="mt-2 max-w-xs text-sm text-blue-100/60">
-                Mais desafios estão a ser preparados pelos teus líderes!
-              </p>
-              <span className="mt-5 rounded-full bg-white/[0.07] px-3 py-1 text-[11px] font-extrabold uppercase tracking-wider text-blue-200/60">
-                Bloqueado
-              </span>
-            </article>
-          </div>
+            </section>
+          ))}
         </div>
       </main>
 

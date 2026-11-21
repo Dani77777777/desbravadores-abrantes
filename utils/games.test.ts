@@ -5,6 +5,7 @@ import {
   GAMES,
   defaultGameSetting,
   formatMultiplier,
+  groupGamesByMode,
   multiplierStatus,
   normalizeGameSetting,
   type GameSetting,
@@ -105,5 +106,23 @@ describe('jogos-surpresa sem linha na BD', () => {
   test('os outros jogos continuam abertos a todos', () => {
     expect(defaultGameSetting('vantur').allowed_roles).toEqual(['desbravador', 'dirigente', 'coordenador'])
     expect(defaultGameSetting('vantur').hidden).toBe(false)
+  })
+})
+
+describe('groupGamesByMode', () => {
+  test('ao vivo primeiro, depois a solo, e cada jogo no grupo certo', () => {
+    const groups = groupGamesByMode(GAMES)
+    expect(groups.map((g) => g.mode.id)).toEqual(['ao-vivo', 'a-solo'])
+    const solo = groups.find((g) => g.mode.id === 'a-solo')!.games.map((g) => g.id)
+    const live = groups.find((g) => g.mode.id === 'ao-vivo')!.games.map((g) => g.id)
+    expect(solo).toEqual(expect.arrayContaining(['vantur', 'vana-trilha', 'vana-codigo', 'vana-sentinela', 'vana-arca']))
+    expect(live).toEqual(expect.arrayContaining(['vana-quest', 'vana-espada', 'vana-words', 'vana-sketch', 'vana-camp', 'vana-coro']))
+    expect(solo.length + live.length).toBe(GAMES.length)
+  })
+
+  test('grupos vazios não aparecem e a ordem dentro do grupo mantém-se', () => {
+    const only = groupGamesByMode([{ id: 'b', singlePlayer: true }, { id: 'a', singlePlayer: true }])
+    expect(only.length).toBe(1)
+    expect(only[0].games.map((g) => g.id)).toEqual(['b', 'a'])
   })
 })

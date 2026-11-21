@@ -219,6 +219,53 @@ export const GAMES: GameDefinition[] = [
   },
 ];
 
+// ─── Grupos do Centro de Jogos e da landing ──────────────────────────────────
+// "Ao vivo" = jogos com projetor em que o anfitrião conduz e todos jogam juntos;
+// "A solo" = cada um joga no seu telemóvel, quando quiser. Coincide com
+// `singlePlayer`, por isso um jogo novo entra sozinho no grupo certo.
+
+export type GameMode = "ao-vivo" | "a-solo";
+
+export interface GameModeInfo {
+  id: GameMode;
+  title: string;
+  /** Frase curta: como se joga. */
+  description: string;
+  /** Etiquetas do "o que é preciso" (ex.: "Projetor", "Em grupo"). */
+  tags: string[];
+}
+
+export const GAME_MODES: readonly GameModeInfo[] = [
+  {
+    id: "ao-vivo",
+    title: "Ao vivo",
+    description:
+      "Jogam-se todos juntos nas atividades do clube: o jogo aparece no projetor e cada um responde no seu telemóvel.",
+    tags: ["Em grupo", "Projetor + telemóveis", "Com um dirigente"],
+  },
+  {
+    id: "a-solo",
+    title: "A solo",
+    description:
+      "Joga sozinho no teu telemóvel, quando quiseres, e ganha XP e Gold sem precisar de mais ninguém.",
+    tags: ["Sozinho", "No telemóvel", "Quando quiseres"],
+  },
+];
+
+export function gameMode(game: Pick<GameDefinition, "singlePlayer">): GameMode {
+  return game.singlePlayer ? "a-solo" : "ao-vivo";
+}
+
+/** Os jogos agrupados por modo, pela ordem de GAME_MODES (grupos vazios ficam de fora). */
+export function groupGamesByMode<T extends Pick<GameDefinition, "singlePlayer">>(
+  games: readonly T[],
+): { mode: GameModeInfo; games: T[] }[] {
+  return GAME_MODES.map((mode) => ({
+    mode,
+    games: games.filter((g) => gameMode(g) === mode.id),
+  })).filter((group) => group.games.length > 0);
+}
+
 export function getGame(id: string): GameDefinition | undefined {
   return GAMES.find((g) => g.id === id);
 }

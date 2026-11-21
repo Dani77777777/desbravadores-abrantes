@@ -22,7 +22,8 @@ import {
   Lock,
   Star,
 } from "lucide-react";
-import { GAMES, formatMultiplier, type GameVisibility } from "@/utils/games";
+import { GAMES, formatMultiplier, groupGamesByMode, type GameVisibility } from "@/utils/games";
+import { GameModeHeader } from "@/components/games/GameModeHeader";
 import { displayFont } from "./fonts";
 import { SiteFooter } from "./SiteFooter";
 import { NextEventCard, type PublicEvent } from "./NextEventCard";
@@ -621,101 +622,109 @@ export function LandingPage({
             </Link>
           </div>
 
-          <div className="mt-12 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
-            {visibleGames.map((game, i) => {
-              const available =
-                (gameVisibility[game.id] ?? "available") === "available";
-              const href = game.requiresAuth ? game.loginHref : game.href;
-              const multiplier = gameMultipliers[game.id] ?? 1;
+          {/* Agrupados: ao vivo (projetor) e a solo */}
+          {groupGamesByMode(visibleGames).map(({ mode, games: group }) => (
+            <div key={mode.id} className="mt-14">
+              <div data-reveal>
+                <GameModeHeader mode={mode} count={group.length} />
+              </div>
+              <div className="mt-8 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+                {group.map((game, i) => {
+                  const available =
+                    (gameVisibility[game.id] ?? "available") === "available";
+                  const href = game.requiresAuth ? game.loginHref : game.href;
+                  const multiplier = gameMultipliers[game.id] ?? 1;
 
-              const card = (
-                <div
-                  className={`group relative h-full overflow-hidden rounded-3xl bg-white/[0.06] ring-1 ring-inset ring-white/10 transition-all duration-300 ${
-                    available
-                      ? "hover:-translate-y-1.5 hover:bg-white/10 hover:ring-white/25"
-                      : "opacity-70"
-                  }`}
-                >
-                  <div
-                    className={`relative flex h-36 items-center justify-center overflow-hidden bg-gradient-to-br ${game.color} ${available ? "" : "grayscale"}`}
-                  >
+                  const card = (
                     <div
-                      aria-hidden
-                      className="absolute inset-0 opacity-30"
-                      style={{
-                        backgroundImage:
-                          "radial-gradient(circle at 1px 1px, rgba(255,255,255,.6) 1px, transparent 0)",
-                        backgroundSize: "14px 14px",
-                      }}
-                    />
-                    <div className="relative z-10 rounded-3xl bg-white p-3 shadow-2xl transition-transform duration-300 group-hover:-rotate-6 group-hover:scale-110">
-                      <img
-                        src={game.image}
-                        alt={game.title}
-                        className="h-16 w-16 rounded-xl object-contain"
-                      />
-                    </div>
-                    <span
-                      className={`absolute right-3 top-3 z-20 inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider ${
-                        !available
-                          ? "bg-black/50 text-white"
-                          : game.requiresAuth
-                            ? "bg-blue-950/60 text-yellow-300 backdrop-blur"
-                            : "bg-emerald-400 text-emerald-950"
+                      className={`group relative h-full overflow-hidden rounded-3xl bg-white/[0.06] ring-1 ring-inset ring-white/10 transition-all duration-300 ${
+                        available
+                          ? "hover:-translate-y-1.5 hover:bg-white/10 hover:ring-white/25"
+                          : "opacity-70"
                       }`}
                     >
-                      {!available ? (
-                        "Indisponível"
-                      ) : game.requiresAuth ? (
-                        <>
-                          <Lock className="h-3 w-3" /> Com conta
-                        </>
-                      ) : (
-                        <>
-                          <Zap className="h-3 w-3" /> Joga já
-                        </>
-                      )}
-                    </span>
-                    {available && multiplier > 1 && (
-                      <span className="absolute left-3 top-3 z-20 inline-flex items-center gap-1 rounded-full bg-amber-400 px-2.5 py-1 text-[11px] font-black uppercase tracking-wider text-amber-950 shadow-lg">
-                        <Sparkles className="h-3 w-3" /> Pontos ×{formatMultiplier(multiplier)}
-                      </span>
-                    )}
-                    {available && multiplier <= 1 && game.isNew && (
-                      <span className="absolute left-3 top-3 z-20 inline-flex items-center gap-1 rounded-full bg-pink-500 px-2.5 py-1 text-[11px] font-black uppercase tracking-wider text-white shadow-lg">
-                        <Sparkles className="h-3 w-3" /> Novo
-                      </span>
-                    )}
-                  </div>
-                  <div className="p-5">
-                    <h3 className={`${D} text-xl font-extrabold text-white`}>
-                      {game.title}
-                    </h3>
-                    <p className="mt-1.5 text-sm leading-relaxed text-blue-100/70">
-                      {game.description}
-                    </p>
-                    {!available && (
-                      <p className="mt-3 text-xs font-semibold text-blue-200/60">
-                        De momento não está disponível
-                      </p>
-                    )}
-                  </div>
-                </div>
-              );
+                      <div
+                        className={`relative flex h-36 items-center justify-center overflow-hidden bg-gradient-to-br ${game.color} ${available ? "" : "grayscale"}`}
+                      >
+                        <div
+                          aria-hidden
+                          className="absolute inset-0 opacity-30"
+                          style={{
+                            backgroundImage:
+                              "radial-gradient(circle at 1px 1px, rgba(255,255,255,.6) 1px, transparent 0)",
+                            backgroundSize: "14px 14px",
+                          }}
+                        />
+                        <div className="relative z-10 rounded-3xl bg-white p-3 shadow-2xl transition-transform duration-300 group-hover:-rotate-6 group-hover:scale-110">
+                          <img
+                            src={game.image}
+                            alt={game.title}
+                            className="h-16 w-16 rounded-xl object-contain"
+                          />
+                        </div>
+                        <span
+                          className={`absolute right-3 top-3 z-20 inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider ${
+                            !available
+                              ? "bg-black/50 text-white"
+                              : game.requiresAuth
+                                ? "bg-blue-950/60 text-yellow-300 backdrop-blur"
+                                : "bg-emerald-400 text-emerald-950"
+                          }`}
+                        >
+                          {!available ? (
+                            "Indisponível"
+                          ) : game.requiresAuth ? (
+                            <>
+                              <Lock className="h-3 w-3" /> Com conta
+                            </>
+                          ) : (
+                            <>
+                              <Zap className="h-3 w-3" /> Joga já
+                            </>
+                          )}
+                        </span>
+                        {available && multiplier > 1 && (
+                          <span className="absolute left-3 top-3 z-20 inline-flex items-center gap-1 rounded-full bg-amber-400 px-2.5 py-1 text-[11px] font-black uppercase tracking-wider text-amber-950 shadow-lg">
+                            <Sparkles className="h-3 w-3" /> Pontos ×{formatMultiplier(multiplier)}
+                          </span>
+                        )}
+                        {available && multiplier <= 1 && game.isNew && (
+                          <span className="absolute left-3 top-3 z-20 inline-flex items-center gap-1 rounded-full bg-pink-500 px-2.5 py-1 text-[11px] font-black uppercase tracking-wider text-white shadow-lg">
+                            <Sparkles className="h-3 w-3" /> Novo
+                          </span>
+                        )}
+                      </div>
+                      <div className="p-5">
+                        <h3 className={`${D} text-xl font-extrabold text-white`}>
+                          {game.title}
+                        </h3>
+                        <p className="mt-1.5 text-sm leading-relaxed text-blue-100/70">
+                          {game.description}
+                        </p>
+                        {!available && (
+                          <p className="mt-3 text-xs font-semibold text-blue-200/60">
+                            De momento não está disponível
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  );
 
-              return (
-                <div key={game.id} data-reveal style={delay((i % 3) * 100)}>
-                  {available ? (
-                    <Link href={href} className="block h-full">
-                      {card}
-                    </Link>
-                  ) : (
-                    card
-                  )}
-                </div>
-              );
-            })}
-          </div>
+                  return (
+                    <div key={game.id} data-reveal style={delay((i % 3) * 100)}>
+                      {available ? (
+                        <Link href={href} className="block h-full">
+                          {card}
+                        </Link>
+                      ) : (
+                        card
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
         </div>
       </section>
 
